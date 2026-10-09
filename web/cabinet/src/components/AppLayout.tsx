@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
+  Activity,
   Home,
   Sparkles,
   Zap,
@@ -66,6 +67,7 @@ const overflowNavMainItems: { to: string; icon: typeof Home; labelKey: string }[
   { to: '/subscription', icon: Sparkles, labelKey: 'nav.subscription' },
   { to: '/tariffs', icon: Zap, labelKey: 'nav.tariffs' },
   { to: '/support', icon: MessageCircle, labelKey: 'nav.support' },
+  { to: '/status', icon: Activity, labelKey: 'nav.servers' },
   { to: '/promocodes', icon: TicketPercent, labelKey: 'nav.promocodes' },
   { to: '/referral', icon: Users, labelKey: 'nav.referral' },
   { to: '/partner', icon: Handshake, labelKey: 'nav.partner' },

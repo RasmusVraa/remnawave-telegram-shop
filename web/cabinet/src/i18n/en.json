@@ -22,6 +22,7 @@
       "payments": "Payments",
       "promocodes": "Promo codes",
       "support": "Support",
+      "servers": "Servers",
       "info": "Info",
       "profile": "Profile",
       "referral": "Referrals",
@@ -119,6 +120,10 @@
       "boundaryReload": "Reload page",
       "retry": "Retry"
     },
+    "cabinetStatus": {
+      "title": "Servers",
+      "lead": "Reachability of the locations added by hand."
+    },
     "dashboard": {
       "partnerCardTitle": "Partners",
       "partnerCardHint": "A percentage of payments from clients you bring",
@@ -161,6 +166,8 @@
       "tariffsCardHint": "Renew or switch",
       "referralsCardHint": "Days for invites",
       "promocodesCardHint": "Redeem a code",
+      "serversCardTitle": "Server status",
+      "serversCardHint": "Location reachability",
       "trialOfferPill": "Free trial",
       "trialOfferCaption_one": "day free",
       "trialOfferCaption_other": "days free",
@@ -2250,8 +2257,8 @@
         "open": "Open page",
         "note": "Node addresses are not included in the page response and never reach the browser. Probes do not call private addresses. The 30-day bar fills only for days that were actually measured.",
         "targetsTitle": "Countries to check",
-        "targetsHint": "An empty list keeps the panel nodes on the page. Your list replaces them and appears in the order set here. The address is visible only here: a public IP or a domain. 0 probes means “use the shared setting”. Interval is minutes, from 5 to 180. “Whitelists” checks the address only through belspiski.online.",
-        "targetsEmpty": "No countries yet. Add one, or leave the list empty to check panel nodes.",
+        "targetsHint": "The page shows only this list, in the order set here. Panel nodes are not added. The address is visible only here: a public IP or a domain. 0 probes means “use the shared setting”. Interval is minutes, from 5 to 180. “Whitelists” checks the address only through belspiski.online.",
+        "targetsEmpty": "No countries yet. While the list is empty, the status page has no locations.",
         "targetsSaved": "Country list saved.",
         "forceProbe": "Check now",
         "forceProbeStarted": "Check started for the saved list. The status page updates when the probes reply.",
@@ -2758,7 +2765,7 @@
           },
           "STATUS_PROBES_ENABLED": {
             "label": "Probe ping",
-            "hint": "A few points from the world and from Russia. Off — the page keeps only panel node reachability"
+            "hint": "A few points from the world and from Russia. Off — ping stops, countries from the list stay"
           },
           "STATUS_WORLD_PROBES": {
             "label": "World probes",
@@ -3268,7 +3275,7 @@
         "legendDown": "Down",
         "colLocation": "Location",
         "colState": "Panel",
-        "emptyHint": "Servers will show up here once the panel has them.",
+        "emptyHint": "No locations yet. Add countries in the admin, under Status.",
         "whatTitle": "What the status means",
         "whatBody": "This is whether the control panel can see its own server. It is not a speed test to your provider and not a promise that a particular site will open.",
         "missingTitle": "Why a location may be missing",
@@ -3308,7 +3315,7 @@
         "cardSupportTitle": "Trouble connecting?",
         "cardSupportBody": "If the server is reachable at your provider but the VPN does not connect, write to us and we will sort it out.",
         "cardSupportCta": "Contact support",
-        "probesOff": "Probe ping is off. Below is only panel node reachability.",
+        "probesOff": "Probe ping is off. Countries from the list stay, and measurements are not updated.",
         "colWorld": "From the world",
         "colRussia": "From Russia",
         "colHistory": "Last 30 days",

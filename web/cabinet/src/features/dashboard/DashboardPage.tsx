@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import {
+  Activity,
   Users,
   Handshake,
   Zap,
@@ -448,6 +449,16 @@ function QuickLinks({
           <QuickActionLink key={action.to} action={action} compact={pair.length === 2} />
         ))}
       </div>
+
+      <QuickActionLink
+        action={{
+          to: '/status',
+          icon: Activity,
+          label: t('dashboard.serversCardTitle'),
+          hint: t('dashboard.serversCardHint'),
+          accent: '',
+        }}
+      />
 
       <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 py-1">
         <Link

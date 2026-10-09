@@ -40,6 +40,7 @@ const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage')
 // Публичный лендинг (9a): отдельный маршрут, корень SPA по-прежнему ведёт в кабинет.
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
 const StatusPage = lazy(() => import('@/features/landing/StatusPage'))
+const CabinetStatusPage = lazy(() => import('@/features/status/CabinetStatusPage'))
 
 // Dev-превью компонентов. Маршруты ниже регистрируются только при import.meta.env.DEV;
 // через lazy модули не попадают и в прод-чанки.
@@ -126,12 +127,24 @@ function normalizePath(pathname: string): string {
 }
 
 function isPublicShellPath(pathname: string): boolean {
-  if (normalizePath(pathname) === '/status') return true
+  if (normalizePath(pathname) === '/status') {
+    return typeof window === 'undefined' || !window.location.pathname.startsWith('/cabinet')
+  }
   if (PUBLIC_SHELL_PATHS.has(normalizePath(pathname))) return true
   // Корень домена — лендинг. Внутри /cabinet «/» это вход в кабинет, его так не помечаем.
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cabinet')) return false
   const path = normalizePath(pathname)
   return path === '/' || path === '/landing'
+}
+
+function StatusEntry() {
+  const inCabinet = typeof window !== 'undefined' && window.location.pathname.startsWith('/cabinet')
+  if (!inCabinet) return <StatusPage />
+  return (
+    <ProtectedRoute requireVerified>
+      <CabinetStatusPage />
+    </ProtectedRoute>
+  )
 }
 
 function AppRoutes() {
@@ -175,7 +188,7 @@ function AppRoutes() {
 
       {/* Витрина на корне домена. В мини-приложении сразу уходим в кабинет. */}
       <Route path="/landing" element={<PublicLanding />} />
-      <Route path="/status" element={<StatusPage />} />
+      <Route path="/status" element={<StatusEntry />} />
 
       {/* Только dev: превью акцентной кнопки «Подключить устройство». */}
       {import.meta.env.DEV && (

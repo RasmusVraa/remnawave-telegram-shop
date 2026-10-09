@@ -1,0 +1,64 @@
+{
+  "/public/status": {
+    "available": true,
+    "updated_at": "2026-10-09T22:00:00Z",
+    "online": 2,
+    "total": 3,
+    "show_map": false,
+    "probes_enabled": true,
+    "probe_world": 3,
+    "probe_russia": 20,
+    "probe_interval_min": 20,
+    "nodes": [
+      {
+        "name": "Польша",
+        "country": "PL",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T22:00:00Z",
+          "history": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "hits": [
+            { "city": "Москва", "network": "МТС", "country": "RU", "ok": true, "ping_ms": 48 },
+            { "city": "Казань", "network": "Билайн", "country": "RU", "ok": true, "ping_ms": 61 }
+          ]
+        }
+      },
+      {
+        "name": "Финляндия",
+        "country": "FI",
+        "note": "Белые списки",
+        "whitelist": true,
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 0,
+          "russia_total": 0,
+          "measured_at": "2026-10-09T22:00:00Z",
+          "history": [1, 1, 1, 1, 0.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          "hits": [
+            { "city": "Москва", "network": "МТС", "kind": "whitelist", "ok": true, "answer": "Открывается" },
+            { "city": "Санкт-Петербург", "network": "Ростелеком", "kind": "whitelist", "ok": false, "answer": "Таймаут" }
+          ]
+        }
+      },
+      {
+        "name": "Германия",
+        "country": "DE",
+        "state": "down",
+        "probe": {
+          "world_ok": 0,
+          "world_total": 3,
+          "russia_ok": 4,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T21:40:00Z",
+          "history": [1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+        }
+      }
+    ]
+  }
+}

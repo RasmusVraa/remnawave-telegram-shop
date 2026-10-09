@@ -73,13 +73,12 @@ type publicStatusBody struct {
 func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	configured := h.savedTargets(r.Context())
-	// Свой список стран уже в базе. Не ждём панель: недоступный Remnawave
-	// держал ответ по несколько секунд, и таблица на /status появлялась с задержкой.
+	// Локации только из ручного списка. Панель нужна лишь чтобы подкрасить
+	// уже добавленную страну, если её адрес совпал с узлом. Пустой список
+	// не подставляет узлы Remnawave.
 	var panel []remnawave.ProbeTarget
 	if hasEnabledTargets(configured) {
 		panel = h.panelCached()
-	} else {
-		panel = h.targets(r.Context())
 	}
 	targets, kick := mergeStatusTargets(panel, configured)
 	if h.probes != nil && len(kick) > 0 {
@@ -200,34 +199,6 @@ func hasEnabledTargets(configured []statusprobe.ConfiguredTarget) bool {
 	return false
 }
 
-// targets кэширует список узлов на 20 секунд. nil — панель не ответила.
-// Адрес живёт только в этом кэше процесса.
-func (h *PublicStatus) targets(ctx context.Context) []remnawave.ProbeTarget {
-	if h.rw == nil {
-		return nil
-	}
-	h.mu.Lock()
-	if h.hasCache && time.Since(h.cachedAt) < 20*time.Second {
-		out := append([]remnawave.ProbeTarget(nil), h.cached...)
-		h.mu.Unlock()
-		return out
-	}
-	h.mu.Unlock()
-
-	cctx, cancel := context.WithTimeout(ctx, 8*time.Second)
-	defer cancel()
-	nodes, err := h.rw.ListProbeTargets(cctx)
-	if err != nil {
-		return nil
-	}
-	h.mu.Lock()
-	h.cached = nodes
-	h.cachedAt = time.Now()
-	h.hasCache = true
-	h.mu.Unlock()
-	return nodes
-}
-
 func (h *PublicStatus) savedTargets(ctx context.Context) []statusprobe.ConfiguredTarget {
 	if h.configured == nil {
 		return nil
@@ -252,8 +223,8 @@ func (h *PublicStatus) savedTargets(ctx context.Context) []statusprobe.Configure
 	return list
 }
 
-// mergeStatusTargets: если админ задал страны, страница показывает их.
-// Пустой список оставляет узлы панели. nil — панель не ответила и своего списка нет.
+// mergeStatusTargets показывает только страны, которые админ включил вручную.
+// Пустой список не подменяется узлами панели.
 func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.ConfiguredTarget) ([]remnawave.ProbeTarget, []statusprobe.Target) {
 	enabled := make([]statusprobe.ConfiguredTarget, 0, len(configured))
 	for _, item := range configured {
@@ -262,17 +233,7 @@ func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.
 		}
 	}
 	if len(enabled) == 0 {
-		if panel == nil {
-			return nil, nil
-		}
-		kick := make([]statusprobe.Target, 0, len(panel))
-		for _, n := range panel {
-			kick = append(kick, statusprobe.Target{
-				Key:     statusprobe.NodeKey(n.CountryCode, n.Name),
-				Address: n.Address,
-			})
-		}
-		return panel, kick
+		return []remnawave.ProbeTarget{}, nil
 	}
 
 	byAddr := map[string]string{}
