@@ -14,6 +14,7 @@ jobs:
   build-docker-image:
     runs-on: ubuntu-latest # Изменено с self-hosted на ubuntu-latest для надежности
     permissions:
+      contents: read
       packages: write
     steps:
       - uses: actions/checkout@v4
