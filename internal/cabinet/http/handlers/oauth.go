@@ -132,7 +132,7 @@ func (h *OAuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	}
 
 	cabmetrics.RecordAuth("google_callback", "success")
-	setRefreshCookie(w, result.Pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, result.Pair, h.cookieDomain, "/cabinet/api/auth")
 	if result.SuccessRedirect != "" {
 		http.Redirect(w, r, result.SuccessRedirect, http.StatusFound)
 		return
@@ -168,7 +168,7 @@ func (h *OAuthHandler) GoogleLinkConfirm(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	cabmetrics.RecordAuth("google_link_confirm", "success")
-	setRefreshCookie(w, pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, pair, h.cookieDomain, "/cabinet/api/auth")
 	http.Redirect(w, r, "/cabinet/dashboard", http.StatusFound)
 }
 
@@ -209,7 +209,7 @@ func (h *OAuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	setRefreshCookie(w, result.Pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, result.Pair, h.cookieDomain, "/cabinet/api/auth")
 	if result.SuccessRedirect != "" {
 		http.Redirect(w, r, result.SuccessRedirect, http.StatusFound)
 		return
@@ -255,7 +255,7 @@ func (h *OAuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	setRefreshCookie(w, result.Pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, result.Pair, h.cookieDomain, "/cabinet/api/auth")
 	if result.SuccessRedirect != "" {
 		http.Redirect(w, r, result.SuccessRedirect, http.StatusFound)
 		return
@@ -316,7 +316,7 @@ func (h *OAuthHandler) TelegramOIDCCallback(w http.ResponseWriter, r *http.Reque
 		http.Redirect(w, r, "/cabinet/login?status=error&reason_code=telegram_oidc_failed", http.StatusFound)
 		return
 	}
-	setRefreshCookie(w, res.Pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, res.Pair, h.cookieDomain, "/cabinet/api/auth")
 	http.Redirect(w, r, "/cabinet/dashboard", http.StatusFound)
 }
 
@@ -427,7 +427,7 @@ func (h *OAuthHandler) TelegramLogin(w http.ResponseWriter, r *http.Request) {
 		method = "telegram_miniapp"
 	}
 	cabmetrics.RecordAuth(method, "success")
-	setRefreshCookie(w, pair, h.cookieDomain, "/cabinet/api/auth")
+	setRefreshCookie(w, r, pair, h.cookieDomain, "/cabinet/api/auth")
 	writeJSON(w, http.StatusOK, loginResp{
 		AccessToken: pair.AccessToken,
 		AccessExp:   pair.AccessExp.Unix(),

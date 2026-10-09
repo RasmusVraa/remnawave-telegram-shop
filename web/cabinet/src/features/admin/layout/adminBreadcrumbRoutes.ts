@@ -10,6 +10,7 @@ export const ADMIN_BREADCRUMB_ROUTE_KEYS: Record<string, string> = {
   broadcast: 'admin.nav.broadcast',
   settings: 'admin.nav.settings',
   infra: 'admin.nav.infra',
+  status: 'admin.nav.status',
   sync: 'admin.nav.sync',
 }
 

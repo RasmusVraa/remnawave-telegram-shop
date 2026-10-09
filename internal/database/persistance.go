@@ -11,10 +11,19 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	_ "github.com/lib/pq"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"remnawave-tg-shop-bot/internal/config"
 )
+
+// migrationFileURL делает file-URL для golang-migrate.
+// На Windows file://D:/path парсер считает портом, а file:///D:/path
+// драйвер открывает как каталог «.» — поэтому путь кладём в Opaque.
+func migrationFileURL(path string) string {
+	u := &url.URL{Scheme: "file", Opaque: filepath.ToSlash(path)}
+	return u.String()
+}
 
 type MigrationConfig struct {
 	MigrationsPath string
@@ -47,7 +56,7 @@ func RunMigrations(ctx context.Context, migrationConfig *MigrationConfig, pool *
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", absPath),
+		migrationFileURL(absPath),
 		"postgres", driver,
 	)
 	if err != nil {
@@ -129,7 +138,7 @@ func GetMigrationVersion(migrationsPath string) (uint, bool, error) {
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
-		fmt.Sprintf("file://%s", migrationsPath),
+		migrationFileURL(migrationsPath),
 		"postgres", driver)
 	if err != nil {
 		return 0, false, fmt.Errorf("migration initialization failed: %w", err)

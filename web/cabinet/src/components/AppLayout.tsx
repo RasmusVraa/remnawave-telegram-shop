@@ -140,6 +140,26 @@ export function AppLayout({ children }: AppLayoutProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  const mobileNavRef = useRef<HTMLElement>(null)
+
+  /*
+   * Высота нижнего меню в --cabinet-bottom-nav-h: на iPhone у меню отступ под
+   * безопасную зону, и оно выше, чем в Telegram на Android. Фиксированные
+   * плашки над меню (кнопка оплаты в CheckoutPage) встают ровно на его верх.
+   */
+  useEffect(() => {
+    const nav = mobileNavRef.current
+    if (!nav || typeof ResizeObserver === 'undefined') return
+    const root = document.documentElement
+    const sync = () => root.style.setProperty('--cabinet-bottom-nav-h', `${nav.offsetHeight}px`)
+    sync()
+    const ro = new ResizeObserver(sync)
+    ro.observe(nav)
+    return () => {
+      ro.disconnect()
+      root.style.removeProperty('--cabinet-bottom-nav-h')
+    }
+  }, [])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -202,7 +222,9 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="cabinet-shell relative flex min-h-dvh flex-col">
       <div className="cabinet-shell-gradient" aria-hidden />
       <CabinetDecorLayer />
-      <header className="relative sticky top-0 z-50 isolate shrink-0 border-b border-border/80 bg-card/92 backdrop-blur-xl shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] dark:border-primary/12 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] cabinet-app-header">
+      {/* iPhone: фон шапки над краем экрана, под панелями браузера (index.css) */}
+      <div className="cabinet-edge-top" aria-hidden />
+      <header className="relative sticky top-0 z-50 isolate shrink-0 border-b border-border/80 bg-card/92 backdrop-blur-xl shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] dark:border-primary/12 dark:shadow-[0_8px_32px_-8px_rgba(0,0,0,0.55),inset_0_1px_0_rgba(255,255,255,0.06)] cabinet-app-header cabinet-edge-header">
         <div>
           <CabinetDecorHeader />
           <div className="max-w-5xl mx-auto flex items-center gap-2 px-2.5 py-2 sm:gap-4 sm:px-3 sm:py-2">
@@ -531,10 +553,11 @@ export function AppLayout({ children }: AppLayoutProps) {
       <CabinetOnboarding />
 
       <nav
-        className="fixed inset-x-0 bottom-0 z-50 sm:hidden px-2 pb-[max(0.5rem,var(--cabinet-tg-safe-bottom))] pointer-events-none"
+        ref={mobileNavRef}
+        className="cabinet-edge-nav fixed inset-x-0 bottom-0 z-50 sm:hidden px-2 pb-[max(0.5rem,var(--cabinet-tg-safe-bottom))] pointer-events-none"
         aria-label={t('nav.mobile')}
       >
-        <div className="pointer-events-auto flex items-stretch justify-around gap-0 overflow-x-auto rounded-2xl border border-border bg-card/95 px-1 py-1.5 backdrop-blur-md shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)]">
+        <div className="cabinet-edge-nav-bar pointer-events-auto flex items-stretch justify-around gap-0 overflow-x-auto rounded-2xl border border-border bg-card/95 px-1 py-1.5 backdrop-blur-md shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)]">
           {mobileBottomNavItems.map(({ to, icon: Icon, labelKey, activePrefixes }) => {
             const active = navItemActive(location.pathname, { to, icon: Icon, labelKey, activePrefixes })
             const label = t(labelKey)

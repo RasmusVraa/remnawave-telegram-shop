@@ -47,9 +47,11 @@
 | `MINI_APP_URL` | URL Telegram Mini App; пусто — не используется |
 | `GREETING_IMAGE` | Картинка главного меню: `http(s)://` или путь к файлу |
 | `FORWARD_USER_MESSAGES_TO_ADMIN` | Пересылать админу сообщения пользователей (`true`/`false`) |
+| `SUSPICIOUS_USER_FILTER_ENABLED` | Фильтр подозрительных имён (t.me, Telegram Support) (`true`/`false`, по умолчанию `true`) |
 | `BLOCKED_TELEGRAM_IDS` | Telegram ID через запятую — блок доступа |
 | `WHITELISTED_TELEGRAM_IDS` | ID, обходящие проверки на подозрительных пользователей |
 | `ADMIN_TELEGRAM_ID` | ID админа: админка в боте и кабинете |
+| `CABINET_ADMIN_EMAILS` | Почты через запятую, которым открыта админка кабинета |
 
 ---
 
@@ -313,7 +315,16 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `CABINET_BRAND_LOGO_URL` / `CABINET_BRAND_LOGO_FILE` / `CABINET_BRAND_LOGO_FILE_BASE` | Логотип |
 | `CABINET_PWA_ENABLED` / `CABINET_PWA_APP_NAME` / `CABINET_PWA_SHORT_NAME` | PWA |
 | `CABINET_LIGHT_THEME_ENABLED` | Светлая тема (`true` по умолчанию) |
-| `CABINET_DECOR_THEME` | Декор кабинета: `off` (по умолчанию), `green`, `spring`, `cyber`, `neon`, `ocean`, `new_year`, `slate`, `carbon`, `aurora`, `nebula`, `violet`, `lavender`, `pink`, `valentine`, `wine`, `sunset`, `orange`, `halloween`, `yellow`, `summer`, `black_friday`. Меняется в админке без рестарта |
+| `CABINET_DECOR_THEME` | Декор кабинета и лендинга: `off` (по умолчанию, розово-фиолетовая пастель), `green`, `spring`, `cyber`, `neon`, `ocean`, `new_year`, `slate`, `carbon`, `aurora`, `nebula`, `violet`, `lavender`, `pink`, `valentine`, `wine`, `sunset`, `orange`, `halloween`, `yellow`, `summer`, `black_friday`. Меняется в админке без рестарта |
+| `LANDING_HERO_TITLE` / `LANDING_HERO_SUBTITLE` / `LANDING_NOTE` | Тексты первого экрана лендинга. Пусто — перевод кабинета. Меняется в админке без рестарта |
+| `LANDING_STAT_TRAFFIC_VALUE` / `LANDING_STAT_TRAFFIC_LABEL` / `LANDING_STAT_DEVICES_VALUE` / `LANDING_STAT_DEVICES_LABEL` | Две плашки под кнопками лендинга. Пусто — перевод |
+| `LANDING_SHOW_TARIFFS` / `LANDING_SHOW_STEPS` / `LANDING_SHOW_FEATURES` / `LANDING_SHOW_FAQ` | Видимость блоков лендинга (`true` по умолчанию) |
+| `STATUS_PROBES_ENABLED` | Пинг зондов Globalping на `/status` (`true` по умолчанию). Выключено — страница показывает только доступность узлов панели |
+| `GLOBALPING_TOKEN` | Необязательный токен с dash.globalping.io. Поднимает официальную квоту. Без него действует бесплатный лимит, и после ответа 429 проверка замолкает на время из заголовка `Retry-After` |
+| `STATUS_WORLD_PROBES` / `STATUS_RUSSIA_PROBES` | Число зондов из мира (1–10, по умолчанию 3) и из России (1–30, по умолчанию 20) |
+| `STATUS_PROBE_INTERVAL_MIN` | Как часто пинговать, если у страны не задан свой интервал (5–180 минут, по умолчанию 20). Список стран (публичный IP или домен) хранится в `bot_runtime_settings` и редактируется на странице «Статус» |
+| `STATUS_SHOW_MAP` | Карта на `/status` (`true` по умолчанию) |
+| `STATUS_PAGE_TITLE` / `STATUS_PAGE_LEAD` | Заголовок и подзаголовок `/status`. Пусто — перевод кабинета. Меняется в админке без рестарта |
 | `CABINET_DECOR_AUTO_ENABLED` | Авто-смена декор-темы по календарю (`false` по умолчанию). В праздничном окне тема окна перекрывает `CABINET_DECOR_THEME`, вне окон возвращается она же |
 | `CABINET_DECOR_SCHEDULE` | Окна авто-смены: JSON `[{"theme":"new_year","from":"12-01","to":"01-31","enabled":true}]`. Пусто — встроенный пресет праздников. Побеждает первое совпавшее окно; `from > to` — окно через 31 декабря. Редактируется в админке |
 | `CABINET_SUBSCRIPTION_SHOW_LOYALTY` | Плашка уровня лояльности на странице «Подписка» (`false` по умолчанию). Флаг влияет только на эту страницу: раздел `/loyalty` и плашка в профиле доступны всегда, программу целиком выключает `LOYALTY_ENABLED`. Меняется в админке без рестарта |

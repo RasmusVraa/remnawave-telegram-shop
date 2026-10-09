@@ -1,65 +1,51 @@
 import { useTranslation } from 'react-i18next'
 
-import { accentVar, LANDING_STEPS } from '../landingContent'
+import { LANDING_STEPS } from '../landingContent'
 import type { LandingBrand } from '../useLandingBrand'
-import { Reveal, useCardSpotlight } from './LandingMotion'
-import { LandingCabinetCta, SectionHeading } from './LandingPrimitives'
 
 /**
- * «Как подключиться»: три шага в ряд, соединённые пунктирной линией на десктопе.
- * Иконка и номер стоят на одной строке (иконка слева, номер справа) — вертикальный
- * стек из двух кружков выглядел рыхло, особенно на мобильных.
+ * Три шага подключения в одну линию: номер, заголовок, короткая строка.
+ * Без отдельных карточек — секция остаётся плотной.
  */
 export function LandingSteps({ brand }: { brand: LandingBrand }) {
   const { t } = useTranslation()
-  const onMouseMove = useCardSpotlight()
+  const label = brand.authenticated ? t('landing.nav.cabinet') : t('landing.steps.ctaCabinet')
 
   return (
-    <section id="how" className="px-4 py-14 sm:px-6 sm:py-20">
+    <section id="connect" className="px-4 py-12 sm:px-6 sm:py-16">
       <div className="mx-auto max-w-6xl">
-        <SectionHeading
-          eyebrow={t('landing.steps.eyebrow')}
-          title={t('landing.steps.title')}
-          description={t('landing.steps.subtitle')}
-        />
-
-        <div className="relative mt-10 sm:mt-14">
-          {/* Линия идёт на уровне иконок; на узких экранах карточки в столбец — прячем. */}
-          <div className="landing-steps-rail hidden lg:block" aria-hidden />
-
-          <div className="relative grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-3">
-            {LANDING_STEPS.map((step, i) => (
-              <Reveal key={step.id} delay={0.1 * i}>
-                <article
-                  className="landing-card h-full p-5 sm:p-6"
-                  style={{ ['--lp-accent' as string]: accentVar(step.accent) }}
-                  onMouseMove={onMouseMove}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="landing-icon-tile size-12">
-                      <step.icon className="size-[1.4rem]" strokeWidth={1.9} />
-                    </span>
-                    <span className="landing-step-num">{i + 1}</span>
-                  </div>
-                  <h3 className="mt-4 font-heading text-lg font-bold tracking-tight">
-                    {t(`landing.steps.items.${step.id}.title`)}
-                  </h3>
-                  <p className="mt-2 text-pretty text-sm leading-relaxed text-muted-foreground">
-                    {t(`landing.steps.items.${step.id}.text`)}
-                  </p>
-                </article>
-              </Reveal>
-            ))}
+        <div className="grid items-end gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div>
+            <h2 className="font-heading text-4xl font-extrabold leading-[1.05] tracking-tight sm:text-5xl">
+              {t('landing.steps.title')}
+            </h2>
+            <p className="mt-3 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground">
+              {t('landing.steps.subtitle')}
+            </p>
           </div>
+          <a
+            href={brand.cabinetHref}
+            className="landing-cta landing-cta--solid inline-flex h-11 items-center justify-center rounded-full px-6 text-sm font-semibold"
+          >
+            {label}
+          </a>
         </div>
 
-        <Reveal delay={0.2}>
-          <LandingCabinetCta
-            className="mt-10 justify-center sm:mt-12"
-            href={brand.cabinetHref}
-            label={brand.authenticated ? t('landing.nav.cabinet') : t('landing.steps.ctaCabinet')}
-          />
-        </Reveal>
+        <ol className="mt-8 grid gap-6 sm:grid-cols-3">
+          {LANDING_STEPS.map((step, i) => (
+            <li key={step.id} className="border-t border-border/80 pt-4">
+              <span className="font-heading text-sm font-bold text-[hsl(var(--lp-cyan))]">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3 className="mt-2 font-heading text-xl font-bold tracking-tight">
+                {t(`landing.steps.items.${step.id}.title`)}
+              </h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {t(`landing.steps.items.${step.id}.text`)}
+              </p>
+            </li>
+          ))}
+        </ol>
       </div>
     </section>
   )

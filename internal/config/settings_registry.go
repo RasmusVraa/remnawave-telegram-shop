@@ -5,6 +5,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 // cabinetDecorThemeIDs — порядок опций в админке (синхрон с internal/cabinet/config.ValidDecorThemeIDs).
@@ -471,6 +472,11 @@ func RuntimeSettingsRegistry() []SettingField {
 			Current: func() string { return boolStr(conf.forwardUserMessagesToAdmin) },
 		},
 		{
+			Key: "SUSPICIOUS_USER_FILTER_ENABLED", Group: "access", Type: SettingBool, Instant: true,
+			Apply:   applyBoolField(func(v bool) { conf.suspiciousUserFilterEnabled = v }),
+			Current: func() string { return boolStr(conf.suspiciousUserFilterEnabled) },
+		},
+		{
 			Key: "BLOCKED_TELEGRAM_IDS", Group: "access", Type: SettingCSVInt,
 			Apply: func(value string) error {
 				m, err := parseTelegramIDList(value)
@@ -521,6 +527,103 @@ func RuntimeSettingsRegistry() []SettingField {
 			Key: "CABINET_SUBSCRIPTION_SHOW_LOYALTY", Group: "cabinet", Type: SettingBool, Instant: true,
 			Apply:   applyFortuneBool("CABINET_SUBSCRIPTION_SHOW_LOYALTY"),
 			Current: cabinetBoolCurrent("CABINET_SUBSCRIPTION_SHOW_LOYALTY", false),
+		},
+
+		// --- landing (тексты и секции публичной витрины; пустой текст = перевод) ---
+		{
+			Key: "LANDING_HERO_TITLE", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_HERO_TITLE", 160),
+			Current: fortuneCurrent("LANDING_HERO_TITLE"),
+		},
+		{
+			Key: "LANDING_HERO_SUBTITLE", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_HERO_SUBTITLE", 280),
+			Current: fortuneCurrent("LANDING_HERO_SUBTITLE"),
+		},
+		{
+			Key: "LANDING_NOTE", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_NOTE", 200),
+			Current: fortuneCurrent("LANDING_NOTE"),
+		},
+		{
+			Key: "LANDING_STAT_TRAFFIC_VALUE", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_STAT_TRAFFIC_VALUE", 40),
+			Current: fortuneCurrent("LANDING_STAT_TRAFFIC_VALUE"),
+		},
+		{
+			Key: "LANDING_STAT_TRAFFIC_LABEL", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_STAT_TRAFFIC_LABEL", 60),
+			Current: fortuneCurrent("LANDING_STAT_TRAFFIC_LABEL"),
+		},
+		{
+			Key: "LANDING_STAT_DEVICES_VALUE", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_STAT_DEVICES_VALUE", 40),
+			Current: fortuneCurrent("LANDING_STAT_DEVICES_VALUE"),
+		},
+		{
+			Key: "LANDING_STAT_DEVICES_LABEL", Group: "landing", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("LANDING_STAT_DEVICES_LABEL", 60),
+			Current: fortuneCurrent("LANDING_STAT_DEVICES_LABEL"),
+		},
+		{
+			Key: "LANDING_SHOW_TARIFFS", Group: "landing", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("LANDING_SHOW_TARIFFS"),
+			Current: cabinetBoolCurrent("LANDING_SHOW_TARIFFS", true),
+		},
+		{
+			Key: "LANDING_SHOW_STEPS", Group: "landing", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("LANDING_SHOW_STEPS"),
+			Current: cabinetBoolCurrent("LANDING_SHOW_STEPS", true),
+		},
+		{
+			Key: "LANDING_SHOW_FEATURES", Group: "landing", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("LANDING_SHOW_FEATURES"),
+			Current: cabinetBoolCurrent("LANDING_SHOW_FEATURES", true),
+		},
+		{
+			Key: "LANDING_SHOW_FAQ", Group: "landing", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("LANDING_SHOW_FAQ"),
+			Current: cabinetBoolCurrent("LANDING_SHOW_FAQ", true),
+		},
+
+		// --- status (публичная страница /status) ---
+		{
+			Key: "STATUS_PROBES_ENABLED", Group: "status", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("STATUS_PROBES_ENABLED"),
+			Current: cabinetBoolCurrent("STATUS_PROBES_ENABLED", true),
+		},
+		{
+			Key: "STATUS_WORLD_PROBES", Group: "status", Type: SettingInt, Instant: true,
+			MinInt: intPtr(1), MaxInt: intPtr(10),
+			Apply:   applyBoundedInt("STATUS_WORLD_PROBES", 1, 10),
+			Current: cabinetIntCurrent("STATUS_WORLD_PROBES", 3),
+		},
+		{
+			Key: "STATUS_RUSSIA_PROBES", Group: "status", Type: SettingInt, Instant: true,
+			MinInt: intPtr(1), MaxInt: intPtr(30),
+			Apply:   applyBoundedInt("STATUS_RUSSIA_PROBES", 1, 30),
+			Current: cabinetIntCurrent("STATUS_RUSSIA_PROBES", 20),
+		},
+		{
+			Key: "STATUS_PROBE_INTERVAL_MIN", Group: "status", Type: SettingInt, Instant: true,
+			MinInt: intPtr(5), MaxInt: intPtr(180),
+			Apply:   applyBoundedInt("STATUS_PROBE_INTERVAL_MIN", 5, 180),
+			Current: cabinetIntCurrent("STATUS_PROBE_INTERVAL_MIN", 20),
+		},
+		{
+			Key: "STATUS_SHOW_MAP", Group: "status", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("STATUS_SHOW_MAP"),
+			Current: cabinetBoolCurrent("STATUS_SHOW_MAP", true),
+		},
+		{
+			Key: "STATUS_PAGE_TITLE", Group: "status", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("STATUS_PAGE_TITLE", 120),
+			Current: fortuneCurrent("STATUS_PAGE_TITLE"),
+		},
+		{
+			Key: "STATUS_PAGE_LEAD", Group: "status", Type: SettingText, Instant: true,
+			Apply:   applyLandingText("STATUS_PAGE_LEAD", 400),
+			Current: fortuneCurrent("STATUS_PAGE_LEAD"),
 		},
 
 		// --- cabinet_connect (подключение и кнопки в Telegram) ---
@@ -898,6 +1001,30 @@ func applyFortuneBool(key string) func(string) error {
 	}
 }
 
+func applyBoundedInt(key string, min, max int) func(string) error {
+	return func(value string) error {
+		v, err := strconv.Atoi(strings.TrimSpace(value))
+		if err != nil {
+			return fmt.Errorf("invalid integer")
+		}
+		if v < min || v > max {
+			return fmt.Errorf("must be between %d and %d", min, max)
+		}
+		setRuntimeOverride(key, strconv.Itoa(v))
+		return nil
+	}
+}
+
+func cabinetIntCurrent(key string, def int) func() string {
+	return func() string {
+		v := strings.TrimSpace(effectiveEnvUnderRLock(key))
+		if v == "" {
+			return strconv.Itoa(def)
+		}
+		return v
+	}
+}
+
 func applyFortuneInt(key string, min int) func(string) error {
 	return func(value string) error {
 		v, err := strconv.Atoi(strings.TrimSpace(value))
@@ -927,6 +1054,17 @@ func cabinetLightThemeCurrent() func() string {
 }
 
 // cabinetBoolCurrent — Current для bool-настройки с явным дефолтом при пустом env.
+func applyLandingText(key string, maxRunes int) func(string) error {
+	return func(value string) error {
+		v := strings.TrimSpace(value)
+		if utf8.RuneCountInString(v) > maxRunes {
+			return fmt.Errorf("must be at most %d characters", maxRunes)
+		}
+		setRuntimeOverride(key, v)
+		return nil
+	}
+}
+
 func cabinetBoolCurrent(key string, def bool) func() string {
 	return func() string {
 		v := strings.TrimSpace(effectiveEnvUnderRLock(key))

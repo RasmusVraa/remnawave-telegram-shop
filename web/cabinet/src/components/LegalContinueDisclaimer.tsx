@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 type Props = {
   siteLinks?: Record<string, string> | null
   className?: string
+  /** short — одна строка «Оплачивая, вы принимаете…» для плашки оплаты на телефоне. */
+  variant?: 'full' | 'short'
 }
 
 function resolveAgreementURL(siteLinks?: Record<string, string> | null): string {
@@ -35,12 +37,23 @@ function DocLink({ href, children }: { href?: string; children: ReactNode }) {
 }
 
 /** Дисклеймер «Продолжая, Вы соглашаетесь…» со ссылками на политику и соглашение. */
-export function LegalContinueDisclaimer({ siteLinks, className }: Props) {
+export function LegalContinueDisclaimer({ siteLinks, className, variant = 'full' }: Props) {
   const { t } = useTranslation()
   const privacy = siteLinks?.privacy_policy?.trim() || ''
   const agreement = resolveAgreementURL(siteLinks)
   if (!privacy && !agreement) {
     return null
+  }
+
+  if (variant === 'short') {
+    return (
+      <p className={cn('text-center text-[11px] leading-snug text-muted-foreground', className)}>
+        {t('legal.payShortBefore')}
+        <DocLink href={agreement || undefined}>{t('legal.payShortAgreement')}</DocLink>
+        {t('legal.continueAnd')}
+        <DocLink href={privacy || undefined}>{t('legal.payShortPrivacy')}</DocLink>
+      </p>
+    )
   }
 
   return (

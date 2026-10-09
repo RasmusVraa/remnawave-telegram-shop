@@ -24,6 +24,13 @@ export function isMobileUserAgent(): boolean {
   return /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent)
 }
 
+/** iPhone, iPad и iPod — любой браузер там WebKit. iPadOS 13+ представляется маком, поэтому одного userAgent мало. */
+export function isIosWebKit(): boolean {
+  if (typeof navigator === 'undefined') return false
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true
+  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+}
+
 /** Генерирует UUID v4 для Idempotency-Key. */
 export function newIdempotencyKey(): string {
   return crypto.randomUUID()

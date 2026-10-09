@@ -4,9 +4,9 @@
       "ru"
     ],
     "branding": {
-      "name": "MEOWS VPN",
-      "logoUrl": "https://meows.gg/img/main/meowsvpn.jpg",
-      "supportUrl": "https://t.me/Meows_support_bot"
+      "name": "StarlitVPN",
+      "logoUrl": "https://rasmusvraa.site/uploads/1786463562100-5c5093bb38f9.jpg",
+      "supportUrl": "https://t.me/starlitsupportbot"
     }
   },
   "platforms": {
@@ -48,7 +48,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "ru": "ВИДЕО ИНСТРУКЦИЯ"
               }
@@ -102,7 +102,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -118,7 +118,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Happ, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Happ به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -162,7 +162,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "ru": "ВИДЕО ИНСТРУКЦИЯ"
               }
@@ -216,7 +216,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -232,7 +232,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Happ, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Happ به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -275,7 +275,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -291,7 +291,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In FlClashX, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در FlClashX به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В FlClashX перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В FlClashX перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -341,7 +341,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "ru": "ВИДЕО ИНСТРУКЦИЯ"
               }
@@ -387,7 +387,7 @@
       "additionalAfterAddSubscriptionStep": {
         "buttons": [
           {
-            "buttonLink": "https://t.me/VPN_meows_news/44",
+            "buttonLink": "https://t.me/starlitmoontg/35",
             "buttonText": {
               "en": "VIDEO INSTRUCTION",
               "fa": "ویدیو راهنما",
@@ -403,7 +403,7 @@
         "description": {
           "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Koala Clash, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
           "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Koala Clash به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-          "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+          "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
         }
       },
       "connectAndUseStep": {
@@ -448,7 +448,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -464,7 +464,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Koala Clash, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Koala Clash به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Koala Clash перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Koala Clash перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -507,7 +507,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -523,7 +523,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Koala Clash, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Koala Clash به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -567,7 +567,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "ru": "ВИДЕО ИНСТРУКЦИЯ"
               }
@@ -613,7 +613,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -629,7 +629,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Koala Clash, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
             "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Koala Clash به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -672,7 +672,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -688,7 +688,7 @@
           "description": {
             "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add a subscription manually:\n\n1. Click the Get link button on this page in the upper right corner\n2. Copy the link\n3. In FlClash, go to the Profiles section\n4. Click the + button\n5. Select the URL\n6. Paste your copied link and click Send",
             "fa": "اگر بعد از کلیک روی دکمه هیچ اتفاقی نیفتاد، اشتراکی را به صورت دستی اضافه کنید. روی دکمه دریافت لینک در این صفحه در گوشه سمت راست بالا کلیк کنید، لینک را کپی کنید. در FlClash به بخش Profiles بروید، دکمه + را کلیک کنید، URL را انتخاب کنید، پیوند کپی شده خود را جایگذاری کنید و روی ارسال کلیک کنید.",
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Скопируйте ссылку\n3. В FlClash перейдите в раздел Профили\n4. Нажмите кнопку +\n5. Выберите URL\n6. Вставьте вашу скопированную ссылку и нажмите Отправить"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Скопируйте ссылку\n3. В FlClash перейдите в раздел Профили\n4. Нажмите кнопку +\n5. Выберите URL\n6. Вставьте вашу скопированную ссылку и нажмите Отправить"
           }
         },
         "connectAndUseStep": {
@@ -769,7 +769,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "en": "VIDEO INSTRUCTION",
                 "fa": "ویدیو راهنما",
@@ -783,7 +783,7 @@
             "ru": "Если подписка не добавилась"
           },
           "description": {
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {
@@ -842,7 +842,7 @@
         "additionalAfterAddSubscriptionStep": {
           "buttons": [
             {
-              "buttonLink": "https://t.me/VPN_meows_news/44",
+              "buttonLink": "https://t.me/starlitmoontg/35",
               "buttonText": {
                 "ru": "ВИДЕО ИНСТРУКЦИЯ"
               }
@@ -852,7 +852,7 @@
             "ru": "Если подписка не добавилась"
           },
           "description": {
-            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+            "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.starlit-moon.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
           }
         },
         "connectAndUseStep": {

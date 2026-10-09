@@ -1,0 +1,80 @@
+{
+  "/admin/status/targets": {
+    "targets": [
+      {
+        "id": "nl1",
+        "name": "Нидерланды",
+        "country": "NL",
+        "address": "1.1.1.1",
+        "enabled": true,
+        "interval_min": 20,
+        "world_probes": 0,
+        "russia_probes": 20
+      }
+    ]
+  },
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "status",
+        "fields": [
+          {
+            "key": "STATUS_PROBES_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_WORLD_PROBES",
+            "type": "int",
+            "value": "3",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 10
+          },
+          {
+            "key": "STATUS_RUSSIA_PROBES",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 30
+          },
+          {
+            "key": "STATUS_PROBE_INTERVAL_MIN",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 5,
+            "max_int": 180
+          },
+          {
+            "key": "STATUS_SHOW_MAP",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_TITLE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_LEAD",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          }
+        ]
+      }
+    ]
+  }
+}

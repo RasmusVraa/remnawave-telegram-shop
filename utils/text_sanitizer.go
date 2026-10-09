@@ -24,7 +24,7 @@ var (
 	}
 
 	obfuscatedDomainPatterns = []*regexp.Regexp{
-		regexp.MustCompile(`(?i)[tт][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[\.\s\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[mм][eе]`),
+		regexp.MustCompile(`(?i)(?:^|[^\p{L}\p{N}])[tт][\s\.\-/\\•﹒٫＿_․·∙‧ꞏ‒–—﹘﹣⁻−]*[mм][\s\.\-/\\•﹒٫＿_․·∙‧ꞏ‒–—﹘﹣⁻−]*[eе](?:[^\p{L}\p{N}]|$)`),
 		regexp.MustCompile(`(?i)[tт][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[eе][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[lłl1i|][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[eе][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[gɢgqг][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[rр][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*[aа][\s\.\-/\\•﹒٫＿․·∙‧ꞏ‒–—﹘﹣⁻−]*(?:[mм]|rn)`),
 		regexp.MustCompile(`(?i)t\.me\S*`),
 	}
@@ -60,8 +60,9 @@ var (
 		regexp.MustCompile(`(?i)абуз\w*`),
 	}
 
+	// Ищутся подстрокой в имени, склеенном без пробелов и разделителей:
+	// эти слова длинные и в настоящих именах не встречаются.
 	normalizedBannedTokens = map[string]bool{
-		"tme":          true,
 		"telegram":     true,
 		"teleqram":     true,
 		"teiegram":     true,
@@ -70,11 +71,16 @@ var (
 		"joinchat":     true,
 		"notification": true,
 		"moderation":   true,
-		"review":       true,
 		"compliance":   true,
-		"abuse":        true,
-		"spam":         true,
-		"report":       true,
+	}
+
+	// Ищутся только целым словом (можно во множественном числе): подстрокой
+	// они цепляют обычные имена — «Абусев», «Reviewer», «Spammer».
+	bannedWords = map[string]bool{
+		"review": true,
+		"abuse":  true,
+		"spam":   true,
+		"report": true,
 	}
 
 	dangerousKeywords = map[string]bool{
@@ -162,6 +168,97 @@ func normalizeForDetection(value string) string {
 	return normalized
 }
 
+// detectionWords разбивает значение на нормализованные слова. Границы слов —
+// любые символы кроме букв и цифр, смена регистра (SpamBot → spam, bot)
+// и переход между буквами и цифрами (spam123 → spam, 123).
+func detectionWords(value string) []string {
+	fields := strings.FieldsFunc(stripMarks(norm.NFKD.String(value)), func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
+
+	var words []string
+	for _, field := range fields {
+		for _, part := range splitCamelAndDigits(field) {
+			if normalized := normalizeForDetection(part); normalized != "" {
+				words = append(words, normalized)
+			}
+		}
+	}
+	return words
+}
+
+func stripMarks(value string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.In(r, unicode.Mn) {
+			return -1
+		}
+		return r
+	}, value)
+}
+
+func splitCamelAndDigits(field string) []string {
+	runes := []rune(field)
+	var parts []string
+	start := 0
+	for i := 1; i < len(runes); i++ {
+		prev, cur := runes[i-1], runes[i]
+		lowerToUpper := unicode.IsLower(prev) && unicode.IsUpper(cur)
+		// Конец аббревиатуры: «TMe» → «T», «Me».
+		acronymEnd := unicode.IsUpper(prev) && unicode.IsUpper(cur) && i+1 < len(runes) && unicode.IsLower(runes[i+1])
+		letterDigit := unicode.IsDigit(prev) != unicode.IsDigit(cur)
+		if lowerToUpper || acronymEnd || letterDigit {
+			parts = append(parts, string(runes[start:i]))
+			start = i
+		}
+	}
+	return append(parts, string(runes[start:]))
+}
+
+// containsTelegramLink ищет ссылку t.me только как отдельный токен («t.me», «t me»,
+// «t•m•e», «TMe»): несколько подряд идущих слов складываются ровно в «tme».
+// Буквы «tme» внутри имени не считаются: иначе банятся «Ахмет Мейрамов», «Just me», «@hotmeal».
+func containsTelegramLink(words []string) bool {
+	const token = "tme"
+	for i := range words {
+		joined := ""
+		for j := i; j < len(words) && len(joined) < len(token); j++ {
+			joined += words[j]
+			if joined == token {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsBannedWord(words []string) bool {
+	for _, word := range words {
+		if bannedWords[word] || bannedWords[strings.TrimSuffix(word, "s")] {
+			return true
+		}
+	}
+	return false
+}
+
+// containsBannedContent — значение выдаёт себя за Telegram, поддержку или ссылку на t.me.
+func containsBannedContent(value string) bool {
+	glued := normalizeForDetection(value)
+	if glued == "" {
+		return false
+	}
+	for token := range normalizedBannedTokens {
+		if strings.Contains(glued, token) {
+			return true
+		}
+	}
+	if containsDangerousCombination(glued) {
+		return true
+	}
+
+	words := detectionWords(value)
+	return containsTelegramLink(words) || containsBannedWord(words)
+}
+
 func removePatterns(value string) string {
 	updated := value
 	allPatterns := append([]*regexp.Regexp{}, urlPatterns...)
@@ -185,25 +282,7 @@ func finalize(value string, originalValue string) *string {
 		return nil
 	}
 
-	normalizedOriginal := normalizeForDetection(originalValue)
-	for token := range normalizedBannedTokens {
-		if strings.Contains(normalizedOriginal, token) {
-			return nil
-		}
-	}
-
-	if containsDangerousCombination(normalizedOriginal) {
-		return nil
-	}
-
-	normalized := normalizeForDetection(compacted)
-	for token := range normalizedBannedTokens {
-		if strings.Contains(normalized, token) {
-			return nil
-		}
-	}
-
-	if containsDangerousCombination(normalized) {
+	if containsBannedContent(originalValue) || containsBannedContent(compacted) {
 		return nil
 	}
 
@@ -257,32 +336,12 @@ func DisplayNameOrFallback(firstName *string, fallback string) string {
 	return usernamePlaceholder
 }
 
-// IsSuspiciousUser checks if user has suspicious username or display name
-// containsAlphanumeric checks if string contains any letter or digit
-func containsAlphanumeric(s string) bool {
-	for _, r := range s {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
-			(r >= '0' && r <= '9') || (r >= 'а' && r <= 'я') ||
-			(r >= 'А' && r <= 'Я') {
-			return true
-		}
-	}
-	return false
-}
-
+// IsSuspiciousUser checks if user has suspicious username or display name.
+// Поле, целиком состоящее из служебного слова («Support», «System»), само по себе
+// не банит: такое имя только скрывается при показе (SanitizeDisplayName).
 func IsSuspiciousUser(username *string, firstName *string, lastName *string) bool {
-	if username != nil && *username != "" {
-		if containsAlphanumeric(*username) && SanitizeUsername(username) == nil {
-			return true
-		}
-	}
-	if firstName != nil && *firstName != "" {
-		if containsAlphanumeric(*firstName) && SanitizeDisplayName(firstName) == nil {
-			return true
-		}
-	}
-	if lastName != nil && *lastName != "" {
-		if containsAlphanumeric(*lastName) && SanitizeDisplayName(lastName) == nil {
+	for _, value := range []*string{username, firstName, lastName} {
+		if value != nil && containsBannedContent(*value) {
 			return true
 		}
 	}

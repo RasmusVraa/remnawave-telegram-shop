@@ -252,6 +252,62 @@ func TestIsSuspiciousUser(t *testing.T) {
 	}
 }
 
+// Обычные имена, которые раньше ложно банились: «tme» склеивался из соседних
+// слов, abuse/spam/report/review искались подстрокой, а одиночное служебное
+// слово превращало поле в пустое.
+func TestIsSuspiciousUser_NoFalsePositives(t *testing.T) {
+	names := []string{
+		"Ахмет Мейрамов", "Сабит Мерей", "Марат Мелис", "Отмена",
+		"Matt Mercer", "Scott Meyers", "Just me", "Let me in", "ArtMe",
+		"Абусев", "Reviewer", "Spammer", "Reporter",
+		"Support", "System", "Service", "Security", "Поддержка",
+		"Fran4esko_Bamboni",
+	}
+	for _, name := range names {
+		t.Run("name "+name, func(t *testing.T) {
+			if IsSuspiciousUser(nil, stringPtr(name), nil) {
+				t.Errorf("IsSuspiciousUser(firstName=%q) = true, want false", name)
+			}
+		})
+	}
+
+	usernames := []string{"just_me", "hotmeal", "itmentor", "getme_vpn", "Fran4esko_Bamboni", "@Fran4esko_Bamboni"}
+	for _, username := range usernames {
+		t.Run("username "+username, func(t *testing.T) {
+			if IsSuspiciousUser(stringPtr(username), nil, nil) {
+				t.Errorf("IsSuspiciousUser(username=%q) = true, want false", username)
+			}
+		})
+	}
+}
+
+func TestIsSuspiciousUser_CatchesImpersonation(t *testing.T) {
+	names := []string{
+		"t.me/scam", "t me/scam", "T.Me", "ТМе", "t_me_bot", "t•m•e", "t . m . e",
+		"https://t.me/joinchat/abc", "Ivan t.me/xyz",
+		"Telegram", "TELEGRAM SUPPORT", "Teleqram", "Te.le.gram", "Телеграм",
+		"Spam", "Spam Bot", "SpamBot", "spam123", "Report", "Reports", "Abuse Team", "Review",
+		"Notifications", "Moderation", "Compliance",
+		"Security Admin", "System Admin",
+	}
+	for _, name := range names {
+		t.Run(name, func(t *testing.T) {
+			if !IsSuspiciousUser(nil, stringPtr(name), nil) {
+				t.Errorf("IsSuspiciousUser(firstName=%q) = false, want true", name)
+			}
+		})
+	}
+}
+
+func TestSanitizeDisplayName_KeepsNamesAroundTme(t *testing.T) {
+	for _, name := range []string{"Ахмет Мейрамов", "Matt Mercer", "Just me"} {
+		got := SanitizeDisplayName(stringPtr(name))
+		if got == nil || *got != name {
+			t.Errorf("SanitizeDisplayName(%q) = %v, want unchanged", name, ptrToString(got))
+		}
+	}
+}
+
 func TestUsernameForDisplay(t *testing.T) {
 	tests := []struct {
 		name     string

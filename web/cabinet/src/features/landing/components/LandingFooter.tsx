@@ -26,7 +26,7 @@ export function LandingFooter({ brand }: { brand: LandingBrand }) {
   ].filter((v): v is { key: string; href: string } => v !== null)
 
   return (
-    <footer className="border-t border-border/60 px-4 py-12 sm:px-6">
+    <footer className="landing-footer border-t border-border/60 px-4 py-12 sm:px-6">
       <Reveal y={16}>
         <div className="mx-auto max-w-6xl">
           <div className="flex flex-col gap-10 md:flex-row md:justify-between">
@@ -62,13 +62,13 @@ export function LandingFooter({ brand }: { brand: LandingBrand }) {
                 <a href={brand.cabinetHref} className="landing-footer-link text-sm">
                   {brand.authenticated ? t('landing.nav.cabinet') : t('landing.nav.login')}
                 </a>
-                <a href="#features" className="landing-footer-link text-sm">
-                  {t('landing.nav.features')}
+                <a href="/status" className="landing-footer-link text-sm">
+                  {t('landing.nav.status')}
                 </a>
-                <a href="#tariffs" className="landing-footer-link text-sm">
+                <a href="/#tariffs" className="landing-footer-link text-sm">
                   {t('landing.nav.tariffs')}
                 </a>
-                <a href="#faq" className="landing-footer-link text-sm">
+                <a href="/#faq" className="landing-footer-link text-sm">
                   {t('landing.nav.faq')}
                 </a>
               </FooterColumn>

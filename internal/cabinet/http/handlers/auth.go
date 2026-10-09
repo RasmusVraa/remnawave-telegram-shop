@@ -145,6 +145,7 @@ func (h *AuthHandler) AuthBootstrap(w http.ResponseWriter, r *http.Request) {
 		// Уже с учётом авто-расписания (CABINET_DECOR_AUTO_ENABLED): в праздничном
 		// окне отдаём тему окна, вне окон — выбранную админом вручную.
 		"decor_theme": cabcfg.EffectiveDecorTheme(),
+		"landing":     cabcfg.LandingPublic(),
 		// CABINET_SUBSCRIPTION_SHOW_LOYALTY: плашка уровня на /subscription.
 		// Раздел /loyalty и плашка в профиле от флага не зависят.
 		"subscription_loyalty_visible": cabcfg.SubscriptionLoyaltyVisible(),
@@ -235,7 +236,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cabmetrics.RecordAuth("email_login", "success")
-	h.setAuthCookies(w, tp)
+	h.setAuthCookies(w, r, tp)
 	writeJSON(w, http.StatusOK, loginResp{
 		AccessToken: tp.AccessToken,
 		AccessExp:   tp.AccessExp.Unix(),
@@ -250,12 +251,12 @@ func (h *AuthHandler) Refresh(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// На reuse-detection стираем cookies — иначе SPA будет долбить refresh.
 		if errors.Is(err, service.ErrReused) || errors.Is(err, service.ErrInvalidToken) {
-			h.clearAuthCookies(w)
+			h.clearAuthCookies(w, r)
 		}
 		writeServiceErr(w, err, "refresh")
 		return
 	}
-	h.setAuthCookies(w, tp)
+	h.setAuthCookies(w, r, tp)
 	writeJSON(w, http.StatusOK, loginResp{
 		AccessToken: tp.AccessToken,
 		AccessExp:   tp.AccessExp.Unix(),
@@ -269,7 +270,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.Logout(r.Context(), refresh); err != nil {
 		slog.Warn("logout failed", "error", err)
 	}
-	h.clearAuthCookies(w)
+	h.clearAuthCookies(w, r)
 	writeJSON(w, http.StatusOK, messageResp{Message: "logged out"})
 }
 
@@ -330,7 +331,7 @@ func (h *AuthHandler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
 		writeServiceErr(w, err, "confirm_email")
 		return
 	}
-	h.setAuthCookies(w, tp)
+	h.setAuthCookies(w, r, tp)
 	writeJSON(w, http.StatusOK, loginResp{
 		AccessToken: tp.AccessToken,
 		AccessExp:   tp.AccessExp.Unix(),
@@ -345,22 +346,23 @@ func (h *AuthHandler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
 const refreshCookiePath = "/cabinet/api/auth"
 
 // setAuthCookies — обёртка вокруг пакетного setRefreshCookie (util.go).
-func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, tp *service.TokenPair) {
-	setRefreshCookie(w, tp, h.cookieDomain, refreshCookiePath)
+func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, r *http.Request, tp *service.TokenPair) {
+	setRefreshCookie(w, r, tp, h.cookieDomain, refreshCookiePath)
 }
 
-func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
+func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter, r *http.Request) {
+	domain, secure := cookieScope(r, h.cookieDomain)
 	http.SetCookie(w, &http.Cookie{
 		Name:     service.RefreshCookieName,
 		Value:    "",
 		Path:     refreshCookiePath,
-		Domain:   h.cookieDomain,
+		Domain:   domain,
 		MaxAge:   -1,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	clearCabCsrfCookie(w, h.cookieDomain)
+	clearCabCsrfCookie(w, r, h.cookieDomain)
 }
 
 // maxPartnerPercent — большая из двух ставок партнёрской программы. Идёт в

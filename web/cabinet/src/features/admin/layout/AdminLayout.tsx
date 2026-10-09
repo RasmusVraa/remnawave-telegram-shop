@@ -11,6 +11,7 @@ import {
   Handshake,
   Megaphone,
   Server,
+  Activity,
   RefreshCw,
   LayoutDashboard,
   ChevronLeft,
@@ -143,6 +144,7 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
         // (триал, HWID, курс звёзд), которые нужны в любом режиме продаж.
         { to: '/admin/tariffs', icon: Zap, labelKey: 'admin.nav.tariffs' },
         { to: '/admin/settings', icon: SlidersHorizontal, labelKey: 'admin.nav.settings' },
+        { to: '/admin/status', icon: Activity, labelKey: 'admin.nav.status' },
         { to: '/admin/infra', icon: Server, labelKey: 'admin.nav.infra' },
         { to: '/admin/sync', icon: RefreshCw, labelKey: 'admin.nav.sync' },
       ],

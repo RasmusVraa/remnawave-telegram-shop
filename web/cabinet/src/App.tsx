@@ -11,6 +11,7 @@ import { BrandFavicon } from '@/components/BrandFavicon'
 import { ThemePolicyProvider } from '@/components/ThemePolicyProvider'
 import { ToastProvider } from '@/components/ui/toast'
 import { CabinetDecorThemeSync } from '@/features/decor/CabinetDecorThemeSync'
+import { isTelegramMiniAppSession } from '@/lib/telegram-web-app-loader'
 
 // Главная — единственная страница, загружаемая сразу: мини-апп открывается на ней,
 // и отдельный запрос за чанком добавил бы round-trip к первому экрану.
@@ -38,6 +39,7 @@ const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage')
 
 // Публичный лендинг (9a): отдельный маршрут, корень SPA по-прежнему ведёт в кабинет.
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
+const StatusPage = lazy(() => import('@/features/landing/StatusPage'))
 
 // Dev-превью компонентов. Маршруты ниже регистрируются только при import.meta.env.DEV;
 // через lazy модули не попадают и в прод-чанки.
@@ -76,6 +78,7 @@ const AdminLoyaltyPage = lazy(() => import('@/features/admin/pages/AdminLoyaltyP
 const AdminPartnersPage = lazy(() => import('@/features/admin/pages/AdminPartnersPage'))
 const AdminBroadcastPage = lazy(() => import('@/features/admin/pages/AdminBroadcastPage'))
 const AdminInfraPage = lazy(() => import('@/features/admin/pages/AdminInfraPage'))
+const AdminStatusPage = lazy(() => import('@/features/admin/pages/AdminStatusPage'))
 const AdminSyncPage = lazy(() => import('@/features/admin/pages/AdminSyncPage'))
 const AdminSettingsPage = lazy(() => import('@/features/admin/pages/AdminSettingsPage'))
 
@@ -89,9 +92,8 @@ const queryClient = new QueryClient({
 })
 
 /**
- * Кабинет живёт под /cabinet, а лендинг отдаётся ещё и с корня домена (/landing) —
- * см. mux.Handle("/landing") в internal/cabinet/http/router.go. Basename выбираем
- * по фактическому пути, иначе router с фиксированным '/cabinet' не сматчит /landing.
+ * Кабинет живёт под /cabinet. Лендинг — на корне домена (/) и на старом /landing.
+ * Basename выбираем по фактическому пути, иначе router с '/cabinet' не сматчит корень.
  */
 function resolveBasename(): string {
   if (typeof window === 'undefined') return '/cabinet'
@@ -124,7 +126,12 @@ function normalizePath(pathname: string): string {
 }
 
 function isPublicShellPath(pathname: string): boolean {
-  return PUBLIC_SHELL_PATHS.has(normalizePath(pathname))
+  if (normalizePath(pathname) === '/status') return true
+  if (PUBLIC_SHELL_PATHS.has(normalizePath(pathname))) return true
+  // Корень домена — лендинг. Внутри /cabinet «/» это вход в кабинет, его так не помечаем.
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/cabinet')) return false
+  const path = normalizePath(pathname)
+  return path === '/' || path === '/landing'
 }
 
 function AppRoutes() {
@@ -166,8 +173,9 @@ function AppRoutes() {
       */}
       <Route path="/connect" element={<ConnectionsPage />} />
 
-      {/* Витрина проекта. Доступна и гостю, и авторизованному — редиректа нет. */}
-      <Route path="/landing" element={<LandingPage />} />
+      {/* Витрина на корне домена. В мини-приложении сразу уходим в кабинет. */}
+      <Route path="/landing" element={<PublicLanding />} />
+      <Route path="/status" element={<StatusPage />} />
 
       {/* Только dev: превью акцентной кнопки «Подключить устройство». */}
       {import.meta.env.DEV && (
@@ -439,6 +447,16 @@ function AppRoutes() {
         }
       />
       <Route
+        path="/admin/status"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminStatusPage />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/admin/infra"
         element={
           <ProtectedRoute>
@@ -469,13 +487,35 @@ function AppRoutes() {
         }
       />
 
+      {/* Корень: лендинг на домене, дашборд внутри /cabinet. */}
+      <Route path="/" element={<DomainRoot />} />
+
       {/* Fallbacks */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
     </Suspense>
     </RouteErrorBoundary>
   )
+}
+
+/** Мини-приложение Telegram открывает кабинет, а не витрину. Hash с tgWebAppData сохраняем. */
+function redirectMiniAppToCabinet(): boolean {
+  if (!isTelegramMiniAppSession()) return false
+  const { search, hash } = window.location
+  window.location.replace(`/cabinet/${search}${hash}`)
+  return true
+}
+
+function PublicLanding() {
+  if (redirectMiniAppToCabinet()) return <FullscreenSpinner />
+  return <LandingPage />
+}
+
+function DomainRoot() {
+  if (window.location.pathname.startsWith('/cabinet')) {
+    return <Navigate to="/dashboard" replace />
+  }
+  return <PublicLanding />
 }
 
 /** Общий индикатор: инициализация auth и подгрузка чанка страницы выглядят одинаково. */

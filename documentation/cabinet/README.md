@@ -23,6 +23,17 @@
   reverse-proxy, что подтягивается из настроек, где править тексты:
   - [landing.md](./landing.md)
 
+## Страница подключения устройства
+
+- `/cabinet/connections` и `/connect` по приглашению: устройство экрана, откуда
+  берутся тексты и кнопки, окно выбора устройства, блок помощи, план переверстки:
+  - [connections-page.md](./connections-page.md)
+
+## Шапка и меню на iPhone
+
+- Почему на iOS 26 и в новом Telegram шапка и нижнее меню сделаны «сплошными» и как это устроено:
+  - [iphone-edges.md](./iphone-edges.md)
+
 ## Чат поддержки (bridge к telegram-support-bot)
 
 - Встроенный чат в кабинете при `SUPPORT_BOT_API=true` (миграция `000036_cabinet_support`).

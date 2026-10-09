@@ -1,0 +1,102 @@
+{
+  "/tariffs": {
+    "sales_mode": "tariffs",
+    "currency": "RUB",
+    "price_display": "monthly",
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "base",
+        "name": "Стандарт",
+        "description": "2 устройства\nЛимит до 200 ГБ/мес",
+        "device_limit": 1,
+        "traffic_limit_bytes": 214748364800,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 150
+          },
+          {
+            "months": 3,
+            "amount_rub": 400
+          },
+          {
+            "months": 6,
+            "amount_rub": 750
+          },
+          {
+            "months": 12,
+            "amount_rub": 1320
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "slug": "default-plus",
+        "name": "дефолт+++",
+        "description": "64654",
+        "device_limit": 4,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 200
+          },
+          {
+            "months": 6,
+            "amount_rub": 1000
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "slug": "premium",
+        "name": "🔥Премиум",
+        "description": "Обход Белых списков🔥\nБезлимитный трафик для 3 устройств",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 400
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "slug": "extended",
+        "name": "❤️Расширенный",
+        "description": "низкие цены\n- все четко\n- порвет по скорости\n- офигенный тариф",
+        "device_limit": 5,
+        "traffic_limit_bytes": 107374182400,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 1000
+          }
+        ]
+      }
+    ],
+    "savings_badge": "corner"
+  },
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "cryptopay": true,
+      "telegram": true,
+      "platega_sbp": true,
+      "heleket": true
+    },
+    "site_links": {
+      "privacy_policy": "https://example.com/privacy",
+      "terms_of_service": "https://example.com/terms"
+    }
+  },
+  "/payments/preview": {
+    "amount": 480,
+    "amount_rub": 480,
+    "currency": "RUB",
+    "scenario": "new"
+  },
+  "/subscription": {}
+}

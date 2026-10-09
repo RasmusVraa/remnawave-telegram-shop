@@ -4,8 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown } from 'lucide-react'
 
 import { LANDING_FAQ_IDS } from '../landingContent'
-import { Reveal } from './LandingMotion'
-import { SectionHeading } from './LandingPrimitives'
 
 const EASE = [0.22, 1, 0.36, 1] as const
 
@@ -19,20 +17,19 @@ export function LandingFaq() {
   const baseId = useId()
 
   return (
-    <section id="faq" className="px-4 py-14 sm:px-6 sm:py-20">
+    <section id="faq" className="px-4 pb-16 pt-4 sm:px-6 sm:pb-20">
       <div className="mx-auto max-w-3xl">
-        <SectionHeading
-          eyebrow={t('landing.faq.eyebrow')}
-          title={t('landing.faq.title')}
-          description={t('landing.faq.subtitle')}
-        />
+        <h2 className="font-heading text-4xl font-extrabold tracking-tight sm:text-5xl">
+          {t('landing.faq.title')}
+        </h2>
+        <p className="mt-3 max-w-xl text-base text-muted-foreground">{t('landing.faq.subtitle')}</p>
 
-        <div className="mt-9 flex flex-col gap-3 sm:mt-12">
-          {LANDING_FAQ_IDS.map((id, i) => {
+        <div className="landing-faq-list mt-8">
+          {LANDING_FAQ_IDS.map((id) => {
             const open = openId === id
             const panelId = `${baseId}-${id}`
             return (
-              <Reveal key={id} delay={0.05 * i} y={18}>
+              <div key={id}>
                 <div className="landing-faq-item" data-open={open}>
                   <button
                     type="button"
@@ -65,7 +62,7 @@ export function LandingFaq() {
                     )}
                   </AnimatePresence>
                 </div>
-              </Reveal>
+              </div>
             )
           })}
         </div>

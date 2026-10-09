@@ -42,34 +42,35 @@ func GenerateToken() (string, error) {
 }
 
 // SetCookie выставляет csrf_token cookie. Параметры:
-//   - Secure=true (только HTTPS, TTL совпадает с access+refresh горизонтом);
+//   - Secure задаёт вызывающий код: true на публичном HTTPS, false на localhost по HTTP;
 //   - HttpOnly=false (SPA должен читать значение);
 //   - SameSite=Lax (достаточно, refresh-cookie и так Lax, top-level navigation
 //     безопасен для логина через OAuth-редиректы).
 //
 // Domain задаётся вызывающим кодом — должен совпадать с refresh-cookie Domain.
-func SetCookie(w http.ResponseWriter, token, domain, path string, maxAge int) {
+func SetCookie(w http.ResponseWriter, token, domain, path string, maxAge int, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
 		Path:     path,
 		Domain:   domain,
 		MaxAge:   maxAge,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 	})
 }
 
 // ClearCookie сбрасывает csrf_token cookie (logout, reset password).
-func ClearCookie(w http.ResponseWriter, domain, path string) {
+// secure должен совпадать с тем, как cookie была выставлена, иначе браузер её не сотрёт.
+func ClearCookie(w http.ResponseWriter, domain, path string, secure bool) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     path,
 		Domain:   domain,
 		MaxAge:   -1,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 	})

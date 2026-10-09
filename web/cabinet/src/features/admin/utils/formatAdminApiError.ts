@@ -16,6 +16,21 @@ const BODY_KEY_MAP: Record<string, string> = {
   'no valid fields': 'admin.errors.noValidFields',
   'code and type are required': 'admin.errors.promoCodeRequired',
   'slug is required': 'admin.errors.slugRequired',
+  'csrf: missing token': 'admin.errors.csrf',
+  'csrf: token mismatch': 'admin.errors.csrf',
+  'csrf: forbidden': 'admin.errors.csrf',
+  'name is required': 'admin.errors.statusName',
+  'name is too long': 'admin.errors.statusName',
+  'country must be 2 letters': 'admin.errors.statusCountry',
+  'address is not a public ip': 'admin.errors.statusAddress',
+  'address is not a public host': 'admin.errors.statusAddress',
+  'note is too long': 'admin.errors.statusNote',
+  'too many targets': 'admin.errors.statusTooMany',
+  'interval must be between 5 and 180': 'admin.errors.statusInterval',
+  'world probes must be between 1 and 10': 'admin.errors.statusWorld',
+  'russia probes must be between 1 and 30': 'admin.errors.statusRussia',
+  'probe already running': 'admin.errors.statusProbeBusy',
+  'no targets': 'admin.errors.statusProbeEmpty',
 }
 
 function normalizeBody(body: string): string {

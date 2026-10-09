@@ -69,11 +69,17 @@ const config: Config = {
           from: { transform: 'translateX(0)' },
           to: { transform: 'translateX(-50%)' },
         },
+        // Тост уходит за правый край экрана
+        'toast-out': {
+          from: { opacity: '1', transform: 'translateX(0)' },
+          to: { opacity: '0', transform: 'translateX(115%)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out both',
         'spin-slow': 'spin-slow 2s linear infinite',
         'fortune-winners-marquee': 'fortune-winners-marquee 250s linear infinite',
+        'toast-out': 'toast-out 0.3s ease-in forwards',
       },
     },
   },

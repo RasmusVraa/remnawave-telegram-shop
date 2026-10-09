@@ -63,8 +63,13 @@ export const LANDING_FAQ_IDS = [
   'refund',
 ] as const
 
-/** Пункты меню в шапке: id секции = якорь на странице. */
-export const LANDING_NAV_SECTIONS = ['tariffs', 'how', 'features', 'faq'] as const
+/** Пункты меню. href абсолютный: страница живёт и на корне домена, и внутри /cabinet. */
+export const LANDING_NAV = [
+  { id: 'how', href: '/#how' },
+  { id: 'tariffs', href: '/#tariffs' },
+  { id: 'faq', href: '/#faq' },
+  { id: 'status', href: '/status' },
+] as const
 
 /**
  * Какой тариф получает нашивку «Популярный» в режиме sales_mode=tariffs.

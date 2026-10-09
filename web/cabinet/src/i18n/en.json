@@ -40,7 +40,10 @@
       "continueBefore": "By continuing, you agree to the ",
       "privacyPolicy": "privacy policy",
       "continueAnd": " and ",
-      "userAgreement": "terms of service"
+      "userAgreement": "terms of service",
+      "payShortBefore": "By paying, you accept the ",
+      "payShortAgreement": "terms",
+      "payShortPrivacy": "privacy policy"
     },
     "auth": {
       "login": "Sign in",
@@ -83,7 +86,8 @@
       "resendCooldown": "Resend in {{sec}}s",
       "checkSpam": "Didn't receive it? Check your spam folder.",
       "resendNeedEmail": "Open this page from the registration or link-email flow so we know which address to resend to.",
-      "backToLogin": "Back to sign in"
+      "backToLogin": "Back to sign in",
+      "changeEmail": "Wrong address? Use a different email"
     },
     "forgotPassword": {
       "title": "Reset password",
@@ -214,6 +218,11 @@
       "deleteDevice": "Delete",
       "deleteDeviceConfirm": "Delete this device?",
       "deleteDeviceConfirmHint": "The device will be disconnected from the subscription and free up its slot. You can connect it again at any time.",
+      "renameDevice": "Rename",
+      "renameDeviceSave": "Save",
+      "renameDeviceCancel": "Cancel",
+      "renameDevicePlaceholder": "Device name",
+      "renameDeviceError": "Could not rename the device",
       "extraDevicesTitle": "Additional options",
       "extraDevicesBuyTitle": "Buy more device slots",
       "extraDevicesDecreaseTitle": "Reduce device slots",
@@ -1130,6 +1139,7 @@
         "loyalty": "Loyalty",
         "broadcast": "Broadcast",
         "partners": "Partners",
+        "status": "Status",
         "infra": "Infrastructure",
         "sync": "Sync",
         "settings": "Bot settings"
@@ -1162,6 +1172,17 @@
         "badRequest": "Invalid request data.",
         "unauthorized": "Session expired. Please sign in again.",
         "forbidden": "Insufficient permissions.",
+        "csrf": "Session is missing the check token. Sign out and sign in again.",
+        "statusName": "Enter a country name.",
+        "statusCountry": "Country code is two letters, for example NL.",
+        "statusAddress": "A public IP or domain is required. Probes do not check private addresses.",
+        "statusNote": "The caption is longer than 48 characters.",
+        "statusTooMany": "Too many countries. The maximum is 24.",
+        "statusInterval": "Interval must be from 5 to 180 minutes.",
+        "statusWorld": "World probes must be from 1 to 10, or empty.",
+        "statusRussia": "Russia probes must be from 1 to 30, or empty.",
+        "statusProbeBusy": "A check is already running. Wait for it to finish.",
+        "statusProbeEmpty": "There are no enabled countries with an address. Save the list and try again.",
         "notFound": "Not found.",
         "conflict": "Operation already running or data conflict.",
         "tooManyRequests": "Too many requests. Please wait.",
@@ -2223,6 +2244,34 @@
         "attachmentNone": "none, text only",
         "previewEmpty": "Your broadcast text will appear here"
       },
+      "statusPage": {
+        "title": "Status",
+        "subtitle": "Map, ping and copy on the public status page",
+        "open": "Open page",
+        "note": "Node addresses are not included in the page response and never reach the browser. Probes do not call private addresses. The 30-day bar fills only for days that were actually measured.",
+        "targetsTitle": "Countries to check",
+        "targetsHint": "An empty list keeps the panel nodes on the page. Your list replaces them and appears in the order set here. The address is visible only here: a public IP or a domain. 0 probes means “use the shared setting”. Interval is minutes, from 5 to 180. “Whitelists” checks the address only through belspiski.online.",
+        "targetsEmpty": "No countries yet. Add one, or leave the list empty to check panel nodes.",
+        "targetsSaved": "Country list saved.",
+        "forceProbe": "Check now",
+        "forceProbeStarted": "Check started for the saved list. The status page updates when the probes reply.",
+        "addTarget": "Add country",
+        "removeTarget": "Remove country",
+        "moveUp": "Move up",
+        "moveDown": "Move down",
+        "fieldName": "Name",
+        "fieldCountry": "Country",
+        "fieldAddress": "IP or domain",
+        "fieldEnabled": "On",
+        "fieldInterval": "Interval, min",
+        "fieldIntervalPlaceholder": "shared",
+        "fieldWorld": "World probes",
+        "fieldRussia": "Russia probes",
+        "fieldWhitelist": "Whitelists",
+        "fieldNote": "Caption",
+        "fieldNotePlaceholder": "+ whitelists",
+        "fieldCountPlaceholder": "shared"
+      },
       "infra": {
         "title": "Infrastructure",
         "subtitle": "Server and provider billing",
@@ -2334,6 +2383,10 @@
             "schedule": "Holiday auto-switch",
             "sections": "Subscription page sections"
           },
+          "landing": {
+            "copy": "First screen copy",
+            "sections": "Which blocks to show"
+          },
           "cabinet_connect": {
             "deeplink": "Connection deep links",
             "telegram": "Telegram buttons (minimalism)"
@@ -2358,6 +2411,8 @@
           "links": "Bot links",
           "fortune": "Fortune wheel",
           "cabinet": "Cabinet appearance",
+          "landing": "Landing page",
+          "status": "Status page",
           "cabinet_connect": "Connection and Telegram",
           "tariffs": "Price display"
         },
@@ -2629,6 +2684,10 @@
             "label": "Forward messages to admin",
             "hint": "Text and unknown commands"
           },
+          "SUSPICIOUS_USER_FILTER_ENABLED": {
+            "label": "Suspicious name filter",
+            "hint": "Blocks names posing as Telegram or support (t.me, Telegram Support)"
+          },
           "BLOCKED_TELEGRAM_IDS": {
             "label": "Blocked Telegram IDs",
             "hint": "Comma-separated"
@@ -2652,6 +2711,78 @@
           "CABINET_DECOR_SCHEDULE": {
             "label": "Holiday theme schedule",
             "hint": ""
+          },
+          "LANDING_HERO_TITLE": {
+            "label": "Landing headline",
+            "hint": "Empty uses the translation. Your text replaces the whole headline"
+          },
+          "LANDING_HERO_SUBTITLE": {
+            "label": "Subtitle",
+            "hint": "Empty uses the translation"
+          },
+          "LANDING_NOTE": {
+            "label": "Line under the buttons",
+            "hint": "Short note, for example about a trial. Empty uses the translation"
+          },
+          "LANDING_STAT_TRAFFIC_VALUE": {
+            "label": "Traffic figure",
+            "hint": "Large text on the first chip. Empty uses the translation"
+          },
+          "LANDING_STAT_TRAFFIC_LABEL": {
+            "label": "Traffic caption",
+            "hint": "Small caption under the figure. Empty uses the translation"
+          },
+          "LANDING_STAT_DEVICES_VALUE": {
+            "label": "Devices figure",
+            "hint": "Large text on the second chip. Empty uses the translation"
+          },
+          "LANDING_STAT_DEVICES_LABEL": {
+            "label": "Devices caption",
+            "hint": "Small caption under the figure. Empty uses the translation"
+          },
+          "LANDING_SHOW_TARIFFS": {
+            "label": "Pricing block",
+            "hint": "Prices come from the showcase; this only shows or hides the block"
+          },
+          "LANDING_SHOW_STEPS": {
+            "label": "How it works block",
+            "hint": ""
+          },
+          "LANDING_SHOW_FEATURES": {
+            "label": "Features block",
+            "hint": ""
+          },
+          "LANDING_SHOW_FAQ": {
+            "label": "FAQ block",
+            "hint": ""
+          },
+          "STATUS_PROBES_ENABLED": {
+            "label": "Probe ping",
+            "hint": "A few points from the world and from Russia. Off — the page keeps only panel node reachability"
+          },
+          "STATUS_WORLD_PROBES": {
+            "label": "World probes",
+            "hint": "From 1 to 10. Default is 3"
+          },
+          "STATUS_RUSSIA_PROBES": {
+            "label": "Russia probes",
+            "hint": "From 1 to 30. Default is 20"
+          },
+          "STATUS_PROBE_INTERVAL_MIN": {
+            "label": "Check interval, min",
+            "hint": "How often to ping when a country has no interval of its own. From 5 to 180, default 20"
+          },
+          "STATUS_SHOW_MAP": {
+            "label": "Map",
+            "hint": "Location dots and lines to the Russia probes"
+          },
+          "STATUS_PAGE_TITLE": {
+            "label": "Page title",
+            "hint": "Empty — live status: all servers up, or some trouble"
+          },
+          "STATUS_PAGE_LEAD": {
+            "label": "Subtitle",
+            "hint": "Empty — cabinet translation"
           },
           "CABINET_SUBSCRIPTION_SHOW_LOYALTY": {
             "label": "Loyalty card on subscription page",
@@ -2942,16 +3073,28 @@
         "features": "Features",
         "how": "How it works",
         "tariffs": "Pricing",
+        "apps": "App",
         "faq": "FAQ",
+        "status": "Status",
         "cabinet": "Dashboard",
         "login": "Sign in",
+        "try": "Try it",
         "menu": "Menu"
       },
       "hero": {
+        "headline": "The internet, open again",
         "titleBefore": "",
         "titleAfter": "— fast and private VPN",
-        "subtitle": "Available on every device",
-        "ctaCabinet": "Go to dashboard"
+        "subtitle": "Sites and apps open the way they used to. One subscription for your devices, and paid plans do not cap traffic.",
+        "note": "Setup takes a couple of minutes. No card is required to open the dashboard.",
+        "ctaCabinet": "Open dashboard",
+        "ctaTelegram": "Open in Telegram",
+        "stats": {
+          "trafficValue": "Unlimited",
+          "trafficLabel": "Traffic on paid plans",
+          "devicesValue": "Several",
+          "devicesLabel": "Devices on one subscription"
+        }
       },
       "panel": {
         "status": "Subscription active",
@@ -3003,6 +3146,36 @@
           }
         }
       },
+      "path": {
+        "eyebrow": "The path",
+        "title": "Your provider sees an ordinary connection",
+        "text": "What gets blocked is a recognizable trace in the traffic, not the word VPN. The connection looks like ordinary encrypted traffic, so the provider has nothing to latch onto.",
+        "steps": {
+          "device": {
+            "title": "Your device",
+            "text": "Phone, computer or TV opens the app and sends the request."
+          },
+          "provider": {
+            "title": "Your provider",
+            "text": "To the provider this is an ordinary encrypted connection, with no list of sites."
+          },
+          "server": {
+            "title": "Our server",
+            "text": "The server accepts the subscription and reaches the network from its own address."
+          },
+          "site": {
+            "title": "The site",
+            "text": "The site opens as if you were browsing from another country."
+          }
+        },
+        "callout": "The connection stays ordinary even where a recognizable trace gets cut.",
+        "cta": "Plans and prices"
+      },
+      "apps": {
+        "eyebrow": "The app",
+        "title": "One key for phone and computer",
+        "text": "The subscription opens in an app. The cabinet gives you the link and the steps after payment."
+      },
       "steps": {
         "eyebrow": "How it works",
         "title": "Three steps to a working VPN",
@@ -3025,10 +3198,19 @@
       },
       "tariffs": {
         "eyebrow": "Pricing",
-        "title": "Simple prices, no surprises",
-        "subtitle": "You pay for the period you choose, with no automatic charges by default. Full terms and plan details live in the dashboard.",
+        "title": "You pay for the plan",
+        "subtitle": "The longer the term, the cheaper each month. Plan details and devices are in the dashboard.",
         "cta": "Get started",
-        "perMonthFull": "/ per month"
+        "perMonthFull": "/ per month",
+        "periodMonths": "{{count}} mo.",
+        "periodYear": "1 year",
+        "pay": {
+          "label": "Pay with:",
+          "sbp": "SBP",
+          "card": "Card",
+          "crypto": "Crypto",
+          "stars": "Telegram Stars"
+        }
       },
       "faq": {
         "eyebrow": "FAQ",
@@ -3072,6 +3254,76 @@
         "windows": "Windows",
         "linux": "Linux",
         "tv": "Smart TV"
+      },
+      "status": {
+        "eyebrow": "Status",
+        "allUp": "Every location is up",
+        "partial": "Some locations are down",
+        "empty": "No locations yet",
+        "unavailable": "Panel status is unavailable",
+        "updated": "Updated {{time}}",
+        "online": "{{online}} of {{total}} up",
+        "legendUp": "Up",
+        "legendPartial": "Connecting",
+        "legendDown": "Down",
+        "colLocation": "Location",
+        "colState": "Panel",
+        "emptyHint": "Servers will show up here once the panel has them.",
+        "whatTitle": "What the status means",
+        "whatBody": "This is whether the control panel can see its own server. It is not a speed test to your provider and not a promise that a particular site will open.",
+        "missingTitle": "Why a location may be missing",
+        "missingBody": "The list only includes servers the panel exposes. Address and port stay private.",
+        "support": "Contact support",
+        "mapLabel": "Location map",
+        "mapEurope": "Europe",
+        "mapWorld": "World",
+        "mapRu": "Russia · probes",
+        "mapLegendUp": "Up",
+        "mapLegendPartial": "Partial",
+        "mapLegendDown": "Down",
+        "mapLegendRu": "Probes in Russia",
+        "mapMoreWorld": "{{count}} more — on the World view",
+        "expand": "Details",
+        "providersOpen": "By provider · {{count}}",
+        "providersHide": "Hide providers",
+        "providersLeadAll": "The server opens from all {{total}} home providers we checked.",
+        "providersLeadSome": "The server opens from {{ok}} of {{total}} home providers we checked.",
+        "providersPending": "The probe list appears after the next check.",
+        "colCity": "City",
+        "colProvider": "Provider",
+        "colResult": "Result",
+        "colPing": "Response",
+        "colAnswer": "Operator reply",
+        "whitelistProbes": "Whitelists",
+        "hitUp": "Ping",
+        "hitDown": "Unreachable",
+        "hitPing": "{{ms}} ms",
+        "updatedMin": "Updated {{count}} min ago",
+        "updatedJust": "Updated just now",
+        "leadProbes": "Probes check whether the server address opens from the world and from Russia.",
+        "cardWorldTitle": "Check from the world",
+        "cardWorldBody": "{{count}} probes in other countries check whether the server opens. A measurement runs about every {{minutes}} min.",
+        "cardRussiaTitle": "Check from Russia",
+        "cardRussiaBody": "{{count}} Globalping probes on home providers in Russia check whether the address opens. That shows if a particular network is blocking it.",
+        "cardSupportTitle": "Trouble connecting?",
+        "cardSupportBody": "If the server is reachable at your provider but the VPN does not connect, write to us and we will sort it out.",
+        "cardSupportCta": "Contact support",
+        "probesOff": "Probe ping is off. Below is only panel node reachability.",
+        "colWorld": "From the world",
+        "colRussia": "From Russia",
+        "colHistory": "Last 30 days",
+        "worldUp": "Up",
+        "worldDown": "Down",
+        "worldPending": "Still measuring",
+        "worldPing": "ping {{ms}} ms",
+        "russiaUp": "Address reachable",
+        "inWhitelist": "On whitelists",
+        "russiaDown": "Address unreachable",
+        "russiaRatio": "{{ok}} of {{total}} providers",
+        "historyEmpty": "No measurements yet",
+        "historyPct": "{{pct}}% over {{days}} days",
+        "historyPast": "30 days ago",
+        "historyNow": "Today"
       },
       "footer": {
         "tagline": "A VPN service with payments and subscription management in Telegram and the web dashboard.",

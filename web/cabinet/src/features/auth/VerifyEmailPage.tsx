@@ -32,6 +32,7 @@ export default function VerifyEmailPage() {
   const setToken = useAuthStore((s) => s.setToken)
   const fetchMe = useAuthStore((s) => s.fetchMe)
   const accessToken = useAuthStore((s) => s.accessToken)
+  const user = useAuthStore((s) => s.user)
   const { data: bootstrap } = useAuthBootstrap()
 
   const emailFromState = (location.state as { email?: string })?.email ?? ''
@@ -44,6 +45,7 @@ export default function VerifyEmailPage() {
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
   const [confirmLoading, setConfirmLoading] = useState(false)
+  const [changeLoading, setChangeLoading] = useState(false)
   const [legacyLoading, setLegacyLoading] = useState(!!tokenFromURL && isLegacyVerifyToken(tokenFromURL))
 
   // Старые письма со ссылкой ?token=base64… — подтверждаем автоматически.
@@ -104,6 +106,35 @@ export default function VerifyEmailPage() {
     } finally {
       setResendSecurity(false)
       setResendLoading(false)
+    }
+  }
+
+  // Почта привязана к Telegram/OAuth-аккаунту как доп. способ входа, но не
+  // подтверждена (например, опечатка в адресе). Без этой кнопки пользователь
+  // заперт: requireVerified-роуты всегда ведут сюда, а код уходит не туда.
+  const canChangeEmail =
+    !!accessToken && !!user && !user.email_verified && user.providers.some((p) => p !== 'email')
+
+  async function handleChangeEmail() {
+    setChangeLoading(true)
+    setMessage(null)
+    setError(null)
+    try {
+      await api.identityUnlink('email')
+      // В текущем JWT ещё email_verified=false — без refresh бэкенд вернёт 403
+      // на подписку и платежи.
+      const data = await api.refresh()
+      setToken(data.access_token)
+      await fetchMe()
+      navigate('/accounts/email', { replace: true })
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 400) {
+        setError(t('accounts.unlinkLastMethod'))
+      } else {
+        setError(t('errors.unknown'))
+      }
+    } finally {
+      setChangeLoading(false)
     }
   }
 
@@ -206,6 +237,12 @@ export default function VerifyEmailPage() {
               ? t('verifyEmail.resendCooldown', { sec: resendCooldown })
               : t('verifyEmail.resend')}
           </Button>
+
+          {canChangeEmail && (
+            <Button variant="ghost" className="w-full" onClick={handleChangeEmail} loading={changeLoading}>
+              {t('verifyEmail.changeEmail')}
+            </Button>
+          )}
 
           <Link
             to="/login"

@@ -7,13 +7,13 @@ import type { TFunction } from 'i18next'
 
 import { AppLayout } from '@/components/AppLayout'
 import { ConfirmModal } from '@/components/ConfirmModal'
-import { DevicePlatformIcon } from '@/components/DevicePlatformIcon'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
 import { SubscriptionActions } from '@/components/SubscriptionActions'
 import { SubscriptionExpireAtBlock } from '@/components/SubscriptionExpireAtBlock'
 import { TrafficUsageBar } from '@/components/TrafficUsageBar'
 import { LoyaltyCompactCard } from '@/features/loyalty/LoyaltyProgramPage'
 import { AddDeviceSlot, ConnectExtraDeviceCard, ConnectInviteModal } from '@/features/subscription/ConnectExtraDevice'
+import { DeviceRow } from '@/features/subscription/DeviceRow'
 import { SubscriptionExtraDevices } from '@/features/subscription/SubscriptionExtraDevices'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -277,42 +277,14 @@ export default function SubscriptionPage() {
                   </p>
                 ) : (
                   <ul className="space-y-1">
-                    {devices.devices.map((d) => {
-                      const title = d.device_model || d.platform || d.hwid
-                      const subtitle = [d.platform, d.os_version].filter(Boolean).join(' · ')
-                      return (
-                        <li
-                          key={d.hwid}
-                          className="cabinet-row flex items-center justify-between gap-3 rounded-xl px-3 py-2"
-                        >
-                          <div className="flex min-w-0 items-center gap-3">
-                            {/* Иконка по платформе: ноутбук для macOS/Windows, телефон для мобильных. */}
-                            <span className="cabinet-icon-box inline-flex size-9 shrink-0 items-center justify-center rounded-lg">
-                              <DevicePlatformIcon
-                                platform={d.platform ?? d.device_model}
-                                className="size-4"
-                              />
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-medium">{title}</p>
-                              <p className="truncate text-xs text-muted-foreground">
-                                {subtitle || d.hwid}
-                              </p>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            disabled={deleteDevice.isPending}
-                            onClick={() => setDeleteConfirmHwid(d.hwid)}
-                            aria-label={t('subscriptionPage.deleteDevice')}
-                            title={t('subscriptionPage.deleteDevice')}
-                            className="shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </li>
-                      )
-                    })}
+                    {devices.devices.map((d) => (
+                      <DeviceRow
+                        key={d.hwid}
+                        device={d}
+                        deleteDisabled={deleteDevice.isPending}
+                        onDelete={() => setDeleteConfirmHwid(d.hwid)}
+                      />
+                    ))}
                   </ul>
                 )}
 

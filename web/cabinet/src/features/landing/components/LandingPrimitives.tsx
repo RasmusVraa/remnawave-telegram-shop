@@ -75,7 +75,7 @@ interface SectionHeadingProps {
 /** Единая шапка секции: бейдж → заголовок → лид. Все три появляются лесенкой. */
 export function SectionHeading({ eyebrow, title, description, className }: SectionHeadingProps) {
   return (
-    <div className={cn('mx-auto max-w-2xl text-center', className)}>
+    <div className={cn('max-w-2xl text-left', className)}>
       <Reveal>
         <span className="landing-pill px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.14em]">
           <span className="size-1.5 rounded-full bg-[hsl(var(--lp-cyan))]" aria-hidden />

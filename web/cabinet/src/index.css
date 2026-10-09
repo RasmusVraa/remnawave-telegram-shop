@@ -32,52 +32,52 @@
       var(--tg-safe-area-inset-bottom, 0px) + var(--tg-content-safe-area-inset-bottom, 0px)
     );
 
-    /* Light theme */
-    --connect-device-inner-bg: 210 40% 96%;
-    --connect-device-inner-bg-hover: 210 35% 91%;
-    --background: 210 40% 98%;
-    --foreground: 222 47% 11%;
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --border: 214 32% 89%;
-    --input: 214 32% 89%;
-    --primary: 174 72% 36%;
+    /* Light theme: розово-фиолетовая пастель. Декор-тема из админки подменяет --primary. */
+    --connect-device-inner-bg: 320 40% 96%;
+    --connect-device-inner-bg-hover: 320 32% 92%;
+    --background: 320 42% 98%;
+    --foreground: 280 28% 16%;
+    --card: 320 45% 99%;
+    --card-foreground: 280 28% 16%;
+    --border: 318 28% 90%;
+    --input: 318 28% 90%;
+    --primary: 322 46% 46%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 40% 95%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 210 40% 95%;
-    --muted-foreground: 215 16% 47%;
-    --accent: 174 72% 36%;
+    --secondary: 318 40% 96%;
+    --secondary-foreground: 280 28% 16%;
+    --muted: 318 36% 95%;
+    --muted-foreground: 280 12% 42%;
+    --accent: 270 40% 62%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --ring: 174 72% 36%;
+    --ring: 322 46% 46%;
     --tariffs-shine-color: 73 73 73;
     --tariffs-shine-shadow: 73 73 73;
     --radius: 1.25rem;
   }
 
   .dark {
-    --connect-device-inner-bg: 218 32% 20%;
-    --connect-device-inner-bg-hover: 218 32% 23%;
+    --connect-device-inner-bg: 278 24% 18%;
+    --connect-device-inner-bg-hover: 278 22% 22%;
     /* Поверхности разведены по lightness: фон → muted → card → secondary → border */
-    --background: 226 50% 9%;
-    --foreground: 210 40% 96%;
-    --card: 220 38% 16%;
-    --card-foreground: 210 40% 96%;
-    --border: 215 28% 26%;
-    --input: 215 28% 24%;
-    --primary: 198 89% 50%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 218 32% 20%;
-    --secondary-foreground: 210 40% 96%;
-    --muted: 222 28% 14%;
-    --muted-foreground: 214 24% 63%;
-    --accent: 198 89% 50%;
-    --accent-foreground: 0 0% 100%;
+    --background: 278 32% 9%;
+    --foreground: 320 30% 96%;
+    --card: 278 24% 14%;
+    --card-foreground: 320 30% 96%;
+    --border: 280 18% 24%;
+    --input: 280 18% 22%;
+    --primary: 326 62% 74%;
+    --primary-foreground: 280 30% 12%;
+    --secondary: 278 22% 18%;
+    --secondary-foreground: 320 30% 96%;
+    --muted: 276 22% 13%;
+    --muted-foreground: 300 16% 72%;
+    --accent: 270 48% 74%;
+    --accent-foreground: 280 30% 12%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --ring: 198 89% 50%;
+    --ring: 326 62% 74%;
     --tariffs-shine-color: 214 214 214;
     --tariffs-shine-shadow: 255 255 255;
     --radius: 1.25rem;
@@ -96,9 +96,9 @@
       ),
       linear-gradient(
         168deg,
-        hsl(222 46% 12%) 0%,
+        hsl(286 32% 13%) 0%,
         hsl(var(--background)) 42%,
-        hsl(229 54% 7%) 100%
+        hsl(280 36% 7%) 100%
       );
   }
 
@@ -143,7 +143,7 @@
     font-weight: 700;
   }
 
-  /* Тёмная тема: midnight-синеватый depth + cyan-свечение сверху. */
+  /* Тёмная тема: сливовый фон и пастельное свечение от --primary. */
   .dark body {
     background-image: var(--cabinet-dark-bg-image);
   }
@@ -175,6 +175,72 @@
 
   .cabinet-app-header {
     padding-top: var(--cabinet-tg-safe-top);
+  }
+
+  /*
+   * iPhone (html[data-cabinet-ios], ставит main.tsx): «сплошные края».
+   * В Safari на iOS 26 и в новом Telegram панели браузера плавающие и
+   * прозрачные, страница заходит под них. Шапка и нижнее меню прижаты к краю
+   * видимой области, и в щелях между ними и панелями просвечивало содержимое.
+   * Фон шапки продолжаем вверх, меню делаем сплошной панелью и продолжаем вниз:
+   * панели браузера ложатся на наш фон. Где панелей нет (Mini App, PWA),
+   * продолжение уходит за край экрана — видно его только при оттяжке за край.
+   */
+  html[data-cabinet-ios] .cabinet-edge-header {
+    background-color: hsl(var(--card));
+    /* Шапка и так непрозрачная, а размытие в WebKit мешало бы рисовать за её границей. */
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  /*
+   * Продолжение шапки вверх — отдельная fixed-полоса над верхним краем видимой
+   * области, а не ::before у шапки: у шапки с backdrop-filter WebKit на iPhone
+   * не рисовал выходящий за неё ::before (проверено на iOS 27). Шапка sticky top-0,
+   * поэтому верх видимой области — это всегда её верх.
+   */
+  .cabinet-edge-top {
+    display: none;
+  }
+  html[data-cabinet-ios] .cabinet-edge-top {
+    display: block;
+    position: fixed;
+    z-index: 50;
+    inset-inline: 0;
+    bottom: 100%;
+    height: 100vh;
+    background-color: hsl(var(--card));
+    pointer-events: none;
+  }
+  html[data-cabinet-ios] .cabinet-edge-nav {
+    padding: 0;
+  }
+  /* Продолжение вниз — у самого nav: у полоски внутри overflow-x-auto, он бы его обрезал. */
+  html[data-cabinet-ios] .cabinet-edge-nav::after {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 100%;
+    height: 100vh;
+    background-color: hsl(var(--card));
+  }
+  html[data-cabinet-ios] .cabinet-edge-nav-bar {
+    border-width: 1px 0 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    background-color: hsl(var(--card));
+    padding-bottom: max(0.375rem, env(safe-area-inset-bottom, 0px), var(--cabinet-tg-safe-bottom));
+    box-shadow: 0 -10px 24px -16px rgb(0 0 0 / 0.55);
+  }
+
+  /*
+   * Шторка под плашкой оплаты на телефоне (CheckoutPage): лента мягко уходит
+   * под неё, а текст и кнопка лежат уже на сплошном фоне страницы.
+   */
+  .cabinet-pay-scrim {
+    background-image: linear-gradient(
+      to bottom,
+      hsl(var(--background) / 0) 0,
+      hsl(var(--background)) 1.75rem
+    );
   }
 
   /*

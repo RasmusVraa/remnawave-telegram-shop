@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	adminauth "remnawave-tg-shop-bot/internal/cabinet/admin/auth"
 	googleoauth "remnawave-tg-shop-bot/internal/cabinet/auth/oauth"
@@ -32,6 +33,7 @@ type MeHandler struct {
 	ids          *repository.IdentityRepo
 	links        *repository.AccountCustomerLinkRepo
 	customers    *database.CustomerRepository
+	deviceNames  *database.DeviceNameRepository
 	bootstrap    *bootstrap.CustomerBootstrap
 	payments     *payment.PaymentService
 	purchases    *database.PurchaseRepository
@@ -60,6 +62,7 @@ func NewMe(
 	purchases *database.PurchaseRepository,
 	rw *remnawave.Client,
 	customers *database.CustomerRepository,
+	deviceNames *database.DeviceNameRepository,
 	adminChecker *adminauth.Checker,
 	tgProfiles *tgprofile.Service,
 	avatarSecret []byte,
@@ -72,7 +75,7 @@ func NewMe(
 ) *MeHandler {
 	return &MeHandler{
 		svc: svc, accounts: accounts, ids: ids, links: links, bootstrap: boot, payments: payments, purchases: purchases, rw: rw,
-		customers: customers, adminChecker: adminChecker, tgProfiles: tgProfiles, avatarSecret: avatarSecret,
+		customers: customers, deviceNames: deviceNames, adminChecker: adminChecker, tgProfiles: tgProfiles, avatarSecret: avatarSecret,
 		cookieDomain: cookieDomain, telegramWidgetBot: telegramWidgetBot,
 		googleOAuthEnabled: googleOAuthEnabled, yandexOAuthEnabled: yandexOAuthEnabled, vkOAuthEnabled: vkOAuthEnabled, telegramOIDCEnabled: telegramOIDCEnabled,
 	}
@@ -84,8 +87,10 @@ type meDeviceItem struct {
 	OSVersion   string `json:"os_version,omitempty"`
 	DeviceModel string `json:"device_model,omitempty"`
 	UserAgent   string `json:"user_agent,omitempty"`
-	CreatedAt   string `json:"created_at,omitempty"`
-	UpdatedAt   string `json:"updated_at,omitempty"`
+	// CustomName — название, которое пользователь дал устройству в кабинете.
+	CustomName string `json:"custom_name,omitempty"`
+	CreatedAt  string `json:"created_at,omitempty"`
+	UpdatedAt  string `json:"updated_at,omitempty"`
 }
 
 type meDevicesResp struct {
@@ -97,6 +102,11 @@ type meDevicesResp struct {
 
 type meDeleteDeviceReq struct {
 	HWID string `json:"hwid"`
+}
+
+type meRenameDeviceReq struct {
+	HWID string `json:"hwid"`
+	Name string `json:"name"`
 }
 
 type meResp struct {
@@ -479,7 +489,7 @@ func (h *MeHandler) PutPassword(w http.ResponseWriter, r *http.Request) {
 		writeServiceErr(w, err, "change_password")
 		return
 	}
-	setRefreshCookie(w, pair, h.cookieDomain, refreshCookiePath)
+	setRefreshCookie(w, r, pair, h.cookieDomain, refreshCookiePath)
 	writeJSON(w, http.StatusOK, loginResp{
 		AccessToken: pair.AccessToken,
 		AccessExp:   pair.AccessExp.Unix(),
@@ -752,12 +762,21 @@ func (h *MeHandler) GetDevices(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, meDevicesResp{Enabled: true, DeviceLimit: limit, Devices: []meDeviceItem{}})
 		return
 	}
+	// Без названий список всё равно нужен: ошибка БД не должна прятать устройства.
+	var names map[string]string
+	if h.deviceNames != nil {
+		names, err = h.deviceNames.ListByCustomer(r.Context(), c.ID)
+		if err != nil {
+			slog.Warn("me: list device names failed", "account_id", claims.AccountID, "error", err.Error())
+		}
+	}
 	out := make([]meDeviceItem, 0, len(devs))
 	for _, d := range devs {
 		item := meDeviceItem{
-			HWID:      d.Hwid,
-			CreatedAt: d.CreatedAt.UTC().Format(time.RFC3339),
-			UpdatedAt: d.UpdatedAt.UTC().Format(time.RFC3339),
+			HWID:       d.Hwid,
+			CustomName: names[d.Hwid],
+			CreatedAt:  d.CreatedAt.UTC().Format(time.RFC3339),
+			UpdatedAt:  d.UpdatedAt.UTC().Format(time.RFC3339),
 		}
 		if d.Platform != nil {
 			item.Platform = *d.Platform
@@ -801,26 +820,8 @@ func (h *MeHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing hwid", http.StatusBadRequest)
 		return
 	}
-	if h.rw == nil || h.bootstrap == nil || h.customers == nil {
-		http.Error(w, "devices are unavailable", http.StatusNotImplemented)
-		return
-	}
-	link, err := h.bootstrap.EnsureForAccount(r.Context(), claims.AccountID, "")
-	if err != nil || link == nil {
-		if handleAccountGone(w, err, "me.delete_device", claims.AccountID) {
-			return
-		}
-		http.Error(w, "subscription not found", http.StatusNotFound)
-		return
-	}
-	c, err := h.customers.FindById(r.Context(), link.CustomerID)
-	if err != nil || c == nil {
-		http.Error(w, "subscription not found", http.StatusNotFound)
-		return
-	}
-	rwUser, err := cabsvc.ResolveRemnawaveCustomerUser(r.Context(), h.rw, h.customers, c)
-	if err != nil {
-		http.Error(w, "subscription not found", http.StatusNotFound)
+	c, rwUser, ok := h.resolveDeviceOwner(w, r, claims.AccountID, "me.delete_device")
+	if !ok {
 		return
 	}
 	if err := h.rw.DeleteUserDevice(r.Context(), rwUser.ID, hwid); err != nil {
@@ -828,7 +829,109 @@ func (h *MeHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "delete device failed", http.StatusBadRequest)
 		return
 	}
+	// Название уходит вместе с устройством: при повторном подключении того же
+	// HWID оно не вернётся. Сбой здесь не отменяет уже сделанное удаление.
+	if h.deviceNames != nil {
+		if err := h.deviceNames.Delete(r.Context(), c.ID, hwid); err != nil {
+			slog.Warn("me: delete device name failed", "account_id", claims.AccountID, "error", err.Error())
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+// RenameDevice — POST /cabinet/api/me/devices/rename: задаёт своё название
+// устройству. Пустое имя сбрасывает его к исходному из Remnawave.
+func (h *MeHandler) RenameDevice(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req meRenameDeviceReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	hwid := strings.TrimSpace(req.HWID)
+	if hwid == "" {
+		http.Error(w, "missing hwid", http.StatusBadRequest)
+		return
+	}
+	name := strings.Join(strings.Fields(req.Name), " ")
+	if utf8.RuneCountInString(name) > database.DeviceNameMaxLen {
+		http.Error(w, "name too long", http.StatusBadRequest)
+		return
+	}
+	if h.deviceNames == nil {
+		http.Error(w, "devices are unavailable", http.StatusNotImplemented)
+		return
+	}
+	c, rwUser, ok := h.resolveDeviceOwner(w, r, claims.AccountID, "me.rename_device")
+	if !ok {
+		return
+	}
+	// Переименовать можно только своё подключённое устройство: иначе таблица
+	// копила бы названия для произвольных строк.
+	devs, err := h.rw.GetUserDevices(r.Context(), rwUser.ID)
+	if err != nil {
+		slog.Warn("me: rename device: list devices failed", "account_id", claims.AccountID, "error", err.Error())
+		http.Error(w, "rename device failed", http.StatusBadGateway)
+		return
+	}
+	found := false
+	for _, d := range devs {
+		if d.Hwid == hwid {
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.Error(w, "device not found", http.StatusNotFound)
+		return
+	}
+	if name == "" {
+		err = h.deviceNames.Delete(r.Context(), c.ID, hwid)
+	} else {
+		err = h.deviceNames.Upsert(r.Context(), c.ID, hwid, name)
+	}
+	if err != nil {
+		slog.Warn("me: rename device failed", "account_id", claims.AccountID, "error", err.Error())
+		http.Error(w, "rename device failed", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "custom_name": name})
+}
+
+// resolveDeviceOwner находит клиента и пользователя Remnawave для действий над
+// устройствами. При неудаче сам пишет ответ и возвращает ok=false.
+func (h *MeHandler) resolveDeviceOwner(w http.ResponseWriter, r *http.Request, accountID int64, op string) (*database.Customer, *remnawave.User, bool) {
+	if h.rw == nil || h.bootstrap == nil || h.customers == nil {
+		http.Error(w, "devices are unavailable", http.StatusNotImplemented)
+		return nil, nil, false
+	}
+	link, err := h.bootstrap.EnsureForAccount(r.Context(), accountID, "")
+	if err != nil || link == nil {
+		if handleAccountGone(w, err, op, accountID) {
+			return nil, nil, false
+		}
+		http.Error(w, "subscription not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	c, err := h.customers.FindById(r.Context(), link.CustomerID)
+	if err != nil || c == nil {
+		http.Error(w, "subscription not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	rwUser, err := cabsvc.ResolveRemnawaveCustomerUser(r.Context(), h.rw, h.customers, c)
+	if err != nil {
+		http.Error(w, "subscription not found", http.StatusNotFound)
+		return nil, nil, false
+	}
+	return c, rwUser, true
 }
 
 type meHwidExtraApplyReq struct {
@@ -996,7 +1099,7 @@ func (h *MeHandler) PostAccountDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	clearCabinetSessionCookies(w, h.cookieDomain)
+	clearCabinetSessionCookies(w, r, h.cookieDomain)
 	writeJSON(w, http.StatusOK, messageResp{Message: "account deleted"})
 }
 

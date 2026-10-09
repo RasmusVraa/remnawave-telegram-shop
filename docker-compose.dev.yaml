@@ -1,0 +1,57 @@
+# Development docker-compose - для локальной разработки с локальной сборкой
+# Использование: docker compose -f docker-compose.dev.yaml up -d
+
+services:
+  bot:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./translations:/translations
+    networks:
+      - remnawave-network
+    ports:
+      - "3002:3002"
+      
+  db:
+    image: postgres:17.7
+    container_name: "remnawave-telegram-shop-db"
+    hostname: remnawave-telegram-shop-db
+    restart: unless-stopped
+    command: ["postgres", "-c", "jit=off"]
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - TZ=UTC
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - remnawave-telegram-shop-db-data:/var/lib/postgresql/data
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
+    networks:
+      - remnawave-network
+
+volumes:
+  remnawave-telegram-shop-db-data:
+    driver: local
+    external: false
+    name: remnawave-telegram-shop-db-data
+
+networks:
+  remnawave-network:
+    name: remnawave-network
+    driver: bridge
+    external: true
+

@@ -145,6 +145,23 @@ export interface AuthBootstrapResponse {
   deeplink_incy_encrypt?: boolean
   /** true — на странице подписки показывается плашка уровня лояльности (CABINET_SUBSCRIPTION_SHOW_LOYALTY, по умолчанию выключено); раздел /loyalty доступен всегда. */
   subscription_loyalty_visible?: boolean
+  /**
+   * Тексты и видимость секций лендинга. Пустая строка — брать перевод.
+   * Секции по умолчанию включены.
+   */
+  landing?: {
+    hero_title?: string
+    hero_subtitle?: string
+    note?: string
+    stat_traffic_value?: string
+    stat_traffic_label?: string
+    stat_devices_value?: string
+    stat_devices_label?: string
+    show_tariffs?: boolean
+    show_steps?: boolean
+    show_features?: boolean
+    show_faq?: boolean
+  }
   /** Декоративная тема кабинета (CABINET_DECOR_THEME) */
   decor_theme?:
     | 'off'
@@ -440,6 +457,8 @@ export interface DeviceInfo {
   os_version?: string
   device_model?: string
   user_agent?: string
+  /** Название, которое пользователь дал устройству в кабинете. */
+  custom_name?: string
   created_at?: string
   updated_at?: string
 }
@@ -1223,8 +1242,53 @@ export const api = {
   deleteDevice: (hwid: string) =>
     request<{ ok: boolean }>('POST', '/me/devices/delete', { hwid }),
 
+  /** Пустое name сбрасывает название к исходному из Remnawave. */
+  renameDevice: (hwid: string, name: string) =>
+    request<{ ok: boolean; custom_name: string }>('POST', '/me/devices/rename', { hwid, name }),
+
   // Tariffs
   tariffs: () => request<TariffsRawResponse>('GET', '/tariffs').then(normalizeTariffsResponse),
+
+  publicStatus: () =>
+    request<{
+      available: boolean
+      updated_at?: string
+      online: number
+      total: number
+      show_map?: boolean
+      probes_enabled?: boolean
+      probe_world?: number
+      probe_russia?: number
+      probe_interval_min?: number
+      title?: string
+      lead?: string
+      nodes: {
+        name: string
+        country?: string
+        note?: string
+        whitelist?: boolean
+        state: string
+        probe?: {
+          world_ping_ms?: number
+          world_ok: number
+          world_total: number
+          russia_ok: number
+          russia_total: number
+          history?: Array<number | null>
+          hits?: {
+            city?: string
+            network?: string
+            country?: string
+            lat?: number
+            lon?: number
+            ping_ms?: number
+            ok?: boolean
+            kind?: string
+            answer?: string
+          }[]
+        }
+      }[]
+    }>('GET', '/public/status'),
 
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider.
   checkout: (
@@ -1595,6 +1659,40 @@ export const api = {
   adminInfraSettings: () => request<AdminInfraSettingsDTO>('GET', '/admin/infra/settings'),
   adminInfraUpdateSettings: (body: { days: number; enabled: boolean }) =>
     request<AdminOkDTO>('PATCH', '/admin/infra/settings', body),
+
+  adminStatusTargets: () =>
+    request<{
+      targets: {
+        id: string
+        name: string
+        country: string
+        address: string
+        enabled: boolean
+        interval_min: number
+        world_probes: number
+        russia_probes: number
+        note?: string
+        whitelist?: boolean
+      }[]
+    }>('GET', '/admin/status/targets'),
+
+  saveAdminStatusTargets: (
+    targets: {
+      id: string
+      name: string
+      country: string
+      address: string
+      enabled: boolean
+      interval_min: number
+      world_probes: number
+      russia_probes: number
+      note?: string
+      whitelist?: boolean
+    }[],
+  ) =>
+    request<{ targets: { id: string }[] }>('PUT', '/admin/status/targets', { targets }),
+
+  adminStatusProbe: () => request<{ ok: boolean }>('POST', '/admin/status/probe'),
 
   adminBotSettings: () => request<AdminBotSettingsDTO>('GET', '/admin/settings'),
   adminBotSettingsPatch: (body: { settings: Record<string, string> }) =>

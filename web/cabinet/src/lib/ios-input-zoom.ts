@@ -1,3 +1,5 @@
+import { isIosWebKit } from '@/lib/utils'
+
 /**
  * Автозум iOS на фокусе поля ввода.
  *
@@ -16,13 +18,6 @@
  * пинч-зум у всего кабинета, а это единственный способ разглядеть мелкое для
  * тех, кому он нужен.
  */
-
-/** iPadOS 13+ представляется маком, поэтому одного userAgent мало. */
-function isIosWebKit(): boolean {
-  if (typeof navigator === 'undefined') return false
-  if (/iPad|iPhone|iPod/.test(navigator.userAgent)) return true
-  return navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
-}
 
 /**
  * Зумит только то, куда вводят текст с клавиатуры. Ползунки, чекбоксы и кнопки

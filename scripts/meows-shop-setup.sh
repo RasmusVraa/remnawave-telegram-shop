@@ -1263,14 +1263,38 @@ server {
 
     client_max_body_size 2m;
 
-    # Корень без /cabinet/ у бота даёт Go «404 page not found» — всегда редиректим.
+    # Публичный лендинг: https://${domain}/  (бот отдаёт SPA на GET /).
     location = / {
-        return 302 /cabinet/;
+        proxy_pass http://127.0.0.1:${port};
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host  \$host;
+        proxy_set_header X-Forwarded-Port  \$server_port;
     }
 
-    # Публичный лендинг на корне домена: https://${domain}/landing.
+    # Старый адрес лендинга: https://${domain}/landing.
     # Бот отдаёт его сам (mux.Handle("/landing") в internal/cabinet/http/router.go),
     # поэтому проксируем как есть — без редиректа на /cabinet/.
+    location /status {
+        proxy_pass http://127.0.0.1:${port};
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        proxy_set_header Host              \$host;
+        proxy_set_header X-Real-IP         \$remote_addr;
+        proxy_set_header X-Forwarded-For   \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header X-Forwarded-Host  \$host;
+        proxy_set_header X-Forwarded-Port  \$server_port;
+    }
+
     location /landing {
         proxy_pass http://127.0.0.1:${port};
         proxy_http_version 1.1;
@@ -1353,10 +1377,9 @@ verify_cabinet_http() {
   # Через nginx на этой же машине (не через публичный routing/hairpin)
   root_code="$(curl -k -sS -o /dev/null -w '%{http_code}' --max-time 8 \
     --resolve "${domain}:443:127.0.0.1" "https://${domain}/" 2>/dev/null || echo 000)"
-  info "https://${domain}/ → HTTP ${root_code} (ожидаем 302 на /cabinet/)"
-  if [[ "$root_code" != "302" && "$root_code" != "301" ]]; then
-    warn "Корень не редиректит на /cabinet/ — в браузере будет Go «404 page not found»."
-    warn "Откройте явно: https://${domain}/cabinet/"
+  info "https://${domain}/ → HTTP ${root_code} (ожидаем 200, лендинг)"
+  if [[ "$root_code" != "200" ]]; then
+    warn "Корень не отдал лендинг. Проверьте location = / в nginx: он должен проксировать на бота, а не редиректить на /cabinet/."
   fi
 
   pub_hc="$(curl -k -fsS --max-time 8 --resolve "${domain}:443:127.0.0.1" \

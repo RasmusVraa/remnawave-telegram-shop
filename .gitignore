@@ -379,3 +379,6 @@ remnawave-bedolaga-telegram-bot-main
 
 # Снимки визуальной проверки кабинета
 .tmp/
+
+# Локальные зависимости фронтенда
+node_modules/

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"remnawave-tg-shop-bot/internal/cabinet/auth/csrf"
@@ -75,39 +77,70 @@ func nowUnix() int64 {
 	return time.Now().Unix()
 }
 
+// cookieScope решает Domain и Secure для refresh и csrf.
+// На localhost/127.0.0.1 браузер не сохраняет Secure-cookie по HTTP и отбрасывает
+// Domain чужого хоста — из-за этого мутирующие запросы админки теряли CSRF.
+// На публичном хосте остаётся настроенный домен и Secure.
+func cookieScope(r *http.Request, configuredDomain string) (domain string, secure bool) {
+	if requestHostIsLoopback(r) {
+		return "", false
+	}
+	return configuredDomain, true
+}
+
+func requestHostIsLoopback(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	switch strings.ToLower(host) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	default:
+		return false
+	}
+}
+
 // setRefreshCookie ставит refresh (HttpOnly) + csrf (readable) cookies.
 // Переиспользуется в auth.go и oauth.go, чтобы cookie-политика была одинаковой.
-func setRefreshCookie(w http.ResponseWriter, tp *service.TokenPair, cookieDomain, cookiePath string) {
+func setRefreshCookie(w http.ResponseWriter, r *http.Request, tp *service.TokenPair, cookieDomain, cookiePath string) {
+	domain, secure := cookieScope(r, cookieDomain)
 	http.SetCookie(w, &http.Cookie{
 		Name:     service.RefreshCookieName,
 		Value:    tp.RefreshToken,
 		Path:     cookiePath,
-		Domain:   cookieDomain,
+		Domain:   domain,
 		Expires:  tp.RefreshExp,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	csrf.SetCookie(w, tp.CSRFToken, cookieDomain, "/cabinet", int(tp.RefreshExp.Unix()-nowUnix()))
+	csrf.SetCookie(w, tp.CSRFToken, domain, "/cabinet", int(tp.RefreshExp.Unix()-nowUnix()), secure)
 }
 
 // clearCabCsrfCookie удаляет CSRF cookie. Wrapper для csrf.ClearCookie.
-func clearCabCsrfCookie(w http.ResponseWriter, cookieDomain string) {
-	csrf.ClearCookie(w, cookieDomain, "/cabinet")
+func clearCabCsrfCookie(w http.ResponseWriter, r *http.Request, cookieDomain string) {
+	domain, secure := cookieScope(r, cookieDomain)
+	csrf.ClearCookie(w, domain, "/cabinet", secure)
 }
 
 // clearCabinetSessionCookies — сбрасывает refresh + CSRF (как при logout).
-func clearCabinetSessionCookies(w http.ResponseWriter, cookieDomain string) {
+func clearCabinetSessionCookies(w http.ResponseWriter, r *http.Request, cookieDomain string) {
+	domain, secure := cookieScope(r, cookieDomain)
 	const refreshPath = "/cabinet/api/auth"
 	http.SetCookie(w, &http.Cookie{
 		Name:     service.RefreshCookieName,
 		Value:    "",
 		Path:     refreshPath,
-		Domain:   cookieDomain,
+		Domain:   domain,
 		MaxAge:   -1,
-		Secure:   true,
+		Secure:   secure,
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
 	})
-	clearCabCsrfCookie(w, cookieDomain)
+	clearCabCsrfCookie(w, r, cookieDomain)
 }

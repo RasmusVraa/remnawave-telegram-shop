@@ -27,7 +27,7 @@ func TestRequireAdmin_forbiddenWhenNotAdmin(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	checker := adminauth.NewChecker(nil)
+	checker := adminauth.NewChecker(nil, nil)
 	handler := RequireAdmin(checker)(next)
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)

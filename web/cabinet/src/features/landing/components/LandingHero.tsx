@@ -1,242 +1,149 @@
-import type { ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { motion, useReducedMotion } from 'framer-motion'
-import { Activity, Gauge, Shield, ShieldCheck } from 'lucide-react'
+import { Shield } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
+import { CountryFlag } from '@/features/admin/components/CountryFlag'
+import { countryCentroid } from '../countryCentroids'
 import type { LandingBrand } from '../useLandingBrand'
+import type { LandingCopy } from '../useLandingCopy'
 import { Rise, WordsReveal } from './LandingMotion'
-import { LandingPlatformRow } from './LandingPlatforms'
-import { LandingCabinetCta } from './LandingPrimitives'
-
-const EASE = [0.22, 1, 0.36, 1] as const
+import { TelegramGlyph } from './LandingPrimitives'
 
 /**
- * Первый экран.
- *
- * Заголовок собирается из трёх i18n-кусков (`titleBefore` / бренд из env / `titleAfter`),
- * чтобы в русской и английской версии бренд стоял в разных местах фразы.
- * Слова проявляются по очереди, остальное — лесенкой следом.
- *
- * `aside` — раскладка «тарифы справа от hero»: текст уезжает влево и в колонку
- * справа встаёт витрина. Без него hero центрируется, а под ним показывается
- * декоративная карточка подписки — её можно погасить через showPanel, если
- * следом идёт секция тарифов и две «витрины» подряд были бы лишними.
+ * Первый экран: крупный заголовок, орбита со щитом и две плашки.
+ * Тарифы живут отдельной секцией ниже.
  */
 export function LandingHero({
   brand,
-  aside,
-  showPanel = true,
+  copy,
 }: {
   brand: LandingBrand
-  aside?: ReactNode
-  showPanel?: boolean
+  copy: LandingCopy
 }) {
   const { t } = useTranslation()
-  const split = Boolean(aside)
 
-  const titleSegments = [
-    ...t('landing.hero.titleBefore').split(' ').filter(Boolean),
-    <span key="brand" className="landing-title-gradient">
-      {brand.name}
-    </span>,
-    ...t('landing.hero.titleAfter').split(' ').filter(Boolean),
-  ]
-
-  const copy = (
-    <div className={cn('mx-auto max-w-3xl', split ? 'text-center lg:mx-0 lg:text-left' : 'text-center')}>
-      {split && <HeroBrandMark brand={brand} />}
-
-      <h1
-        className={cn(
-          'text-balance font-heading font-extrabold leading-[1.12] tracking-tight',
-          split
-            ? 'mt-7 text-[2rem] sm:text-5xl lg:text-[3.25rem]'
-            : 'text-[2rem] sm:text-5xl lg:text-6xl',
-        )}
-      >
-        <WordsReveal segments={titleSegments} delay={0.12} stagger={0.06} />
-      </h1>
-
-      <Rise delay={0.5} y={28}>
-        <div className={cn('mt-5 max-w-xl sm:mt-6', split ? 'mx-auto lg:mx-0' : 'mx-auto')}>
-          <p className="text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-            {t('landing.hero.subtitle')}
-          </p>
-          {/* Логотипы платформ вместо перечисления словами — читается с одного взгляда. */}
-          <LandingPlatformRow
-            className={cn('mt-4', split ? 'justify-center lg:justify-start' : 'justify-center')}
-            label={t('landing.hero.subtitle')}
-          />
-        </div>
-      </Rise>
-
-      {/*
-        На десктопе CTA скрыт: там его роль берут «Войти» в шапке и «Оформить»
-        в витрине тарифов справа. На мобильных шапка свёрнута в бургер — кнопка
-        остаётся единственной видимой точкой входа.
-      */}
-      <Rise delay={0.64} y={28}>
-        <LandingCabinetCta
-          className={cn('mt-7 sm:mt-9', split ? 'justify-center lg:justify-start' : 'justify-center')}
-          size="lg"
-          href={brand.cabinetHref}
-          label={brand.authenticated ? t('landing.nav.cabinet') : t('landing.hero.ctaCabinet')}
-          desktopHidden
-        />
-      </Rise>
-    </div>
-  )
-
-  if (!split) {
-    return (
-      <section
-        className={
-          showPanel
-            ? 'relative px-4 pb-6 pt-10 sm:px-6 sm:pb-8 sm:pt-20 lg:pt-24'
-            : 'relative px-4 pb-2 pt-10 sm:px-6 sm:pb-4 sm:pt-20 lg:pt-24'
-        }
-      >
-        {copy}
-        {showPanel && <HeroPanel />}
-      </section>
-    )
-  }
+  const title = copy.heroTitle || t('landing.hero.headline')
+  const subtitle = copy.heroSubtitle || t('landing.hero.subtitle')
+  const note = copy.note || t('landing.hero.note')
+  const cabinetLabel = brand.authenticated ? t('landing.nav.cabinet') : t('landing.nav.try')
 
   return (
-    <section className="relative px-4 pb-10 pt-10 sm:px-6 sm:pb-14 sm:pt-16 lg:pt-20">
-      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-2 lg:gap-12">
-        {copy}
-        <Rise delay={0.35} y={36} duration={0.75}>
-          {aside}
+    <section className="relative px-4 pb-8 pt-10 sm:px-6 sm:pb-14 sm:pt-16">
+      <div className="mx-auto grid max-w-6xl items-center gap-10 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:gap-6">
+        <div>
+          <h1 className="landing-hero-title font-heading text-balance">
+            <WordsReveal segments={title.split(' ').filter(Boolean)} delay={0.05} stagger={0.045} />
+          </h1>
+
+          <Rise delay={0.28} y={18}>
+            <p className="mt-5 max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
+              {subtitle}
+            </p>
+          </Rise>
+
+          <Rise delay={0.4} y={18}>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={brand.cabinetHref}
+                className="landing-cta landing-cta--solid inline-flex h-12 items-center justify-center rounded-full px-7 text-base font-semibold sm:h-14"
+              >
+                {cabinetLabel}
+              </a>
+              {brand.botUrl && (
+                <a
+                  href={brand.botUrl}
+                  className="landing-cta landing-cta--ghost inline-flex h-12 items-center justify-center gap-2 rounded-full px-6 text-base font-semibold sm:h-14"
+                >
+                  <TelegramGlyph className="size-4" />
+                  {t('landing.hero.ctaTelegram')}
+                </a>
+              )}
+            </div>
+            {note ? <p className="mt-4 max-w-md text-sm text-muted-foreground">{note}</p> : null}
+          </Rise>
+        </div>
+
+        <Rise delay={0.15} y={12}>
+          <LandingConstellation logoUrl={brand.logoUrl} name={brand.name} />
         </Rise>
       </div>
     </section>
   )
 }
 
-/**
- * Крупный знак бренда над заголовком — заполняет левую колонку в раскладке со ширмой.
- *
- * Внутри — логотип из env (CABINET_BRAND_LOGO_URL / CABINET_BRAND_LOGO_FILE),
- * тот же, что в шапке кабинета. Если он не задан, рисуется щит-заглушка.
- * Пульсация и расходящиеся кольца живут в CSS (.landing-brandmark в landing.css),
- * здесь только появление при загрузке.
- */
-function HeroBrandMark({ brand }: { brand: LandingBrand }) {
-  const reduce = useReducedMotion()
+const FLY_LANES = [
+  { inset: '9%', dur: 34 },
+  { inset: '18%', dur: 46 },
+  { inset: '26%', dur: 27 },
+]
+
+function LandingConstellation({ logoUrl, name }: { logoUrl?: string; name: string }) {
+  const { i18n } = useTranslation()
+  const query = useQuery({
+    queryKey: ['public-status'],
+    queryFn: () => api.publicStatus(),
+    staleTime: 60_000,
+  })
+  const seen = new Set<string>()
+  const countries = (query.data?.nodes ?? []).flatMap((node) => {
+    const code = (node.country ?? '').toUpperCase()
+    if (!countryCentroid(code) || seen.has(code)) return []
+    seen.add(code)
+    let label = node.name
+    try {
+      label = new Intl.DisplayNames([i18n.language], { type: 'region' }).of(code) ?? node.name
+    } catch {
+      label = node.name
+    }
+    return [{ code, label }]
+  })
 
   return (
-    <motion.div
-      className="flex justify-center lg:justify-start"
-      initial={reduce ? false : { opacity: 0, scale: 0.86 }}
-      animate={reduce ? undefined : { opacity: 1, scale: 1 }}
-      transition={{ duration: 0.7, ease: EASE }}
-    >
-      <span className="landing-brandmark size-40 sm:size-44 lg:size-52">
-        <span className="landing-brandmark__halo" aria-hidden />
-        <span className="landing-brandmark__disc landing-brandmark__disc--outer" aria-hidden />
-        <span className="landing-brandmark__disc landing-brandmark__disc--inner" aria-hidden />
-        <span className="landing-brandmark__ring" aria-hidden />
-        <span className="landing-brandmark__ring" aria-hidden />
-        <span className="landing-brandmark__ring" aria-hidden />
-
-        {brand.logoUrl ? (
-          <span className="landing-brandmark__core">
-            <img src={brand.logoUrl} alt="" loading="eager" />
-          </span>
-        ) : (
-          <span className="landing-brandmark__core landing-brandmark__core--fallback">
-            <Shield className="size-[55%]" strokeWidth={2.1} />
-          </span>
-        )}
-      </span>
-    </motion.div>
-  )
-}
-
-/**
- * Стеклянная «витрина» под hero: имитирует карточку подписки из кабинета —
- * сразу показывает, как выглядит продукт, и связывает лендинг с самим ЛК.
- * Данные декоративные и намеренно захардкожены: это иллюстрация, не виджет.
- */
-function HeroPanel() {
-  const { t } = useTranslation()
-  const reduce = useReducedMotion()
-
-  const stats = [
-    { id: 'speed', icon: Gauge, accent: 'cyan' as const },
-    { id: 'uptime', icon: Activity, accent: 'emerald' as const },
-    { id: 'protocol', icon: ShieldCheck, accent: 'violet' as const },
-  ]
-
-  return (
-    <motion.div
-      className="mx-auto mt-10 w-full max-w-4xl sm:mt-16"
-      initial={reduce ? false : { opacity: 0, y: 48, scale: 0.97 }}
-      animate={reduce ? undefined : { opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay: 0.85, duration: 0.85, ease: EASE }}
-    >
-      <div className="landing-card p-5 sm:p-7">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="relative flex size-2.5">
-              {!reduce && (
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-[hsl(var(--lp-emerald))] opacity-60" />
-              )}
-              <span className="relative inline-flex size-2.5 rounded-full bg-[hsl(var(--lp-emerald))]" />
-            </span>
-            <span className="text-sm font-semibold">{t('landing.panel.status')}</span>
-          </div>
-          <span className="rounded-full border border-[hsl(var(--lp-emerald)/0.35)] bg-[hsl(var(--lp-emerald)/0.12)] px-3 py-1 text-xs font-semibold text-[hsl(var(--lp-emerald))]">
-            {t('landing.panel.badge')}
-          </span>
-        </div>
-
-        <div className="mt-5 sm:mt-6">
-          <div className="flex items-baseline justify-between text-sm">
-            <span className="text-muted-foreground">{t('landing.panel.trafficLabel')}</span>
-            <span className="landing-price font-semibold">
-              {t('landing.panel.trafficValue')}
-            </span>
-          </div>
-          <div className="mt-2.5 h-2.5 overflow-hidden rounded-full bg-secondary/80">
-            <motion.div
-              className="h-full rounded-full bg-gradient-to-r from-[hsl(var(--lp-cyan))] to-[hsl(var(--lp-violet))]"
-              initial={reduce ? false : { width: 0 }}
-              animate={reduce ? undefined : { width: '64%' }}
-              style={reduce ? { width: '64%' } : undefined}
-              transition={{ delay: 1.25, duration: 1.1, ease: EASE }}
-            />
-          </div>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-3">
-          {stats.map((stat, i) => (
-            <motion.div
-              key={stat.id}
-              className="flex items-center gap-3.5 rounded-2xl border border-border/60 bg-background/40 p-4 sm:block"
-              style={{ ['--lp-accent' as string]: `var(--lp-${stat.accent})` }}
-              initial={reduce ? false : { opacity: 0, y: 14 }}
-              animate={reduce ? undefined : { opacity: 1, y: 0 }}
-              transition={{ delay: 1.15 + i * 0.1, duration: 0.5, ease: EASE }}
+    <div className="landing-constellation" aria-hidden>
+      <div className="landing-constellation__wash" />
+      <div className="landing-constellation__halo" />
+      <div className="landing-constellation__orbit landing-constellation__orbit--one" />
+      <div className="landing-constellation__orbit landing-constellation__orbit--two" />
+      <div className="landing-constellation__orbit landing-constellation__orbit--three" />
+      {countries.map((item, index) => {
+        const lane = FLY_LANES[index % FLY_LANES.length]
+        const reverse = index % 2 === 1
+        const delay = `-${(index / Math.max(countries.length, 1)) * lane.dur}s`
+        return (
+          <span
+            key={item.code}
+            className="landing-constellation__lane"
+            style={{
+              inset: lane.inset,
+              animationDuration: `${lane.dur}s`,
+              animationDelay: delay,
+              animationDirection: reverse ? 'reverse' : 'normal',
+            }}
+          >
+            <span
+              className="landing-constellation__pin"
+              style={{
+                animationDuration: `${lane.dur}s`,
+                animationDelay: delay,
+                animationDirection: reverse ? 'normal' : 'reverse',
+              }}
             >
-              <stat.icon
-                className="size-5 shrink-0 text-[hsl(var(--lp-accent))]"
-                strokeWidth={1.9}
-              />
-              <div className="min-w-0">
-                <p className="landing-price font-heading text-lg font-bold sm:mt-3 sm:text-xl">
-                  {t(`landing.panel.stats.${stat.id}.value`)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t(`landing.panel.stats.${stat.id}.label`)}
-                </p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
+              <span className="landing-constellation__upright" style={{ animationDelay: `${index * 0.4}s` }}>
+                <CountryFlag code={item.code} className="h-3.5 w-5 rounded-[2px]" />
+                {item.label}
+              </span>
+            </span>
+          </span>
+        )
+      })}
+      <div className="landing-constellation__logo">
+        {logoUrl ? (
+          <img src={logoUrl} alt="" />
+        ) : (
+          <Shield className="size-12" strokeWidth={1.6} aria-label={name} />
+        )}
       </div>
-    </motion.div>
+    </div>
   )
 }

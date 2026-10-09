@@ -8,7 +8,7 @@ import (
 	"testing/fstest"
 )
 
-// Лендинг отдаётся с двух адресов: /landing (корень домена) и /cabinet/landing.
+// Лендинг отдаётся с корня домена (/), со старого /landing и с /cabinet/landing.
 // В обоих случаях SPA-хендлер должен вернуть index.html, а не 404 — иначе
 // прямой заход и обновление страницы ломаются.
 func TestSPAHandlerServesIndexForLandingRoutes(t *testing.T) {
@@ -23,12 +23,18 @@ func TestSPAHandlerServesIndexForLandingRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	spa := buildSPAHandler(spaFS)
 	mux.Handle("/cabinet/", spa)
+	mux.Handle("/{$}", spa)
 	mux.Handle("/landing", spa)
 	mux.Handle("/landing/", spa)
+	mux.Handle("/status", spa)
+	mux.Handle("/status/", spa)
 
 	for _, path := range []string{
+		"/",
 		"/landing",
 		"/landing/",
+		"/status",
+		"/status/",
 		"/cabinet/landing",
 		"/cabinet/",
 		"/cabinet/dashboard",

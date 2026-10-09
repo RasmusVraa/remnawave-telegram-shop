@@ -4,9 +4,12 @@
  * Файл подключается только из LandingPage.tsx — попадает в отдельный CSS-чанк
  * и не влияет на остальные экраны кабинета.
  *
- * Палитра берётся из токенов кабинета (--primary, --card, --border …): корень
- * лендинга сам несёт класс `dark`, поэтому значения тут всегда тёмные,
- * независимо от переключателя темы в шапке.
+ * Палитра берётся из токенов кабинета (--primary, --card, --border …), поэтому
+ * светлая тема и декор-тема из админки красят лендинг вместе с кабинетом.
+ *
+ * Декор-тема (data-cabinet-decor на <html>) подменяет пару акцентов
+ * --lp-cyan и --lp-violet, см. блок «Декор-темы» ниже. Без темы страница
+ * остаётся тёмным полотном с сине-фиолетовым акцентом.
  *
  * Плейн-CSS без @apply/@layer: Tailwind-директивы живут только в index.css.
  */
@@ -26,11 +29,23 @@ html[data-landing="1"] {
 }
 
 .landing-root {
-  /* Акценты секций: cyan (primary кабинета) + три дополнительных для карточек. */
-  --lp-cyan: 198 89% 50%;
-  --lp-violet: 262 83% 68%;
-  --lp-emerald: 160 74% 46%;
-  --lp-amber: 38 92% 58%;
+  /* База без декор-темы: тёмное полотно и розово-фиолетовый акцент. */
+  --lp-cyan: 330 78% 68%;
+  --lp-violet: 280 72% 72%;
+  --lp-emerald: 160 45% 52%;
+  --lp-amber: 28 70% 64%;
+
+  --lp-cta-mid: #e07adf;
+  --lp-on-accent: #2a1024;
+
+  --background: 320 42% 7%;
+  --foreground: 320 40% 97%;
+  --card: 318 36% 12%;
+  --border: 318 28% 24%;
+  --muted-foreground: 318 22% 74%;
+  --primary: 330 78% 68%;
+  --primary-foreground: 320 40% 10%;
+  --secondary: 318 30% 16%;
 
   --lp-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --lp-header-h: 68px;
@@ -39,24 +54,80 @@ html[data-landing="1"] {
   isolation: isolate;
   min-height: 100dvh;
   overflow-x: clip;
-  background-color: hsl(var(--background));
-  color: hsl(var(--foreground));
+  background-color: #160814;
+  color: #fff4fb;
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Декор-темы
+ *
+ * --lp-cyan — это --primary темы (значения из index.css), --lp-violet — второй
+ * цвет градиентов, подобранный под тему вручную: сдвиг оттенка по формуле на
+ * части тем даёт грязные пары (оранжевый → салатовый у halloween).
+ * off не перечислен: без темы остаётся тёмное полотно и сине-фиолетовый акцент.
+ * Новая тема без строки здесь просто оставит этот акцент.
+ * ───────────────────────────────────────────────────────────── */
+
+html[data-cabinet-decor]:not([data-cabinet-decor="nebula"]) .landing-root {
+  --lp-cta-mid: color-mix(in oklab, hsl(var(--lp-cyan)) 60%, hsl(var(--lp-violet)));
+}
+
+html[data-cabinet-decor="green"] .landing-root { --lp-cyan: 142 55% 46%; --lp-violet: 188 75% 56%; }
+html[data-cabinet-decor="spring"] .landing-root { --lp-cyan: 142 55% 46%; --lp-violet: 330 75% 72%; }
+html[data-cabinet-decor="cyber"] .landing-root { --lp-cyan: 140 90% 46%; --lp-violet: 172 90% 52%; }
+html[data-cabinet-decor="neon"] .landing-root { --lp-cyan: 186 100% 50%; --lp-violet: 300 90% 66%; }
+html[data-cabinet-decor="ocean"] .landing-root { --lp-cyan: 205 85% 52%; --lp-violet: 178 72% 52%; }
+html[data-cabinet-decor="new_year"] .landing-root { --lp-cyan: 198 85% 52%; --lp-violet: 220 70% 80%; }
+html[data-cabinet-decor="slate"] .landing-root { --lp-cyan: 215 20% 62%; --lp-violet: 250 30% 74%; }
+html[data-cabinet-decor="carbon"] .landing-root { --lp-cyan: 217 90% 60%; --lp-violet: 190 70% 60%; }
+html[data-cabinet-decor="aurora"] .landing-root { --lp-cyan: 168 75% 48%; --lp-violet: 262 80% 68%; }
+html[data-cabinet-decor="violet"] .landing-root { --lp-cyan: 262 72% 62%; --lp-violet: 318 78% 68%; }
+html[data-cabinet-decor="lavender"] .landing-root { --lp-cyan: 270 48% 68%; --lp-violet: 222 70% 72%; }
+html[data-cabinet-decor="pink"] .landing-root { --lp-cyan: 338 78% 52%; --lp-violet: 280 78% 70%; }
+html[data-cabinet-decor="valentine"] .landing-root { --lp-cyan: 338 78% 52%; --lp-violet: 8 85% 64%; }
+html[data-cabinet-decor="wine"] .landing-root { --lp-cyan: 346 66% 52%; --lp-violet: 300 50% 62%; }
+html[data-cabinet-decor="sunset"] .landing-root { --lp-cyan: 18 92% 56%; --lp-violet: 330 85% 65%; }
+html[data-cabinet-decor="orange"] .landing-root { --lp-cyan: 28 95% 48%; --lp-violet: 350 80% 64%; }
+html[data-cabinet-decor="halloween"] .landing-root { --lp-cyan: 28 95% 48%; --lp-violet: 270 72% 66%; }
+html[data-cabinet-decor="yellow"] .landing-root { --lp-cyan: 38 92% 46%; --lp-violet: 12 85% 62%; }
+html[data-cabinet-decor="summer"] .landing-root { --lp-cyan: 38 92% 46%; --lp-violet: 190 80% 55%; }
+html[data-cabinet-decor="black_friday"] .landing-root { --lp-cyan: 45 95% 46%; --lp-violet: 20 90% 58%; }
+
+/* Яркий акцент: белая подпись на кнопке не читается — берём тёмную. */
+html[data-cabinet-decor="neon"] .landing-root,
+html[data-cabinet-decor="cyber"] .landing-root,
+html[data-cabinet-decor="yellow"] .landing-root,
+html[data-cabinet-decor="summer"] .landing-root,
+html[data-cabinet-decor="black_friday"] .landing-root {
+  --lp-on-accent: hsl(224 40% 10%);
 }
 
 /* ─────────────────────────────────────────────────────────────
  * Фон
  * ───────────────────────────────────────────────────────────── */
 
-/* Базовый слой: тот же многослойный градиент, что и в кабинете. */
+/* Базовый слой: мягкое свечение от акцента, без жёсткой сетки. */
 .landing-backdrop {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background-image: var(--cabinet-dark-bg-image);
+  background-color: hsl(var(--background));
 }
 
-/* Сетка «блюпринта», растворяющаяся к низу экрана. */
+.landing-backdrop__wash {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(ellipse 62% 48% at 6% -4%, hsl(var(--lp-violet) / 0.62), transparent 58%),
+    radial-gradient(ellipse 54% 42% at 102% 6%, hsl(var(--lp-cyan) / 0.5), transparent 56%),
+    radial-gradient(ellipse 40% 36% at 72% 38%, hsl(var(--lp-violet) / 0.32), transparent 64%),
+    radial-gradient(ellipse 46% 38% at -4% 58%, hsl(var(--lp-cyan) / 0.28), transparent 62%),
+    radial-gradient(ellipse 42% 34% at 96% 74%, hsl(330 78% 58% / 0.34), transparent 62%),
+    radial-gradient(ellipse 50% 36% at 28% 100%, hsl(var(--lp-violet) / 0.3), transparent 60%);
+}
+
+/* Сетка оставлена в разметке старых сборок; новый фон её не использует. */
 .landing-backdrop__grid {
   position: absolute;
   inset: 0;
@@ -73,7 +144,7 @@ html[data-landing="1"] {
   position: absolute;
   border-radius: 9999px;
   filter: blur(90px);
-  opacity: 0;
+  opacity: 0.8;
   animation: lp-orb-in 1.6s var(--lp-ease) forwards;
 }
 
@@ -96,13 +167,199 @@ html[data-landing="1"] {
   animation-delay: 0.35s;
 }
 
+.landing-status-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: hsl(var(--muted-foreground));
+  box-shadow: 0 0 0 4px hsl(var(--muted-foreground) / 0.12);
+}
+.landing-status-dot--up {
+  background: hsl(152 48% 46%);
+  box-shadow: 0 0 0 4px hsl(152 48% 46% / 0.16);
+}
+.landing-status-dot--partial {
+  background: hsl(36 86% 52%);
+  box-shadow: 0 0 0 4px hsl(36 86% 52% / 0.16);
+}
+.landing-status-dot--down {
+  background: hsl(0 68% 58%);
+  box-shadow: 0 0 0 4px hsl(0 68% 58% / 0.16);
+}
+.landing-status-dot--ru {
+  background: hsl(222 90% 66%);
+  box-shadow: 0 0 0 4px hsl(222 90% 66% / 0.18);
+  border-radius: 0.2rem;
+}
+
+.landing-status-map {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.5rem;
+  background: #0c1428;
+  border: 1px solid rgb(255 255 255 / 0.06);
+}
+.landing-status-map__stage {
+  position: relative;
+}
+.landing-status-map__stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.landing-status-map svg,
+.landing-status-map__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;
+  cursor: grab;
+}
+.landing-status-map__canvas:active {
+  cursor: grabbing;
+}
+@media (max-width: 700px) {
+  .landing-status-map__tag {
+    font-size: 0;
+  }
+  .landing-status-map__tag img {
+    width: 1rem;
+    height: 0.7rem;
+  }
+}
+.landing-status-map__land {
+  fill: #1a2748;
+  stroke: #2a3d68;
+  stroke-width: 0.6;
+}
+.landing-status-map__line {
+  fill: none;
+  stroke: rgb(167 139 250 / 0.85);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 6;
+  vector-effect: non-scaling-stroke;
+}
+.landing-status-map__leaders path {
+  fill: none;
+  stroke: #6e84a8;
+  stroke-width: 0.7;
+  stroke-linecap: butt;
+  stroke-linejoin: miter;
+}
+.landing-status-map__label {
+  fill: #f4f7ff;
+  font-size: 13px;
+  font-weight: 700;
+}
+.landing-status-map__toggle {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgb(8 12 24 / 0.72);
+}
+.landing-status-map__toggle button {
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 650;
+  color: rgb(226 232 240 / 0.82);
+}
+.landing-status-map__toggle button[data-on='1'] {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.landing-status-bar {
+  display: flex;
+  gap: 2px;
+  height: 1.35rem;
+  align-items: flex-end;
+}
+.landing-status-bar i {
+  flex: 1;
+  height: 100%;
+  border-radius: 2px;
+  background: rgb(148 163 184 / 0.28);
+}
+.landing-status-bar i[data-level='up'] { background: #3dd68c; }
+.landing-status-bar i[data-level='partial'] { background: #f5b942; }
+.landing-status-bar i[data-level='down'] { background: #f07178; }
+
+.landing-status-mark {
+  display: inline-block;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 999px;
+}
+.landing-status-mark--world {
+  background: #3dd68c;
+  box-shadow: 0 0 0 5px rgb(61 214 140 / 0.18);
+}
+.landing-status-mark--ru {
+  border-radius: 0.2rem;
+  background: #6f97ff;
+  box-shadow: 0 0 0 5px rgb(111 151 255 / 0.18);
+}
+.landing-status-note {
+  background: hsl(var(--card) / 0.72);
+}
+
+.landing-status-map__dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: landing-dot-in 0.7s var(--lp-ease) both;
+}
+.landing-status-map__pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: landing-map-ping 2.6s ease-out infinite;
+}
+.landing-status-map__line {
+  animation: landing-dash 22s linear infinite;
+}
+@keyframes landing-dash {
+  to { stroke-dashoffset: -280; }
+}
+@keyframes landing-dot-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes landing-map-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  75%, 100% { transform: scale(2.5); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .landing-status-map__dot,
+  .landing-status-map__pulse,
+  .landing-status-map__line {
+    animation: none;
+  }
+}
+
+.landing-stat {
+  border-radius: 1.25rem;
+  border: 1px solid hsl(var(--border) / 0.7);
+  background: hsl(var(--card) / 0.72);
+  box-shadow: 0 10px 30px hsl(var(--lp-violet) / 0.08);
+}
+
 .landing-orb--emerald {
-  top: 82vh;
+  top: 70vh;
   left: -14vw;
   width: min(50vw, 600px);
   height: min(50vw, 600px);
-  background: radial-gradient(circle, hsl(var(--lp-emerald) / 0.3) 0%, transparent 62%);
+  background: radial-gradient(circle, hsl(var(--lp-emerald) / 0.45) 0%, transparent 62%);
   animation-delay: 0.6s;
+}
+
+.landing-orb--rose {
+  top: 120vh;
+  right: -8vw;
+  width: min(48vw, 560px);
+  height: min(48vw, 560px);
+  background: radial-gradient(circle, hsl(var(--lp-cyan) / 0.4) 0%, transparent 62%);
+  animation-delay: 0.8s;
 }
 
 @keyframes lp-orb-in {
@@ -135,6 +392,19 @@ html[data-landing="1"] {
       lp-orb-in 1.6s var(--lp-ease) 0.6s forwards,
       lp-drift-a 38s ease-in-out 2.2s infinite reverse;
   }
+
+  .landing-orb--rose {
+    animation:
+      lp-orb-in 1.6s var(--lp-ease) 0.8s forwards,
+      lp-drift-b 34s ease-in-out 2.4s infinite;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-orb {
+    opacity: 0.75;
+    animation: none;
+  }
 }
 
 @keyframes lp-drift-a {
@@ -165,16 +435,17 @@ html[data-landing="1"] {
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid transparent;
+  border-bottom: 1px solid #4a2844;
+  background-color: rgb(22 8 20 / 0.88);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
   transition:
     background-color 0.4s var(--lp-ease),
-    border-color 0.4s var(--lp-ease),
-    backdrop-filter 0.4s var(--lp-ease),
     box-shadow 0.4s var(--lp-ease);
 }
 
 .landing-header[data-stuck="true"] {
-  background-color: hsl(var(--background) / 0.72);
+  background-color: hsl(var(--background) / 0.94);
   border-bottom-color: hsl(var(--border) / 0.6);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
@@ -259,10 +530,10 @@ html[data-landing="1"] {
   background-image: linear-gradient(
     135deg,
     hsl(var(--lp-cyan)) 0%,
-    hsl(210 90% 56%) 55%,
+    var(--lp-cta-mid) 55%,
     hsl(var(--lp-violet)) 100%
   );
-  color: #fff;
+  color: var(--lp-on-accent);
   box-shadow:
     0 10px 30px -12px hsl(var(--lp-cyan) / 0.7),
     inset 0 1px 0 rgb(255 255 255 / 0.22);
@@ -295,6 +566,17 @@ html[data-landing="1"] {
 .landing-cta--primary:hover::after,
 .landing-cta--primary:focus-visible::after {
   transform: translateX(120%);
+}
+
+.landing-cta--solid {
+  background: #f1f2ff;
+  color: #0a0a1f;
+  box-shadow: 0 10px 28px -16px rgb(241 242 255 / 0.7);
+}
+
+.landing-cta--solid:hover,
+.landing-cta--solid:focus-visible {
+  filter: brightness(0.96);
 }
 
 .landing-cta--ghost {
@@ -517,7 +799,38 @@ html[data-landing="1"] {
 
 .landing-price {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+}
+
+.landing-stage {
+  border-radius: 1.75rem;
+  border: 1px solid hsl(var(--border) / 0.65);
+  background:
+    radial-gradient(ellipse 80% 60% at 100% 0%, hsl(var(--lp-violet) / 0.16), transparent 55%),
+    hsl(var(--card) / 0.62);
+  padding: 0.9rem;
+}
+@media (min-width: 640px) {
+  .landing-stage {
+    padding: 1.25rem;
+  }
+}
+
+.landing-tariff-pill {
+  border-radius: 999px;
+  padding: 0.15rem 0.55rem;
+  background-image: linear-gradient(135deg, hsl(var(--lp-cyan)), hsl(var(--lp-violet)));
+  color: var(--lp-on-accent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.landing-tariff-card--stage {
+  min-height: 9.5rem;
+  background: hsl(var(--background) / 0.55);
 }
 
 /* Карточка тарифа — ссылка целиком, поэтому гасим подчёркивание и режем нашивку по углу. */
@@ -593,6 +906,24 @@ html[data-landing="1"] {
 /* ─────────────────────────────────────────────────────────────
  * FAQ
  * ───────────────────────────────────────────────────────────── */
+
+.landing-faq-list {
+  overflow: hidden;
+  border: 1px solid hsl(var(--border) / 0.8);
+  border-radius: 1.25rem;
+  background: hsl(var(--card) / 0.55);
+}
+
+.landing-faq-list .landing-faq-item {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  border-bottom: 1px solid hsl(var(--border) / 0.65);
+}
+
+.landing-faq-list .landing-faq-item:last-child {
+  border-bottom: 0;
+}
 
 .landing-faq-item {
   border-radius: var(--radius);
@@ -816,4 +1147,410 @@ html[data-landing="1"] {
     transform: scale(1.28);
     opacity: 0;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────
+ * Витрина: орбита, плашки, линия пути
+ * ───────────────────────────────────────────────────────────── */
+
+.landing-hero-title {
+  font-size: 46px;
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+
+@media (min-width: 761px) {
+  .landing-hero-title {
+    font-size: 72px;
+  }
+}
+
+.landing-orbit {
+  position: relative;
+  width: min(100%, 420px);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+
+.landing-orbit__rings {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.landing-orbit__rings ellipse {
+  fill: none;
+  stroke: hsl(var(--lp-violet) / 0.55);
+  stroke-width: 1.4;
+}
+
+.landing-orbit__rings g {
+  transform-origin: 210px 210px;
+}
+
+.landing-orbit__shield {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 28px;
+  color: #fff7fc;
+  background:
+    radial-gradient(circle at 30% 20%, hsl(var(--lp-violet) / 0.9), transparent 55%),
+    linear-gradient(160deg, hsl(var(--lp-cyan)), hsl(var(--lp-violet)));
+  box-shadow: 0 18px 50px -18px hsl(var(--lp-violet) / 0.9);
+  transform: translate(-50%, -50%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-orbit__rings g:nth-child(1) {
+    animation: lp-orbit 18s linear infinite;
+  }
+  .landing-orbit__rings g:nth-child(2) {
+    animation: lp-orbit 26s linear infinite reverse;
+  }
+  .landing-orbit__rings g:nth-child(3) {
+    animation: lp-orbit 22s linear infinite;
+  }
+}
+
+@keyframes lp-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.landing-chip {
+  border-radius: 1.35rem;
+  padding: 1rem 1.15rem;
+}
+
+.landing-chip small {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  opacity: 0.78;
+}
+
+.landing-chip strong {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.landing-chip--glow {
+  background-image: linear-gradient(135deg, hsl(var(--lp-cyan)), hsl(var(--lp-violet)));
+  color: #2a1024;
+}
+
+.landing-chip--dark {
+  border: 1px solid #4a2844;
+  background: #24101f;
+  color: #fff4fb;
+}
+
+.landing-timeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin-top: 2.5rem;
+}
+
+.landing-timeline::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 12.5%;
+  right: 12.5%;
+  height: 2px;
+  background: linear-gradient(90deg, #fff4fb, #c9a0c4 28%, hsl(var(--lp-cyan)) 62%, hsl(var(--lp-violet)));
+}
+
+.landing-timeline::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 12.5%;
+  width: 12%;
+  height: 10px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 0 16px hsl(var(--lp-violet));
+  animation: landing-timeline-run 3.6s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.landing-timeline__item {
+  position: relative;
+  padding: 1.6rem 0.7rem 0;
+}
+
+.landing-timeline__dot {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #fff4fb;
+  box-shadow: 0 0 0 4px #160814;
+  transform: translateX(-50%);
+  animation: landing-timeline-dot 3.6s ease-in-out infinite;
+}
+
+.landing-timeline__item:nth-child(2) .landing-timeline__dot { animation-delay: 0.9s; }
+.landing-timeline__item:nth-child(3) .landing-timeline__dot { animation-delay: 1.8s; }
+.landing-timeline__item:nth-child(4) .landing-timeline__dot { animation-delay: 2.7s; }
+
+.landing-timeline__item:nth-child(2) .landing-timeline__dot { background: #c9a0c4; }
+.landing-timeline__item:nth-child(3) .landing-timeline__dot { background: hsl(var(--lp-cyan)); }
+.landing-timeline__item:nth-child(4) .landing-timeline__dot { background: hsl(var(--lp-violet)); }
+
+.landing-callout {
+  margin-top: 2.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid #4a2844;
+  border-radius: 1.5rem;
+  background: #24101f;
+  padding: 1.25rem 1.4rem;
+}
+
+.landing-footer {
+  background: #1c0c18;
+}
+
+@keyframes landing-timeline-run {
+  from { left: 12.5%; }
+  to { left: calc(87.5% - 12%); }
+}
+
+@keyframes landing-timeline-run-v {
+  from { top: 0; }
+  to { top: 78%; }
+}
+
+@keyframes landing-timeline-dot {
+  0%, 100% { box-shadow: 0 0 0 4px #160814; }
+  35% { box-shadow: 0 0 0 4px #160814, 0 0 0 9px hsl(var(--lp-violet) / 0.4); }
+}
+
+@media (max-width: 700px) {
+  .landing-timeline {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .landing-timeline::before {
+    top: 0;
+    bottom: 0;
+    left: 7px;
+    right: auto;
+    width: 2px;
+    height: auto;
+  }
+
+  .landing-timeline::after {
+    top: 0;
+    left: 3px;
+    width: 10px;
+    height: 14%;
+    animation-name: landing-timeline-run-v;
+  }
+
+  .landing-timeline__item {
+    padding: 0 0 0 2rem;
+  }
+
+  .landing-timeline__dot {
+    left: 0;
+    top: 0.15rem;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-timeline::after,
+  .landing-timeline__dot {
+    animation: none;
+  }
+}
+
+.landing-constellation {
+  position: relative;
+  width: min(100%, 520px);
+  aspect-ratio: 1;
+  margin-inline: auto;
+}
+
+.landing-constellation__wash {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle, hsl(var(--lp-violet) / 0.55), hsl(var(--lp-cyan) / 0.12) 42%, transparent 70%);
+  filter: blur(6px);
+  animation: lp-pulse 5s ease-in-out infinite;
+}
+
+.landing-constellation__halo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 42%;
+  height: 42%;
+  transform: translate(-50%, -50%);
+}
+
+.landing-constellation__halo::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent 0 12%,
+    hsl(var(--lp-cyan)) 28%,
+    transparent 46%,
+    hsl(var(--lp-violet)) 68%,
+    transparent 86%
+  );
+  filter: blur(12px);
+  opacity: 0.9;
+  animation: lp-spin 10s linear infinite;
+}
+
+.landing-constellation__orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid hsl(var(--lp-violet) / 0.35);
+  pointer-events: none;
+}
+
+.landing-constellation__orbit--one {
+  inset: 6%;
+  border-style: dashed;
+  animation: lp-spin 42s linear infinite;
+}
+
+.landing-constellation__orbit--one::before,
+.landing-constellation__orbit--one::after,
+.landing-constellation__orbit--two::after {
+  content: '';
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 12px hsl(var(--lp-cyan));
+}
+
+.landing-constellation__orbit--one::before { top: -3px; left: 50%; }
+.landing-constellation__orbit--one::after { bottom: 12%; left: -3px; width: 5px; height: 5px; }
+.landing-constellation__orbit--two::after { top: 8%; right: -3px; }
+
+.landing-constellation__orbit--two {
+  inset: 16%;
+  border-color: hsl(var(--lp-cyan) / 0.4);
+  animation: lp-spin 28s linear infinite reverse;
+}
+
+.landing-constellation__orbit--three {
+  inset: 27%;
+  border-style: dotted;
+  border-color: hsl(var(--lp-violet) / 0.7);
+  animation: lp-spin 18s linear infinite;
+}
+
+.landing-constellation__lane {
+  position: absolute;
+  border-radius: 50%;
+  animation: lp-spin linear infinite;
+}
+
+.landing-constellation__pin {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  animation: lp-spin linear infinite;
+}
+
+.landing-constellation__upright {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: -8px;
+  margin-top: -14px;
+  border-radius: 999px;
+  border: 1px solid hsl(var(--lp-violet) / 0.55);
+  background: rgb(28 10 24 / 0.88);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35), 0 0 18px hsl(var(--lp-violet) / 0.35);
+  padding: 0.28rem 0.7rem 0.28rem 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  animation: lp-bob 5.5s ease-in-out infinite;
+}
+
+.landing-constellation__logo {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: clamp(104px, 28%, 136px);
+  height: clamp(104px, 28%, 136px);
+  overflow: hidden;
+  border-radius: 50%;
+  color: #fff7fc;
+  background:
+    radial-gradient(circle at 32% 24%, hsl(var(--lp-violet) / 0.95), transparent 58%),
+    linear-gradient(160deg, hsl(var(--lp-cyan)), hsl(var(--lp-violet)));
+  box-shadow:
+    0 0 0 8px hsl(var(--lp-violet) / 0.22),
+    0 0 36px hsl(var(--lp-violet) / 0.7),
+    0 0 80px hsl(var(--lp-cyan) / 0.35);
+  transform: translate(-50%, -50%);
+}
+
+.landing-constellation__logo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-constellation__wash,
+  .landing-constellation__halo::before,
+  .landing-constellation__orbit,
+  .landing-constellation__lane,
+  .landing-constellation__pin,
+  .landing-constellation__upright {
+    animation: none;
+  }
+}
+
+@keyframes lp-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes lp-pulse {
+  50% { opacity: 0.55; transform: scale(1.06); }
+}
+
+@keyframes lp-bob {
+  50% { transform: translateY(-7px); }
 }

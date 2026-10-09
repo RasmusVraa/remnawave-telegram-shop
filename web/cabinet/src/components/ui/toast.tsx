@@ -26,16 +26,31 @@ import { cn } from '@/lib/utils'
 
 type ToastVariant = 'success' | 'error' | 'info'
 
+/** Необязательная кнопка в тосте — например, «Отменить». Нажатие закрывает тост. */
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
+interface ToastOptions {
+  action?: ToastAction
+  /** Своя длительность показа вместо стандартной для варианта. */
+  durationMs?: number
+}
+
 interface Toast {
   id: number
   message: string
   variant: ToastVariant
+  action?: ToastAction
+  /** Тост уезжает за край экрана — ещё в списке, но уже без кликов. */
+  leaving?: boolean
 }
 
 interface ToastApi {
-  success: (message: string) => void
-  error: (message: string) => void
-  info: (message: string) => void
+  success: (message: string, options?: ToastOptions) => void
+  error: (message: string, options?: ToastOptions) => void
+  info: (message: string, options?: ToastOptions) => void
 }
 
 const ToastContext = createContext<ToastApi | null>(null)
@@ -46,29 +61,37 @@ const AUTO_HIDE_MS: Record<ToastVariant, number> = {
   error: 6000,
 }
 
+/** Длительность анимации ухода — совпадает с toast-out в tailwind.config. */
+const LEAVE_MS = 300
+
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
   const nextId = useRef(1)
   const timers = useRef(new Map<number, number>())
 
+  // Сначала тост уезжает вбок, и только потом пропадает из списка.
   const dismiss = useCallback((id: number) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id))
     const timer = timers.current.get(id)
-    if (timer !== undefined) {
-      window.clearTimeout(timer)
-      timers.current.delete(id)
-    }
+    if (timer !== undefined) window.clearTimeout(timer)
+    setToasts((prev) => prev.map((toast) => (toast.id === id ? { ...toast, leaving: true } : toast)))
+    timers.current.set(
+      id,
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((toast) => toast.id !== id))
+        timers.current.delete(id)
+      }, LEAVE_MS),
+    )
   }, [])
 
   const push = useCallback(
-    (message: string, variant: ToastVariant) => {
+    (message: string, variant: ToastVariant, options?: ToastOptions) => {
       const text = message.trim()
       if (!text) return
       const id = nextId.current++
-      setToasts((prev) => [...prev.slice(-2), { id, message: text, variant }])
+      setToasts((prev) => [...prev.slice(-2), { id, message: text, variant, action: options?.action }])
       timers.current.set(
         id,
-        window.setTimeout(() => dismiss(id), AUTO_HIDE_MS[variant]),
+        window.setTimeout(() => dismiss(id), options?.durationMs ?? AUTO_HIDE_MS[variant]),
       )
     },
     [dismiss],
@@ -85,9 +108,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<ToastApi>(
     () => ({
-      success: (message: string) => push(message, 'success'),
-      error: (message: string) => push(message, 'error'),
-      info: (message: string) => push(message, 'info'),
+      success: (message: string, options?: ToastOptions) => push(message, 'success', options),
+      error: (message: string, options?: ToastOptions) => push(message, 'error', options),
+      info: (message: string, options?: ToastOptions) => push(message, 'info', options),
     }),
     [push],
   )
@@ -147,12 +170,25 @@ function ToastViewport({
           <div
             key={toast.id}
             className={cn(
-              'animate-fade-in pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-xl border bg-card/95 px-3.5 py-3 text-sm shadow-lg backdrop-blur-md',
+              'pointer-events-auto flex w-full max-w-sm items-start gap-2.5 rounded-xl border bg-card/95 px-3.5 py-3 text-sm shadow-lg backdrop-blur-md',
+              toast.leaving ? 'pointer-events-none animate-toast-out' : 'animate-fade-in',
               variantClass[toast.variant],
             )}
           >
             <Icon className="mt-0.5 size-4 shrink-0" aria-hidden />
             <p className="min-w-0 flex-1 text-card-foreground">{toast.message}</p>
+            {toast.action ? (
+              <button
+                type="button"
+                onClick={() => {
+                  toast.action?.onClick()
+                  onDismiss(toast.id)
+                }}
+                className="-my-0.5 shrink-0 rounded-md px-1.5 py-0.5 font-semibold text-primary transition-colors hover:bg-primary/10"
+              >
+                {toast.action.label}
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => onDismiss(toast.id)}

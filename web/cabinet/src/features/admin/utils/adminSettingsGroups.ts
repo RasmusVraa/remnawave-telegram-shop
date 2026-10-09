@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import {
+  Activity,
   BadgeRussianRuble,
   Bell,
   CalendarDays,
@@ -10,6 +11,7 @@ import {
   Gift,
   Handshake,
   LayoutList,
+  PanelTop,
   Link2,
   ListFilter,
   Megaphone,
@@ -37,6 +39,8 @@ import {
 /** Порядок и иконки секций (синхрон с backend buildAdminSettingsResponse). */
 export const ADMIN_SETTINGS_GROUP_ORDER = [
   'cabinet',
+  'landing',
+  'status',
   'cabinet_connect',
   'tariffs',
   'trial',
@@ -74,6 +78,8 @@ export const ADMIN_SETTINGS_GROUP_ICONS: Record<AdminSettingsGroupId, LucideIcon
   lifecycle: RefreshCw,
   fortune: CircleDot,
   cabinet: Sparkles,
+  landing: PanelTop,
+  status: Activity,
   cabinet_connect: Settings2,
 }
 
@@ -99,6 +105,8 @@ export const ADMIN_SETTINGS_GROUP_ICON_STYLES: Record<AdminSettingsGroupId, Admi
   lifecycle: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
   fortune: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
   cabinet: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
+  landing: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
+  status: { box: 'bg-cyan-500/10 dark:bg-cyan-500/20', icon: 'text-cyan-500' },
   cabinet_connect: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
 }
 
@@ -118,6 +126,9 @@ export function adminSettingsGroupIconStyle(id: string): AdminSettingsGroupIconS
  * экране. Поэтому в ADMIN_SETTINGS_CATEGORIES этих групп нет.
  */
 export const ADMIN_PRODUCT_SETTINGS_GROUPS = ['tariffs', 'trial', 'hwid', 'stars'] as const
+
+/** Группа живёт на отдельной странице «Статус», не в общих настройках и не на тарифах. */
+export const ADMIN_STATUS_SETTINGS_GROUP: AdminSettingsGroupId = 'status'
 
 /** Крупные категории на странице «Настройки бота». */
 export const ADMIN_SETTINGS_CATEGORY_ORDER = [
@@ -145,7 +156,7 @@ export const ADMIN_SETTINGS_CATEGORIES: AdminSettingsCategoryDef[] = [
     id: 'design',
     titleKey: 'admin.settings.categories.design',
     icon: Sparkles,
-    groups: ['cabinet', 'cabinet_connect'],
+    groups: ['cabinet', 'landing', 'cabinet_connect'],
     iconStyle: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
   },
   {
@@ -190,7 +201,11 @@ const GROUP_TO_CATEGORY = new Map<AdminSettingsGroupId, AdminSettingsCategoryId>
 if (import.meta.env.DEV) {
   // Каждая группа должна быть либо в категории «Настроек бота», либо в
   // продуктовом блоке страницы «Тарифы» — иначе она не отрендерится нигде.
-  const placed = new Set<string>([...GROUP_TO_CATEGORY.keys(), ...ADMIN_PRODUCT_SETTINGS_GROUPS])
+  const placed = new Set<string>([
+    ...GROUP_TO_CATEGORY.keys(),
+    ...ADMIN_PRODUCT_SETTINGS_GROUPS,
+    ADMIN_STATUS_SETTINGS_GROUP,
+  ])
   for (const groupId of ADMIN_SETTINGS_GROUP_ORDER) {
     if (!placed.has(groupId)) {
       console.error(`[adminSettingsGroups] group "${groupId}" is not assigned to any category`)
@@ -340,7 +355,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       id: 'moderation',
       titleKey: 'admin.settings.subsections.access.moderation',
       icon: MessageSquare,
-      keys: ['FORWARD_USER_MESSAGES_TO_ADMIN'],
+      keys: ['FORWARD_USER_MESSAGES_TO_ADMIN', 'SUSPICIOUS_USER_FILTER_ENABLED'],
     },
     {
       id: 'lists',
@@ -466,6 +481,33 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       titleKey: 'admin.settings.subsections.cabinet.schedule',
       icon: CalendarDays,
       keys: ['CABINET_DECOR_AUTO_ENABLED', 'CABINET_DECOR_SCHEDULE'],
+    },
+  ],
+  landing: [
+    {
+      id: 'copy',
+      titleKey: 'admin.settings.subsections.landing.copy',
+      icon: PanelTop,
+      keys: [
+        'LANDING_HERO_TITLE',
+        'LANDING_HERO_SUBTITLE',
+        'LANDING_NOTE',
+        'LANDING_STAT_TRAFFIC_VALUE',
+        'LANDING_STAT_TRAFFIC_LABEL',
+        'LANDING_STAT_DEVICES_VALUE',
+        'LANDING_STAT_DEVICES_LABEL',
+      ],
+    },
+    {
+      id: 'sections',
+      titleKey: 'admin.settings.subsections.landing.sections',
+      icon: LayoutList,
+      keys: [
+        'LANDING_SHOW_TARIFFS',
+        'LANDING_SHOW_STEPS',
+        'LANDING_SHOW_FEATURES',
+        'LANDING_SHOW_FAQ',
+      ],
     },
   ],
   cabinet_connect: [

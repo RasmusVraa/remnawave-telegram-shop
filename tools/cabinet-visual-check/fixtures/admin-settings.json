@@ -66,6 +66,88 @@
         ]
       },
       {
+        "id": "landing",
+        "fields": [
+          {
+            "key": "LANDING_HERO_TITLE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_HERO_SUBTITLE",
+            "type": "text",
+            "value": "Сайты открываются как раньше",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "LANDING_NOTE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_STAT_TRAFFIC_VALUE",
+            "type": "text",
+            "value": "Безлимит",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "LANDING_STAT_TRAFFIC_LABEL",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_STAT_DEVICES_VALUE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_STAT_DEVICES_LABEL",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_SHOW_TARIFFS",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_SHOW_STEPS",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_SHOW_FEATURES",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "LANDING_SHOW_FAQ",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          }
+        ]
+      },
+      {
         "id": "cabinet_connect",
         "fields": [
           {

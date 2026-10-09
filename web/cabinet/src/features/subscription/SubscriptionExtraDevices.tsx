@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { api, ApiError, type HwidExtraPreviewResponse, type SubscriptionHwidExtraInfo } from '@/lib/api'
 import { newIdempotencyKey, cn } from '@/lib/utils'
+import { reservePaymentWindow } from '@/lib/payment-window'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 
 type Panel = 'menu' | 'buy' | 'decrease'
@@ -456,12 +457,16 @@ export function SubscriptionExtraDevices({ hwid, inactive, onUpdated }: Props) {
               onClick={async () => {
                 setPayError(null)
                 setPayLoading(true)
+                // До первого await: иначе Safari заблокирует вкладку оплаты.
+                const payWindow = reservePaymentWindow()
                 try {
                   const idem = newIdempotencyKey()
                   const res = await api.hwidExtraCheckout(buyTarget, provider, idem)
-                  window.open(res.payment_url, '_blank', 'noopener,noreferrer')
-                  navigate(`/payment/status/${res.checkout_id}`)
+                  if (payWindow.go(res.payment_url)) {
+                    navigate(`/payment/status/${res.checkout_id}`)
+                  }
                 } catch (err) {
+                  payWindow.cancel()
                   if (err instanceof ApiError) {
                     setPayError(err.status === 429 ? t('errors.tooManyRequests') : t('checkout.notAvailable'))
                   } else {

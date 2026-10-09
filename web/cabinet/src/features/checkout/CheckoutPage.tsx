@@ -16,7 +16,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError, type TariffItem } from '@/lib/api'
-import { getTelegramInitData, newIdempotencyKey, cn } from '@/lib/utils'
+import { newIdempotencyKey, cn } from '@/lib/utils'
+import { reservePaymentWindow } from '@/lib/payment-window'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { LegalContinueDisclaimer } from '@/components/LegalContinueDisclaimer'
 import { formatNumber } from '@/lib/format'
@@ -43,15 +44,6 @@ const PROVIDER_ORDER: Provider[] = [
   'telegram',
   'heleket',
 ]
-
-function openPaymentUrl(url: string): void {
-  const inMiniApp = getTelegramInitData().length > 0
-  if (inMiniApp && window.Telegram?.WebApp?.openLink) {
-    window.Telegram.WebApp.openLink(url, { try_instant_view: false })
-    return
-  }
-  window.open(url, '_blank', 'noopener,noreferrer')
-}
 
 export default function CheckoutPage() {
   const { t } = useTranslation()
@@ -138,6 +130,8 @@ export default function CheckoutPage() {
     setError(null)
     setLoading(true)
 
+    // До первого await: иначе Safari заблокирует вкладку оплаты.
+    const payWindow = reservePaymentWindow()
     const idempotencyKey = newIdempotencyKey()
 
     try {
@@ -152,11 +146,11 @@ export default function CheckoutPage() {
         },
         idempotencyKey,
       )
-      // Mini App on iOS can block window.open popups.
-      // Use Telegram openLink inside Mini App and keep window.open for browsers.
-      openPaymentUrl(res.payment_url)
-      navigate(`/payment/status/${res.checkout_id}`)
+      if (payWindow.go(res.payment_url)) {
+        navigate(`/payment/status/${res.checkout_id}`)
+      }
     } catch (err) {
+      payWindow.cancel()
       if (err instanceof ApiError) {
         if (err.status === 429) {
           setError(t('errors.tooManyRequests'))
@@ -431,15 +425,18 @@ export default function CheckoutPage() {
         </RevealItem>
 
         {/* Mobile spacer: fixed pay bar + legal line should not overlap content */}
-        <div className="sm:hidden h-[8.5rem]" aria-hidden />
+        <div className="sm:hidden h-[5.5rem]" aria-hidden />
       </PageReveal>
 
-      {/* Mobile: fixed to viewport above bottom navbar (via portal). */}
+      {/*
+        Mobile: шторка от кнопки до низа экрана, нижнее меню (z-50) лежит поверх неё.
+        Без подложки способы оплаты просвечивали сквозь текст согласия.
+        z-[39] — под выпадающим мобильным меню (z-40).
+      */}
       {typeof document !== 'undefined' &&
         createPortal(
-          <div className="sm:hidden fixed inset-x-0 z-[60] bottom-[calc(73px+var(--cabinet-tg-safe-bottom))] px-2">
+          <div className="cabinet-pay-scrim sm:hidden fixed inset-x-0 bottom-0 z-[39] px-3 pt-8 pb-[calc(var(--cabinet-bottom-nav-h,calc(73px+var(--cabinet-tg-safe-bottom)))+0.375rem)]">
             <div className="mx-auto flex w-full max-w-lg flex-col gap-1.5">
-              <LegalContinueDisclaimer siteLinks={bootstrap?.site_links} />
               <Button
                 className={cn('w-full shadow-none', !loading && disabledPayButtonClass)}
                 size="lg"
@@ -450,6 +447,7 @@ export default function CheckoutPage() {
                 {t('checkout.pay')}
                 {tariff ? ` ${formatNumber(amountValue)} ${amountSuffix}` : ''}
               </Button>
+              <LegalContinueDisclaimer siteLinks={bootstrap?.site_links} variant="short" />
             </div>
           </div>,
           document.body,

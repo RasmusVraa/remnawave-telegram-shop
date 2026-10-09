@@ -1,1 +1,0 @@
-import"./query-COvk_SeJ.js";import{E as d}from"./index-DSROzL4b.js";const e={well:"bg-background dark:bg-muted",card:"bg-card",raised:"bg-secondary shadow-sm dark:shadow-none"},a={well:"border border-border/50",card:"border border-border/60",raised:"border border-border"};function n(r,o){return d(e[r],a[r],o)}function c(r,o){return d(e[r],o)}export{c as a,n as s};

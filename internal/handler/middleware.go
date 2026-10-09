@@ -110,7 +110,7 @@ func (h Handler) SuspiciousUserFilterMiddleware(next bot.HandlerFunc) bot.Handle
 			return
 		}
 
-		if utils.IsSuspiciousUser(username, firstName, lastName) {
+		if config.SuspiciousUserFilterEnabled() && utils.IsSuspiciousUser(username, firstName, lastName) {
 			slog.Warn("suspicious user blocked", "userId", utils.MaskHalfInt64(userID))
 			_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID:    chatID,

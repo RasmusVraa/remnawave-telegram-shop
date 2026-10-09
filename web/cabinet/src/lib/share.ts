@@ -49,7 +49,17 @@ function telegramShareUrl(text: string, url: string): string {
 
 function openInNewTab(url: string): boolean {
   try {
-    return window.open(url, '_blank', 'noopener,noreferrer') !== null
+    // Без 'noopener' в features: с ним window.open по спецификации всегда
+    // возвращает null, и открытая вкладка выглядела бы заблокированной —
+    // вызывающий каждый раз ещё и копировал ссылку. Связь рвём вручную.
+    const w = window.open(url, '_blank')
+    if (!w) return false
+    try {
+      w.opener = null
+    } catch {
+      /* вкладка уже открыта — это главное */
+    }
+    return true
   } catch {
     return false
   }

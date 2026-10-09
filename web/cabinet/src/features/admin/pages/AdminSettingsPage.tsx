@@ -10,6 +10,7 @@ import { AdminSettingsGroupEditor, fieldLabel } from '../components/AdminSetting
 import { useAdminSettingsDraft } from '../hooks/useAdminSettingsDraft'
 import {
   ADMIN_PRODUCT_SETTINGS_GROUPS,
+  ADMIN_STATUS_SETTINGS_GROUP,
   ADMIN_SETTINGS_CATEGORIES,
   ADMIN_SETTINGS_DEFAULT_CATEGORY,
   ADMIN_SETTINGS_GROUPS_LIST_ANCHOR,
@@ -98,7 +99,7 @@ export default function AdminSettingsPage() {
   // Продуктовые группы переехали на страницу «Тарифы» — прячем их здесь целиком,
   // включая поиск, иначе их можно было бы редактировать в двух местах сразу.
   const pageGroups = useMemo(() => {
-    const moved = new Set<string>(ADMIN_PRODUCT_SETTINGS_GROUPS)
+    const moved = new Set<string>([...ADMIN_PRODUCT_SETTINGS_GROUPS, ADMIN_STATUS_SETTINGS_GROUP])
     return (groups ?? []).filter((g) => !moved.has(g.id))
   }, [groups])
 

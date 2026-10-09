@@ -60,7 +60,9 @@ type config struct {
 	isMoynalogEnabled                                                            bool
 	moynalogReceiptYookasa, moynalogReceiptPlatega, moynalogReceiptCrypto        bool // MOYNALOG_RECEIPT_FOR
 	adminTelegramId                                                              int64
+	cabinetAdminEmails                                                           []string
 	forwardUserMessagesToAdmin                                                   bool
+	suspiciousUserFilterEnabled                                                  bool
 	trialDays                                                                    int
 	squadUUIDs                                                                   map[uuid.UUID]uuid.UUID
 	referralDays                                                                 int
@@ -724,9 +726,41 @@ func GetAdminTelegramId() int64 {
 	return conf.adminTelegramId
 }
 
+// CabinetAdminEmails — почты, которым открыта админка кабинета (CABINET_ADMIN_EMAILS).
+// Сравнение без регистра. Пустой список ничего не добавляет к ADMIN_TELEGRAM_ID.
+func CabinetAdminEmails() []string {
+	return conf.cabinetAdminEmails
+}
+
+// ParseCabinetAdminEmails режет список почт из env: запятая, пробелы, нижний регистр.
+func ParseCabinetAdminEmails(raw string) []string {
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ';' || r == ' ' || r == '\n' || r == '\t'
+	})
+	out := make([]string, 0, len(parts))
+	seen := map[string]struct{}{}
+	for _, part := range parts {
+		email := strings.ToLower(strings.TrimSpace(part))
+		if email == "" || !strings.Contains(email, "@") {
+			continue
+		}
+		if _, ok := seen[email]; ok {
+			continue
+		}
+		seen[email] = struct{}{}
+		out = append(out, email)
+	}
+	return out
+}
+
 // ForwardUserMessagesToAdmin — пересылать админу текст пользователей и неизвестные команды (FORWARD_USER_MESSAGES_TO_ADMIN).
 func ForwardUserMessagesToAdmin() bool {
 	return conf.forwardUserMessagesToAdmin
+}
+
+// SuspiciousUserFilterEnabled — не пускать в бота пользователей с подозрительными именами (SUSPICIOUS_USER_FILTER_ENABLED).
+func SuspiciousUserFilterEnabled() bool {
+	return conf.suspiciousUserFilterEnabled
 }
 
 func GetHealthCheckPort() int {
@@ -1006,8 +1040,10 @@ func InitConfig() {
 	if err != nil {
 		panic("ADMIN_TELEGRAM_ID .env variable not set")
 	}
+	conf.cabinetAdminEmails = ParseCabinetAdminEmails(os.Getenv("CABINET_ADMIN_EMAILS"))
 
 	conf.forwardUserMessagesToAdmin = envBoolDefault("FORWARD_USER_MESSAGES_TO_ADMIN", true)
+	conf.suspiciousUserFilterEnabled = envBoolDefault("SUSPICIOUS_USER_FILTER_ENABLED", true)
 
 	conf.telegramToken = mustEnv("TELEGRAM_TOKEN")
 

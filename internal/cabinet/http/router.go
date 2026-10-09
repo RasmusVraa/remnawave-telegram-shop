@@ -47,6 +47,7 @@ import (
 	botpayment "remnawave-tg-shop-bot/internal/payment"
 	"remnawave-tg-shop-bot/internal/promo"
 	"remnawave-tg-shop-bot/internal/remnawave"
+	"remnawave-tg-shop-bot/internal/statusprobe"
 	"remnawave-tg-shop-bot/internal/sync"
 	"remnawave-tg-shop-bot/internal/tariffsquads"
 	"remnawave-tg-shop-bot/internal/translation"
@@ -226,7 +227,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		cabcfg.TelegramOIDCEnabled(),
 		cabcfg.TelegramWebAuthMode(),
 	)
-	adminChecker := adminauth.NewChecker(identityRepo)
+	adminChecker := adminauth.NewChecker(identityRepo, accountRepo)
 
 	contentHandler := handlers.NewCabinetContentHandler()
 	// Профили Telegram (имя + аватарка) тянутся ботом и кэшируются в процессе.
@@ -235,7 +236,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	avatarSecret := []byte(cabcfg.JWTSecret())
 
 	meHandler := handlers.NewMe(authSvc, accountRepo, identityRepo, linkRepo, customerBootstrap,
-		paymentService, purchaseRepo, rw, customerRepo, adminChecker, tgProfiles, avatarSecret, cabcfg.CookieDomain(), tgWidgetBot, cabcfg.GoogleEnabled(), cabcfg.YandexEnabled(), cabcfg.VKEnabled(), cabcfg.TelegramOIDCEnabled())
+		paymentService, purchaseRepo, rw, customerRepo, database.NewDeviceNameRepository(pool), adminChecker, tgProfiles, avatarSecret, cabcfg.CookieDomain(), tgWidgetBot, cabcfg.GoogleEnabled(), cabcfg.YandexEnabled(), cabcfg.VKEnabled(), cabcfg.TelegramOIDCEnabled())
 	tariffsHandler := handlers.NewTariffs(catalogSvc)
 	subscriptionHandler := handlers.NewSubscription(subscriptionSvc)
 	// Приглашения «подключить ещё устройство»: токен подписывается тем же
@@ -394,6 +395,34 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim)
 
+	statusTargets := statusprobe.NewKVTargets(runtimeSettingsRepo)
+	statusRunner := statusprobe.NewRunner(statusprobe.NewKVHistory(runtimeSettingsRepo))
+	publicStatus := handlers.NewPublicStatus(rw, statusRunner, statusTargets)
+	api.Handle("/cabinet/api/public/status",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: http.HandlerFunc(publicStatus.Get),
+		}),
+	)
+	adminStatusTargets := handlers.NewAdminStatusTargets(statusTargets, statusRunner)
+	api.Handle("/cabinet/api/admin/status/targets",
+		middleware.Chain(
+			http.HandlerFunc(adminStatusTargets.Handle),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireAdmin(adminChecker),
+			middleware.CSRF(),
+			middleware.RateLimit(adminAcctLim, accountKey("admin_status_targets")),
+		),
+	)
+	api.Handle("/cabinet/api/admin/status/probe",
+		middleware.Chain(
+			http.HandlerFunc(adminStatusTargets.Probe),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireAdmin(adminChecker),
+			middleware.CSRF(),
+			middleware.RateLimit(adminAcctLim, accountKey("admin_status_probe")),
+		),
+	)
+
 	// 404 JSON на любой неизвестный /cabinet/api/*.
 	api.HandleFunc("/cabinet/api/", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -426,12 +455,15 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	mux.Handle("/cabinet/api/", apiChain)
 	mux.Handle("/cabinet/", spaChain)
 
-	// Публичный лендинг живёт на корне домена: https://host/landing (а не /cabinet/landing).
-	// buildSPAHandler на неизвестный путь отдаёт index.html, а SPA сама выбирает
-	// basename по location.pathname (см. resolveBasename в web/cabinet/src/App.tsx),
-	// поэтому один и тот же бандл обслуживает оба адреса.
+	// Публичный лендинг — корень домена (https://host/). Старый адрес /landing
+	// оставлен, чтобы уже разосланные ссылки не сломались. {$} — только «/»,
+	// вебхуки и /healthcheck на том же mux не перехватываются.
+	// Ассеты SPA по-прежнему под /cabinet/ (vite base).
+	mux.Handle("/{$}", spaChain)
 	mux.Handle("/landing", spaChain)
 	mux.Handle("/landing/", spaChain)
+	mux.Handle("/status", spaChain)
+	mux.Handle("/status/", spaChain)
 
 	// Часто открывают кабинет как https://host/login без префикса /cabinet — иначе 404.
 	registerCabinetRootRedirects(mux)
@@ -822,6 +854,15 @@ func registerAPIRoutes(
 			middleware.RequireVerifiedEmail(),
 			middleware.CSRF(),
 			middleware.RateLimit(subscriptionAcctLim, accountKey("devices_delete")),
+		)),
+	)
+	api.Handle("/cabinet/api/me/devices/rename",
+		onlyPOST(middleware.Chain(
+			http.HandlerFunc(me.RenameDevice),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireVerifiedEmail(),
+			middleware.CSRF(),
+			middleware.RateLimit(subscriptionAcctLim, accountKey("devices_rename")),
 		)),
 	)
 	api.Handle("/cabinet/api/me/hwid-extra/apply",

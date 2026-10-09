@@ -1,15 +1,16 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 
 import { api, type TariffItem, type TariffsResponse } from '@/lib/api'
+import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { formatDecimals, formatInteger } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { LANDING_POPULAR_PLAN_PATTERNS } from '../landingContent'
 import { logLandingMockHint, readLandingTariffsMock } from '../landingTariffsMock'
 import type { LandingBrand } from '../useLandingBrand'
-import { Reveal, useCardSpotlight } from './LandingMotion'
+import { useCardSpotlight } from './LandingMotion'
 import { SectionHeading } from './LandingPrimitives'
 
 /**
@@ -27,7 +28,7 @@ import { SectionHeading } from './LandingPrimitives'
  * просмотра без бэкенда есть мок — см. landingTariffsMock.ts.
  */
 
-export type LandingTariffsVariant = 'section' | 'panel'
+export type LandingTariffsVariant = 'section' | 'panel' | 'stage'
 
 interface TariffCardData {
   key: string
@@ -40,6 +41,43 @@ interface TariffCardData {
   /** Скидка к базовой месячной цене, %. 0 — плашку не показываем. */
   savingsPct: number
   featured: boolean
+}
+
+function cardFromItem(item: TariffItem, monthPrice: number): TariffCardData {
+  const perMonth = item.months > 0 ? item.price_rub / item.months : item.price_rub
+  const pct =
+    monthPrice > 0 && perMonth < monthPrice ? Math.round((1 - perMonth / monthPrice) * 100) : 0
+  const haystack = `${item.slug} ${item.name}`.toLowerCase()
+  return {
+    key: item.slug,
+    name: item.name,
+    priceRub: item.price_rub,
+    perMonthRub: perMonth,
+    savingsPct: pct,
+    featured: LANDING_POPULAR_PLAN_PATTERNS.some((p) => haystack.includes(p)),
+  }
+}
+
+function PaymentLine() {
+  const { t } = useTranslation()
+  const { data } = useAuthBootstrap()
+  const providers = data?.payment_providers
+  const labels = [
+    providers?.platega_sbp ? t('landing.tariffs.pay.sbp') : null,
+    providers?.yookassa || providers?.platega_cards || providers?.platega_acquiring
+      ? t('landing.tariffs.pay.card')
+      : null,
+    providers?.cryptopay || providers?.platega_crypto || providers?.heleket
+      ? t('landing.tariffs.pay.crypto')
+      : null,
+    providers?.telegram ? t('landing.tariffs.pay.stars') : null,
+  ].filter((label): label is string => Boolean(label))
+  if (labels.length === 0) return null
+  return (
+    <p className="mt-5 text-center text-sm text-muted-foreground">
+      {t('landing.tariffs.pay.label')} {labels.join(' · ')}
+    </p>
+  )
 }
 
 function formatRubInteger(n: number): string {
@@ -138,6 +176,8 @@ function useLandingTariffs() {
 
   return {
     cards,
+    items: data?.tariffs ?? [],
+    salesMode: data?.sales_mode ?? '',
     /** true — карточки описывают периоды, значит под ценой нужна цена за месяц. */
     isPeriods: data?.sales_mode !== 'tariffs',
     loading: !mock && query.isLoading,
@@ -148,11 +188,13 @@ function TariffCard({
   card,
   href,
   isPeriods,
+  stage,
   onMouseMove,
 }: {
   card: TariffCardData
   href: string
   isPeriods: boolean
+  stage?: boolean
   onMouseMove: (e: React.MouseEvent<HTMLElement>) => void
 }) {
   const { t } = useTranslation()
@@ -161,36 +203,37 @@ function TariffCard({
     <a
       href={href}
       className={cn(
-        'landing-tariff-card landing-card block h-full p-4 sm:p-5',
+        'landing-tariff-card landing-card flex h-full flex-col p-4 sm:p-5',
+        stage && 'landing-tariff-card--stage',
         card.featured && 'landing-card--featured',
       )}
       onMouseMove={onMouseMove}
     >
-      {card.featured && (
-        <span className="landing-tariff-ribbon" aria-hidden>
-          <span>{t('tariffs.popular')}</span>
-        </span>
-      )}
-
-      <span className="block pr-12 text-[0.95rem] font-medium leading-tight text-foreground sm:pr-[76px] sm:text-base">
-        {card.name}
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className="text-sm font-semibold leading-tight sm:text-base">{card.name}</span>
+        {card.featured && <span className="landing-tariff-pill">{t('tariffs.popular')}</span>}
       </span>
 
       {card.savingsPct > 0 ? (
-        <span className="mt-1 block text-xs font-semibold text-[hsl(var(--lp-cyan))] sm:text-[0.8rem]">
+        <span className="mt-2 block text-xs font-semibold text-[hsl(var(--lp-cyan))]">
           {t('tariffs.saving', { pct: card.savingsPct })}
         </span>
       ) : (
-        <span className="mt-1 block text-xs opacity-0" aria-hidden>
+        <span className="mt-2 block text-xs opacity-0" aria-hidden>
           &nbsp;
         </span>
       )}
 
-      <span className="landing-price mt-4 block font-heading text-2xl font-extrabold leading-none sm:text-[1.75rem]">
+      <span
+        className={cn(
+          'landing-price mt-auto block font-heading font-extrabold leading-none',
+          stage ? 'pt-5 text-[1.7rem] sm:text-4xl' : 'pt-5 text-4xl sm:text-5xl',
+        )}
+      >
         {formatRubInteger(card.priceRub)} ₽
       </span>
 
-      <span className="landing-price mt-1.5 block text-[0.7rem] leading-4 text-muted-foreground sm:text-xs">
+      <span className="mt-1.5 block text-xs leading-4 text-muted-foreground sm:text-sm">
         {isPeriods
           ? `${formatRub2(card.perMonthRub)} ₽ ${t('landing.tariffs.perMonthFull')}`
           : t('landing.tariffs.perMonthFull')}
@@ -208,20 +251,84 @@ export function LandingTariffs({
 }) {
   const { t } = useTranslation()
   const onMouseMove = useCardSpotlight()
-  const { cards, isPeriods, loading } = useLandingTariffs()
+  const { cards, items, salesMode, isPeriods, loading } = useLandingTariffs()
+  const months = useMemo(() => {
+    if (salesMode !== 'tariffs') return []
+    return [...new Set(items.map((item) => item.months))].filter((n) => n > 0).sort((a, b) => a - b)
+  }, [items, salesMode])
+  const [month, setMonth] = useState<number | null>(null)
+  const selectedMonth = month && months.includes(month) ? month : (months[0] ?? null)
+
+  const periodCards = useMemo(() => {
+    if (salesMode !== 'tariffs' || selectedMonth == null) return cards
+    const baseBySlug = new Map<string, number>()
+    for (const item of items) {
+      if (item.months === 1) baseBySlug.set(item.slug, item.price_rub)
+    }
+    return items
+      .filter((item) => item.months === selectedMonth)
+      .map((item) => cardFromItem(item, baseBySlug.get(item.slug) ?? 0))
+  }, [cards, items, salesMode, selectedMonth])
 
   // Пока грузится — держим место, чтобы hero и якорь #tariffs не «прыгали».
   if (loading) {
-    return variant === 'panel' ? (
-      <div className="min-h-[22rem]" aria-busy />
-    ) : (
-      <section id="tariffs" className="min-h-[40vh]" aria-busy />
-    )
+    if (variant === 'panel' || variant === 'stage') {
+      return <div className="landing-stage min-h-[18rem]" aria-busy />
+    }
+    return <section id="tariffs" className="min-h-[40vh]" aria-busy />
   }
   if (cards.length === 0) return null
 
   // На лендинге тариф не выбирают — ведём в кабинет, дальше обычный флоу оплаты.
   const buyHref = brand.tariffsHref
+  const shown = salesMode === 'tariffs' ? periodCards : cards
+
+  if (variant === 'stage') {
+    return (
+      <div id="tariffs" className="landing-stage">
+        <div className="flex flex-wrap items-end justify-between gap-3 px-1">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {t('landing.tariffs.eyebrow')}
+            </p>
+            <h2 className="mt-1 font-heading text-2xl font-bold tracking-tight">{t('landing.tariffs.title')}</h2>
+          </div>
+        </div>
+
+        {months.length > 1 && (
+          <div className="mt-4 flex flex-wrap gap-2">
+            {months.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMonth(value)}
+                className={cn(
+                  'rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors',
+                  value === selectedMonth ? 'landing-cta landing-cta--primary' : 'landing-cta landing-cta--ghost',
+                )}
+              >
+                {value === 12 ? t('landing.tariffs.periodYear') : t('landing.tariffs.periodMonths', { count: value })}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          {shown.map((card) => (
+            <TariffCard
+              key={card.key}
+              card={card}
+              href={buyHref}
+              isPeriods={isPeriods || salesMode === 'tariffs'}
+              stage
+              onMouseMove={onMouseMove}
+            />
+          ))}
+        </div>
+        <PaymentLine />
+      </div>
+    )
+  }
 
   if (variant === 'panel') {
     return (
@@ -256,9 +363,9 @@ export function LandingTariffs({
   }
 
   const columns =
-    cards.length <= 2
+    shown.length <= 2
       ? 'grid-cols-1 sm:grid-cols-2 sm:max-w-2xl sm:mx-auto'
-      : cards.length === 3
+      : shown.length === 3
         ? 'grid-cols-2 lg:grid-cols-3 lg:max-w-4xl lg:mx-auto'
         : 'grid-cols-2 lg:grid-cols-4'
 
@@ -271,30 +378,49 @@ export function LandingTariffs({
           description={t('landing.tariffs.subtitle')}
         />
 
-        <div className={cn('mt-10 grid gap-3 sm:mt-14 sm:gap-4', columns)}>
-          {cards.map((card, i) => (
-            <Reveal key={card.key} delay={0.06 * i}>
-              <TariffCard
-                card={card}
-                href={buyHref}
-                isPeriods={isPeriods}
-                onMouseMove={onMouseMove}
-              />
-            </Reveal>
+        {months.length > 1 && (
+          <div className="mt-8 flex flex-wrap justify-center gap-2">
+            {months.map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMonth(value)}
+                className={cn(
+                  'rounded-full px-4 py-2 text-sm font-semibold transition-colors',
+                  value === selectedMonth
+                    ? 'landing-cta landing-cta--solid'
+                    : 'landing-cta landing-cta--ghost',
+                )}
+              >
+                {value === 12 ? t('landing.tariffs.periodYear') : t('landing.tariffs.periodMonths', { count: value })}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <PaymentLine />
+
+        <div className={cn('mt-8 grid gap-3 sm:gap-4', columns)}>
+          {shown.map((card) => (
+            <TariffCard
+              key={card.key}
+              card={card}
+              href={buyHref}
+              isPeriods={isPeriods}
+              onMouseMove={onMouseMove}
+            />
           ))}
         </div>
 
-        <Reveal delay={0.2}>
-          <div className="mt-8 flex justify-center sm:mt-10">
-            <a
-              href={buyHref}
-              className="landing-cta landing-cta--primary group inline-flex h-12 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold"
-            >
-              {t('landing.tariffs.cta')}
-              <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
-            </a>
-          </div>
-        </Reveal>
+        <div className="mt-8 flex justify-center sm:mt-10">
+          <a
+            href={buyHref}
+            className="landing-cta landing-cta--solid group inline-flex h-12 items-center justify-center gap-2 rounded-full px-7 text-sm font-semibold"
+          >
+            {t('landing.tariffs.cta')}
+            <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+          </a>
+        </div>
       </div>
     </section>
   )

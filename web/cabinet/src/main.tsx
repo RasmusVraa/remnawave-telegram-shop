@@ -7,6 +7,7 @@ import { loadTelegramWebAppScriptIfNeeded } from '@/lib/telegram-web-app-loader'
 import { configureTelegramViewport } from '@/lib/telegram-web-app'
 import { preventIosInputZoom } from '@/lib/ios-input-zoom'
 import { useAuthStore } from '@/store/auth'
+import { isIosWebKit } from '@/lib/utils'
 
 // Применяем тему до первого рендера (избегаем мигания).
 const savedTheme = localStorage.getItem('cab_theme')
@@ -16,6 +17,10 @@ if (savedTheme === 'light') {
 } else {
   document.documentElement.classList.add('dark')
 }
+
+// iPhone: сплошные края шапки и нижнего меню под «стеклянными» панелями
+// браузера и Telegram (index.css, html[data-cabinet-ios]).
+if (isIosWebKit()) document.documentElement.setAttribute('data-cabinet-ios', '')
 
 function bootTelegramWebAppShell(): void {
   window.Telegram?.WebApp?.ready?.()

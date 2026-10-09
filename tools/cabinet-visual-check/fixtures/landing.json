@@ -1,0 +1,290 @@
+{
+  "/tariffs": {
+    "sales_mode": "tariffs",
+    "currency": "RUB",
+    "price_display": "monthly",
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "base",
+        "name": "Стандарт",
+        "description": "2 устройства\nЛимит до 200 ГБ/мес",
+        "device_limit": 1,
+        "traffic_limit_bytes": 214748364800,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 150
+          },
+          {
+            "months": 3,
+            "amount_rub": 400
+          },
+          {
+            "months": 6,
+            "amount_rub": 750
+          },
+          {
+            "months": 12,
+            "amount_rub": 1320
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "slug": "default-plus",
+        "name": "дефолт+++",
+        "description": "64654",
+        "device_limit": 4,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 200
+          },
+          {
+            "months": 6,
+            "amount_rub": 1000
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "slug": "premium",
+        "name": "🔥Премиум",
+        "description": "Обход Белых списков🔥\nБезлимитный трафик для 3 устройств",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 400
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "slug": "extended",
+        "name": "❤️Расширенный",
+        "description": "низкие цены\n- все четко\n- порвет по скорости\n- офигенный тариф",
+        "device_limit": 5,
+        "traffic_limit_bytes": 107374182400,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 1000
+          }
+        ]
+      }
+    ],
+    "savings_badge": "corner"
+  },
+  "/me/subscription": {
+    "expire_at": "2026-10-14T12:00:00Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 1,
+    "traffic_used_gb": 42.5,
+    "traffic_limit_gb": 200,
+    "tariff": {
+      "id": 1,
+      "slug": "base",
+      "name": "Базовый",
+      "traffic_gb": 200,
+      "device_limit": 1
+    },
+    "loyalty_xp": 1240,
+    "loyalty_tier": "silver"
+  },
+  "/auth/bootstrap": {
+    "brand_name": "Starlit",
+    "decor_theme": "off",
+    "light_theme_enabled": true,
+    "site_links": {
+      "bot": "https://t.me/example",
+      "support": "https://t.me/support"
+    },
+    "payment_providers": {
+      "yookassa": true,
+      "platega_sbp": true,
+      "cryptopay": true,
+      "telegram": true
+    },
+    "landing": {
+      "hero_title": "",
+      "hero_subtitle": "",
+      "note": "",
+      "stat_traffic_value": "",
+      "stat_traffic_label": "",
+      "stat_devices_value": "",
+      "stat_devices_label": "",
+      "show_tariffs": true,
+      "show_steps": true,
+      "show_features": true,
+      "show_faq": true
+    }
+  },
+  "/public/status": {
+    "available": true,
+    "updated_at": "2026-10-09T15:40:00Z",
+    "online": 4,
+    "total": 5,
+    "show_map": true,
+    "probes_enabled": true,
+    "probe_world": 3,
+    "probe_russia": 20,
+    "probe_interval_min": 20,
+    "nodes": [
+      {
+        "name": "Беларусь",
+        "country": "BY",
+        "state": "up",
+        "probe": {
+          "world_ping_ms": 22,
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 1, 1]
+        }
+      },
+      {
+        "name": "Финляндия",
+        "country": "FI",
+        "note": "+ белые списки",
+        "whitelist": true,
+        "state": "up",
+        "probe": {
+          "world_ping_ms": 44,
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 1, 1],
+          "hits": [
+            {"city": "Moscow", "network": "Timeweb", "country": "RU", "lat": 55.75, "lon": 37.62, "ping_ms": 118, "ok": true},
+            {"city": "Saint Petersburg", "network": "SkyNET", "country": "RU", "lat": 59.93, "lon": 30.33, "ping_ms": 102, "ok": true},
+            {"city": "Novosibirsk", "network": "MTS", "country": "RU", "lat": 55.03, "lon": 82.92, "ping_ms": 169, "ok": true},
+            {"city": "Krasnodar", "network": "GENERAL IT RUS", "country": "RU", "lat": 45.04, "lon": 38.98, "ping_ms": 119, "ok": true},
+            {"city": "Kazan", "network": "Tattelecom", "country": "RU", "lat": 55.79, "lon": 49.12, "ping_ms": 121, "ok": true},
+            {"city": "Yekaterinburg", "network": "Rostelecom", "country": "RU", "lat": 56.84, "lon": 60.6, "ping_ms": 134, "ok": true},
+            {"city": "Nizhny Novgorod", "network": "Rostelecom", "country": "RU", "lat": 56.33, "lon": 44.0, "ping_ms": 115, "ok": true},
+            {"city": "Samara", "network": "ER-Telecom", "country": "RU", "lat": 53.2, "lon": 50.15, "ping_ms": 128, "ok": true},
+            {"city": "Rostov-on-Don", "network": "Rostelecom", "country": "RU", "lat": 47.23, "lon": 39.72, "ping_ms": 122, "ok": true},
+            {"city": "Ufa", "network": "New Hosting Technologies", "country": "RU", "lat": 54.74, "lon": 55.97, "ping_ms": 137, "ok": true},
+            {"city": "Voronezh", "network": "Rostelecom", "country": "RU", "lat": 51.67, "lon": 39.18, "ping_ms": 116, "ok": true},
+            {"city": "Perm", "network": "Rostelecom", "country": "RU", "lat": 58.01, "lon": 56.25, "ping_ms": 141, "ok": true},
+            {"city": "Volgograd", "network": "Rostelecom", "country": "RU", "lat": 48.71, "lon": 44.51, "ping_ms": 130, "ok": true},
+            {"city": "Omsk", "network": "MTS", "country": "RU", "lat": 54.99, "lon": 73.37, "ping_ms": 158, "ok": true},
+            {"city": "Chelyabinsk", "network": "Rostelecom", "country": "RU", "lat": 55.16, "lon": 61.4, "ping_ms": 145, "ok": true},
+            {"city": "Tula", "network": "ER-Telecom Holding", "country": "RU", "lat": 54.2, "lon": 37.62, "ping_ms": 124, "ok": true},
+            {"city": "Kursk", "network": "Kurier", "country": "RU", "lat": 51.73, "lon": 36.19, "ping_ms": 126, "ok": true},
+            {"city": "Orenburg", "network": "Stroytechservice", "country": "RU", "lat": 51.77, "lon": 55.1, "ping_ms": 118, "ok": true},
+            {"city": "Kostroma", "network": "Rostelecom", "country": "RU", "lat": 57.77, "lon": 40.93, "ping_ms": 121, "ok": true},
+            {"city": "Otradnyy", "network": "Region Svyaz Konsalt", "country": "RU", "lat": 53.37, "lon": 51.35, "ping_ms": 186, "ok": true},
+            {"city": "Санкт-Петербург", "network": "Ростелеком", "country": "RU", "kind": "whitelist", "ok": true, "answer": "В белом списке · HTTP 200 · TCP OK · ICMP 41 ms"},
+            {"city": "Санкт-Петербург", "network": "МТС", "country": "RU", "kind": "whitelist", "ok": false, "answer": "БС включены, сайт закрыт · HTTP нет · TCP OK · ICMP 38 ms"},
+            {"city": "Санкт-Петербург", "network": "Мегафон", "country": "RU", "kind": "whitelist", "ok": false, "answer": "БС нет — сайт открывается · HTTP 200 · TCP OK"}
+          ]
+        }
+      },
+      {
+        "name": "Нидерланды",
+        "country": "NL",
+        "state": "up",
+        "probe": {
+          "world_ping_ms": 35,
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 18,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 0.5, 1],
+          "hits": [
+            {"city": "Moscow", "network": "Timeweb", "country": "RU", "lat": 55.75, "lon": 37.62, "ping_ms": 42, "ok": true},
+            {"city": "Saint Petersburg", "network": "SkyNET", "country": "RU", "lat": 59.93, "lon": 30.33, "ping_ms": 38, "ok": true},
+            {"city": "Kazan", "network": "Tattelecom", "country": "RU", "lat": 55.79, "lon": 49.12, "ping_ms": 51, "ok": true},
+            {"city": "Krasnodar", "network": "GENERAL IT RUS", "country": "RU", "lat": 45.04, "lon": 38.98, "ping_ms": 61, "ok": true},
+            {"city": "Yekaterinburg", "network": "Rostelecom", "country": "RU", "lat": 56.84, "lon": 60.6, "ping_ms": 72, "ok": true},
+            {"city": "Novosibirsk", "network": "MTS", "country": "RU", "lat": 55.03, "lon": 82.92, "ping_ms": 98, "ok": true}
+          ]
+        }
+      },
+      {
+        "name": "Польша",
+        "country": "PL",
+        "state": "up",
+        "probe": {
+          "world_ping_ms": 28,
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 4,
+          "russia_total": 5,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 1, 0.8],
+          "hits": [
+            {"city": "Moscow", "network": "Timeweb", "country": "RU", "lat": 55.75, "lon": 37.62, "ping_ms": 31, "ok": true},
+            {"city": "Saint Petersburg", "network": "SkyNET", "country": "RU", "lat": 59.93, "lon": 30.33, "ping_ms": 28, "ok": true},
+            {"city": "Kursk", "network": "Kurier", "country": "RU", "lat": 51.73, "lon": 36.19, "ping_ms": 34, "ok": true},
+            {"city": "Krasnodar", "network": "GENERAL IT RUS", "country": "RU", "lat": 45.04, "lon": 38.98, "ping_ms": 48, "ok": true}
+          ]
+        }
+      },
+      {
+        "name": "Румыния",
+        "country": "RO",
+        "state": "partial",
+        "probe": {
+          "world_ping_ms": 54,
+          "world_ok": 2,
+          "world_total": 3,
+          "russia_ok": 18,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 0, 1, 1, 0.6],
+          "hits": [
+            {"city": "Moscow", "network": "Timeweb", "country": "RU", "lat": 55.75, "lon": 37.62, "ping_ms": 55, "ok": true},
+            {"city": "Voronezh", "network": "Rostelecom", "country": "RU", "lat": 51.67, "lon": 39.18, "ping_ms": 49, "ok": true},
+            {"city": "Volgograd", "network": "Rostelecom", "country": "RU", "lat": 48.71, "lon": 44.51, "ping_ms": 52, "ok": true},
+            {"city": "Samara", "network": "ER-Telecom", "country": "RU", "lat": 53.2, "lon": 50.15, "ping_ms": 64, "ok": false}
+          ]
+        }
+      },
+      {
+        "name": "Франция",
+        "country": "FR",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 18,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 1, 1]
+        }
+      },
+      {
+        "name": "Албания",
+        "country": "AL",
+        "note": "Белые списки",
+        "state": "up",
+        "probe": {
+          "world_ping_ms": 61,
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 18,
+          "russia_total": 20,
+          "measured_at": "2026-10-09T16:01:00Z",
+          "history": [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1, 1, 1, 1, 1, 1],
+          "hits": [
+            {"city": "Moscow", "network": "Timeweb", "country": "RU", "lat": 55.75, "lon": 37.62, "ping_ms": 71, "ok": true},
+            {"city": "Rostov-on-Don", "network": "Rostelecom", "country": "RU", "lat": 47.23, "lon": 39.72, "ping_ms": 66, "ok": true},
+            {"city": "Krasnodar", "network": "GENERAL IT RUS", "country": "RU", "lat": 45.04, "lon": 38.98, "ping_ms": 58, "ok": true},
+            {"city": "Ufa", "network": "New Hosting Technologies", "country": "RU", "lat": 54.74, "lon": 55.97, "ping_ms": 89, "ok": true}
+          ]
+        }
+      }
+    ]
+  }
+}
