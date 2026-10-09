@@ -53,7 +53,7 @@ func (h *KVHistory) Load(ctx context.Context) (map[string]map[string]DayRecord, 
 	}
 	var parsed map[string]map[string]DayRecord
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return map[string]map[string]DayRecord{}, nil
+		return nil, err
 	}
 	if parsed == nil {
 		parsed = map[string]map[string]DayRecord{}
@@ -88,7 +88,7 @@ func (h *KVHistory) LoadLatest(ctx context.Context) (map[string]Sample, error) {
 	}
 	var parsed map[string]persistedSample
 	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
-		return map[string]Sample{}, nil
+		return nil, err
 	}
 	out := make(map[string]Sample, len(parsed))
 	for key, item := range parsed {
@@ -112,8 +112,20 @@ func (h *KVHistory) SaveLatest(ctx context.Context, samples map[string]Sample) e
 	if h == nil || h.repo == nil {
 		return nil
 	}
-	payload := make(map[string]persistedSample, len(samples))
+	// Дописываем к уже лежащему журналу. Иначе короткий замер после рестарта
+	// затирал бы страны, которые в этот раз ещё не пинговались.
+	existing, err := h.LoadLatest(ctx)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		existing = map[string]Sample{}
+	}
 	for key, sample := range samples {
+		existing[key] = sample
+	}
+	payload := make(map[string]persistedSample, len(existing))
+	for key, sample := range existing {
 		payload[key] = persistedSample{
 			WorldPingMs:     sample.WorldPingMs,
 			WorldOK:         sample.WorldOK,

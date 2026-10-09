@@ -80,6 +80,9 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 	if hasEnabledTargets(configured) {
 		panel = h.panelCached()
 	}
+	if h.probes != nil {
+		h.probes.EnsureLoaded(r.Context())
+	}
 	targets, kick := mergeStatusTargets(panel, configured)
 	if h.probes != nil && len(kick) > 0 {
 		h.probes.Kick(kick)

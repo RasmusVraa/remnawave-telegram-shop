@@ -2,11 +2,11 @@
 # Для локальной разработки используйте: docker compose -f docker-compose.dev.yaml up -d
 #
 # Для использования конкретной версии замените :latest на нужную версию, например:
-# image: ghcr.io/mrme0ws/remnawave-telegram-shop-bot:3.4.0
+# image: ghcr.io/rasmusvraa/remnawave-telegram-shop-bot:3.4.0
 
 services:
   bot:
-    image: ghcr.io/mrme0ws/remnawave-telegram-shop-bot:latest
+    image: ghcr.io/rasmusvraa/remnawave-telegram-shop-bot:latest
     container_name: remnawave-telegram-shop-bot
     restart: unless-stopped
     env_file:

@@ -222,142 +222,190 @@ func dueTargets(targets []Target, samples map[string]Sample, now time.Time) []Ta
 	return out
 }
 
+// pingTarget и listTarget подменяются в тесте. В бою это Globalping и belspiski.
+var pingTarget = MeasurePingCounts
+var listTarget = measureWhitelist
+
+func probeCounts(target Target) (world, russia int) {
+	world, russia = ProbeLimits()
+	if target.World > 0 {
+		world = target.World
+	}
+	if target.Russia > 0 {
+		russia = target.Russia
+	}
+	return world, russia
+}
+
 func (r *Runner) run(targets []Target) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
-	r.ensureLoaded(ctx)
+	r.EnsureLoaded(ctx)
 
 	if len(targets) > maxNodes {
 		targets = targets[:maxNodes]
 	}
+	// Сначала пинг всех стран. Белые списки долгие и иначе держат очередь:
+	// первая страна с галочкой измеряется, остальные висят на «Ещё считаем».
 	measured := 0
 	for _, target := range targets {
 		host, ok := PublicTarget(target.Address)
 		if !ok {
 			continue
 		}
-		world, russia := ProbeLimits()
-		if target.World > 0 {
-			world = target.World
-		}
-		if target.Russia > 0 {
-			russia = target.Russia
-		}
 		r.mu.Lock()
-		globalpingPaused := time.Now().Before(r.cooldownUntil)
-		prev := r.samples[target.Key]
+		paused := time.Now().Before(r.cooldownUntil)
 		r.mu.Unlock()
-
-		var sample Sample
-		if !globalpingPaused {
-			var err error
-			sample, err = MeasurePingCounts(ctx, r.client, host, world, russia)
-			if err != nil {
-				var limited *RateLimitError
-				if errors.As(err, &limited) {
-					wait := 15 * time.Minute
-					if limited != nil && limited.RetryAfter > 0 {
-						wait = limited.RetryAfter
-					}
-					r.mu.Lock()
-					r.cooldownUntil = time.Now().Add(wait)
-					r.mu.Unlock()
-					slog.Warn("status probe paused", "error", err, "retry_in", wait.String())
-					sample = Sample{}
-				} else {
-					slog.Warn("status probe failed", "error", err)
-					sample = Sample{}
+		if paused {
+			break
+		}
+		world, russia := probeCounts(target)
+		sample, err := pingTarget(ctx, r.client, host, world, russia)
+		if err != nil {
+			var limited *RateLimitError
+			if errors.As(err, &limited) {
+				wait := 15 * time.Minute
+				if limited != nil && limited.RetryAfter > 0 {
+					wait = limited.RetryAfter
 				}
-			}
-		}
-		if target.Whitelist {
-			base := sample
-			if base.WorldTotal == 0 && base.RussiaTotal == 0 {
-				base = prev
-			}
-			base.Probes = dropProxyErrorHits(base.Probes)
-			base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-			wl, wlErr := measureWhitelist(ctx, r.client, host, func(hit ProbeHit) {
-				base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
-				base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-				base.MeasuredAt = time.Now()
 				r.mu.Lock()
-				r.samples[target.Key] = base
+				r.cooldownUntil = time.Now().Add(wait)
 				r.mu.Unlock()
-			})
-			if wlErr != nil {
-				slog.Warn("whitelist probe failed", "error", wlErr)
+				slog.Warn("status probe paused", "error", err, "retry_in", wait.String())
+				break
 			}
-			if wl.Total > 0 {
-				base.WhitelistPingMs = wl.PingMs
-				sample = base
-				slog.Info("whitelist probe", "operators", base.WhitelistTotal)
-			}
+			slog.Warn("status probe failed", "error", err)
+			continue
 		}
-		if sample.WorldTotal == 0 && sample.RussiaTotal == 0 && sample.WhitelistTotal == 0 {
+		if sample.WorldTotal == 0 && sample.RussiaTotal == 0 {
 			continue
 		}
 		if sample.MeasuredAt.IsZero() {
 			sample.MeasuredAt = time.Now()
 		}
-		r.mu.Lock()
-		r.samples[target.Key] = sample
-		RecordDay(r.history, target.Key, sample, time.Now())
-		r.mu.Unlock()
+		r.storeSample(target.Key, sample)
+		r.persist()
 		measured++
+	}
+
+	for _, target := range targets {
+		if !target.Whitelist {
+			continue
+		}
+		host, ok := PublicTarget(target.Address)
+		if !ok {
+			continue
+		}
+		r.mu.Lock()
+		base := r.samples[target.Key]
+		r.mu.Unlock()
+		base.Probes = dropProxyErrorHits(base.Probes)
+		base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
+		wl, wlErr := listTarget(ctx, r.client, host, func(hit ProbeHit) {
+			base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
+			base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
+			if base.MeasuredAt.IsZero() {
+				base.MeasuredAt = time.Now()
+			}
+			r.mu.Lock()
+			r.samples[target.Key] = base
+			r.mu.Unlock()
+		})
+		if wlErr != nil {
+			slog.Warn("whitelist probe failed", "error", wlErr)
+		}
+		if wl.Total == 0 {
+			continue
+		}
+		base.WhitelistPingMs = wl.PingMs
+		if base.MeasuredAt.IsZero() {
+			base.MeasuredAt = time.Now()
+		}
+		r.mu.Lock()
+		r.samples[target.Key] = base
+		r.mu.Unlock()
+		r.persist()
+		measured++
+		slog.Info("whitelist probe", "operators", base.WhitelistTotal)
 	}
 	if measured == 0 {
 		return
 	}
-	r.mu.Lock()
-	snapshot := cloneHistory(r.history)
-	r.mu.Unlock()
-	if r.store != nil {
-		if err := r.store.Save(ctx, snapshot); err != nil {
-			slog.Warn("status probe history save", "error", err)
-		}
-	}
-	if latest, ok := r.store.(interface {
-		SaveLatest(context.Context, map[string]Sample) error
-	}); ok {
-		r.mu.Lock()
-		samples := make(map[string]Sample, len(r.samples))
-		for key, sample := range r.samples {
-			samples[key] = sample
-		}
-		r.mu.Unlock()
-		if err := latest.SaveLatest(ctx, samples); err != nil {
-			slog.Warn("status probe latest save", "error", err)
-		}
-	}
+	r.persist()
 	slog.Info("status probes updated", "nodes", measured)
 }
 
-func (r *Runner) ensureLoaded(ctx context.Context) {
+func (r *Runner) storeSample(key string, sample Sample) {
 	r.mu.Lock()
-	loaded := r.loaded
+	r.samples[key] = sample
+	RecordDay(r.history, key, sample, time.Now())
 	r.mu.Unlock()
-	if loaded || r.store == nil {
+}
+
+func (r *Runner) persist() {
+	if r.store == nil {
 		return
 	}
+	r.mu.Lock()
+	if !r.loaded {
+		r.mu.Unlock()
+		return
+	}
+	snapshot := cloneHistory(r.history)
+	samples := make(map[string]Sample, len(r.samples))
+	for key, sample := range r.samples {
+		samples[key] = sample
+	}
+	r.mu.Unlock()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := r.store.Save(ctx, snapshot); err != nil {
+		slog.Warn("status probe history save", "error", err)
+	}
+	latest, ok := r.store.(interface {
+		SaveLatest(context.Context, map[string]Sample) error
+	})
+	if !ok {
+		return
+	}
+	if err := latest.SaveLatest(ctx, samples); err != nil {
+		slog.Warn("status probe latest save", "error", err)
+	}
+}
+
+// EnsureLoaded поднимает журнал из базы до того, как страница статуса его прочитает.
+// Пока чтение не удалось, запись не включается: пустой снимок не сотрёт старые дни.
+func (r *Runner) EnsureLoaded(ctx context.Context) {
+	r.mu.Lock()
+	if r.loaded || r.store == nil {
+		r.mu.Unlock()
+		return
+	}
+	r.mu.Unlock()
+
 	history, histErr := r.store.Load(ctx)
 	var latest map[string]Sample
+	var latestErr error
 	if store, ok := r.store.(interface {
 		LoadLatest(context.Context) (map[string]Sample, error)
 	}); ok {
-		loaded, latestErr := store.LoadLatest(ctx)
-		if latestErr != nil {
-			slog.Warn("status probe latest load", "error", latestErr)
-		} else {
-			latest = loaded
-		}
+		latest, latestErr = store.LoadLatest(ctx)
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.loaded = true
+	if r.loaded {
+		return
+	}
 	if histErr != nil {
 		slog.Warn("status probe history load", "error", histErr)
-	} else if history != nil {
+		return
+	}
+	if latestErr != nil {
+		slog.Warn("status probe latest load", "error", latestErr)
+		return
+	}
+	r.loaded = true
+	if history != nil {
 		r.history = history
 	}
 	for key, sample := range latest {

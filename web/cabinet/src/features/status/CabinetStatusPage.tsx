@@ -245,7 +245,9 @@ function LocationCard({
                       <span className={cn('size-2 rounded-full', hit.ok ? 'bg-emerald-400' : 'bg-rose-400')} />
                       <span>
                         {whitelist
-                          ? hit.answer || (hit.ok ? t('landing.status.hitUp') : t('landing.status.hitDown'))
+                          ? hit.ok
+                            ? t('landing.status.inWhitelist')
+                            : t('landing.status.hitDown')
                           : hit.ok
                             ? hit.ping_ms != null
                               ? t('landing.status.hitPing', { ms: hit.ping_ms })

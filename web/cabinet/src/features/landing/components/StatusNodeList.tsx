@@ -151,7 +151,7 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
                               <td className="py-2">
                                 <span className="inline-flex items-start gap-2">
                                   <span className={cn('landing-status-dot mt-1.5 shrink-0', hit.ok ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
-                                  <span>{hit.answer || (hit.ok ? t('landing.status.hitUp') : t('landing.status.hitDown'))}</span>
+                                  <span>{hit.ok ? t('landing.status.inWhitelist') : t('landing.status.hitDown')}</span>
                                 </span>
                               </td>
                             </tr>
