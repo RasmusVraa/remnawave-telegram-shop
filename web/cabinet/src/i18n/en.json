@@ -3307,6 +3307,8 @@
         "hitPing": "{{ms}} ms",
         "updatedMin": "Updated {{count}} min ago",
         "updatedJust": "Updated just now",
+        "nextIn": "Update in {{time}}",
+        "nextSoon": "Update soon",
         "leadProbes": "Probes check whether the server address opens from the world and from Russia.",
         "cardWorldTitle": "Check from the world",
         "cardWorldBody": "{{count}} probes in other countries check whether the server opens. A measurement runs about every {{minutes}} min.",

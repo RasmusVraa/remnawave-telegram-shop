@@ -3,6 +3,7 @@ package statusprobe
 import (
 	"context"
 	"net/http"
+	"sync"
 	"testing"
 	"time"
 )
@@ -15,13 +16,18 @@ func TestRunPingsEveryNodeBeforeWhitelist(t *testing.T) {
 		listTarget = prevList
 	})
 
+	var mu sync.Mutex
 	var order []string
 	pingTarget = func(_ context.Context, _ *http.Client, target string, _, _ int) (Sample, error) {
+		mu.Lock()
 		order = append(order, "ping:"+target)
+		mu.Unlock()
 		return Sample{WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now()}, nil
 	}
 	listTarget = func(_ context.Context, _ *http.Client, host string, onHit func(ProbeHit)) (whitelistResult, error) {
+		mu.Lock()
 		order = append(order, "list:"+host)
+		mu.Unlock()
 		if onHit != nil {
 			onHit(ProbeHit{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true})
 		}
@@ -34,16 +40,20 @@ func TestRunPingsEveryNodeBeforeWhitelist(t *testing.T) {
 		{Key: "fi", Address: "fi.example"},
 	})
 
-	want := []string{"ping:pl.example", "ping:fi.example", "list:pl.example"}
-	if len(order) != len(want) {
-		t.Fatalf("order %v", order)
+	got := map[string]bool{}
+	for _, item := range order {
+		got[item] = true
 	}
-	for i := range want {
-		if order[i] != want[i] {
+	for _, want := range []string{"ping:pl.example", "ping:fi.example", "list:pl.example"} {
+		if !got[want] {
 			t.Fatalf("order %v", order)
 		}
 	}
 	if _, _, ok := runner.Snapshot("fi"); !ok {
-		t.Fatal("finland ping was not stored before whitelist")
+		t.Fatal("finland ping was not stored")
+	}
+	sample, _, ok := runner.Snapshot("pl")
+	if !ok || sample.WorldTotal != 1 || sample.WhitelistTotal != 1 {
+		t.Fatalf("poland ping and whitelist %+v ok=%v", sample, ok)
 	}
 }

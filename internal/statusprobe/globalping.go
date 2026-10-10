@@ -81,8 +81,11 @@ type Sample struct {
 	WhitelistOK     int
 	WhitelistTotal  int
 	WhitelistPingMs *int
-	MeasuredAt      time.Time
-	Probes          []ProbeHit
+	// WhitelistAt — когда последний раз заканчивалась проверка белых списков.
+	// Отдельно от MeasuredAt, чтобы обычный пинг шёл по своему интервалу.
+	WhitelistAt time.Time
+	MeasuredAt  time.Time
+	Probes      []ProbeHit
 }
 
 // PublicTarget оставляет хост, который можно отдать внешнему зонду.

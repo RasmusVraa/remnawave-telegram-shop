@@ -90,7 +90,7 @@ func (r *Runner) Kick(targets []Target) {
 	}
 	r.running = true
 	r.mu.Unlock()
-	r.start(due)
+	r.start(due, false)
 }
 
 // Force измеряет все переданные страны сразу, не дожидаясь интервала.
@@ -109,11 +109,11 @@ func (r *Runner) Force(targets []Target) error {
 	r.running = true
 	r.cooldownUntil = time.Time{}
 	r.mu.Unlock()
-	r.start(targets)
+	r.start(targets, true)
 	return nil
 }
 
-func (r *Runner) start(targets []Target) {
+func (r *Runner) start(targets []Target, force bool) {
 	go func() {
 		defer func() {
 			r.mu.Lock()
@@ -121,7 +121,7 @@ func (r *Runner) start(targets []Target) {
 			r.lastRun = time.Now()
 			r.mu.Unlock()
 		}()
-		r.run(targets)
+		r.execute(targets, force)
 	}()
 }
 
@@ -200,24 +200,50 @@ func withoutWhitelist(hits []ProbeHit) []ProbeHit {
 	return out
 }
 
+func targetInterval(target Target) time.Duration {
+	interval := target.Interval
+	if interval <= 0 {
+		interval = time.Duration(ProbeIntervalMinutes()) * time.Minute
+	}
+	if interval < 5*time.Minute {
+		return 5 * time.Minute
+	}
+	return interval
+}
+
+func pingDue(target Target, sample Sample, ok bool, now time.Time) bool {
+	if !ok || sample.MeasuredAt.IsZero() {
+		return true
+	}
+	return now.Sub(sample.MeasuredAt) >= targetInterval(target)
+}
+
+func whitelistDue(target Target, sample Sample, ok bool, now time.Time) bool {
+	if !target.Whitelist {
+		return false
+	}
+	if !ok {
+		return true
+	}
+	// Старые снимки без отдельной метки белых списков считаем по времени пинга,
+	// иначе каждый заход на страницу заново гонял бы проверку.
+	at := sample.WhitelistAt
+	if at.IsZero() {
+		at = sample.MeasuredAt
+	}
+	if at.IsZero() {
+		return true
+	}
+	return now.Sub(at) >= targetInterval(target)
+}
+
 func dueTargets(targets []Target, samples map[string]Sample, now time.Time) []Target {
 	out := make([]Target, 0, len(targets))
 	for _, target := range targets {
-		interval := target.Interval
-		if interval <= 0 {
-			interval = time.Duration(ProbeIntervalMinutes()) * time.Minute
+		sample, ok := samples[target.Key]
+		if pingDue(target, sample, ok, now) || whitelistDue(target, sample, ok, now) {
+			out = append(out, target)
 		}
-		if interval < 5*time.Minute {
-			interval = 5 * time.Minute
-		}
-		if sample, ok := samples[target.Key]; ok && !sample.MeasuredAt.IsZero() && now.Sub(sample.MeasuredAt) < interval {
-			incomplete := sample.WhitelistTotal < len(belspiskiPicks) || hasProxyError(sample.Probes)
-			if target.Whitelist && incomplete && (sample.WhitelistTotal == 0 || now.Sub(sample.MeasuredAt) >= 90*time.Second) {
-				out = append(out, target)
-			}
-			continue
-		}
-		out = append(out, target)
 	}
 	return out
 }
@@ -238,6 +264,10 @@ func probeCounts(target Target) (world, russia int) {
 }
 
 func (r *Runner) run(targets []Target) {
+	r.execute(targets, false)
+}
+
+func (r *Runner) execute(targets []Target, force bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	defer cancel()
 	r.EnsureLoaded(ctx)
@@ -245,8 +275,37 @@ func (r *Runner) run(targets []Target) {
 	if len(targets) > maxNodes {
 		targets = targets[:maxNodes]
 	}
-	// Сначала пинг всех стран. Белые списки долгие и иначе держат очередь:
-	// первая страна с галочкой измеряется, остальные висят на «Ещё считаем».
+	now := time.Now()
+	r.mu.Lock()
+	pingTargets := make([]Target, 0, len(targets))
+	listTargets := make([]Target, 0, len(targets))
+	for _, target := range targets {
+		sample, ok := r.samples[target.Key]
+		if force || pingDue(target, sample, ok, now) {
+			pingTargets = append(pingTargets, target)
+		}
+		if target.Whitelist && (force || whitelistDue(target, sample, ok, now)) {
+			listTargets = append(listTargets, target)
+		}
+	}
+	r.mu.Unlock()
+
+	// Обычный пинг и белые списки идут вместе: долгая проверка операторов
+	// больше не отодвигает замер остальных стран.
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		r.pingPass(ctx, pingTargets)
+	}()
+	go func() {
+		defer wg.Done()
+		r.whitelistPass(ctx, listTargets)
+	}()
+	wg.Wait()
+}
+
+func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 	measured := 0
 	for _, target := range targets {
 		host, ok := PublicTarget(target.Address)
@@ -287,59 +346,88 @@ func (r *Runner) run(targets []Target) {
 		r.persist()
 		measured++
 	}
+	if measured > 0 {
+		slog.Info("status probes updated", "nodes", measured)
+	}
+}
 
+func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
+	measured := 0
 	for _, target := range targets {
-		if !target.Whitelist {
-			continue
-		}
 		host, ok := PublicTarget(target.Address)
 		if !ok {
 			continue
 		}
 		r.mu.Lock()
 		base := r.samples[target.Key]
-		r.mu.Unlock()
 		base.Probes = dropProxyErrorHits(base.Probes)
-		base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
+		r.samples[target.Key] = base
+		r.mu.Unlock()
 		wl, wlErr := listTarget(ctx, r.client, host, func(hit ProbeHit) {
-			base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
-			base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-			if base.MeasuredAt.IsZero() {
-				base.MeasuredAt = time.Now()
-			}
-			r.mu.Lock()
-			r.samples[target.Key] = base
-			r.mu.Unlock()
+			r.addWhitelistHit(target.Key, hit)
 		})
 		if wlErr != nil {
 			slog.Warn("whitelist probe failed", "error", wlErr)
 		}
-		if wl.Total == 0 {
+		r.finishWhitelist(target.Key, wl.PingMs, true)
+		if wl.Total == 0 && wlErr != nil {
 			continue
 		}
-		base.WhitelistPingMs = wl.PingMs
-		if base.MeasuredAt.IsZero() {
-			base.MeasuredAt = time.Now()
-		}
-		r.mu.Lock()
-		r.samples[target.Key] = base
-		r.mu.Unlock()
 		r.persist()
 		measured++
-		slog.Info("whitelist probe", "operators", base.WhitelistTotal)
+		slog.Info("whitelist probe", "operators", wl.Total)
 	}
-	if measured == 0 {
-		return
+	if measured > 0 {
+		r.persist()
 	}
-	r.persist()
-	slog.Info("status probes updated", "nodes", measured)
 }
 
 func (r *Runner) storeSample(key string, sample Sample) {
 	r.mu.Lock()
+	prev := r.samples[key]
+	sample.Probes = append(withoutWhitelist(sample.Probes), whitelistOnly(prev.Probes)...)
+	sample.WhitelistOK, sample.WhitelistTotal = whitelistCounts(sample.Probes)
+	sample.WhitelistPingMs = prev.WhitelistPingMs
+	sample.WhitelistAt = prev.WhitelistAt
 	r.samples[key] = sample
 	RecordDay(r.history, key, sample, time.Now())
 	r.mu.Unlock()
+}
+
+func (r *Runner) addWhitelistHit(key string, hit ProbeHit) {
+	r.mu.Lock()
+	base := r.samples[key]
+	base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
+	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
+	if base.WhitelistAt.IsZero() {
+		base.WhitelistAt = time.Now()
+	}
+	r.samples[key] = base
+	r.mu.Unlock()
+}
+
+func (r *Runner) finishWhitelist(key string, pingMs *int, stamp bool) {
+	r.mu.Lock()
+	base := r.samples[key]
+	if pingMs != nil {
+		base.WhitelistPingMs = pingMs
+	}
+	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
+	if stamp {
+		base.WhitelistAt = time.Now()
+	}
+	r.samples[key] = base
+	r.mu.Unlock()
+}
+
+func whitelistOnly(hits []ProbeHit) []ProbeHit {
+	out := make([]ProbeHit, 0)
+	for _, hit := range hits {
+		if hit.Kind == "whitelist" {
+			out = append(out, hit)
+		}
+	}
+	return out
 }
 
 func (r *Runner) persist() {

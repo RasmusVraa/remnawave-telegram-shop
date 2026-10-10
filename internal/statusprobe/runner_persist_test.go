@@ -77,6 +77,50 @@ func TestEnsureLoadedRestoresPingsBeforeNextProbe(t *testing.T) {
 	}
 }
 
+func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
+	now := time.Now()
+	target := Target{Key: "pl", Interval: 30 * time.Minute, Whitelist: true}
+	sample := Sample{
+		MeasuredAt:     now.Add(-2 * time.Minute),
+		WhitelistAt:    now.Add(-2 * time.Minute),
+		WorldTotal:     3,
+		WhitelistTotal: 1,
+		Probes:         []ProbeHit{{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true}},
+	}
+	if pingDue(target, sample, true, now) {
+		t.Fatal("ping ran again before the interval")
+	}
+	if whitelistDue(target, sample, true, now) {
+		t.Fatal("whitelist ran again before the interval")
+	}
+	if len(dueTargets([]Target{target}, map[string]Sample{target.Key: sample}, now)) != 0 {
+		t.Fatal("target was scheduled inside the interval")
+	}
+	later := now.Add(31 * time.Minute)
+	if !pingDue(target, sample, true, later) || !whitelistDue(target, sample, true, later) {
+		t.Fatal("both checks should be due after the interval")
+	}
+}
+
+func TestNewPingKeepsPreviousWhitelist(t *testing.T) {
+	runner := NewRunner(nil)
+	when := time.Now().Add(-time.Hour)
+	runner.samples["pl"] = Sample{
+		WhitelistOK:    1,
+		WhitelistTotal: 1,
+		WhitelistAt:    when,
+		Probes:         []ProbeHit{{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true}},
+	}
+	runner.storeSample("pl", Sample{
+		WorldOK: 2, WorldTotal: 2, MeasuredAt: time.Now(),
+		Probes: []ProbeHit{{City: "Berlin", OK: true}},
+	})
+	sample, _, ok := runner.Snapshot("pl")
+	if !ok || sample.WorldTotal != 2 || sample.WhitelistTotal != 1 || sample.WhitelistAt.IsZero() {
+		t.Fatalf("whitelist was dropped: %+v ok=%v", sample, ok)
+	}
+}
+
 func TestPersistDoesNotOverwriteWhenLoadFailed(t *testing.T) {
 	repo := &memKV{getErr: errors.New("db down")}
 	store := NewKVHistory(repo)

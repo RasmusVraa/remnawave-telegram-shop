@@ -105,7 +105,10 @@ export default function StatusPage() {
 
           {data?.show_map !== false && (
             <Rise delay={0.12}>
-              <StatusMap nodes={nodes} />
+              <StatusMap
+                nodes={nodes}
+                intervalMin={data?.probes_enabled === false ? undefined : data?.probe_interval_min}
+              />
             </Rise>
           )}
 

@@ -202,6 +202,22 @@ html[data-cabinet-decor="black_friday"] .landing-root {
 .landing-status-map__stage {
   position: relative;
 }
+.landing-status-map__timer {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 2;
+  margin: 0;
+  pointer-events: none;
+  border-radius: 999px;
+  background: rgb(8 12 24 / 0.72);
+  color: rgb(226 232 240);
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+}
 .landing-status-map__stage svg {
   display: block;
   width: 100%;

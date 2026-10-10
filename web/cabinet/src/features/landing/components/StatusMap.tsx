@@ -141,6 +141,9 @@ interface Pt {
 
 const LABEL_H = 16
 
+/** Ниже этого масштаба карта «далеко»: подписи прячем, имя всплывает на точке. */
+const NAME_ZOOM = 1.45
+
 function labelWidth(label: string) {
   return label.length * 7.2 + 22
 }
@@ -281,6 +284,28 @@ function placeAnchors(anchors: Anchor[]): LabelBox[] {
   return boxes
 }
 
+/** Вблизи имя есть у каждой точки, даже если выноска не поместилась без пересечений. */
+function ensureLabels(anchors: Anchor[], placed: LabelBox[]): LabelBox[] {
+  const have = new Set(placed.map((box) => box.code))
+  const out = [...placed]
+  for (const anchor of anchors) {
+    if (have.has(anchor.code)) continue
+    const w = labelWidth(anchor.label)
+    out.push({
+      ...anchor,
+      x: Math.min(WIDTH - w - 4, anchor.ax + 12),
+      y: Math.max(4, anchor.ay - LABEL_H - 8),
+      w,
+      h: LABEL_H,
+      flag: true,
+      kneeX: anchor.ax,
+      kneeY: anchor.ay,
+      shelfX: anchor.ax,
+    })
+  }
+  return out
+}
+
 function inView(point: [number, number], view: View): boolean {
   const x = point[0] * view.k + view.x
   const y = point[1] * view.k + view.y
@@ -300,8 +325,48 @@ function arc(from: [number, number], to: [number, number], bend: number): string
 
 const RUSSIA: [number, number] = COUNTRY_CENTROIDS.RU ?? [37.6, 55.75]
 
+/** Ближайший момент, когда хотя бы одна локация снова попадёт в интервал замера. */
+function earliestDue(nodes: StatusMapNode[], intervalMin: number): number | null {
+  let best = Number.POSITIVE_INFINITY
+  const step = intervalMin * 60_000
+  for (const node of nodes) {
+    const raw = node.probe?.measured_at
+    if (!raw) continue
+    const ts = Date.parse(raw)
+    if (Number.isNaN(ts)) continue
+    const due = ts + step
+    if (due < best) best = due
+  }
+  return Number.isFinite(best) ? best : null
+}
+
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const hours = Math.floor(total / 3600)
+  const minutes = Math.floor((total % 3600) / 60)
+  const seconds = total % 60
+  const pad = (n: number) => String(n).padStart(2, '0')
+  if (hours > 0) return `${hours}:${pad(minutes)}:${pad(seconds)}`
+  return `${pad(minutes)}:${pad(seconds)}`
+}
+
+function ProbeCountdown({ dueAt }: { dueAt: number }) {
+  const { t } = useTranslation()
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [])
+  const left = dueAt - now
+  return (
+    <p className="landing-status-map__timer">
+      {left <= 0 ? t('landing.status.nextSoon') : t('landing.status.nextIn', { time: formatCountdown(left) })}
+    </p>
+  )
+}
+
 /** Карта локаций: её можно двигать и приближать. Линии идут из одной точки в России. */
-export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
+export function StatusMap({ nodes, intervalMin }: { nodes: StatusMapNode[]; intervalMin?: number }) {
   const { t, i18n } = useTranslation()
   const svgRef = useRef<SVGSVGElement>(null)
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -332,8 +397,11 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
   const initial = useMemo<View>(() => openingView(projection, frame), [projection, frame])
 
   const [view, setView] = useState<View>(initial)
+  const [hoverCode, setHoverCode] = useState<string | null>(null)
   const viewRef = useRef(view)
   viewRef.current = view
+  const showNames = view.k >= NAME_ZOOM
+  const dueAt = intervalMin && intervalMin > 0 ? earliestDue(nodes, intervalMin) : null
 
   useEffect(() => {
     const svg = svgRef.current
@@ -403,8 +471,8 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
         ay: raw[1] * view.k + view.y,
       })
     }
-    return placeAnchors(anchors)
-  }, [placed, projection, view, i18n.language])
+    return showNames ? ensureLabels(anchors, placeAnchors(anchors)) : []
+  }, [placed, projection, view, i18n.language, showNames])
 
   function toLocal(event: React.PointerEvent) {
     const rect = svgRef.current?.getBoundingClientRect()
@@ -508,6 +576,17 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
                 stroke="#04101f"
                 strokeWidth={1.4 / view.k}
               />
+              <circle
+                cx={projection(RUSSIA)![0]}
+                cy={projection(RUSSIA)![1]}
+                r={16 / view.k}
+                fill="transparent"
+                style={{ cursor: 'pointer' }}
+                onPointerEnter={() => setHoverCode('RU')}
+                onPointerLeave={() => setHoverCode((current) => (current === 'RU' ? null : current))}
+              >
+                <title>{regionName('RU')}</title>
+              </circle>
             </>
           )}
           {placed.map((item, index) => {
@@ -535,6 +614,17 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
                   strokeWidth={1.6 / view.k}
                   style={{ animationDelay: `${(index % 6) * 0.08}s` }}
                 />
+                <circle
+                  cx={point[0]}
+                  cy={point[1]}
+                  r={16 / view.k}
+                  fill="transparent"
+                  style={{ cursor: 'pointer' }}
+                  onPointerEnter={() => setHoverCode(item.code)}
+                  onPointerLeave={() => setHoverCode((current) => (current === item.code ? null : current))}
+                >
+                  <title>{regionName(item.code)}</title>
+                </circle>
               </g>
             )
           })}
@@ -548,6 +638,33 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
         </g>
       </svg>
       <div className="pointer-events-none absolute inset-0">
+        {!showNames && hoverCode
+          ? (() => {
+              const coord = hoverCode === 'RU' ? RUSSIA : countryCentroid(hoverCode)
+              const raw = coord ? projection(coord) : null
+              if (!raw) return null
+              const x = raw[0] * view.k + view.x
+              const y = raw[1] * view.k + view.y
+              return (
+                <span
+                  className="landing-status-map__tag absolute flex items-center gap-1 whitespace-nowrap text-[12px] font-semibold text-white"
+                  style={{
+                    left: `${(x / WIDTH) * 100}%`,
+                    top: `${((y - 22) / HEIGHT) * 100}%`,
+                    transform: 'translate(-50%, -100%)',
+                    textShadow: '0 1px 2px #04101f, 0 0 6px #04101f',
+                  }}
+                >
+                  <img
+                    src={`${import.meta.env.BASE_URL}flags/${hoverCode.toLowerCase()}.svg`}
+                    alt=""
+                    className="h-2.5 w-3.5 rounded-[2px]"
+                  />
+                  {regionName(hoverCode)}
+                </span>
+              )
+            })()
+          : null}
         {labelBoxes.map((item) => (
           <span
             key={item.code}
@@ -570,6 +687,8 @@ export function StatusMap({ nodes }: { nodes: StatusMapNode[] }) {
         ))}
       </div>
       </div>
+
+      {dueAt != null && <ProbeCountdown dueAt={dueAt} />}
 
       <ul className="absolute right-3 top-3 hidden flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-200 sm:flex sm:max-w-[28rem]">
         <li className="inline-flex items-center gap-1.5">
