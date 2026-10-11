@@ -27,6 +27,7 @@ export interface StatusProbe {
   russia_total: number
   history?: Array<number | null>
   measured_at?: string
+  next_min?: number
   hits?: StatusProbeHit[]
 }
 
@@ -328,13 +329,13 @@ const RUSSIA: [number, number] = COUNTRY_CENTROIDS.RU ?? [37.6, 55.75]
 /** Ближайший момент, когда хотя бы одна локация снова попадёт в интервал замера. */
 function earliestDue(nodes: StatusMapNode[], intervalMin: number): number | null {
   let best = Number.POSITIVE_INFINITY
-  const step = intervalMin * 60_000
   for (const node of nodes) {
     const raw = node.probe?.measured_at
     if (!raw) continue
     const ts = Date.parse(raw)
     if (Number.isNaN(ts)) continue
-    const due = ts + step
+    const minutes = node.probe?.next_min && node.probe.next_min > 0 ? node.probe.next_min : intervalMin
+    const due = ts + minutes * 60_000
     if (due < best) best = due
   }
   return Number.isFinite(best) ? best : null

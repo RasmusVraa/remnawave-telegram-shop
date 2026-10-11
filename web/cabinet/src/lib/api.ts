@@ -1275,6 +1275,8 @@ export const api = {
           russia_ok: number
           russia_total: number
           history?: Array<number | null>
+          measured_at?: string
+          next_min?: number
           hits?: {
             city?: string
             network?: string

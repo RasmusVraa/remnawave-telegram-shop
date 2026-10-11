@@ -43,6 +43,7 @@ type publicProbe struct {
 	RussiaTotal int                    `json:"russia_total"`
 	History     []*float64             `json:"history,omitempty"`
 	MeasuredAt  string                 `json:"measured_at,omitempty"`
+	NextMin     int                    `json:"next_min,omitempty"`
 	Hits        []statusprobe.ProbeHit `json:"hits,omitempty"`
 }
 
@@ -100,6 +101,7 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	notes := map[string]string{}
 	whitelist := map[string]bool{}
+	intervals := map[string]int{}
 	for _, item := range configured {
 		key := statusprobe.NodeKey(item.Country, item.Name)
 		if note := strings.TrimSpace(item.Note); note != "" {
@@ -108,6 +110,7 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 		if item.Whitelist {
 			whitelist[key] = true
 		}
+		intervals[key] = item.IntervalMin
 	}
 	if targets != nil {
 		body.Available = true
@@ -145,6 +148,7 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 						RussiaTotal: sample.RussiaTotal,
 						History:     history,
 						MeasuredAt:  measured,
+						NextMin:     statusprobe.NextPingMinutes(intervals[key], sample),
 						Hits:        hits,
 					}
 				}

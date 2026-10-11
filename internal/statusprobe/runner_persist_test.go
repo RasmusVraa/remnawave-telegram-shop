@@ -158,6 +158,7 @@ func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
 	}
 	incomplete := sample
 	incomplete.WhitelistDone = false
+	incomplete.WhitelistAt = time.Time{}
 	if !whitelistDue(target, incomplete, true, now) {
 		t.Fatal("unfinished whitelist should run again")
 	}
@@ -167,6 +168,48 @@ func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
 	later := now.Add(31 * time.Minute)
 	if !pingDue(target, sample, true, later) || !whitelistDue(target, sample, true, later) {
 		t.Fatal("both checks should be due after the interval")
+	}
+}
+
+func TestFailedPingRetriesInTenMinutes(t *testing.T) {
+	now := time.Now()
+	target := Target{Key: "pl", Interval: 30 * time.Minute}
+	failed := Sample{MeasuredAt: now.Add(-11 * time.Minute), WorldOK: 1, WorldTotal: 3}
+	if !pingDue(target, failed, true, now) {
+		t.Fatal("failed ping should be due after 10 minutes")
+	}
+	failed.MeasuredAt = now.Add(-2 * time.Minute)
+	if pingDue(target, failed, true, now) {
+		t.Fatal("failed ping should wait 10 minutes")
+	}
+	okSample := Sample{MeasuredAt: now.Add(-11 * time.Minute), WorldOK: 3, WorldTotal: 3}
+	if pingDue(target, okSample, true, now) {
+		t.Fatal("successful ping should keep the configured interval")
+	}
+	if NextPingMinutes(30, failed) != 10 || NextPingMinutes(30, okSample) != 30 {
+		t.Fatalf("next %d %d", NextPingMinutes(30, failed), NextPingMinutes(30, okSample))
+	}
+}
+
+func TestIncompleteWhitelistResumesMissingOperators(t *testing.T) {
+	hits := make([]ProbeHit, 0, 6)
+	for _, pick := range belspiskiPicks[:6] {
+		city, network := splitPick(pick, "")
+		hits = append(hits, ProbeHit{Kind: "whitelist", City: city, Network: network, OK: true})
+	}
+	missing := missingWhitelistPicks(hits)
+	if len(missing) != len(belspiskiPicks)-6 || missing[0] != belspiskiPicks[6] {
+		t.Fatalf("missing %v", missing)
+	}
+	now := time.Now()
+	target := Target{Key: "pl", Interval: 30 * time.Minute, Whitelist: true}
+	sample := Sample{WhitelistAt: now.Add(-2 * time.Minute), Probes: hits}
+	if whitelistDue(target, sample, true, now) {
+		t.Fatal("partial whitelist retried too soon")
+	}
+	sample.WhitelistAt = now.Add(-11 * time.Minute)
+	if !whitelistDue(target, sample, true, now) {
+		t.Fatal("partial whitelist should resume after 10 minutes")
 	}
 }
 

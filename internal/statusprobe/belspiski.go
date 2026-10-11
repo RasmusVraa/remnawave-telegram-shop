@@ -67,23 +67,26 @@ var belspiskiWait = func(ctx context.Context, d time.Duration) error {
 // MeasureWhitelist проверяет адрес только через belspiski.online:
 // открывается ли он у операторов, когда у них включены белые списки.
 func MeasureWhitelist(ctx context.Context, client *http.Client, host string) (whitelistResult, error) {
-	return measureWhitelist(ctx, client, host, nil)
+	return measureWhitelist(ctx, client, host, nil, nil)
 }
 
-func measureWhitelist(ctx context.Context, client *http.Client, host string, onHit func(ProbeHit)) (whitelistResult, error) {
+func measureWhitelist(ctx context.Context, client *http.Client, host string, picks []string, onHit func(ProbeHit)) (whitelistResult, error) {
+	if len(picks) == 0 {
+		picks = belspiskiPicks
+	}
 	var out whitelistResult
 	var pings []int
 	var firstErr error
 	var lastLimit error
-	for batch := 0; batch < len(belspiskiPicks); batch += belspiskiBatch {
+	for batch := 0; batch < len(picks); batch += belspiskiBatch {
 		if err := ctx.Err(); err != nil {
 			return incompleteWhitelist(out, pings, lastLimit)
 		}
 		end := batch + belspiskiBatch
-		if end > len(belspiskiPicks) {
-			end = len(belspiskiPicks)
+		if end > len(picks) {
+			end = len(picks)
 		}
-		chunk := belspiskiPicks[batch:end]
+		chunk := picks[batch:end]
 		batchID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), batch)
 		for _, pick := range chunk {
 			if err := ctx.Err(); err != nil {
@@ -214,6 +217,48 @@ func isBelspiskiLimit(err error) bool {
 	return ok
 }
 
+func looksLikeLimit(msg string) bool {
+	msg = strings.ToLower(msg)
+	if msg == "" {
+		return false
+	}
+	for _, part := range []string{"rate", "limit", "too many", "максимум", "подожд", "позже"} {
+		if strings.Contains(msg, part) {
+			return true
+		}
+	}
+	return false
+}
+
+// missingWhitelistPicks — операторы, которых ещё нет в снимке.
+// Ошибка прокси не считается ответом: такую строку нужно спросить снова.
+func missingWhitelistPicks(hits []ProbeHit) []string {
+	have := map[string]struct{}{}
+	for _, hit := range hits {
+		if hit.Kind != "whitelist" || hitProxyError(hit) {
+			continue
+		}
+		have[whitelistHitKey(hit.City, hit.Network)] = struct{}{}
+	}
+	missing := make([]string, 0)
+	for _, pick := range belspiskiPicks {
+		city, network := splitPick(pick, "")
+		if _, ok := have[whitelistHitKey(city, network)]; ok {
+			continue
+		}
+		missing = append(missing, pick)
+	}
+	return missing
+}
+
+func whitelistCovered(hits []ProbeHit) bool {
+	return len(missingWhitelistPicks(hits)) == 0
+}
+
+func whitelistHitKey(city, network string) string {
+	return strings.ToLower(strings.TrimSpace(city)) + "\n" + strings.ToLower(strings.TrimSpace(network))
+}
+
 func errorsAsLimit(err error, dst *belspiskiLimitError) bool {
 	got, ok := err.(belspiskiLimitError)
 	if ok && dst != nil {
@@ -273,7 +318,7 @@ func checkBelspiski(ctx context.Context, client *http.Client, host, pick, batchI
 		return ProbeHit{}, belspiskiProxyError{}
 	}
 	if !payload.OK {
-		if payload.Code == "rate_limited" || res.StatusCode == http.StatusTooManyRequests {
+		if payload.Code == "rate_limited" || res.StatusCode == http.StatusTooManyRequests || looksLikeLimit(payload.Error) {
 			wait := time.Duration(payload.RetryAfter) * time.Second
 			if wait <= 0 {
 				wait = 15 * time.Second

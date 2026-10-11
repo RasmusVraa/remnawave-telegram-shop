@@ -304,21 +304,73 @@ func targetInterval(target Target) time.Duration {
 	return interval
 }
 
+const failedPingRetry = 10 * time.Minute
+
 func pingDue(target Target, sample Sample, ok bool, now time.Time) bool {
 	if !ok || sample.MeasuredAt.IsZero() {
 		return true
 	}
-	return now.Sub(sample.MeasuredAt) >= targetInterval(target)
+	return now.Sub(sample.MeasuredAt) >= pingInterval(target, sample)
+}
+
+// NextPingMinutes — через сколько минут снова мерить сервер.
+// Если часть зондов не достучалась, следующий замер через 10 минут,
+// пока не будет замера без провалов.
+func NextPingMinutes(configuredMin int, sample Sample) int {
+	if configuredMin <= 0 {
+		configuredMin = ProbeIntervalMinutes()
+	}
+	if configuredMin < 5 {
+		configuredMin = 5
+	}
+	if configuredMin > 10 && probeFailed(sample) {
+		return 10
+	}
+	return configuredMin
+}
+
+func pingInterval(target Target, sample Sample) time.Duration {
+	minutes := 0
+	if target.Interval > 0 {
+		minutes = int(target.Interval / time.Minute)
+	}
+	return time.Duration(NextPingMinutes(minutes, sample)) * time.Minute
+}
+
+func probeFailed(sample Sample) bool {
+	if sample.WorldTotal > sample.WorldOK || sample.RussiaTotal > sample.RussiaOK {
+		return true
+	}
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" || hit.OK {
+			continue
+		}
+		return true
+	}
+	return false
 }
 
 func whitelistDue(target Target, sample Sample, ok bool, now time.Time) bool {
 	if !target.Whitelist {
 		return false
 	}
-	if !ok || !sample.WhitelistDone {
+	if !ok {
 		return true
 	}
+	if !sample.WhitelistDone {
+		if sample.WhitelistAt.IsZero() {
+			return true
+		}
+		wait := targetInterval(target)
+		if wait > failedPingRetry {
+			wait = failedPingRetry
+		}
+		return now.Sub(sample.WhitelistAt) >= wait
+	}
 	at := sample.WhitelistAt
+	if at.IsZero() {
+		at = sample.MeasuredAt
+	}
 	if at.IsZero() {
 		return true
 	}
@@ -439,10 +491,20 @@ func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 		}
 		r.mu.Lock()
 		base := r.samples[target.Key]
-		base.Probes = dropProxyErrorHits(base.Probes)
-		r.samples[target.Key] = base
+		probes := base.Probes
+		done := base.WhitelistDone
 		r.mu.Unlock()
-		wl, wlErr := listTarget(ctx, r.client, host, func(hit ProbeHit) {
+		picks := belspiskiPicks
+		if !done {
+			missing := missingWhitelistPicks(probes)
+			if len(missing) == 0 {
+				r.finishWhitelist(target.Key, nil, true)
+				r.persist()
+				continue
+			}
+			picks = missing
+		}
+		wl, wlErr := listTarget(ctx, r.client, host, picks, func(hit ProbeHit) {
 			r.addWhitelistHit(target.Key, hit)
 		})
 		partial := errors.Is(wlErr, errWhitelistPartial)
@@ -491,10 +553,8 @@ func (r *Runner) finishWhitelist(key string, pingMs *int, stamp bool) {
 		base.WhitelistPingMs = pingMs
 	}
 	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-	if stamp {
-		base.WhitelistAt = time.Now()
-		base.WhitelistDone = true
-	}
+	base.WhitelistAt = time.Now()
+	base.WhitelistDone = stamp && whitelistCovered(base.Probes)
 	r.samples[key] = base
 	r.mu.Unlock()
 }

@@ -24,7 +24,7 @@ func TestRunPingsEveryNodeBeforeWhitelist(t *testing.T) {
 		mu.Unlock()
 		return Sample{WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now()}, nil
 	}
-	listTarget = func(_ context.Context, _ *http.Client, host string, onHit func(ProbeHit)) (whitelistResult, error) {
+	listTarget = func(_ context.Context, _ *http.Client, host string, _ []string, onHit func(ProbeHit)) (whitelistResult, error) {
 		mu.Lock()
 		order = append(order, "list:"+host)
 		mu.Unlock()
