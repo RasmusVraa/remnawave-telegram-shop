@@ -6,16 +6,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 const globalpingURL = "https://api.globalping.io/v1/measurements"
+
+var probesURL = "https://api.globalping.io/v1/probes"
 
 // RateLimitError — Globalping ответил 429. RetryAfter берётся из заголовка, не из попытки обойти лимит.
 type RateLimitError struct {
@@ -129,8 +133,10 @@ type gpCreate struct {
 }
 
 type gpLocation struct {
-	Magic string `json:"magic"`
-	Limit int    `json:"limit"`
+	Magic   string `json:"magic,omitempty"`
+	Country string `json:"country,omitempty"`
+	City    string `json:"city,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
 }
 
 type gpCreated struct {
@@ -177,12 +183,9 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		russia = 20
 	}
 	body, _ := json.Marshal(gpCreate{
-		Type:   "ping",
-		Target: target,
-		Locations: []gpLocation{
-			{Magic: "world", Limit: world},
-			{Magic: "Russia", Limit: russia},
-		},
+		Type:              "ping",
+		Target:            target,
+		Locations:         pingLocations(world, russiaCities(ctx, client, russia)),
 		InProgressUpdates: true,
 		MeasurementOptions: map[string]int{
 			"packets": 2,
@@ -234,9 +237,203 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		case <-timer.C:
 		}
 	}
-	sample := summarize(last)
+	sample := limitRussiaCities(summarize(last), russia)
 	sample.MeasuredAt = time.Now().UTC()
 	return sample, nil
+}
+
+// fallbackRussiaCities — города, в которых у Globalping есть зонды.
+// Список нужен, только если живой перечень зондов не открылся.
+var fallbackRussiaCities = []string{
+	"Moscow",
+	"Saint Petersburg",
+	"Novosibirsk",
+	"Vladivostok",
+	"Yekaterinburg",
+	"Kazan",
+	"Nizhniy Novgorod",
+	"Krasnodar",
+	"Samara",
+	"Omsk",
+	"Ufa",
+	"Irkutsk",
+	"Khabarovsk",
+	"Tomsk",
+	"Kemerovo",
+	"Orenburg",
+	"Kursk",
+	"Tula",
+	"Penza",
+	"Yuzhno-Sakhalinsk",
+}
+
+var (
+	russiaCityMu    sync.Mutex
+	russiaCityAt    time.Time
+	russiaCityCache []string
+)
+
+const russiaCityTTL = 30 * time.Minute
+
+func pingLocations(world int, cities []string) []gpLocation {
+	locs := make([]gpLocation, 0, 1+len(cities))
+	locs = append(locs, gpLocation{Magic: "world", Limit: world})
+	for _, city := range cities {
+		city = strings.TrimSpace(city)
+		if city == "" {
+			continue
+		}
+		locs = append(locs, gpLocation{Country: "RU", City: city, Limit: 1})
+	}
+	if len(locs) == 1 {
+		locs = append(locs, gpLocation{Magic: "Russia", Limit: 20})
+	}
+	return locs
+}
+
+// russiaCities — до russia+5 разных городов: запас нужен, если часть зондов offline.
+func russiaCities(ctx context.Context, client *http.Client, n int) []string {
+	if n < 1 {
+		n = 20
+	}
+	ranked := rankedRussiaCities(ctx, client)
+	if len(ranked) == 0 {
+		ranked = fallbackRussiaCities
+	}
+	take := n
+	if len(ranked) > n {
+		take = n + 5
+		if take > len(ranked) {
+			take = len(ranked)
+		}
+	} else {
+		take = len(ranked)
+	}
+	return append([]string(nil), ranked[:take]...)
+}
+
+func rankedRussiaCities(ctx context.Context, client *http.Client) []string {
+	russiaCityMu.Lock()
+	if len(russiaCityCache) > 0 && time.Since(russiaCityAt) < russiaCityTTL {
+		out := append([]string(nil), russiaCityCache...)
+		russiaCityMu.Unlock()
+		return out
+	}
+	russiaCityMu.Unlock()
+
+	listCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(listCtx, http.MethodGet, probesURL, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("User-Agent", "remnawave-telegram-shop/status")
+	authorizeGlobalping(req)
+	res, err := client.Do(req)
+	if err != nil {
+		slog.Warn("status probe cities", "error", err.Error())
+		return nil
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(res.Body, 4<<20))
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		slog.Warn("status probe cities", "status", res.StatusCode)
+		return nil
+	}
+	cities := russiaCitiesFromProbes(raw, 30)
+	if len(cities) == 0 {
+		return nil
+	}
+	russiaCityMu.Lock()
+	russiaCityCache = append([]string(nil), cities...)
+	russiaCityAt = time.Now()
+	russiaCityMu.Unlock()
+	return cities
+}
+
+func russiaCitiesFromProbes(raw []byte, n int) []string {
+	var probes []struct {
+		Location struct {
+			Country string `json:"country"`
+			City    string `json:"city"`
+		} `json:"location"`
+	}
+	if err := json.Unmarshal(raw, &probes); err != nil || n < 1 {
+		return nil
+	}
+	counts := map[string]int{}
+	names := map[string]string{}
+	for _, probe := range probes {
+		if !strings.EqualFold(strings.TrimSpace(probe.Location.Country), "RU") {
+			continue
+		}
+		city := strings.TrimSpace(probe.Location.City)
+		if city == "" {
+			continue
+		}
+		key := strings.ToLower(city)
+		counts[key]++
+		if _, ok := names[key]; !ok {
+			names[key] = city
+		}
+	}
+	type row struct {
+		name string
+		n    int
+	}
+	rows := make([]row, 0, len(counts))
+	for key, count := range counts {
+		rows = append(rows, row{name: names[key], n: count})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].n != rows[j].n {
+			return rows[i].n > rows[j].n
+		}
+		return strings.ToLower(rows[i].name) < strings.ToLower(rows[j].name)
+	})
+	if n > len(rows) {
+		n = len(rows)
+	}
+	out := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		out = append(out, rows[i].name)
+	}
+	return out
+}
+
+// limitRussiaCities оставляет не больше n российских зондов и не больше одного на город.
+func limitRussiaCities(sample Sample, n int) Sample {
+	if n < 1 {
+		n = 20
+	}
+	seen := map[string]struct{}{}
+	kept := make([]ProbeHit, 0, len(sample.Probes))
+	ru := 0
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" || !strings.EqualFold(hit.Country, "RU") {
+			kept = append(kept, hit)
+			continue
+		}
+		key := strings.ToLower(strings.TrimSpace(hit.City))
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		if ru >= n {
+			continue
+		}
+		seen[key] = struct{}{}
+		ru++
+		kept = append(kept, hit)
+	}
+	sample.Probes = kept
+	regular := make([]ProbeHit, 0, len(kept))
+	for _, hit := range kept {
+		if hit.Kind != "whitelist" {
+			regular = append(regular, hit)
+		}
+	}
+	recountPing(regular, &sample)
+	return sample
 }
 
 func fetchMeasurement(ctx context.Context, client *http.Client, id string) (gpMeasurement, error) {

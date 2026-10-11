@@ -2,6 +2,7 @@ package statusprobe
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -76,3 +77,63 @@ func TestSummarizeKeepsTwoProbesPerCity(t *testing.T) {
 		t.Fatalf("got %v", rows)
 	}
 }
+
+func TestRussiaCitiesPrefersBusierCities(t *testing.T) {
+	raw := []byte(`[
+		{"location":{"country":"RU","city":"Moscow"}},
+		{"location":{"country":"RU","city":"Moscow"}},
+		{"location":{"country":"RU","city":"Moscow"}},
+		{"location":{"country":"DE","city":"Berlin"}},
+		{"location":{"country":"RU","city":"Omsk"}},
+		{"location":{"country":"RU","city":"Kazan"}},
+		{"location":{"country":"RU","city":"Kazan"}}
+	]`)
+	got := russiaCitiesFromProbes(raw, 2)
+	if strings.Join(got, "|") != "Moscow|Kazan" {
+		t.Fatalf("%v", got)
+	}
+}
+
+func TestPingLocationsAsksOneProbePerCity(t *testing.T) {
+	locs := pingLocations(3, []string{"Moscow", "Kazan"})
+	if len(locs) != 3 || locs[0].Magic != "world" || locs[0].Limit != 3 {
+		t.Fatalf("world %+v", locs)
+	}
+	if locs[1].Country != "RU" || locs[1].City != "Moscow" || locs[1].Limit != 1 || locs[1].Magic != "" {
+		t.Fatalf("moscow %+v", locs[1])
+	}
+	if locs[2].City != "Kazan" || locs[2].Limit != 1 {
+		t.Fatalf("kazan %+v", locs[2])
+	}
+}
+
+func TestLimitRussiaCitiesKeepsTwentyDifferentCities(t *testing.T) {
+	probes := []ProbeHit{
+		{Country: "RU", City: "Moscow", Network: "a", OK: true},
+		{Country: "RU", City: "Moscow", Network: "b", OK: true},
+	}
+	for i := 0; i < 21; i++ {
+		probes = append(probes, ProbeHit{Country: "RU", City: fmt.Sprintf("City%02d", i), OK: true})
+	}
+	probes = append(probes, ProbeHit{Country: "DE", City: "Berlin", Network: "F", OK: true, PingMs: intPtr(40)})
+	sample := limitRussiaCities(Sample{Probes: probes}, 20)
+	if sample.RussiaTotal != 20 || sample.WorldTotal != 1 {
+		t.Fatalf("%+v", sample)
+	}
+	seen := map[string]int{}
+	for _, hit := range sample.Probes {
+		if strings.EqualFold(hit.Country, "RU") {
+			seen[hit.City]++
+		}
+	}
+	if len(seen) != 20 {
+		t.Fatalf("cities %d", len(seen))
+	}
+	for city, n := range seen {
+		if n != 1 {
+			t.Fatalf("%s repeated %d", city, n)
+		}
+	}
+}
+
+func intPtr(n int) *int { return &n }
