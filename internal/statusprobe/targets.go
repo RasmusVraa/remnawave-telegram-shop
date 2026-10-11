@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -60,6 +61,26 @@ func (s *KVTargets) Load(ctx context.Context) ([]ConfiguredTarget, error) {
 		return []ConfiguredTarget{}, nil
 	}
 	return parsed, nil
+}
+
+// EnabledTargets — включённые страны, которые можно передать в Runner.
+// Нулевой интервал остаётся нулевым: замер возьмёт общий интервал из настроек.
+func EnabledTargets(list []ConfiguredTarget) []Target {
+	out := make([]Target, 0, len(list))
+	for _, item := range list {
+		if !item.Enabled || strings.TrimSpace(item.Address) == "" {
+			continue
+		}
+		out = append(out, Target{
+			Key:       NodeKey(item.Country, item.Name),
+			Address:   item.Address,
+			Interval:  time.Duration(item.IntervalMin) * time.Minute,
+			World:     item.WorldProbes,
+			Russia:    item.RussiaProbes,
+			Whitelist: item.Whitelist,
+		})
+	}
+	return out
 }
 
 func (s *KVTargets) Save(ctx context.Context, targets []ConfiguredTarget) error {

@@ -83,10 +83,8 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 	if h.probes != nil {
 		h.probes.EnsureLoaded(r.Context())
 	}
-	targets, kick := mergeStatusTargets(panel, configured)
-	if h.probes != nil && len(kick) > 0 {
-		h.probes.Kick(kick)
-	}
+	// Замер запускает только планировщик. Открытие страницы читает уже готовый снимок.
+	targets, _ := mergeStatusTargets(panel, configured)
 
 	world, russia := statusprobe.ProbeLimits()
 	title, lead := statusprobe.PageCopy()

@@ -2,6 +2,7 @@ package statusprobe
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -84,6 +85,33 @@ func TestMeasureWhitelistStopsOnRateLimit(t *testing.T) {
 	_, err := MeasureWhitelist(context.Background(), srv.Client(), "203.0.113.10")
 	if err == nil || !isBelspiskiLimit(err) {
 		t.Fatalf("err=%v", err)
+	}
+}
+
+func TestMeasureWhitelistKeepsPartialWhenWaitCancelled(t *testing.T) {
+	prevWait := belspiskiWait
+	belspiskiWait = func(context.Context, time.Duration) error { return context.DeadlineExceeded }
+	t.Cleanup(func() { belspiskiWait = prevWait })
+
+	const okBody = `{"ok":true,"ui":{"chartLabel":"Москва · Ростелеком","inBs":true,"metrics":{"icmp":{"label":"41 ms","ok":true}}}}`
+	var calls int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		body := okBody
+		if calls > 1 {
+			body = `{"ok":false,"code":"rate_limited","error":"too many","retry_after":30}`
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(body))
+	}))
+	defer srv.Close()
+	prev := belspiskiURL
+	belspiskiURL = srv.URL
+	t.Cleanup(func() { belspiskiURL = prev })
+
+	got, err := MeasureWhitelist(context.Background(), srv.Client(), "203.0.113.10")
+	if !errors.Is(err, errWhitelistPartial) || got.Total != 1 {
+		t.Fatalf("calls=%d err=%v %+v", calls, err, got)
 	}
 }
 

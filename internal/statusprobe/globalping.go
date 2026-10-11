@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -84,8 +85,10 @@ type Sample struct {
 	// WhitelistAt — когда последний раз заканчивалась проверка белых списков.
 	// Отдельно от MeasuredAt, чтобы обычный пинг шёл по своему интервалу.
 	WhitelistAt time.Time
-	MeasuredAt  time.Time
-	Probes      []ProbeHit
+	// WhitelistDone — полный проход по всем операторам, а не оборванный набор.
+	WhitelistDone bool
+	MeasuredAt    time.Time
+	Probes        []ProbeHit
 }
 
 // PublicTarget оставляет хост, который можно отдать внешнему зонду.
@@ -264,44 +267,115 @@ func fetchMeasurement(ctx context.Context, client *http.Client, id string) (gpMe
 
 func summarize(m gpMeasurement) Sample {
 	var sample Sample
-	var pingSum float64
-	var pingN int
 	for _, row := range m.Results {
 		ok := row.Result.Status == "finished" && row.Result.Stats.Rcv > 0 && row.Result.Stats.Loss < 100
-		if len(sample.Probes) < 40 {
-			hit := ProbeHit{
-				City:    strings.TrimSpace(row.Probe.City),
-				Network: strings.TrimSpace(row.Probe.Network),
-				Country: strings.ToUpper(strings.TrimSpace(row.Probe.Country)),
-				Lat:     row.Probe.Latitude,
-				Lon:     row.Probe.Longitude,
-				OK:      ok,
-			}
-			if row.Result.Stats.Avg > 0 {
-				ms := int(row.Result.Stats.Avg + 0.5)
-				hit.PingMs = &ms
-			}
-			sample.Probes = append(sample.Probes, hit)
+		hit := ProbeHit{
+			City:    strings.TrimSpace(row.Probe.City),
+			Network: strings.TrimSpace(row.Probe.Network),
+			Country: strings.ToUpper(strings.TrimSpace(row.Probe.Country)),
+			Lat:     row.Probe.Latitude,
+			Lon:     row.Probe.Longitude,
+			OK:      ok,
 		}
-		if strings.EqualFold(row.Probe.Country, "RU") {
+		if row.Result.Stats.Avg > 0 {
+			ms := int(row.Result.Stats.Avg + 0.5)
+			hit.PingMs = &ms
+		}
+		sample.Probes = append(sample.Probes, hit)
+	}
+	sample.Probes = keepTwoPerCity(sample.Probes)
+	recountPing(sample.Probes, &sample)
+	return sample
+}
+
+const maxProbesPerCity = 2
+const maxProbeHits = 40
+
+// limitCities оставляет не больше двух зондов Globalping на город и сортирует
+// их по названию. Строки белых списков не режет: у одного города несколько операторов.
+func limitCities(sample Sample) Sample {
+	regular := make([]ProbeHit, 0, len(sample.Probes))
+	lists := make([]ProbeHit, 0)
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" {
+			lists = append(lists, hit)
+			continue
+		}
+		regular = append(regular, hit)
+	}
+	if len(regular) == 0 {
+		return sample
+	}
+	capped := keepTwoPerCity(regular)
+	sample.Probes = append(capped, lists...)
+	if len(capped) != len(regular) {
+		recountPing(capped, &sample)
+	}
+	return sample
+}
+
+func keepTwoPerCity(hits []ProbeHit) []ProbeHit {
+	counts := map[string]int{}
+	kept := make([]ProbeHit, 0, len(hits))
+	for _, hit := range hits {
+		key := strings.ToLower(strings.TrimSpace(hit.Country)) + "\n" + strings.ToLower(strings.TrimSpace(hit.City))
+		if counts[key] >= maxProbesPerCity {
+			continue
+		}
+		counts[key]++
+		kept = append(kept, hit)
+	}
+	sort.SliceStable(kept, func(i, j int) bool {
+		ai, aj := citySortKey(kept[i].City), citySortKey(kept[j].City)
+		if ai != aj {
+			return ai < aj
+		}
+		ni, nj := strings.ToLower(kept[i].Network), strings.ToLower(kept[j].Network)
+		if ni != nj {
+			return ni < nj
+		}
+		return strings.ToLower(kept[i].Country) < strings.ToLower(kept[j].Country)
+	})
+	if len(kept) > maxProbeHits {
+		kept = kept[:maxProbeHits]
+	}
+	return kept
+}
+
+func citySortKey(city string) string {
+	city = strings.ToLower(strings.TrimSpace(city))
+	if city == "" {
+		return "\uffff"
+	}
+	return city
+}
+
+func recountPing(hits []ProbeHit, sample *Sample) {
+	sample.WorldOK, sample.WorldTotal = 0, 0
+	sample.RussiaOK, sample.RussiaTotal = 0, 0
+	sample.WorldPingMs = nil
+	var pingSum, pingN int
+	for _, hit := range hits {
+		if strings.EqualFold(hit.Country, "RU") {
 			sample.RussiaTotal++
-			if ok {
+			if hit.OK {
 				sample.RussiaOK++
 			}
 			continue
 		}
 		sample.WorldTotal++
-		if ok {
-			sample.WorldOK++
-			if row.Result.Stats.Avg > 0 {
-				pingSum += row.Result.Stats.Avg
-				pingN++
-			}
+		if !hit.OK {
+			continue
 		}
+		sample.WorldOK++
+		if hit.PingMs == nil {
+			continue
+		}
+		pingSum += *hit.PingMs
+		pingN++
 	}
 	if pingN > 0 {
-		ms := int(pingSum/float64(pingN) + 0.5)
+		ms := int(float64(pingSum)/float64(pingN) + 0.5)
 		sample.WorldPingMs = &ms
 	}
-	return sample
 }

@@ -71,6 +71,7 @@ type persistedSample struct {
 	WhitelistTotal  int        `json:"whitelist_total,omitempty"`
 	WhitelistPingMs *int       `json:"whitelist_ping_ms,omitempty"`
 	WhitelistAt     time.Time  `json:"whitelist_at,omitempty"`
+	WhitelistDone   bool       `json:"whitelist_done,omitempty"`
 	MeasuredAt      time.Time  `json:"measured_at"`
 	Probes          []ProbeHit `json:"probes,omitempty"`
 }
@@ -103,6 +104,7 @@ func (h *KVHistory) LoadLatest(ctx context.Context) (map[string]Sample, error) {
 			WhitelistTotal:  item.WhitelistTotal,
 			WhitelistPingMs: item.WhitelistPingMs,
 			WhitelistAt:     item.WhitelistAt,
+			WhitelistDone:   item.WhitelistDone,
 			MeasuredAt:      item.MeasuredAt,
 			Probes:          item.Probes,
 		}
@@ -138,6 +140,7 @@ func (h *KVHistory) SaveLatest(ctx context.Context, samples map[string]Sample) e
 			WhitelistTotal:  sample.WhitelistTotal,
 			WhitelistPingMs: sample.WhitelistPingMs,
 			WhitelistAt:     sample.WhitelistAt,
+			WhitelistDone:   sample.WhitelistDone,
 			MeasuredAt:      sample.MeasuredAt,
 			Probes:          sample.Probes,
 		}

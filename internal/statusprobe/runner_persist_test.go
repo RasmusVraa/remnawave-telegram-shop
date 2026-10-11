@@ -3,6 +3,7 @@ package statusprobe
 import (
 	"context"
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -77,12 +78,74 @@ func TestEnsureLoadedRestoresPingsBeforeNextProbe(t *testing.T) {
 	}
 }
 
+func TestSchedulePingsDueNodeWithoutAPageView(t *testing.T) {
+	t.Setenv("STATUS_PROBES_ENABLED", "true")
+	prevPing := pingTarget
+	t.Cleanup(func() { pingTarget = prevPing })
+
+	var pinged int
+	pingTarget = func(context.Context, *http.Client, string, int, int) (Sample, error) {
+		pinged++
+		return Sample{WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now()}, nil
+	}
+
+	runner := NewRunner(nil)
+	runner.loaded = true
+	runner.samples["pl\nPoland"] = Sample{
+		WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now().Add(-31 * time.Minute),
+	}
+	runner.schedule(context.Background(), func(context.Context) ([]Target, error) {
+		return []Target{{Key: "pl\nPoland", Address: "203.0.113.10", Interval: 30 * time.Minute}}, nil
+	})
+	waitUntil(t, func() bool { return pinged == 1 })
+
+	runner.schedule(context.Background(), func(context.Context) ([]Target, error) {
+		return []Target{{Key: "pl\nPoland", Address: "203.0.113.10", Interval: 30 * time.Minute}}, nil
+	})
+	time.Sleep(50 * time.Millisecond)
+	if pinged != 1 {
+		t.Fatalf("fresh sample was pinged again: %d", pinged)
+	}
+}
+
+func TestScheduleLeavesFreshNodeAlone(t *testing.T) {
+	t.Setenv("STATUS_PROBES_ENABLED", "true")
+	prevPing := pingTarget
+	t.Cleanup(func() { pingTarget = prevPing })
+	pingTarget = func(context.Context, *http.Client, string, int, int) (Sample, error) {
+		t.Fatal("ping started inside the interval")
+		return Sample{}, nil
+	}
+	runner := NewRunner(nil)
+	runner.loaded = true
+	runner.samples["pl\nPoland"] = Sample{
+		WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now().Add(-2 * time.Minute),
+	}
+	runner.schedule(context.Background(), func(context.Context) ([]Target, error) {
+		return []Target{{Key: "pl\nPoland", Address: "203.0.113.10", Interval: 30 * time.Minute}}, nil
+	})
+	time.Sleep(40 * time.Millisecond)
+}
+
+func waitUntil(t *testing.T, ready func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if ready() {
+			return
+		}
+		time.Sleep(15 * time.Millisecond)
+	}
+	t.Fatal("timed out")
+}
+
 func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
 	now := time.Now()
 	target := Target{Key: "pl", Interval: 30 * time.Minute, Whitelist: true}
 	sample := Sample{
 		MeasuredAt:     now.Add(-2 * time.Minute),
 		WhitelistAt:    now.Add(-2 * time.Minute),
+		WhitelistDone:  true,
 		WorldTotal:     3,
 		WhitelistTotal: 1,
 		Probes:         []ProbeHit{{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true}},
@@ -92,6 +155,11 @@ func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
 	}
 	if whitelistDue(target, sample, true, now) {
 		t.Fatal("whitelist ran again before the interval")
+	}
+	incomplete := sample
+	incomplete.WhitelistDone = false
+	if !whitelistDue(target, incomplete, true, now) {
+		t.Fatal("unfinished whitelist should run again")
 	}
 	if len(dueTargets([]Target{target}, map[string]Sample{target.Key: sample}, now)) != 0 {
 		t.Fatal("target was scheduled inside the interval")

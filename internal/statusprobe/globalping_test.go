@@ -2,6 +2,7 @@ package statusprobe
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -45,5 +46,33 @@ func TestSummarizeSplitsRussia(t *testing.T) {
 	}
 	if sample.WorldPingMs == nil || *sample.WorldPingMs != 60 {
 		t.Fatalf("ping %+v", sample.WorldPingMs)
+	}
+}
+
+func TestSummarizeKeepsTwoProbesPerCity(t *testing.T) {
+	raw := []byte(`{"results":[
+		{"probe":{"country":"RU","city":"Moscow","network":"A"},"result":{"status":"finished","stats":{"avg":10,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"B"},"result":{"status":"finished","stats":{"avg":11,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"C"},"result":{"status":"finished","stats":{"avg":12,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"D"},"result":{"status":"finished","stats":{"avg":13,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"E"},"result":{"status":"finished","stats":{"avg":14,"loss":0,"rcv":2}}},
+		{"probe":{"country":"DE","city":"Berlin","network":"F"},"result":{"status":"finished","stats":{"avg":40,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Kazan","network":"G"},"result":{"status":"finished","stats":{"avg":20,"loss":0,"rcv":2}}}
+	]}`)
+	var m gpMeasurement
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	sample := summarize(m)
+	if len(sample.Probes) != 4 || sample.RussiaTotal != 3 || sample.RussiaOK != 3 || sample.WorldTotal != 1 {
+		t.Fatalf("%+v", sample)
+	}
+	var rows []string
+	for _, hit := range sample.Probes {
+		rows = append(rows, hit.City+" "+hit.Network)
+	}
+	want := "Berlin F|Kazan G|Moscow A|Moscow B"
+	if strings.Join(rows, "|") != want {
+		t.Fatalf("got %v", rows)
 	}
 }

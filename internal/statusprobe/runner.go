@@ -33,7 +33,8 @@ type Runner struct {
 	history       map[string]map[string]DayRecord
 	lastRun       time.Time
 	cooldownUntil time.Time
-	running       bool
+	pingBusy      bool
+	listBusy      bool
 	loaded        bool
 }
 
@@ -54,6 +55,9 @@ func (r *Runner) Snapshot(key string) (Sample, []*float64, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	sample, ok := r.samples[key]
+	if ok {
+		sample = limitCities(sample)
+	}
 	return sample, Window(r.history[key], time.Now()), ok
 }
 
@@ -63,34 +67,74 @@ var ErrBusy = errors.New("probe already running")
 // ErrNoTargets — нечего проверять.
 var ErrNoTargets = errors.New("no targets")
 
+// watchEvery — как часто смотреть, не пора ли мерить. Сам пинг реже:
+// Kick пропускает страну, пока не вышел её интервал.
+const watchEvery = 30 * time.Second
+
+// Watch меряет включённые страны по их интервалу, даже если страницу статуса
+// никто не открывает. Останавливается вместе с ctx процесса.
+func (r *Runner) Watch(ctx context.Context, load func(context.Context) ([]Target, error)) {
+	if r == nil || load == nil {
+		return
+	}
+	go r.watch(ctx, watchEvery, load)
+}
+
+func (r *Runner) watch(ctx context.Context, every time.Duration, load func(context.Context) ([]Target, error)) {
+	if every <= 0 {
+		every = watchEvery
+	}
+	slog.Info("status probe scheduler started", "every", every.String())
+	r.schedule(ctx, load)
+	ticker := time.NewTicker(every)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			r.schedule(ctx, load)
+		}
+	}
+}
+
+func (r *Runner) schedule(ctx context.Context, load func(context.Context) ([]Target, error)) {
+	if ctx.Err() != nil {
+		return
+	}
+	loadCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	r.EnsureLoaded(loadCtx)
+	targets, err := load(loadCtx)
+	if err != nil {
+		slog.Warn("status probe schedule", "error", err)
+		return
+	}
+	r.Kick(targets)
+}
+
 // Kick запускает замер стран, у которых снимок старше их интервала.
-// Повторный вызов, пока замер идёт, ничего не делает.
+// Пинг и белые списки не ждут друг друга: долгий обход операторов не держит обычный пинг.
 func (r *Runner) Kick(targets []Target) {
 	if r == nil || len(targets) == 0 || !ProbesEnabled() {
 		return
 	}
 	r.mu.Lock()
-	if r.running {
-		r.mu.Unlock()
-		return
+	pingTargets, listTargets := r.pickLocked(targets, false)
+	if r.pingBusy {
+		pingTargets = nil
 	}
-	due := dueTargets(targets, r.samples, time.Now())
-	if time.Now().Before(r.cooldownUntil) {
-		only := due[:0]
-		for _, target := range due {
-			if target.Whitelist {
-				only = append(only, target)
-			}
-		}
-		due = only
+	if r.listBusy {
+		listTargets = nil
 	}
-	if len(due) == 0 {
-		r.mu.Unlock()
-		return
+	if len(pingTargets) > 0 {
+		r.pingBusy = true
 	}
-	r.running = true
+	if len(listTargets) > 0 {
+		r.listBusy = true
+	}
 	r.mu.Unlock()
-	r.start(due, false)
+	r.launch(pingTargets, listTargets)
 }
 
 // Force измеряет все переданные страны сразу, не дожидаясь интервала.
@@ -102,27 +146,76 @@ func (r *Runner) Force(targets []Target) error {
 		return ErrNoTargets
 	}
 	r.mu.Lock()
-	if r.running {
+	if r.pingBusy || r.listBusy {
 		r.mu.Unlock()
 		return ErrBusy
 	}
-	r.running = true
 	r.cooldownUntil = time.Time{}
+	pingTargets, listTargets := r.pickLocked(targets, true)
+	if len(pingTargets) == 0 && len(listTargets) == 0 {
+		r.mu.Unlock()
+		return ErrNoTargets
+	}
+	if len(pingTargets) > 0 {
+		r.pingBusy = true
+	}
+	if len(listTargets) > 0 {
+		r.listBusy = true
+	}
 	r.mu.Unlock()
-	r.start(targets, true)
+	r.launch(pingTargets, listTargets)
 	return nil
 }
 
-func (r *Runner) start(targets []Target, force bool) {
-	go func() {
-		defer func() {
-			r.mu.Lock()
-			r.running = false
-			r.lastRun = time.Now()
-			r.mu.Unlock()
+func (r *Runner) launch(pingTargets, listTargets []Target) {
+	if len(pingTargets) > 0 {
+		go func() {
+			defer r.donePing()
+			ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
+			defer cancel()
+			r.EnsureLoaded(ctx)
+			r.pingPass(ctx, pingTargets)
 		}()
-		r.execute(targets, force)
-	}()
+	}
+	if len(listTargets) > 0 {
+		go func() {
+			defer r.doneList()
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Minute)
+			defer cancel()
+			r.whitelistPass(ctx, listTargets)
+		}()
+	}
+}
+
+func (r *Runner) donePing() {
+	r.mu.Lock()
+	r.pingBusy = false
+	r.lastRun = time.Now()
+	r.mu.Unlock()
+}
+
+func (r *Runner) doneList() {
+	r.mu.Lock()
+	r.listBusy = false
+	r.mu.Unlock()
+}
+
+func (r *Runner) pickLocked(targets []Target, force bool) (ping []Target, list []Target) {
+	if len(targets) > maxNodes {
+		targets = targets[:maxNodes]
+	}
+	now := time.Now()
+	paused := now.Before(r.cooldownUntil)
+	for _, target := range targets {
+		sample, ok := r.samples[target.Key]
+		if force || (!paused && pingDue(target, sample, ok, now)) {
+			ping = append(ping, target)
+		}
+		if target.Whitelist && (force || whitelistDue(target, sample, ok, now)) {
+			list = append(list, target)
+		}
+	}
+	return ping, list
 }
 
 func mergeWhitelist(prev, next []ProbeHit) []ProbeHit {
@@ -222,15 +315,10 @@ func whitelistDue(target Target, sample Sample, ok bool, now time.Time) bool {
 	if !target.Whitelist {
 		return false
 	}
-	if !ok {
+	if !ok || !sample.WhitelistDone {
 		return true
 	}
-	// Старые снимки без отдельной метки белых списков считаем по времени пинга,
-	// иначе каждый заход на страницу заново гонял бы проверку.
 	at := sample.WhitelistAt
-	if at.IsZero() {
-		at = sample.MeasuredAt
-	}
 	if at.IsZero() {
 		return true
 	}
@@ -268,39 +356,30 @@ func (r *Runner) run(targets []Target) {
 }
 
 func (r *Runner) execute(targets []Target, force bool) {
-	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Minute)
-	defer cancel()
-	r.EnsureLoaded(ctx)
+	loadCtx, loadCancel := context.WithTimeout(context.Background(), 15*time.Second)
+	r.EnsureLoaded(loadCtx)
+	loadCancel()
 
-	if len(targets) > maxNodes {
-		targets = targets[:maxNodes]
-	}
-	now := time.Now()
 	r.mu.Lock()
-	pingTargets := make([]Target, 0, len(targets))
-	listTargets := make([]Target, 0, len(targets))
-	for _, target := range targets {
-		sample, ok := r.samples[target.Key]
-		if force || pingDue(target, sample, ok, now) {
-			pingTargets = append(pingTargets, target)
-		}
-		if target.Whitelist && (force || whitelistDue(target, sample, ok, now)) {
-			listTargets = append(listTargets, target)
-		}
-	}
+	pingTargets, listTargets := r.pickLocked(targets, force)
 	r.mu.Unlock()
 
 	// Обычный пинг и белые списки идут вместе: долгая проверка операторов
-	// больше не отодвигает замер остальных стран.
+	// больше не отодвигает замер остальных стран. У белых списков свой срок,
+	// чтобы ожидание лимита belspiski не обрывало список операторов.
+	pingCtx, pingCancel := context.WithTimeout(context.Background(), 12*time.Minute)
+	listCtx, listCancel := context.WithTimeout(context.Background(), 45*time.Minute)
+	defer pingCancel()
+	defer listCancel()
 	var wg sync.WaitGroup
 	wg.Add(2)
 	go func() {
 		defer wg.Done()
-		r.pingPass(ctx, pingTargets)
+		r.pingPass(pingCtx, pingTargets)
 	}()
 	go func() {
 		defer wg.Done()
-		r.whitelistPass(ctx, listTargets)
+		r.whitelistPass(listCtx, listTargets)
 	}()
 	wg.Wait()
 }
@@ -366,10 +445,11 @@ func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 		wl, wlErr := listTarget(ctx, r.client, host, func(hit ProbeHit) {
 			r.addWhitelistHit(target.Key, hit)
 		})
-		if wlErr != nil {
+		partial := errors.Is(wlErr, errWhitelistPartial)
+		if wlErr != nil && !partial {
 			slog.Warn("whitelist probe failed", "error", wlErr)
 		}
-		r.finishWhitelist(target.Key, wl.PingMs, true)
+		r.finishWhitelist(target.Key, wl.PingMs, !partial)
 		if wl.Total == 0 && wlErr != nil {
 			continue
 		}
@@ -389,6 +469,7 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	sample.WhitelistOK, sample.WhitelistTotal = whitelistCounts(sample.Probes)
 	sample.WhitelistPingMs = prev.WhitelistPingMs
 	sample.WhitelistAt = prev.WhitelistAt
+	sample.WhitelistDone = prev.WhitelistDone
 	r.samples[key] = sample
 	RecordDay(r.history, key, sample, time.Now())
 	r.mu.Unlock()
@@ -399,9 +480,6 @@ func (r *Runner) addWhitelistHit(key string, hit ProbeHit) {
 	base := r.samples[key]
 	base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
 	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-	if base.WhitelistAt.IsZero() {
-		base.WhitelistAt = time.Now()
-	}
 	r.samples[key] = base
 	r.mu.Unlock()
 }
@@ -415,6 +493,7 @@ func (r *Runner) finishWhitelist(key string, pingMs *int, stamp bool) {
 	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
 	if stamp {
 		base.WhitelistAt = time.Now()
+		base.WhitelistDone = true
 	}
 	r.samples[key] = base
 	r.mu.Unlock()

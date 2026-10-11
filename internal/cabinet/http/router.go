@@ -397,6 +397,13 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 
 	statusTargets := statusprobe.NewKVTargets(runtimeSettingsRepo)
 	statusRunner := statusprobe.NewRunner(statusprobe.NewKVHistory(runtimeSettingsRepo))
+	statusRunner.Watch(ctx, func(c context.Context) ([]statusprobe.Target, error) {
+		list, err := statusTargets.Load(c)
+		if err != nil {
+			return nil, err
+		}
+		return statusprobe.EnabledTargets(list), nil
+	})
 	publicStatus := handlers.NewPublicStatus(rw, statusRunner, statusTargets)
 	api.Handle("/cabinet/api/public/status",
 		methodRouter(map[string]http.Handler{

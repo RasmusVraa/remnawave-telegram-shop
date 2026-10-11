@@ -3,6 +3,7 @@ package statusprobe
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -47,6 +48,10 @@ type whitelistResult struct {
 const belspiskiBatch = 3
 const belspiskiProxyRetries = 2
 
+// errWhitelistPartial — обход оборвался, часть операторов ещё не опрошена.
+// Такой проход не считается законченным и повторяется планировщиком.
+var errWhitelistPartial = errors.New("whitelist probe: incomplete")
+
 // belspiskiWait ждёт Retry-After. В тесте подменяется, чтобы не спать по-настоящему.
 var belspiskiWait = func(ctx context.Context, d time.Duration) error {
 	timer := time.NewTimer(d)
@@ -72,7 +77,7 @@ func measureWhitelist(ctx context.Context, client *http.Client, host string, onH
 	var lastLimit error
 	for batch := 0; batch < len(belspiskiPicks); batch += belspiskiBatch {
 		if err := ctx.Err(); err != nil {
-			break
+			return incompleteWhitelist(out, pings, lastLimit)
 		}
 		end := batch + belspiskiBatch
 		if end > len(belspiskiPicks) {
@@ -82,7 +87,7 @@ func measureWhitelist(ctx context.Context, client *http.Client, host string, onH
 		batchID := fmt.Sprintf("%d-%d", time.Now().UnixNano(), batch)
 		for _, pick := range chunk {
 			if err := ctx.Err(); err != nil {
-				break
+				return incompleteWhitelist(out, pings, lastLimit)
 			}
 			var hit ProbeHit
 			var err error
@@ -105,10 +110,7 @@ func measureWhitelist(ctx context.Context, client *http.Client, host string, onH
 					}
 					slog.Info("whitelist probe waiting", "retry_in", wait.String(), "operators", out.Total)
 					if waitErr := belspiskiWait(ctx, wait); waitErr != nil {
-						if out.Total == 0 {
-							return out, lastLimit
-						}
-						return finishWhitelist(out, pings, firstErr)
+						return incompleteWhitelist(out, pings, lastLimit)
 					}
 					batchID = fmt.Sprintf("%d-%d-%d", time.Now().UnixNano(), batch, out.Total)
 					continue
@@ -128,6 +130,19 @@ func measureWhitelist(ctx context.Context, client *http.Client, host string, onH
 				slog.Warn("whitelist probe skipped", "error", err.Error())
 				if firstErr == nil {
 					firstErr = err
+				}
+				city, network := splitPick(pick, "")
+				hit = ProbeHit{
+					City:    city,
+					Network: network,
+					Country: "RU",
+					Kind:    "whitelist",
+					Answer:  "Недоступен",
+				}
+				out.Total++
+				out.Hits = append(out.Hits, hit)
+				if onHit != nil {
+					onHit(hit)
 				}
 				continue
 			}
@@ -150,10 +165,14 @@ func measureWhitelist(ctx context.Context, client *http.Client, host string, onH
 	return finishWhitelist(out, pings, firstErr)
 }
 
-func finishWhitelist(out whitelistResult, pings []int, firstErr error) (whitelistResult, error) {
-	if out.Total == 0 && firstErr != nil {
-		return out, firstErr
+func incompleteWhitelist(out whitelistResult, pings []int, lastLimit error) (whitelistResult, error) {
+	if out.Total == 0 && lastLimit != nil {
+		return out, lastLimit
 	}
+	return finishWhitelist(out, pings, errWhitelistPartial)
+}
+
+func finishWhitelist(out whitelistResult, pings []int, firstErr error) (whitelistResult, error) {
 	if len(pings) > 0 {
 		sum := 0
 		for _, ms := range pings {
@@ -161,6 +180,12 @@ func finishWhitelist(out whitelistResult, pings []int, firstErr error) (whitelis
 		}
 		avg := sum / len(pings)
 		out.PingMs = &avg
+	}
+	if out.Total == 0 && firstErr != nil {
+		return out, firstErr
+	}
+	if errors.Is(firstErr, errWhitelistPartial) {
+		return out, errWhitelistPartial
 	}
 	return out, nil
 }

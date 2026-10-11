@@ -3,8 +3,6 @@ package handlers
 import (
 	"errors"
 	"net/http"
-	"strings"
-	"time"
 
 	"remnawave-tg-shop-bot/internal/statusprobe"
 )
@@ -64,7 +62,7 @@ func (h *AdminStatusTargets) Probe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	if err := h.probes.Force(probeTargets(list)); err != nil {
+	if err := h.probes.Force(statusprobe.EnabledTargets(list)); err != nil {
 		status := http.StatusBadRequest
 		if errors.Is(err, statusprobe.ErrBusy) {
 			status = http.StatusConflict
@@ -75,20 +73,3 @@ func (h *AdminStatusTargets) Probe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
 }
 
-func probeTargets(list []statusprobe.ConfiguredTarget) []statusprobe.Target {
-	out := make([]statusprobe.Target, 0, len(list))
-	for _, item := range list {
-		if !item.Enabled || strings.TrimSpace(item.Address) == "" {
-			continue
-		}
-		out = append(out, statusprobe.Target{
-			Key:       statusprobe.NodeKey(item.Country, item.Name),
-			Address:   item.Address,
-			Interval:  time.Duration(item.IntervalMin) * time.Minute,
-			World:     item.WorldProbes,
-			Russia:    item.RussiaProbes,
-			Whitelist: item.Whitelist,
-		})
-	}
-	return out
-}
