@@ -14,12 +14,13 @@ const maxNodes = 24
 // Target — узел, который можно пинговать. Address не покидает этот пакет.
 // Interval 0 — общий интервал из настроек. World и Russia 0 — общие лимиты зондов.
 type Target struct {
-	Key       string
-	Address   string
-	Interval  time.Duration
-	World     int
-	Russia    int
-	Whitelist bool
+	Key          string
+	Address      string
+	Interval     time.Duration
+	World        int
+	Russia       int
+	Whitelist    bool
+	RepeatCities bool
 }
 
 // Runner держит последний замер и журнал. Страница статуса не ждёт зонды:
@@ -55,9 +56,6 @@ func (r *Runner) Snapshot(key string) (Sample, []*float64, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	sample, ok := r.samples[key]
-	if ok {
-		sample = limitCities(sample)
-	}
 	return sample, Window(r.history[key], time.Now()), ok
 }
 
@@ -450,7 +448,7 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 			break
 		}
 		world, russia := probeCounts(target)
-		sample, err := pingTarget(ctx, r.client, host, world, russia)
+		sample, err := pingTarget(ctx, r.client, host, world, russia, target.RepeatCities)
 		if err != nil {
 			var limited *RateLimitError
 			if errors.As(err, &limited) {

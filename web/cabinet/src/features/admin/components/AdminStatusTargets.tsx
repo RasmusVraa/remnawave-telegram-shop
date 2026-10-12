@@ -18,6 +18,7 @@ export interface StatusTargetDraft {
   russia_probes: number
   note: string
   whitelist: boolean
+  repeat_cities: boolean
 }
 
 function emptyTarget(): StatusTargetDraft {
@@ -32,6 +33,7 @@ function emptyTarget(): StatusTargetDraft {
     russia_probes: 0,
     note: '',
     whitelist: false,
+    repeat_cities: true,
   }
 }
 
@@ -58,6 +60,7 @@ export function AdminStatusTargets() {
         ...item,
         note: item.note ?? '',
         whitelist: Boolean(item.whitelist),
+        repeat_cities: item.repeat_cities !== false,
       })),
     )
     setReady(true)
@@ -267,6 +270,20 @@ export function AdminStatusTargets() {
                   />
                 </label>
               </div>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={row.repeat_cities}
+                  onChange={(e) => patch(index, { repeat_cities: e.target.checked })}
+                />
+                <span>
+                  <span className="font-medium">{t('admin.statusPage.fieldRepeatCities')}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {t('admin.statusPage.fieldRepeatCitiesHint')}
+                  </span>
+                </span>
+              </label>
             </li>
           ))}
         </ul>

@@ -2275,6 +2275,8 @@
         "fieldWorld": "World probes",
         "fieldRussia": "Russia probes",
         "fieldWhitelist": "Whitelists",
+        "fieldRepeatCities": "Cities may repeat",
+        "fieldRepeatCitiesHint": "On: availability counts every probe, even several from one city. Off: each city once, probes from different cities.",
         "fieldNote": "Caption",
         "fieldNotePlaceholder": "+ whitelists",
         "fieldCountPlaceholder": "shared"

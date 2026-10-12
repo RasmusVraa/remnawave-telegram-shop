@@ -1,6 +1,7 @@
 package statusprobe
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -75,6 +76,43 @@ func TestSummarizeKeepsTwoProbesPerCity(t *testing.T) {
 	want := "Berlin F|Kazan G|Moscow A|Moscow B"
 	if strings.Join(rows, "|") != want {
 		t.Fatalf("got %v", rows)
+	}
+}
+
+func TestRepeatCitiesKeepsEveryProbe(t *testing.T) {
+	raw := []byte(`{"results":[
+		{"probe":{"country":"RU","city":"Moscow","network":"A"},"result":{"status":"finished","stats":{"avg":10,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"B"},"result":{"status":"finished","stats":{"avg":11,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"C"},"result":{"status":"finished","stats":{"avg":12,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"D"},"result":{"status":"finished","stats":{"avg":13,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Moscow","network":"E"},"result":{"status":"finished","stats":{"avg":14,"loss":0,"rcv":2}}},
+		{"probe":{"country":"DE","city":"Berlin","network":"F"},"result":{"status":"finished","stats":{"avg":40,"loss":0,"rcv":2}}},
+		{"probe":{"country":"RU","city":"Kazan","network":"G"},"result":{"status":"finished","stats":{"avg":20,"loss":0,"rcv":2}}}
+	]}`)
+	var m gpMeasurement
+	if err := json.Unmarshal(raw, &m); err != nil {
+		t.Fatal(err)
+	}
+	repeated := finishPingSample(m, 20, true)
+	if repeated.RussiaTotal != 6 || repeated.RussiaOK != 6 || repeated.WorldTotal != 1 || len(repeated.Probes) != 7 {
+		t.Fatalf("repeat %+v", repeated)
+	}
+	unique := finishPingSample(m, 20, false)
+	if unique.RussiaTotal != 2 || unique.RussiaOK != 2 {
+		t.Fatalf("unique %+v", unique)
+	}
+	seen := map[string]int{}
+	for _, hit := range unique.Probes {
+		if strings.EqualFold(hit.Country, "RU") {
+			seen[hit.City]++
+		}
+	}
+	if seen["Moscow"] != 1 || seen["Kazan"] != 1 {
+		t.Fatalf("unique cities %v", seen)
+	}
+	locs := measurementLocations(context.Background(), nil, 3, 20, true)
+	if len(locs) != 2 || locs[1].Magic != "Russia" || locs[1].Limit != 20 {
+		t.Fatalf("locations %+v", locs)
 	}
 }
 

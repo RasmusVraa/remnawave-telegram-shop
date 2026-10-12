@@ -10,6 +10,17 @@
         "interval_min": 20,
         "world_probes": 0,
         "russia_probes": 20
+      },
+      {
+        "id": "de1",
+        "name": "Германия",
+        "country": "DE",
+        "address": "1.0.0.1",
+        "enabled": true,
+        "interval_min": 20,
+        "world_probes": 0,
+        "russia_probes": 20,
+        "repeat_cities": false
       }
     ]
   },

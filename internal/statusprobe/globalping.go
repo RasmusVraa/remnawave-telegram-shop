@@ -168,11 +168,12 @@ type gpResult struct {
 
 // MeasurePing запускает один замер Globalping: несколько зондов из мира и из России.
 func MeasurePing(ctx context.Context, client *http.Client, target string) (Sample, error) {
-	return MeasurePingCounts(ctx, client, target, 3, 5)
+	return MeasurePingCounts(ctx, client, target, 3, 5, true)
 }
 
 // MeasurePingCounts — то же, но число зондов задаёт админка.
-func MeasurePingCounts(ctx context.Context, client *http.Client, target string, world, russia int) (Sample, error) {
+// repeatCities оставляет все зонды города: доступность считается по каждому ответу.
+func MeasurePingCounts(ctx context.Context, client *http.Client, target string, world, russia int, repeatCities bool) (Sample, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -185,7 +186,7 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 	body, _ := json.Marshal(gpCreate{
 		Type:              "ping",
 		Target:            target,
-		Locations:         pingLocations(world, russiaCities(ctx, client, russia)),
+		Locations:         measurementLocations(ctx, client, world, russia, repeatCities),
 		InProgressUpdates: true,
 		MeasurementOptions: map[string]int{
 			"packets": 2,
@@ -237,7 +238,7 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		case <-timer.C:
 		}
 	}
-	sample := limitRussiaCities(summarize(last), russia)
+	sample := finishPingSample(last, russia, repeatCities)
 	sample.MeasuredAt = time.Now().UTC()
 	return sample, nil
 }
@@ -274,6 +275,23 @@ var (
 )
 
 const russiaCityTTL = 30 * time.Minute
+
+func measurementLocations(ctx context.Context, client *http.Client, world, russia int, repeatCities bool) []gpLocation {
+	if repeatCities {
+		return []gpLocation{
+			{Magic: "world", Limit: world},
+			{Magic: "Russia", Limit: russia},
+		}
+	}
+	return pingLocations(world, russiaCities(ctx, client, russia))
+}
+
+func finishPingSample(m gpMeasurement, russia int, repeatCities bool) Sample {
+	if repeatCities {
+		return summarizeAll(m)
+	}
+	return limitRussiaCities(summarize(m), russia)
+}
 
 func pingLocations(world int, cities []string) []gpLocation {
 	locs := make([]gpLocation, 0, 1+len(cities))
@@ -463,7 +481,24 @@ func fetchMeasurement(ctx context.Context, client *http.Client, id string) (gpMe
 }
 
 func summarize(m gpMeasurement) Sample {
-	var sample Sample
+	sample := Sample{Probes: keepTwoPerCity(collectProbeHits(m))}
+	recountPing(sample.Probes, &sample)
+	return sample
+}
+
+func summarizeAll(m gpMeasurement) Sample {
+	hits := collectProbeHits(m)
+	sortProbeHits(hits)
+	if len(hits) > maxProbeHits {
+		hits = hits[:maxProbeHits]
+	}
+	sample := Sample{Probes: hits}
+	recountPing(sample.Probes, &sample)
+	return sample
+}
+
+func collectProbeHits(m gpMeasurement) []ProbeHit {
+	hits := make([]ProbeHit, 0, len(m.Results))
 	for _, row := range m.Results {
 		ok := row.Result.Status == "finished" && row.Result.Stats.Rcv > 0 && row.Result.Stats.Loss < 100
 		hit := ProbeHit{
@@ -478,38 +513,13 @@ func summarize(m gpMeasurement) Sample {
 			ms := int(row.Result.Stats.Avg + 0.5)
 			hit.PingMs = &ms
 		}
-		sample.Probes = append(sample.Probes, hit)
+		hits = append(hits, hit)
 	}
-	sample.Probes = keepTwoPerCity(sample.Probes)
-	recountPing(sample.Probes, &sample)
-	return sample
+	return hits
 }
 
 const maxProbesPerCity = 2
 const maxProbeHits = 40
-
-// limitCities оставляет не больше двух зондов Globalping на город и сортирует
-// их по названию. Строки белых списков не режет: у одного города несколько операторов.
-func limitCities(sample Sample) Sample {
-	regular := make([]ProbeHit, 0, len(sample.Probes))
-	lists := make([]ProbeHit, 0)
-	for _, hit := range sample.Probes {
-		if hit.Kind == "whitelist" {
-			lists = append(lists, hit)
-			continue
-		}
-		regular = append(regular, hit)
-	}
-	if len(regular) == 0 {
-		return sample
-	}
-	capped := keepTwoPerCity(regular)
-	sample.Probes = append(capped, lists...)
-	if len(capped) != len(regular) {
-		recountPing(capped, &sample)
-	}
-	return sample
-}
 
 func keepTwoPerCity(hits []ProbeHit) []ProbeHit {
 	counts := map[string]int{}
@@ -522,21 +532,25 @@ func keepTwoPerCity(hits []ProbeHit) []ProbeHit {
 		counts[key]++
 		kept = append(kept, hit)
 	}
-	sort.SliceStable(kept, func(i, j int) bool {
-		ai, aj := citySortKey(kept[i].City), citySortKey(kept[j].City)
-		if ai != aj {
-			return ai < aj
-		}
-		ni, nj := strings.ToLower(kept[i].Network), strings.ToLower(kept[j].Network)
-		if ni != nj {
-			return ni < nj
-		}
-		return strings.ToLower(kept[i].Country) < strings.ToLower(kept[j].Country)
-	})
+	sortProbeHits(kept)
 	if len(kept) > maxProbeHits {
 		kept = kept[:maxProbeHits]
 	}
 	return kept
+}
+
+func sortProbeHits(hits []ProbeHit) {
+	sort.SliceStable(hits, func(i, j int) bool {
+		ai, aj := citySortKey(hits[i].City), citySortKey(hits[j].City)
+		if ai != aj {
+			return ai < aj
+		}
+		ni, nj := strings.ToLower(hits[i].Network), strings.ToLower(hits[j].Network)
+		if ni != nj {
+			return ni < nj
+		}
+		return strings.ToLower(hits[i].Country) < strings.ToLower(hits[j].Country)
+	})
 }
 
 func citySortKey(city string) string {

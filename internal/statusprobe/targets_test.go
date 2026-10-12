@@ -36,6 +36,31 @@ func TestNormalizeTargetsAcceptsDomain(t *testing.T) {
 	}
 }
 
+func TestRepeatCitiesDefaultsOn(t *testing.T) {
+	var stored []ConfiguredTarget
+	if err := json.Unmarshal([]byte(`[{"name":"Нидерланды","country":"NL","address":"1.1.1.1"}]`), &stored); err != nil {
+		t.Fatal(err)
+	}
+	if !stored[0].AllowsRepeatCities() {
+		t.Fatal("missing flag should allow repeats")
+	}
+	got, err := NormalizeTargets(stored)
+	if err != nil || !got[0].AllowsRepeatCities() || got[0].RepeatCities == nil || !*got[0].RepeatCities {
+		t.Fatalf("%+v %v", got, err)
+	}
+	off := false
+	got, err = NormalizeTargets([]ConfiguredTarget{{
+		Name: "Нидерланды", Country: "NL", Address: "1.1.1.1", Enabled: true, RepeatCities: &off,
+	}})
+	if err != nil || got[0].AllowsRepeatCities() {
+		t.Fatalf("off %+v %v", got, err)
+	}
+	enabled := EnabledTargets(got)
+	if len(enabled) != 1 || enabled[0].RepeatCities {
+		t.Fatalf("enabled %+v", enabled)
+	}
+}
+
 func TestNormalizeTargetsKeepsNote(t *testing.T) {
 	got, err := NormalizeTargets([]ConfiguredTarget{{
 		Name:    "Албания",

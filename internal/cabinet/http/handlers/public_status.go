@@ -259,12 +259,13 @@ func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.
 			Address:     item.Address,
 		})
 		kick = append(kick, statusprobe.Target{
-			Key:       statusprobe.NodeKey(item.Country, item.Name),
-			Address:   item.Address,
-			Interval:  time.Duration(item.IntervalMin) * time.Minute,
-			World:     item.WorldProbes,
-			Russia:    item.RussiaProbes,
-			Whitelist: item.Whitelist,
+			Key:          statusprobe.NodeKey(item.Country, item.Name),
+			Address:      item.Address,
+			Interval:     time.Duration(item.IntervalMin) * time.Minute,
+			World:        item.WorldProbes,
+			Russia:       item.RussiaProbes,
+			Whitelist:    item.Whitelist,
+			RepeatCities: item.AllowsRepeatCities(),
 		})
 	}
 	return out, kick

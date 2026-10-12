@@ -28,8 +28,20 @@ type ConfiguredTarget struct {
 	RussiaProbes int    `json:"russia_probes"`
 	// Whitelist — отдельная проверка через belspiski.online, без второго сервиса.
 	Whitelist bool `json:"whitelist"`
+	// RepeatCities — можно ли одному городу попадаться много раз.
+	// nil значит «да»: все зонды идут в доступность. false — каждый город один раз.
+	RepeatCities *bool `json:"repeat_cities,omitempty"`
 	// Note — короткая приписка под названием, например «+ белые списки».
 	Note string `json:"note,omitempty"`
+}
+
+// AllowsRepeatCities — по умолчанию города повторяются, чтобы доступность
+// не занижалась из‑за отброшенных зондов одного города.
+func (t ConfiguredTarget) AllowsRepeatCities() bool {
+	if t.RepeatCities == nil {
+		return true
+	}
+	return *t.RepeatCities
 }
 
 // KVTargets хранит список стран в bot_runtime_settings, без новой таблицы.
@@ -72,12 +84,13 @@ func EnabledTargets(list []ConfiguredTarget) []Target {
 			continue
 		}
 		out = append(out, Target{
-			Key:       NodeKey(item.Country, item.Name),
-			Address:   item.Address,
-			Interval:  time.Duration(item.IntervalMin) * time.Minute,
-			World:     item.WorldProbes,
-			Russia:    item.RussiaProbes,
-			Whitelist: item.Whitelist,
+			Key:          NodeKey(item.Country, item.Name),
+			Address:      item.Address,
+			Interval:     time.Duration(item.IntervalMin) * time.Minute,
+			World:        item.WorldProbes,
+			Russia:       item.RussiaProbes,
+			Whitelist:    item.Whitelist,
+			RepeatCities: item.AllowsRepeatCities(),
 		})
 	}
 	return out
@@ -147,6 +160,7 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 			id = newTargetID()
 		}
 		seen[id] = struct{}{}
+		repeat := item.AllowsRepeatCities()
 		out = append(out, ConfiguredTarget{
 			ID:           id,
 			Name:         name,
@@ -157,6 +171,7 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 			WorldProbes:  world,
 			RussiaProbes: russia,
 			Whitelist:    item.Whitelist,
+			RepeatCities: &repeat,
 			Note:         note,
 		})
 	}

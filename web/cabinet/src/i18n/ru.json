@@ -2328,6 +2328,8 @@
         "fieldWorld": "Зондов из мира",
         "fieldRussia": "Зондов из России",
         "fieldWhitelist": "Белые списки",
+        "fieldRepeatCities": "Города могут повторяться",
+        "fieldRepeatCitiesHint": "Включено: в доступность входят все зонды, даже несколько из одного города. Выключено: каждый город один раз, зонды из разных городов.",
         "fieldCountPlaceholder": "из общих",
         "fieldNote": "Подпись",
         "fieldNotePlaceholder": "+ белые списки"

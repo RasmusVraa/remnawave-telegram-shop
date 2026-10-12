@@ -1675,6 +1675,7 @@ export const api = {
         russia_probes: number
         note?: string
         whitelist?: boolean
+        repeat_cities?: boolean
       }[]
     }>('GET', '/admin/status/targets'),
 
@@ -1690,6 +1691,7 @@ export const api = {
       russia_probes: number
       note?: string
       whitelist?: boolean
+      repeat_cities?: boolean
     }[],
   ) =>
     request<{ targets: { id: string }[] }>('PUT', '/admin/status/targets', { targets }),

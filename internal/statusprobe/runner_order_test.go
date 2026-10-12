@@ -18,7 +18,7 @@ func TestRunPingsEveryNodeBeforeWhitelist(t *testing.T) {
 
 	var mu sync.Mutex
 	var order []string
-	pingTarget = func(_ context.Context, _ *http.Client, target string, _, _ int) (Sample, error) {
+	pingTarget = func(_ context.Context, _ *http.Client, target string, _, _ int, _ bool) (Sample, error) {
 		mu.Lock()
 		order = append(order, "ping:"+target)
 		mu.Unlock()
