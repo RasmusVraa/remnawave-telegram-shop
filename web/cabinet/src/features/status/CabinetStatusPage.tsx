@@ -143,18 +143,20 @@ export default function CabinetStatusPage() {
           </RevealItem>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {nodes.map((node) => (
+            {nodes.map((node, index) => {
+              const key = node.id || `${node.country}-${node.name}-${index}`
+              return (
               <LocationCard
-                key={`${node.country}-${node.name}`}
+                key={key}
                 node={node}
                 locale={i18n.language}
-                open={open === `${node.country}-${node.name}`}
+                open={open === key}
                 onToggle={() => {
-                  const key = `${node.country}-${node.name}`
                   setOpen((current) => (current === key ? null : key))
                 }}
               />
-            ))}
+              )
+            })}
           </div>
         )}
       </PageReveal>
@@ -176,7 +178,7 @@ function LocationCard({
   const { t, i18n } = useTranslation()
   const region = countryName(node.country, locale)
   const probe = node.probe
-  const whitelist = Boolean(node.whitelist) || whitelistHits(probe).length > 0
+  const whitelist = Boolean(node.whitelist)
   const hits = whitelist ? whitelistHits(probe) : russiaHits(probe)
   const history = probe?.history ?? []
   const measured = history.filter((value): value is number => typeof value === 'number')

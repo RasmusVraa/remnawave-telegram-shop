@@ -67,13 +67,13 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
         <p className="px-4 py-8 text-sm text-muted-foreground sm:px-6">{t('landing.status.emptyHint')}</p>
       ) : (
         <ul>
-          {nodes.map((node) => {
-            const key = `${node.country}-${node.name}`
+          {nodes.map((node, index) => {
+            const key = node.id || `${node.country}-${node.name}-${index}`
             const region = countryName(node.country, i18n.language)
             const probe = node.probe
             const hits = russiaHits(probe)
             const whitelist = whitelistHits(probe)
-            const isWhitelist = Boolean(node.whitelist) || whitelist.length > 0
+            const isWhitelist = Boolean(node.whitelist)
             const expanded = open === key
             const showHits = providers === key
             const history = probe?.history ?? []

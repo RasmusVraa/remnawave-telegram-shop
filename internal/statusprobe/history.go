@@ -3,6 +3,7 @@ package statusprobe
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 )
 
@@ -163,9 +164,25 @@ func (h *KVHistory) Save(ctx context.Context, days map[string]map[string]DayReco
 	return h.repo.UpsertBatch(ctx, map[string]string{historyKey: string(raw)}, nil)
 }
 
-// NodeKey связывает замер с узлом без адреса.
+// NodeKey — старый ключ замера. Две строки с одной страной и названием
+// попадали в один снимок, поэтому его больше не используют для новых целей.
 func NodeKey(country, name string) string {
 	return country + "\n" + name
+}
+
+// ProbeKey — свой замер у каждой строки списка. Страна и название не входят
+// в ключ, если у строки есть id: две «Эстонии» или любые другие тёзки
+// не делят пинг и белые списки. Без id строку отличает адрес.
+func ProbeKey(id, country, name, address string) string {
+	id = strings.TrimSpace(id)
+	if id != "" {
+		return "id:" + id
+	}
+	host, ok := PublicTarget(address)
+	if !ok || host == "" {
+		host = strings.TrimSpace(address)
+	}
+	return NodeKey(country, name) + "\n" + strings.ToLower(host)
 }
 
 // RecordDay дописывает сегодняшний замер и выкидывает дни старше окна.

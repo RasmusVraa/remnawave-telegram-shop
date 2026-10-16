@@ -15,12 +15,15 @@ const maxNodes = 24
 // Interval 0 — общий интервал из настроек. World и Russia 0 — общие лимиты зондов.
 type Target struct {
 	Key          string
+	Country      string
+	Name         string
 	Address      string
 	Interval     time.Duration
 	World        int
 	Russia       int
 	Whitelist    bool
 	RepeatCities bool
+	Disabled     bool
 }
 
 // Runner держит последний замер и журнал. Страница статуса не ждёт зонды:
@@ -108,11 +111,100 @@ func (r *Runner) schedule(ctx context.Context, load func(context.Context) ([]Tar
 		slog.Warn("status probe schedule", "error", err)
 		return
 	}
+	r.Retain(targets)
 	r.Kick(targets)
 }
 
 // Kick запускает замер стран, у которых снимок старше их интервала.
 // Пинг и белые списки не ждут друг друга: долгий обход операторов не держит обычный пинг.
+// Retain оставляет снимки только текущих строк и забирает белые списки
+// у строки, где галочка выключена. Старый снимок «страна + название»
+// переносится, только если такая пара в списке одна.
+func (r *Runner) Retain(targets []Target) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	if r.store == nil {
+		r.loaded = true
+	}
+	if !r.loaded {
+		r.mu.Unlock()
+		return
+	}
+	changed := r.retainLocked(targets)
+	r.mu.Unlock()
+	if changed {
+		r.persist()
+	}
+}
+
+func (r *Runner) retainLocked(targets []Target) bool {
+	legacyUsers := map[string]int{}
+	for _, target := range targets {
+		legacyUsers[NodeKey(target.Country, target.Name)]++
+	}
+	keep := map[string]struct{}{}
+	changed := false
+	for _, target := range targets {
+		key := target.Key
+		if key == "" {
+			key = ProbeKey("", target.Country, target.Name, target.Address)
+		}
+		keep[key] = struct{}{}
+		legacy := NodeKey(target.Country, target.Name)
+		if _, ok := r.samples[key]; !ok && legacy != key && legacyUsers[legacy] == 1 {
+			if sample, ok := r.samples[legacy]; ok {
+				r.samples[key] = sample
+				if hist, ok := r.history[legacy]; ok && r.history[key] == nil {
+					r.history[key] = hist
+				}
+				changed = true
+			}
+		}
+		if target.Whitelist {
+			continue
+		}
+		sample, ok := r.samples[key]
+		if !ok || !sampleHasWhitelist(sample) {
+			continue
+		}
+		r.samples[key] = stripWhitelist(sample)
+		changed = true
+	}
+	for key := range r.samples {
+		if _, ok := keep[key]; ok {
+			continue
+		}
+		delete(r.samples, key)
+		delete(r.history, key)
+		changed = true
+	}
+	return changed
+}
+
+func sampleHasWhitelist(sample Sample) bool {
+	if sample.WhitelistTotal > 0 || sample.WhitelistOK > 0 || sample.WhitelistDone || sample.WhitelistPingMs != nil || !sample.WhitelistAt.IsZero() {
+		return true
+	}
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" {
+			return true
+		}
+	}
+	return false
+}
+
+func stripWhitelist(sample Sample) Sample {
+	sample.Probes = withoutWhitelist(sample.Probes)
+	sample.WhitelistOK = 0
+	sample.WhitelistTotal = 0
+	sample.WhitelistPingMs = nil
+	sample.WhitelistAt = time.Time{}
+	sample.WhitelistDone = false
+	return sample
+}
+
 func (r *Runner) Kick(targets []Target) {
 	if r == nil || len(targets) == 0 || !ProbesEnabled() {
 		return
@@ -205,6 +297,9 @@ func (r *Runner) pickLocked(targets []Target, force bool) (ping []Target, list [
 	now := time.Now()
 	paused := now.Before(r.cooldownUntil)
 	for _, target := range targets {
+		if target.Disabled {
+			continue
+		}
 		sample, ok := r.samples[target.Key]
 		if force || (!paused && pingDue(target, sample, ok, now)) {
 			ping = append(ping, target)

@@ -402,7 +402,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		if err != nil {
 			return nil, err
 		}
-		return statusprobe.EnabledTargets(list), nil
+		return statusprobe.TargetsFrom(list), nil
 	})
 	publicStatus := handlers.NewPublicStatus(rw, statusRunner, statusTargets)
 	api.Handle("/cabinet/api/public/status",

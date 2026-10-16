@@ -61,6 +61,31 @@ func TestRepeatCitiesDefaultsOn(t *testing.T) {
 	}
 }
 
+func TestTargetsFromGivesEveryRowItsOwnProbe(t *testing.T) {
+	got := TargetsFrom([]ConfiguredTarget{
+		{ID: "de-plain", Name: "Германия", Country: "DE", Address: "1.1.1.1", Enabled: true},
+		{ID: "de-list", Name: "Германия", Country: "DE", Address: "8.8.8.8", Enabled: true, Whitelist: true},
+		{Name: "Финляндия", Country: "FI", Address: "9.9.9.9", Enabled: true},
+		{Name: "Финляндия", Country: "FI", Address: "9.9.9.10", Enabled: true, Whitelist: true},
+	})
+	if len(got) != 4 {
+		t.Fatalf("rows %d", len(got))
+	}
+	seen := map[string]struct{}{}
+	for _, item := range got {
+		if _, ok := seen[item.Key]; ok {
+			t.Fatalf("shared probe key %q", item.Key)
+		}
+		seen[item.Key] = struct{}{}
+	}
+	if got[0].Whitelist || !got[1].Whitelist || got[2].Whitelist || !got[3].Whitelist {
+		t.Fatalf("flags %+v", got)
+	}
+	if got[2].Key == got[3].Key {
+		t.Fatal("same name without id still shared a probe")
+	}
+}
+
 func TestNormalizeTargetsKeepsNote(t *testing.T) {
 	got, err := NormalizeTargets([]ConfiguredTarget{{
 		Name:    "Албания",

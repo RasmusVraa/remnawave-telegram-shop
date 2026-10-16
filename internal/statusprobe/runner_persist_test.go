@@ -257,3 +257,47 @@ func TestPersistDoesNotOverwriteWhenLoadFailed(t *testing.T) {
 		t.Fatalf("poland measured during the outage %+v ok=%v", sample, ok)
 	}
 }
+
+func TestRetainSplitsSameNameAndDropsWhitelist(t *testing.T) {
+	runner := NewRunner(nil)
+	legacy := NodeKey("EE", "Эстония")
+	runner.samples[legacy] = Sample{
+		WorldOK: 1, WorldTotal: 1,
+		WhitelistOK: 2, WhitelistTotal: 2, WhitelistDone: true,
+		Probes: []ProbeHit{
+			{City: "Berlin", OK: true},
+			{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true},
+		},
+	}
+	plain := Target{Key: ProbeKey("ee-plain", "EE", "Эстония", "1.1.1.1"), Country: "EE", Name: "Эстония", Address: "1.1.1.1"}
+	lists := Target{Key: ProbeKey("ee-list", "EE", "Эстония", "1.1.1.2"), Country: "EE", Name: "Эстония", Address: "1.1.1.2", Whitelist: true}
+	runner.Retain([]Target{plain, lists})
+
+	if _, _, ok := runner.Snapshot(legacy); ok {
+		t.Fatal("shared legacy sample must not stay")
+	}
+	plainSample, _, ok := runner.Snapshot(plain.Key)
+	if ok && (plainSample.WhitelistTotal != 0 || len(plainSample.Probes) != 0) {
+		t.Fatalf("plain estonia inherited whitelist: %+v", plainSample)
+	}
+	if _, _, ok := runner.Snapshot(lists.Key); ok {
+		t.Fatal("whitelist estonia must start clean when the name was shared")
+	}
+
+	runner.samples[legacy] = Sample{
+		WorldOK: 1, WorldTotal: 1,
+		WhitelistTotal: 1,
+		Probes: []ProbeHit{
+			{City: "Berlin", OK: true},
+			{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true},
+		},
+	}
+	runner.Retain([]Target{plain})
+	kept, _, ok := runner.Snapshot(plain.Key)
+	if !ok || kept.WorldTotal != 1 || kept.WhitelistTotal != 0 || len(kept.Probes) != 1 || kept.Probes[0].Kind == "whitelist" {
+		t.Fatalf("recreated estonia still has whitelist: %+v ok=%v", kept, ok)
+	}
+	if _, _, ok := runner.Snapshot(legacy); ok {
+		t.Fatal("legacy key survived the move")
+	}
+}

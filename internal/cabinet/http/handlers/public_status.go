@@ -48,6 +48,7 @@ type publicProbe struct {
 }
 
 type publicStatusNode struct {
+	ID        string       `json:"id,omitempty"`
 	Name      string       `json:"name"`
 	Country   string       `json:"country,omitempty"`
 	Note      string       `json:"note,omitempty"`
@@ -83,9 +84,10 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 	}
 	if h.probes != nil {
 		h.probes.EnsureLoaded(r.Context())
+		h.probes.Retain(statusprobe.TargetsFrom(configured))
 	}
 	// Замер запускает только планировщик. Открытие страницы читает уже готовый снимок.
-	targets, _ := mergeStatusTargets(panel, configured)
+	targets, kick := mergeStatusTargets(panel, configured)
 
 	world, russia := statusprobe.ProbeLimits()
 	title, lead := statusprobe.PageCopy()
@@ -99,35 +101,21 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 		Title:            title,
 		Lead:             lead,
 	}
-	notes := map[string]string{}
-	whitelist := map[string]bool{}
-	intervals := map[string]int{}
-	for _, item := range configured {
-		key := statusprobe.NodeKey(item.Country, item.Name)
-		if note := strings.TrimSpace(item.Note); note != "" {
-			notes[key] = note
-		}
-		if item.Whitelist {
-			whitelist[key] = true
-		}
-		intervals[key] = item.IntervalMin
-	}
 	if targets != nil {
 		body.Available = true
 		body.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		body.Nodes = make([]publicStatusNode, 0, len(targets))
-		for _, n := range targets {
+		for i, n := range targets {
 			if n.State == "up" {
 				body.Online++
 			}
-			key := statusprobe.NodeKey(n.CountryCode, n.Name)
-			node := publicStatusNode{
-				Name:      n.Name,
-				Country:   n.CountryCode,
-				Note:      notes[key],
-				Whitelist: whitelist[key],
-				State:     n.State,
+			key := ""
+			minutes := 0
+			if i < len(kick) {
+				key = kick[i].Key
+				minutes = int(kick[i].Interval / time.Minute)
 			}
+			node := n
 			if h.probes != nil {
 				sample, history, ok := h.probes.Snapshot(key)
 				if ok && (sample.WorldTotal > 0 || sample.RussiaTotal > 0 || sample.WhitelistTotal > 0 || len(sample.Probes) > 0) {
@@ -135,11 +123,15 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 					if !sample.MeasuredAt.IsZero() {
 						measured = sample.MeasuredAt.UTC().Format(time.RFC3339)
 					}
-					hits := append([]statusprobe.ProbeHit(nil), sample.Probes...)
-					for i := range hits {
-						if hits[i].Kind == "whitelist" {
-							hits[i].PingMs = nil
+					hits := make([]statusprobe.ProbeHit, 0, len(sample.Probes))
+					for _, hit := range sample.Probes {
+						if hit.Kind == "whitelist" {
+							if !n.Whitelist {
+								continue
+							}
+							hit.PingMs = nil
 						}
+						hits = append(hits, hit)
 					}
 					node.Probe = &publicProbe{
 						WorldOK:     sample.WorldOK,
@@ -148,7 +140,7 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 						RussiaTotal: sample.RussiaTotal,
 						History:     history,
 						MeasuredAt:  measured,
-						NextMin:     statusprobe.NextPingMinutes(intervals[key], sample),
+						NextMin:     statusprobe.NextPingMinutes(minutes, sample),
 						Hits:        hits,
 					}
 				}
@@ -230,7 +222,7 @@ func (h *PublicStatus) savedTargets(ctx context.Context) []statusprobe.Configure
 
 // mergeStatusTargets показывает только страны, которые админ включил вручную.
 // Пустой список не подменяется узлами панели.
-func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.ConfiguredTarget) ([]remnawave.ProbeTarget, []statusprobe.Target) {
+func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.ConfiguredTarget) ([]publicStatusNode, []statusprobe.Target) {
 	enabled := make([]statusprobe.ConfiguredTarget, 0, len(configured))
 	for _, item := range configured {
 		if item.Enabled && strings.TrimSpace(item.Address) != "" {
@@ -238,37 +230,29 @@ func mergeStatusTargets(panel []remnawave.ProbeTarget, configured []statusprobe.
 		}
 	}
 	if len(enabled) == 0 {
-		return []remnawave.ProbeTarget{}, nil
+		return []publicStatusNode{}, nil
 	}
 
 	byAddr := map[string]string{}
 	for _, n := range panel {
 		byAddr[strings.TrimSpace(n.Address)] = n.State
 	}
-	out := make([]remnawave.ProbeTarget, 0, len(enabled))
-	kick := make([]statusprobe.Target, 0, len(enabled))
+	out := make([]publicStatusNode, 0, len(enabled))
 	for _, item := range enabled {
 		state := byAddr[strings.TrimSpace(item.Address)]
 		if state == "" {
 			state = "partial"
 		}
-		out = append(out, remnawave.ProbeTarget{
-			Name:        item.Name,
-			CountryCode: item.Country,
-			State:       state,
-			Address:     item.Address,
-		})
-		kick = append(kick, statusprobe.Target{
-			Key:          statusprobe.NodeKey(item.Country, item.Name),
-			Address:      item.Address,
-			Interval:     time.Duration(item.IntervalMin) * time.Minute,
-			World:        item.WorldProbes,
-			Russia:       item.RussiaProbes,
-			Whitelist:    item.Whitelist,
-			RepeatCities: item.AllowsRepeatCities(),
+		out = append(out, publicStatusNode{
+			ID:        item.ID,
+			Name:      item.Name,
+			Country:   item.Country,
+			Note:      strings.TrimSpace(item.Note),
+			Whitelist: item.Whitelist,
+			State:     state,
 		})
 	}
-	return out, kick
+	return out, statusprobe.TargetsFrom(enabled)
 }
 
 func intervalMinutes(configured []statusprobe.ConfiguredTarget) int {

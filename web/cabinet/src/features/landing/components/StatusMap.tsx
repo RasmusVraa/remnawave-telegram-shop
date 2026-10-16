@@ -32,6 +32,7 @@ export interface StatusProbe {
 }
 
 export interface StatusMapNode {
+  id?: string
   name: string
   country?: string
   note?: string

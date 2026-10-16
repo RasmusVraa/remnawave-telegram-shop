@@ -21,9 +21,16 @@ export interface StatusTargetDraft {
   repeat_cities: boolean
 }
 
+function newDraftId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().replace(/-/g, '').slice(0, 16)
+  }
+  return `row-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+}
+
 function emptyTarget(): StatusTargetDraft {
   return {
-    id: '',
+    id: newDraftId(),
     name: '',
     country: '',
     address: '',

@@ -1263,6 +1263,7 @@ export const api = {
       title?: string
       lead?: string
       nodes: {
+        id?: string
         name: string
         country?: string
         note?: string

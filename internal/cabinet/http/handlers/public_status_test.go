@@ -34,3 +34,16 @@ func TestMergeStatusTargetsUsesOnlyManualList(t *testing.T) {
 		t.Fatalf("probe kick: %+v", kick)
 	}
 }
+
+func TestMergeStatusTargetsSeparatesSameName(t *testing.T) {
+	_, kick := mergeStatusTargets(nil, []statusprobe.ConfiguredTarget{
+		{ID: "ee-plain", Name: "Эстония", Country: "EE", Address: "1.1.1.1", Enabled: true},
+		{ID: "ee-list", Name: "Эстония", Country: "EE", Address: "1.1.1.2", Enabled: true, Whitelist: true},
+	})
+	if len(kick) != 2 || kick[0].Key == kick[1].Key {
+		t.Fatalf("same name must not share a probe: %+v", kick)
+	}
+	if kick[0].Whitelist || !kick[1].Whitelist {
+		t.Fatalf("whitelist flags: %+v", kick)
+	}
+}

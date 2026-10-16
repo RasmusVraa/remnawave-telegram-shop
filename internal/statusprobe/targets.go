@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -75,23 +76,67 @@ func (s *KVTargets) Load(ctx context.Context) ([]ConfiguredTarget, error) {
 	return parsed, nil
 }
 
-// EnabledTargets — включённые страны, которые можно передать в Runner.
-// Нулевой интервал остаётся нулевым: замер возьмёт общий интервал из настроек.
-func EnabledTargets(list []ConfiguredTarget) []Target {
+// TargetsFrom готовит строки для замера. Выключенные тоже остаются:
+// иначе их снимок сотрут, пока страну просто спрятали.
+func TargetsFrom(list []ConfiguredTarget) []Target {
 	out := make([]Target, 0, len(list))
 	for _, item := range list {
-		if !item.Enabled || strings.TrimSpace(item.Address) == "" {
+		if strings.TrimSpace(item.Address) == "" {
 			continue
 		}
 		out = append(out, Target{
-			Key:          NodeKey(item.Country, item.Name),
+			Key:          ProbeKey(item.ID, item.Country, item.Name, item.Address),
+			Country:      item.Country,
+			Name:         item.Name,
 			Address:      item.Address,
 			Interval:     time.Duration(item.IntervalMin) * time.Minute,
 			World:        item.WorldProbes,
 			Russia:       item.RussiaProbes,
 			Whitelist:    item.Whitelist,
 			RepeatCities: item.AllowsRepeatCities(),
+			Disabled:     !item.Enabled,
 		})
+	}
+	splitSharedProbeKeys(out)
+	return out
+}
+
+// splitSharedProbeKeys не даёт двум строкам писать в один снимок,
+// даже если id пустой или случайно совпал. Различие — адрес, он стабилен.
+func splitSharedProbeKeys(targets []Target) {
+	counts := map[string]int{}
+	for _, target := range targets {
+		counts[target.Key]++
+	}
+	seen := map[string]int{}
+	for i := range targets {
+		if counts[targets[i].Key] < 2 {
+			continue
+		}
+		host, ok := PublicTarget(targets[i].Address)
+		if !ok || host == "" {
+			host = strings.TrimSpace(targets[i].Address)
+		}
+		key := targets[i].Key + "\n" + strings.ToLower(host)
+		n := seen[key]
+		seen[key] = n + 1
+		if n > 0 {
+			key += "#" + strconv.Itoa(n+1)
+		}
+		targets[i].Key = key
+	}
+}
+
+// EnabledTargets — включённые страны, которые можно передать в Runner.
+// Нулевой интервал остаётся нулевым: замер возьмёт общий интервал из настроек.
+func EnabledTargets(list []ConfiguredTarget) []Target {
+	all := TargetsFrom(list)
+	out := make([]Target, 0, len(all))
+	for _, item := range all {
+		if item.Disabled {
+			continue
+		}
+		out = append(out, item)
 	}
 	return out
 }

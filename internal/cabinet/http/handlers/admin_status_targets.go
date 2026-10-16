@@ -45,6 +45,10 @@ func (h *AdminStatusTargets) Handle(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		if h.probes != nil {
+			h.probes.EnsureLoaded(r.Context())
+			h.probes.Retain(statusprobe.TargetsFrom(clean))
+		}
 		writeJSON(w, http.StatusOK, statusTargetsBody{Targets: clean})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -72,4 +76,3 @@ func (h *AdminStatusTargets) Probe(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
 }
-
