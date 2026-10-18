@@ -28,10 +28,11 @@ func TestRunPingsEveryNodeBeforeWhitelist(t *testing.T) {
 		mu.Lock()
 		order = append(order, "list:"+host)
 		mu.Unlock()
+		hit := ProbeHit{Kind: "whitelist", Network: "МТС", Country: "RU", OK: true}
 		if onHit != nil {
-			onHit(ProbeHit{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true})
+			onHit(hit)
 		}
-		return whitelistResult{OK: 1, Total: 1}, nil
+		return whitelistResult{OK: 1, Total: 1, Hits: []ProbeHit{hit}}, nil
 	}
 
 	runner := NewRunner(nil)

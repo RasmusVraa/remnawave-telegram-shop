@@ -27,7 +27,7 @@ type ConfiguredTarget struct {
 	IntervalMin  int    `json:"interval_min"`
 	WorldProbes  int    `json:"world_probes"`
 	RussiaProbes int    `json:"russia_probes"`
-	// Whitelist — отдельная проверка через belspiski.online, без второго сервиса.
+	// Whitelist — отдельная проверка через Latency Lab, модемы с белыми списками.
 	Whitelist bool `json:"whitelist"`
 	// RepeatCities — можно ли одному городу попадаться много раз.
 	// nil значит «да»: все зонды идут в доступность. false — каждый город один раз.

@@ -70,8 +70,13 @@ type ProbeHit struct {
 	Lon     float64 `json:"lon,omitempty"`
 	PingMs  *int    `json:"ping_ms,omitempty"`
 	OK      bool    `json:"ok"`
-	// Kind — "whitelist" для замера belspiski. Пусто у зондов Globalping.
+	// Kind — "whitelist" для замера Latency Lab. Пусто у зондов Globalping.
 	Kind string `json:"kind,omitempty"`
+	// ICMP и TCP — раздельный результат модема Latency Lab.
+	ICMPOK *bool `json:"icmp_ok,omitempty"`
+	TCPOK  *bool `json:"tcp_ok,omitempty"`
+	ICMPMs *int  `json:"icmp_ms,omitempty"`
+	TCPMs  *int  `json:"tcp_ms,omitempty"`
 	// Answer — текст ответа оператора. Адреса узлов сюда не входят.
 	Answer string `json:"answer,omitempty"`
 }

@@ -1288,6 +1288,10 @@ export const api = {
             ok?: boolean
             kind?: string
             answer?: string
+            icmp_ok?: boolean
+            tcp_ok?: boolean
+            icmp_ms?: number
+            tcp_ms?: number
           }[]
         }
       }[]

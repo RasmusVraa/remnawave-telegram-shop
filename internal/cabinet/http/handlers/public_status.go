@@ -125,11 +125,8 @@ func (h *PublicStatus) Get(w http.ResponseWriter, r *http.Request) {
 					}
 					hits := make([]statusprobe.ProbeHit, 0, len(sample.Probes))
 					for _, hit := range sample.Probes {
-						if hit.Kind == "whitelist" {
-							if !n.Whitelist {
-								continue
-							}
-							hit.PingMs = nil
+						if hit.Kind == "whitelist" && (!n.Whitelist || strings.TrimSpace(hit.City) != "") {
+							continue
 						}
 						hits = append(hits, hit)
 					}

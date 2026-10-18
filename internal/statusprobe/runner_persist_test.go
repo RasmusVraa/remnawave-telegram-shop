@@ -192,15 +192,7 @@ func TestFailedPingRetriesInTenMinutes(t *testing.T) {
 }
 
 func TestIncompleteWhitelistResumesMissingOperators(t *testing.T) {
-	hits := make([]ProbeHit, 0, 6)
-	for _, pick := range belspiskiPicks[:6] {
-		city, network := splitPick(pick, "")
-		hits = append(hits, ProbeHit{Kind: "whitelist", City: city, Network: network, OK: true})
-	}
-	missing := missingWhitelistPicks(hits)
-	if len(missing) != len(belspiskiPicks)-6 || missing[0] != belspiskiPicks[6] {
-		t.Fatalf("missing %v", missing)
-	}
+	hits := []ProbeHit{{Kind: "whitelist", Network: "МТС", OK: true}}
 	now := time.Now()
 	target := Target{Key: "pl", Interval: 30 * time.Minute, Whitelist: true}
 	sample := Sample{WhitelistAt: now.Add(-2 * time.Minute), Probes: hits}
@@ -210,6 +202,34 @@ func TestIncompleteWhitelistResumesMissingOperators(t *testing.T) {
 	sample.WhitelistAt = now.Add(-11 * time.Minute)
 	if !whitelistDue(target, sample, true, now) {
 		t.Fatal("partial whitelist should resume after 10 minutes")
+	}
+}
+
+func TestRetainDropsLegacyWhitelistCities(t *testing.T) {
+	runner := NewRunner(nil)
+	runner.loaded = true
+	key := ProbeKey("ee-list", "EE", "Эстония", "203.0.113.10")
+	runner.samples[key] = Sample{
+		WorldOK: 1, WorldTotal: 1,
+		WhitelistOK: 2, WhitelistTotal: 2, WhitelistDone: true,
+		WhitelistAt: time.Now(),
+		Probes: []ProbeHit{
+			{City: "Berlin", OK: true},
+			{Kind: "whitelist", City: "Москва", Network: "МТС", OK: true},
+			{Kind: "whitelist", Network: "Мегафон", Country: "RU", OK: true},
+		},
+	}
+	runner.Retain([]Target{{
+		Key: key, Country: "EE", Name: "Эстония", Address: "203.0.113.10", Whitelist: true,
+	}})
+	sample, _, ok := runner.Snapshot(key)
+	if !ok || sample.WhitelistTotal != 1 || len(sample.Probes) != 2 {
+		t.Fatalf("legacy whitelist stayed: %+v ok=%v", sample, ok)
+	}
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" && hit.City != "" {
+			t.Fatalf("city hit stayed: %+v", hit)
+		}
 	}
 }
 

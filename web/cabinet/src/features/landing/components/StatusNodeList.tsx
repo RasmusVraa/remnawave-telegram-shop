@@ -26,26 +26,17 @@ function russiaHits(probe?: StatusProbe): StatusProbeHit[] {
   return (probe?.hits ?? []).filter((hit) => (hit.country ?? '').toUpperCase() === 'RU' && hit.kind !== 'whitelist')
 }
 
-const WHITELIST_CITIES = ['Москва', 'Санкт-Петербург', 'Новосибирск', 'Инкогнито']
-const WHITELIST_NETWORKS = ['Ростелеком', 'T2', 'МТС', 'Мегафон', 'Билайн']
-
-function listRank(order: string[], value: string | undefined) {
-  const index = order.indexOf(value ?? '')
-  return index < 0 ? order.length : index
-}
-
 function whitelistHits(probe?: StatusProbe): StatusProbeHit[] {
   return (probe?.hits ?? [])
-    .filter((hit) => hit.kind === 'whitelist')
-    .sort((a, b) => {
-      const city = listRank(WHITELIST_CITIES, a.city) - listRank(WHITELIST_CITIES, b.city)
-      if (city !== 0) return city
-      const cityName = (a.city ?? '').localeCompare(b.city ?? '', 'ru')
-      if (cityName !== 0) return cityName
-      const network = listRank(WHITELIST_NETWORKS, a.network) - listRank(WHITELIST_NETWORKS, b.network)
-      if (network !== 0) return network
-      return (a.network ?? '').localeCompare(b.network ?? '', 'ru')
-    })
+    .filter((hit) => hit.kind === 'whitelist' && !(hit.city ?? '').trim())
+    .sort((a, b) => (a.network ?? '').localeCompare(b.network ?? '', 'ru'))
+}
+
+function protocolText(ok: boolean | undefined, ms: number | undefined, up: string, down: string, ping: string) {
+  if (ok == null && ms == null) return '—'
+  if (ok === false) return down
+  if (ms != null) return ping
+  return up
 }
 
 /** Строки локаций: раскрытие и таблица зондов, с которых шёл пинг. */
@@ -135,25 +126,27 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
                     {whitelist.length === 0 ? (
                       <p className="text-sm text-muted-foreground">{t('landing.status.worldPending')}</p>
                     ) : (
-                      <table className="w-full min-w-[28rem] text-left text-sm">
+                      <table className="w-full text-left text-sm">
                         <thead className="text-xs uppercase tracking-wide text-muted-foreground">
                           <tr>
-                            <th className="py-2 pr-3 font-semibold">{t('landing.status.colCity')}</th>
-                            <th className="py-2 pr-3 font-semibold">{t('landing.status.colProvider')}</th>
-                            <th className="py-2 font-semibold">{t('landing.status.colAnswer')}</th>
+                            <th className="py-2 pr-3 font-semibold">{t('landing.status.colOperator')}</th>
+                            <th className="py-2 pr-3 font-semibold">{t('landing.status.colRtt')}</th>
+                            <th className="py-2 pr-3 font-semibold">{t('landing.status.colIcmp')}</th>
+                            <th className="py-2 font-semibold">{t('landing.status.colTcp')}</th>
                           </tr>
                         </thead>
                         <tbody>
                           {whitelist.map((hit, index) => (
-                            <tr key={`${hit.network}-${hit.city}-${index}`} className="border-t border-border/40">
-                              <td className="py-2 pr-3">{hit.city || '—'}</td>
+                            <tr key={`${hit.network}-${index}`} className="border-t border-border/40">
                               <td className="py-2 pr-3">{hit.network || '—'}</td>
-                              <td className="py-2">
-                                <span className="inline-flex items-start gap-2">
-                                  <span className={cn('landing-status-dot mt-1.5 shrink-0', hit.ok ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
-                                  <span>{hit.ok ? t('landing.status.inWhitelist') : t('landing.status.hitDown')}</span>
+                              <td className="py-2 pr-3">
+                                <span className="inline-flex items-center gap-2">
+                                  <span className={cn('landing-status-dot', hit.ok ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
+                                  {protocolText(hit.ok, hit.ping_ms, t('landing.status.whitelistUp'), t('landing.status.protocolNo'), t('landing.status.hitPing', { ms: hit.ping_ms }))}
                                 </span>
                               </td>
+                              <td className="py-2 pr-3 text-muted-foreground">{protocolText(hit.icmp_ok, hit.icmp_ms, t('landing.status.whitelistUp'), t('landing.status.protocolNo'), t('landing.status.hitPing', { ms: hit.icmp_ms }))}</td>
+                              <td className="py-2 text-muted-foreground">{protocolText(hit.tcp_ok, hit.tcp_ms, t('landing.status.whitelistUp'), t('landing.status.protocolNo'), t('landing.status.hitPing', { ms: hit.tcp_ms }))}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -227,10 +220,12 @@ function ProbeRussia({ probe, whitelist }: { probe?: StatusProbe; whitelist?: bo
   const operators = whitelistHits(probe)
   const total = whitelist ? operators.length : (probe?.russia_total ?? 0)
   const ok = whitelist ? operators.filter((hit) => hit.ok).length : (probe?.russia_ok ?? 0)
+  const pings = operators.map((hit) => hit.ping_ms).filter((ms): ms is number => typeof ms === 'number')
+  const avg = pings.length ? Math.round(pings.reduce((sum, ms) => sum + ms, 0) / pings.length) : null
   return (
     <span>
-      <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
-        {t('landing.status.colRussia')}
+      <span className={cn('mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground', !whitelist && 'md:hidden')}>
+        {whitelist ? t('landing.status.whitelistProbes') : t('landing.status.colRussia')}
       </span>
       {!probe || total === 0 ? (
         <span className="text-sm text-muted-foreground">{t('landing.status.worldPending')}</span>
@@ -238,10 +233,17 @@ function ProbeRussia({ probe, whitelist }: { probe?: StatusProbe; whitelist?: bo
         <span className="block">
           <span className="inline-flex items-center gap-2 text-sm font-medium">
             <span className={cn('landing-status-dot', ok > 0 ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
-            {whitelist ? t('landing.status.inWhitelist') : ok > 0 ? t('landing.status.russiaUp') : t('landing.status.russiaDown')}
+            {whitelist
+              ? ok > 0
+                ? t('landing.status.whitelistUp')
+                : t('landing.status.hitDown')
+              : ok > 0
+                ? t('landing.status.russiaUp')
+                : t('landing.status.russiaDown')}
           </span>
           <span className="mt-0.5 block text-sm text-muted-foreground">
-            {t('landing.status.russiaRatio', { ok, total })}
+            {whitelist ? t('landing.status.whitelistRatio', { ok, total }) : t('landing.status.russiaRatio', { ok, total })}
+            {whitelist && avg != null ? ` · ${t('landing.status.hitPing', { ms: avg })}` : ''}
           </span>
         </span>
       )}

@@ -41,8 +41,9 @@
           "measured_at": "2026-10-09T22:00:00Z",
           "history": [1, 1, 1, 1, 0.5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
           "hits": [
-            { "city": "Москва", "network": "МТС", "kind": "whitelist", "ok": true, "answer": "Открывается" },
-            { "city": "Санкт-Петербург", "network": "Ростелеком", "kind": "whitelist", "ok": false, "answer": "Таймаут" }
+            { "network": "МТС", "kind": "whitelist", "ok": true, "ping_ms": 12, "icmp_ok": true, "icmp_ms": 12, "tcp_ok": true, "tcp_ms": 19 },
+            { "network": "Мегафон", "kind": "whitelist", "ok": false, "icmp_ok": false, "tcp_ok": true, "tcp_ms": 40 },
+            { "network": "Т-Мобайл", "kind": "whitelist", "ok": true, "ping_ms": 15, "icmp_ok": true, "icmp_ms": 15, "tcp_ok": true, "tcp_ms": 22 }
           ]
         }
       },

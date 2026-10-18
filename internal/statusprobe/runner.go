@@ -5,6 +5,8 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -32,14 +34,15 @@ type Runner struct {
 	store  HistoryStore
 	client *http.Client
 
-	mu            sync.Mutex
-	samples       map[string]Sample
-	history       map[string]map[string]DayRecord
-	lastRun       time.Time
-	cooldownUntil time.Time
-	pingBusy      bool
-	listBusy      bool
-	loaded        bool
+	mu                sync.Mutex
+	samples           map[string]Sample
+	history           map[string]map[string]DayRecord
+	lastRun           time.Time
+	cooldownUntil     time.Time
+	listCooldownUntil time.Time
+	pingBusy          bool
+	listBusy          bool
+	loaded            bool
 }
 
 func NewRunner(store HistoryStore) *Runner {
@@ -163,6 +166,12 @@ func (r *Runner) retainLocked(targets []Target) bool {
 			}
 		}
 		if target.Whitelist {
+			if sample, ok := r.samples[key]; ok {
+				if next, dropped := dropLegacyWhitelist(sample); dropped {
+					r.samples[key] = next
+					changed = true
+				}
+			}
 			continue
 		}
 		sample, ok := r.samples[key]
@@ -193,6 +202,31 @@ func sampleHasWhitelist(sample Sample) bool {
 		}
 	}
 	return false
+}
+
+// dropLegacyWhitelist убирает строки belspiski. У них заполнен город.
+// Замер Latency Lab города не присылает, поэтому старый список не смешивается с новым.
+func dropLegacyWhitelist(sample Sample) (Sample, bool) {
+	kept := make([]ProbeHit, 0, len(sample.Probes))
+	dropped := false
+	for _, hit := range sample.Probes {
+		if hit.Kind == "whitelist" && strings.TrimSpace(hit.City) != "" {
+			dropped = true
+			continue
+		}
+		kept = append(kept, hit)
+	}
+	if !dropped {
+		return sample, false
+	}
+	sample.Probes = kept
+	sample.WhitelistOK, sample.WhitelistTotal = whitelistCounts(kept)
+	if sample.WhitelistTotal == 0 {
+		sample.WhitelistPingMs = nil
+		sample.WhitelistDone = false
+		sample.WhitelistAt = time.Time{}
+	}
+	return sample, true
 }
 
 func stripWhitelist(sample Sample) Sample {
@@ -241,6 +275,7 @@ func (r *Runner) Force(targets []Target) error {
 		return ErrBusy
 	}
 	r.cooldownUntil = time.Time{}
+	r.listCooldownUntil = time.Time{}
 	pingTargets, listTargets := r.pickLocked(targets, true)
 	if len(pingTargets) == 0 && len(listTargets) == 0 {
 		r.mu.Unlock()
@@ -296,6 +331,7 @@ func (r *Runner) pickLocked(targets []Target, force bool) (ping []Target, list [
 	}
 	now := time.Now()
 	paused := now.Before(r.cooldownUntil)
+	listPaused := now.Before(r.listCooldownUntil)
 	for _, target := range targets {
 		if target.Disabled {
 			continue
@@ -304,42 +340,21 @@ func (r *Runner) pickLocked(targets []Target, force bool) (ping []Target, list [
 		if force || (!paused && pingDue(target, sample, ok, now)) {
 			ping = append(ping, target)
 		}
-		if target.Whitelist && (force || whitelistDue(target, sample, ok, now)) {
+		if target.Whitelist && (force || (!listPaused && whitelistDue(target, sample, ok, now))) {
 			list = append(list, target)
 		}
 	}
 	return ping, list
 }
 
-func mergeWhitelist(prev, next []ProbeHit) []ProbeHit {
-	out := withoutWhitelist(prev)
-	index := map[string]int{}
-	for _, hit := range prev {
-		if hit.Kind != "whitelist" {
-			continue
+func sortWhitelistHits(hits []ProbeHit) {
+	sort.SliceStable(hits, func(i, j int) bool {
+		ai, aj := strings.ToLower(hits[i].Network), strings.ToLower(hits[j].Network)
+		if ai != aj {
+			return ai < aj
 		}
-		key := hit.City + "\n" + hit.Network
-		if _, ok := index[key]; ok {
-			continue
-		}
-		index[key] = len(out)
-		out = append(out, hit)
-	}
-	for _, hit := range next {
-		key := hit.City + "\n" + hit.Network
-		if i, ok := index[key]; ok {
-			out[i] = hit
-			continue
-		}
-		index[key] = len(out)
-		out = append(out, hit)
-	}
-	start := 0
-	for start < len(out) && out[start].Kind != "whitelist" {
-		start++
-	}
-	sortWhitelistHits(out[start:])
-	return out
+		return strings.ToLower(hits[i].City) < strings.ToLower(hits[j].City)
+	})
 }
 
 func whitelistCounts(hits []ProbeHit) (ok, total int) {
@@ -353,26 +368,6 @@ func whitelistCounts(hits []ProbeHit) (ok, total int) {
 		}
 	}
 	return ok, total
-}
-
-func dropProxyErrorHits(hits []ProbeHit) []ProbeHit {
-	out := make([]ProbeHit, 0, len(hits))
-	for _, hit := range hits {
-		if hitProxyError(hit) {
-			continue
-		}
-		out = append(out, hit)
-	}
-	return out
-}
-
-func hasProxyError(hits []ProbeHit) bool {
-	for _, hit := range hits {
-		if hitProxyError(hit) {
-			return true
-		}
-	}
-	return false
 }
 
 func withoutWhitelist(hits []ProbeHit) []ProbeHit {
@@ -481,7 +476,7 @@ func dueTargets(targets []Target, samples map[string]Sample, now time.Time) []Ta
 	return out
 }
 
-// pingTarget и listTarget подменяются в тесте. В бою это Globalping и belspiski.
+// pingTarget и listTarget подменяются в тесте. В бою это Globalping и Latency Lab.
 var pingTarget = MeasurePingCounts
 var listTarget = measureWhitelist
 
@@ -511,7 +506,7 @@ func (r *Runner) execute(targets []Target, force bool) {
 
 	// Обычный пинг и белые списки идут вместе: долгая проверка операторов
 	// больше не отодвигает замер остальных стран. У белых списков свой срок,
-	// чтобы ожидание лимита belspiski не обрывало список операторов.
+	// чтобы ожидание лимита Latency Lab не обрывало список операторов.
 	pingCtx, pingCancel := context.WithTimeout(context.Background(), 12*time.Minute)
 	listCtx, listCancel := context.WithTimeout(context.Background(), 45*time.Minute)
 	defer pingCancel()
@@ -582,32 +577,29 @@ func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 		if !ok {
 			continue
 		}
-		r.mu.Lock()
-		base := r.samples[target.Key]
-		probes := base.Probes
-		done := base.WhitelistDone
-		r.mu.Unlock()
-		picks := belspiskiPicks
-		if !done {
-			missing := missingWhitelistPicks(probes)
-			if len(missing) == 0 {
-				r.finishWhitelist(target.Key, nil, true)
-				r.persist()
-				continue
+		wl, wlErr := listTarget(ctx, r.client, host, nil, nil)
+		var limited *RateLimitError
+		if errors.As(wlErr, &limited) {
+			wait := 15 * time.Minute
+			if limited != nil && limited.RetryAfter > 0 {
+				wait = limited.RetryAfter
 			}
-			picks = missing
+			r.mu.Lock()
+			r.listCooldownUntil = time.Now().Add(wait)
+			r.mu.Unlock()
+			slog.Warn("whitelist probe paused", "error", wlErr, "retry_in", wait.String())
+			break
 		}
-		wl, wlErr := listTarget(ctx, r.client, host, picks, func(hit ProbeHit) {
-			r.addWhitelistHit(target.Key, hit)
-		})
 		partial := errors.Is(wlErr, errWhitelistPartial)
 		if wlErr != nil && !partial {
 			slog.Warn("whitelist probe failed", "error", wlErr)
 		}
-		r.finishWhitelist(target.Key, wl.PingMs, !partial)
 		if wl.Total == 0 && wlErr != nil {
+			r.finishWhitelist(target.Key, nil, nil, false)
+			r.persist()
 			continue
 		}
+		r.finishWhitelist(target.Key, wl.Hits, wl.PingMs, wlErr == nil && wl.Total > 0)
 		r.persist()
 		measured++
 		slog.Info("whitelist probe", "operators", wl.Total)
@@ -630,24 +622,23 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	r.mu.Unlock()
 }
 
-func (r *Runner) addWhitelistHit(key string, hit ProbeHit) {
+func (r *Runner) finishWhitelist(key string, hits []ProbeHit, pingMs *int, stamp bool) {
 	r.mu.Lock()
 	base := r.samples[key]
-	base.Probes = mergeWhitelist(base.Probes, []ProbeHit{hit})
-	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
-	r.samples[key] = base
-	r.mu.Unlock()
-}
-
-func (r *Runner) finishWhitelist(key string, pingMs *int, stamp bool) {
-	r.mu.Lock()
-	base := r.samples[key]
+	if hits != nil {
+		base.Probes = append(withoutWhitelist(base.Probes), hits...)
+		start := 0
+		for start < len(base.Probes) && base.Probes[start].Kind != "whitelist" {
+			start++
+		}
+		sortWhitelistHits(base.Probes[start:])
+	}
 	if pingMs != nil {
 		base.WhitelistPingMs = pingMs
 	}
 	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
 	base.WhitelistAt = time.Now()
-	base.WhitelistDone = stamp && whitelistCovered(base.Probes)
+	base.WhitelistDone = stamp && base.WhitelistTotal > 0
 	r.samples[key] = base
 	r.mu.Unlock()
 }
