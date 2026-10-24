@@ -100,6 +100,10 @@ type Purchase struct {
 	TariffID               *int64         `db:"tariff_id"`
 	PurchaseKind           PurchaseKind   `db:"purchase_kind"`
 	IsEarlyDowngrade       bool           `db:"is_early_downgrade"`
+	// TariffLocationID / TariffLocationName — выбор площадки при покупке тарифа
+	// со списком локаций. Имя хранится снимком: строку локации могут удалить.
+	TariffLocationID   *int64  `db:"tariff_location_id"`
+	TariffLocationName *string `db:"tariff_location_name"`
 }
 
 type PurchaseRepository struct {
@@ -124,7 +128,20 @@ func purchaseScanArgs(p *Purchase) []interface{} {
 		&p.TariffID, &p.PurchaseKind, &p.IsEarlyDowngrade,
 		&p.PlategaID, &p.PlategaURL,
 		&p.HeleketID, &p.HeleketURL,
+		&p.TariffLocationID, &p.TariffLocationName,
 	}
+}
+
+// SetTariffLocation записывает выбранную клиентом площадку на уже созданный счёт.
+func (pr *PurchaseRepository) SetTariffLocation(ctx context.Context, id, locationID int64, name string) error {
+	_, err := pr.pool.Exec(ctx, `
+		UPDATE purchase
+		SET tariff_location_id = $2, tariff_location_name = $3
+		WHERE id = $1`, id, locationID, name)
+	if err != nil {
+		return fmt.Errorf("set tariff location: %w", err)
+	}
+	return nil
 }
 
 func (cr *PurchaseRepository) Create(ctx context.Context, purchase *Purchase) (int64, error) {
@@ -624,6 +641,7 @@ const adminPurchaseSelectCols = `p.id, p.amount, p.customer_id, p.created_at, p.
 	p.tariff_id, p.purchase_kind, p.is_early_downgrade,
 	p.platega_id, p.platega_url,
 	p.heleket_id, p.heleket_url,
+	p.tariff_location_id, p.tariff_location_name,
 	c.telegram_id, c.telegram_username, c.is_web_only`
 
 func scanAdminPurchaseRow(row pgx.Row) (*AdminPurchaseRow, error) {

@@ -34,8 +34,8 @@ export function DecorSnowmanIcon({ className, strokeWidth = 1.75 }: NavIconProps
   )
 }
 
-/** Тыква для halloween вместо «дома». */
-export function DecorPumpkinIcon({ className, strokeWidth = 1.75 }: NavIconProps) {
+/** Ёлка для new_year вместо «дома». */
+export function DecorTreeIcon({ className, strokeWidth = 1.75 }: NavIconProps) {
   return (
     <svg
       className={className}
@@ -47,12 +47,9 @@ export function DecorPumpkinIcon({ className, strokeWidth = 1.75 }: NavIconProps
       strokeLinejoin="round"
       aria-hidden
     >
-      <path d="M12 3.5c-1.2 0-2 .8-2.6 2" />
-      <path d="M12 3.5c1.2 0 2 .8 2.6 2" />
-      <path d="M5.5 14.5c0-4 2.9-7 6.5-7s6.5 3 6.5 7c0 3.2-2.2 5.5-5 5.5h-3c-2.8 0-5-2.3-5-5.5z" />
-      <path d="M9 12.5v1.5" />
-      <path d="M15 12.5v1.5" />
-      <path d="M10 16.5c.7.7 2.3.7 3 0" />
+      <path d="M12 2.5l1 2h-2z" fill="currentColor" />
+      <path d="M12 5L8 10h2.5L7 15h3L6 20h12l-4-5h3l-3.5-5H16z" />
+      <path d="M12 20v2" />
     </svg>
   )
 }
@@ -61,10 +58,10 @@ export function resolveDecorNavIcon(
   theme: DecorThemeId,
   to: string,
   defaultIcon: LucideIcon,
-): LucideIcon | typeof DecorSnowmanIcon | typeof DecorPumpkinIcon {
+): LucideIcon | typeof DecorSnowmanIcon | typeof DecorTreeIcon {
   if (theme === 'valentine' && to === '/support') return Heart
-  if (theme === 'halloween' && to === '/dashboard') return DecorPumpkinIcon
   if (theme === 'new_year' && to === '/profile') return DecorSnowmanIcon
+  if (theme === 'new_year' && to === '/dashboard') return DecorTreeIcon
   return defaultIcon
 }
 

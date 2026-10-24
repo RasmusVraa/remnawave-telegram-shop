@@ -3,6 +3,7 @@ import { useLayoutEffect } from 'react'
 import './landing.css'
 import { useLandingBrand } from './useLandingBrand'
 import { useLandingCopy } from './useLandingCopy'
+import { LandingHolidayFrame } from './components/LandingHolidayFrame'
 import { LandingHeader } from './components/LandingHeader'
 import { LandingHero } from './components/LandingHero'
 import { LandingPath } from './components/LandingPath'
@@ -28,26 +29,16 @@ export default function LandingPage() {
   const copy = useLandingCopy()
 
   return (
-    <div className="landing-root">
-      <div className="landing-backdrop" aria-hidden>
-        <div className="landing-backdrop__wash" />
-        <div className="landing-orb landing-orb--cyan" />
-        <div className="landing-orb landing-orb--violet" />
-        <div className="landing-orb landing-orb--emerald" />
-        <div className="landing-orb landing-orb--rose" />
-      </div>
-
-      <div className="relative z-10">
-        <LandingHeader brand={brand} copy={copy} />
-        <main>
-          <LandingHero brand={brand} copy={copy} />
-          {copy.showFeatures && <LandingPath />}
-          {copy.showTariffs && <LandingTariffs brand={brand} />}
-          {copy.showSteps && <LandingSteps brand={brand} />}
-          {copy.showFaq && <LandingFaq />}
-        </main>
-        <LandingFooter brand={brand} />
-      </div>
-    </div>
+    <LandingHolidayFrame>
+      <LandingHeader brand={brand} copy={copy} />
+      <main>
+        <LandingHero brand={brand} copy={copy} />
+        {copy.showFeatures && <LandingPath />}
+        {copy.showTariffs && <LandingTariffs brand={brand} />}
+        {copy.showSteps && <LandingSteps brand={brand} />}
+        {copy.showFaq && <LandingFaq />}
+      </main>
+      <LandingFooter brand={brand} />
+    </LandingHolidayFrame>
   )
 }

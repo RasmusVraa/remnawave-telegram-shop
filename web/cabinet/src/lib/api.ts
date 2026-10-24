@@ -228,6 +228,8 @@ export interface MeResponse {
   vk_masked_email?: string | null
   /** true, если linked Telegram identity == ADMIN_TELEGRAM_ID. */
   is_admin?: boolean
+  /** Отказ от массовых рассылок в Telegram. Напоминания об окончании подписки остаются. */
+  broadcast_opt_out?: boolean
   /** Имя для шапки профиля: Telegram → OAuth. Пусто — показываем ник или почту. */
   display_name?: string
   /** Ник Telegram без «@». */
@@ -289,6 +291,15 @@ export interface TariffItem {
   device_limit: number
   traffic_gb: number | null
   is_popular?: boolean
+  /** Площадки «своего сервера». Пусто — выбор локации на оплате не нужен. */
+  locations?: TariffLocationItem[]
+}
+
+export interface TariffLocationItem {
+  id: number
+  name: string
+  sold_out: boolean
+  country_code?: string | null
 }
 
 export interface TariffsResponse {
@@ -317,6 +328,7 @@ interface TariffViewDTO {
   traffic_limit_bytes: number
   traffic_limit_reset_strategy?: string
   prices: TariffPriceDTO[]
+  locations?: TariffLocationItem[]
 }
 
 interface TariffsRawResponse {
@@ -357,6 +369,9 @@ export function normalizeTariffsResponse(raw: TariffsRawResponse): TariffsRespon
         t.description_detail != null && String(t.description_detail).trim() !== ''
           ? String(t.description_detail).trim()
           : null
+      const locations = Array.isArray(t.locations)
+        ? t.locations.filter((loc) => loc && typeof loc.id === 'number' && typeof loc.name === 'string')
+        : undefined
       for (const p of t.prices) {
         if (!p || typeof p.months !== 'number') continue
         const months = p.months
@@ -375,6 +390,7 @@ export function normalizeTariffsResponse(raw: TariffsRawResponse): TariffsRespon
           months,
           device_limit: devLim,
           traffic_gb: trafficGb,
+          locations,
         })
       }
       continue
@@ -1087,6 +1103,9 @@ export const api = {
   putLanguage: (language: string) =>
     request<void>('PUT', '/me/language', { language }),
 
+  putBroadcast: (optOut: boolean) =>
+    request<{ broadcast_opt_out: boolean }>('PUT', '/me/broadcast', { opt_out: optOut }),
+
   changePassword: (currentPassword: string, newPassword: string) =>
     request<AuthTokenResponse>('PUT', '/me/password', {
       current_password: currentPassword,
@@ -1299,7 +1318,13 @@ export const api = {
 
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider.
   checkout: (
-    input: { period: number; provider: string; tariffId?: number | null; renewExtraHwid?: boolean },
+    input: {
+      period: number
+      provider: string
+      tariffId?: number | null
+      renewExtraHwid?: boolean
+      locationId?: number | null
+    },
     idempotencyKey: string,
   ) => {
     const body: Record<string, unknown> = {
@@ -1309,6 +1334,9 @@ export const api = {
     }
     if (input.tariffId != null && input.tariffId > 0) {
       body.tariff_id = input.tariffId
+    }
+    if (input.locationId != null && input.locationId > 0) {
+      body.location_id = input.locationId
     }
     return request<CheckoutResponse>('POST', '/payments/checkout', body, { 'Idempotency-Key': idempotencyKey })
   },

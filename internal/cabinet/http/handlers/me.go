@@ -141,6 +141,8 @@ type meResp struct {
 	VKMaskedEmail     *string `json:"vk_masked_email,omitempty"`
 	// IsAdmin — true, если linked Telegram identity == ADMIN_TELEGRAM_ID.
 	IsAdmin bool `json:"is_admin"`
+	// BroadcastOptOut — клиент отказался от массовых рассылок в Telegram.
+	BroadcastOptOut bool `json:"broadcast_opt_out"`
 	// identityProfile — имя, ник и аватарка для шапки профиля (поля инлайнятся).
 	identityProfile
 }
@@ -299,10 +301,50 @@ func (h *MeHandler) Me(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:                  isAdmin,
 		identityProfile:          h.resolveIdentityProfile(r.Context(), acc.ID, ids, linkedCustomer, telegramUserID),
 	}
+	if linkedCustomer != nil {
+		resp.BroadcastOptOut = linkedCustomer.BroadcastOptOut
+	}
 	if h.telegramWidgetBot != "" {
 		resp.TelegramWidgetBot = h.telegramWidgetBot
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+type meBroadcastReq struct {
+	OptOut bool `json:"opt_out"`
+}
+
+// PutBroadcast — PUT /cabinet/api/me/broadcast. Отказ от массовой рассылки.
+func (h *MeHandler) PutBroadcast(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req meBroadcastReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if h.links == nil || h.customers == nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	link, err := h.links.FindByAccountID(r.Context(), claims.AccountID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			http.Error(w, "customer not found", http.StatusNotFound)
+			return
+		}
+		slog.Error("me broadcast: link", "error", err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if err := h.customers.SetBroadcastOptOut(r.Context(), link.CustomerID, req.OptOut); err != nil {
+		slog.Error("me broadcast: save", "error", err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"broadcast_opt_out": req.OptOut})
 }
 
 func (h *MeHandler) TelegramLinkOIDCStart(w http.ResponseWriter, r *http.Request) {

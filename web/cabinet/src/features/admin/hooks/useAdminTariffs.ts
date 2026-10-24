@@ -10,6 +10,14 @@ export interface AdminTariffPrice {
   amount_stars?: number | null
 }
 
+export interface AdminTariffLocation {
+  id: number
+  name: string
+  sort_order: number
+  sold_out: boolean
+  country_code?: string | null
+}
+
 export interface AdminTariff {
   id: number
   slug: string
@@ -26,6 +34,7 @@ export interface AdminTariff {
   description?: string | null
   description_detail?: string | null
   prices: AdminTariffPrice[]
+  locations?: AdminTariffLocation[]
 }
 
 export interface CreateTariffInput {
@@ -43,6 +52,7 @@ export interface CreateTariffInput {
   description_detail?: string | null
   rub: [number, number, number, number]
   stars: [number | null, number | null, number | null, number | null]
+  locations?: AdminTariffLocation[]
 }
 
 export function useAdminTariffList() {

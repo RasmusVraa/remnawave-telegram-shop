@@ -22,9 +22,10 @@ import { applyTheme } from '@/hooks/useTheme'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { DECOR_THEME_IDS } from '@/features/decor/decorThemes'
+import { DECOR_THEME_IDS, type DecorThemeId } from '@/features/decor/decorThemes'
 import { decorThemeOptionLabelStyle } from '@/features/decor/decorThemeAdmin'
-import { CabinetDecorScene } from '@/features/decor/CabinetDecorScene'
+import { CabinetDecorHeader } from '@/features/decor/CabinetDecorHeader'
+import { CabinetDecorLayer } from '@/features/decor/CabinetDecorLayer'
 import { useDecorCardSpotlight } from '@/features/decor/useDecorCardSpotlight'
 
 /**
@@ -44,9 +45,15 @@ import { useDecorCardSpotlight } from '@/features/decor/useDecorCardSpotlight'
 type Page = 'dashboard' | 'subscription'
 type NavVariant = 'pill' | 'underline'
 
+function initialDecor(): DecorThemeId {
+  if (typeof window === 'undefined') return 'nebula'
+  const raw = new URLSearchParams(window.location.search).get('decor')
+  return (DECOR_THEME_IDS as readonly string[]).includes(raw ?? '') ? (raw as DecorThemeId) : 'nebula'
+}
+
 export default function ThemePreviewPage() {
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
-  const [decor, setDecor] = useState<string>('nebula')
+  const [decor, setDecor] = useState<DecorThemeId>(initialDecor)
   const [page, setPage] = useState<Page>('dashboard')
   const [navVariant, setNavVariant] = useState<NavVariant>('underline')
 
@@ -85,11 +92,9 @@ export default function ThemePreviewPage() {
   return (
     <div className="cabinet-shell relative min-h-dvh">
       <div className="cabinet-shell-gradient" aria-hidden />
-      <div className="cabinet-decor-layer" aria-hidden>
-        <DecorSceneForPreview decor={decor} />
-      </div>
+      <CabinetDecorLayer theme={decor} />
 
-      <HeaderStub page={page} />
+      <HeaderStub page={page} decor={decor} />
 
       <div className="relative z-10 mx-auto max-w-3xl px-4 py-6 sm:px-6">
         <Toolbar
@@ -112,22 +117,6 @@ export default function ThemePreviewPage() {
   )
 }
 
-/**
- * CabinetDecorScene читает тему из /auth/bootstrap, а в превью её задаёт селект,
- * поэтому здесь рендерим слой сцены вручную по тем же классам.
- */
-function DecorSceneForPreview({ decor }: { decor: string }) {
-  if (decor !== 'nebula') return <CabinetDecorScene />
-  return (
-    <div className="cabinet-decor-scene cabinet-decor-scene--nebula" aria-hidden>
-      <div className="cabinet-decor-scene__nebula-grid" />
-      <div className="cabinet-decor-scene__nebula-orb cabinet-decor-scene__nebula-orb--cyan" />
-      <div className="cabinet-decor-scene__nebula-orb cabinet-decor-scene__nebula-orb--violet" />
-      <div className="cabinet-decor-scene__nebula-orb cabinet-decor-scene__nebula-orb--teal" />
-    </div>
-  )
-}
-
 function Toolbar({
   theme,
   onTheme,
@@ -140,8 +129,8 @@ function Toolbar({
 }: {
   theme: 'dark' | 'light'
   onTheme: (v: 'dark' | 'light') => void
-  decor: string
-  onDecor: (v: string) => void
+  decor: DecorThemeId
+  onDecor: (v: DecorThemeId) => void
   page: Page
   onPage: (v: Page) => void
   navVariant: NavVariant
@@ -158,7 +147,7 @@ function Toolbar({
           <span className="text-xs font-medium text-muted-foreground">Тема</span>
           <select
             value={decor}
-            onChange={(e) => onDecor(e.target.value)}
+            onChange={(e) => onDecor(e.target.value as DecorThemeId)}
             className="admin-input h-8 rounded-lg px-2 text-xs"
             style={decorThemeOptionLabelStyle(decor)}
           >
@@ -220,9 +209,10 @@ const NAV_STUB: Array<{ id: string; icon: LucideIcon; label: string }> = [
  * + aria-current, поэтому CSS темы применяется ровно как в настоящей шапке.
  * Подпись раскрывается на hover — как в кабинете.
  */
-function HeaderStub({ page }: { page: Page }) {
+function HeaderStub({ page, decor }: { page: Page; decor: DecorThemeId }) {
   return (
     <header className="cabinet-app-header relative z-20 border-b border-border/80 bg-card/92 px-4 backdrop-blur-xl sm:px-6">
+      <CabinetDecorHeader theme={decor} />
       <div className="mx-auto flex h-14 max-w-5xl items-center gap-3">
         <span className="flex shrink-0 items-center gap-2">
           <span className="flex size-8 items-center justify-center rounded-lg bg-primary/15 text-primary">

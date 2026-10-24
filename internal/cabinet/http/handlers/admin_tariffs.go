@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -96,28 +97,32 @@ type tariffPriceDTO struct {
 }
 
 type tariffDTO struct {
-	ID                        int64            `json:"id"`
-	Slug                      string           `json:"slug"`
-	Name                      *string          `json:"name"`
-	SortOrder                 int              `json:"sort_order"`
-	IsActive                  bool             `json:"is_active"`
-	DeviceLimit               int              `json:"device_limit"`
-	TrafficLimitBytes         int64            `json:"traffic_limit_bytes"`
-	TrafficLimitResetStrategy string           `json:"traffic_limit_reset_strategy"`
-	ActiveInternalSquadUUIDs  string           `json:"active_internal_squad_uuids"`
-	ExternalSquadUUID         *string          `json:"external_squad_uuid"`
-	RemnawaveTag              *string          `json:"remnawave_tag"`
-	TierLevel                 *int             `json:"tier_level"`
-	Description               *string          `json:"description"`
-	DescriptionDetail         *string          `json:"description_detail"`
-	Prices                    []tariffPriceDTO `json:"prices"`
+	ID                        int64                     `json:"id"`
+	Slug                      string                    `json:"slug"`
+	Name                      *string                   `json:"name"`
+	SortOrder                 int                       `json:"sort_order"`
+	IsActive                  bool                      `json:"is_active"`
+	DeviceLimit               int                       `json:"device_limit"`
+	TrafficLimitBytes         int64                     `json:"traffic_limit_bytes"`
+	TrafficLimitResetStrategy string                    `json:"traffic_limit_reset_strategy"`
+	ActiveInternalSquadUUIDs  string                    `json:"active_internal_squad_uuids"`
+	ExternalSquadUUID         *string                   `json:"external_squad_uuid"`
+	RemnawaveTag              *string                   `json:"remnawave_tag"`
+	TierLevel                 *int                      `json:"tier_level"`
+	Description               *string                   `json:"description"`
+	DescriptionDetail         *string                   `json:"description_detail"`
+	Prices                    []tariffPriceDTO          `json:"prices"`
+	Locations                 []database.TariffLocation `json:"locations"`
 }
 
-func tariffToDTO(t *database.Tariff, prices []database.TariffPrice) tariffDTO {
+func tariffToDTO(t *database.Tariff, prices []database.TariffPrice, locs []database.TariffLocation) tariffDTO {
 	var extUUID *string
 	if t.ExternalSquadUUID != nil {
 		s := t.ExternalSquadUUID.String()
 		extUUID = &s
+	}
+	if locs == nil {
+		locs = []database.TariffLocation{}
 	}
 	priceDTOs := make([]tariffPriceDTO, 0, len(prices))
 	for _, p := range prices {
@@ -134,7 +139,8 @@ func tariffToDTO(t *database.Tariff, prices []database.TariffPrice) tariffDTO {
 		ActiveInternalSquadUUIDs:  t.ActiveInternalSquadUUIDs,
 		ExternalSquadUUID:         extUUID, RemnawaveTag: t.RemnawaveTag,
 		TierLevel: t.TierLevel, Description: t.Description, DescriptionDetail: t.DescriptionDetail,
-		Prices: priceDTOs,
+		Prices:    priceDTOs,
+		Locations: locs,
 	}
 }
 
@@ -162,26 +168,32 @@ func (h *AdminTariffsHandler) List(w http.ResponseWriter, r *http.Request) {
 		if prices == nil {
 			prices = []database.TariffPrice{}
 		}
-		result = append(result, tariffToDTO(&tariffs[i], prices))
+		locs, lerr := h.tariffs.ListLocations(r.Context(), tariffs[i].ID)
+		if lerr != nil {
+			slog.Error("admin tariffs list locations", "tariff_id", tariffs[i].ID, "error", lerr.Error())
+			locs = []database.TariffLocation{}
+		}
+		result = append(result, tariffToDTO(&tariffs[i], prices, locs))
 	}
 	writeJSON(w, http.StatusOK, result)
 }
 
 type createTariffReq struct {
-	Slug                      string  `json:"slug"`
-	Name                      *string `json:"name"`
-	SortOrder                 int     `json:"sort_order"`
-	IsActive                  bool    `json:"is_active"`
-	DeviceLimit               int     `json:"device_limit"`
-	TrafficLimitBytes         int64   `json:"traffic_limit_bytes"`
-	TrafficLimitResetStrategy string  `json:"traffic_limit_reset_strategy"`
-	ActiveInternalSquadUUIDs  string  `json:"active_internal_squad_uuids"`
-	RemnawaveTag              *string `json:"remnawave_tag"`
-	TierLevel                 *int    `json:"tier_level"`
-	Description               *string `json:"description"`
-	DescriptionDetail         *string `json:"description_detail"`
-	Rub                       [4]int  `json:"rub"`
-	Stars                     [4]*int `json:"stars"`
+	Slug                      string                    `json:"slug"`
+	Name                      *string                   `json:"name"`
+	SortOrder                 int                       `json:"sort_order"`
+	IsActive                  bool                      `json:"is_active"`
+	DeviceLimit               int                       `json:"device_limit"`
+	TrafficLimitBytes         int64                     `json:"traffic_limit_bytes"`
+	TrafficLimitResetStrategy string                    `json:"traffic_limit_reset_strategy"`
+	ActiveInternalSquadUUIDs  string                    `json:"active_internal_squad_uuids"`
+	RemnawaveTag              *string                   `json:"remnawave_tag"`
+	TierLevel                 *int                      `json:"tier_level"`
+	Description               *string                   `json:"description"`
+	DescriptionDetail         *string                   `json:"description_detail"`
+	Rub                       [4]int                    `json:"rub"`
+	Stars                     [4]*int                   `json:"stars"`
+	Locations                 []database.TariffLocation `json:"locations"`
 }
 
 // Create — POST /cabinet/api/admin/tariffs
@@ -232,7 +244,15 @@ func (h *AdminTariffsHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if prices == nil {
 		prices = []database.TariffPrice{}
 	}
-	writeJSON(w, http.StatusCreated, tariffToDTO(&t, prices))
+	locs := []database.TariffLocation{}
+	if len(req.Locations) > 0 {
+		if err := h.tariffs.ReplaceLocations(r.Context(), id, req.Locations); err != nil {
+			writeLocationErr(w, err)
+			return
+		}
+		locs, _ = h.tariffs.ListLocations(r.Context(), id)
+	}
+	writeJSON(w, http.StatusCreated, tariffToDTO(&t, prices, locs))
 }
 
 // Get — GET /cabinet/api/admin/tariffs/{id}
@@ -263,8 +283,13 @@ func (h *AdminTariffsHandler) Get(w http.ResponseWriter, r *http.Request) {
 	if prices == nil {
 		prices = []database.TariffPrice{}
 	}
+	locs, lerr := h.tariffs.ListLocations(r.Context(), id)
+	if lerr != nil {
+		slog.Error("admin tariffs list locations", "error", lerr.Error())
+		locs = []database.TariffLocation{}
+	}
 
-	writeJSON(w, http.StatusOK, tariffToDTO(t, prices))
+	writeJSON(w, http.StatusOK, tariffToDTO(t, prices, locs))
 }
 
 // Update — PATCH /cabinet/api/admin/tariffs/{id}
@@ -349,6 +374,18 @@ func (h *AdminTariffsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if rawLocs, hasLocs := raw["locations"]; hasLocs {
+		var locs []database.TariffLocation
+		if err := json.Unmarshal(rawLocs, &locs); err != nil {
+			http.Error(w, "invalid locations", http.StatusBadRequest)
+			return
+		}
+		if err := h.tariffs.ReplaceLocations(r.Context(), id, locs); err != nil {
+			writeLocationErr(w, err)
+			return
+		}
+	}
+
 	t, err := h.tariffs.GetByID(r.Context(), id)
 	if err != nil {
 		slog.Error("admin tariffs get after update", "error", err.Error())
@@ -359,7 +396,21 @@ func (h *AdminTariffsHandler) Update(w http.ResponseWriter, r *http.Request) {
 	if prices == nil {
 		prices = []database.TariffPrice{}
 	}
-	writeJSON(w, http.StatusOK, tariffToDTO(t, prices))
+	locs, _ := h.tariffs.ListLocations(r.Context(), id)
+	writeJSON(w, http.StatusOK, tariffToDTO(t, prices, locs))
+}
+
+func writeLocationErr(w http.ResponseWriter, err error) {
+	if errors.Is(err, database.ErrDuplicateLocationName) {
+		http.Error(w, "duplicate location name", http.StatusBadRequest)
+		return
+	}
+	if strings.Contains(err.Error(), "too long") {
+		http.Error(w, "location name too long", http.StatusBadRequest)
+		return
+	}
+	slog.Error("admin tariffs locations", "error", err.Error())
+	http.Error(w, "internal error", http.StatusInternalServerError)
 }
 
 // Delete — DELETE /cabinet/api/admin/tariffs/{id}

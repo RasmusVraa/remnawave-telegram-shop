@@ -463,6 +463,41 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 		}
 	}
 
+	var chosenLoc *database.TariffLocation
+	if tariffID != nil && h.tariffRepository != nil {
+		locs, lerr := h.tariffRepository.ListLocations(ctx, *tariffID)
+		if lerr != nil {
+			slog.Error("tariff locations", "error", lerr, "tid", *tariffID)
+			return
+		}
+		if len(locs) > 0 {
+			langCode := update.CallbackQuery.From.LanguageCode
+			locID := parseInt64Safe(callbackQuery["l"])
+			if locID == 0 {
+				h.renderTariffLocationChoice(ctx, b, update, locs, tidStr, strconv.Itoa(month), string(invoiceType), extra, langCode)
+				return
+			}
+			for i := range locs {
+				if locs[i].ID != locID {
+					continue
+				}
+				if locs[i].SoldOut {
+					_, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+						CallbackQueryID: update.CallbackQuery.ID,
+						Text:            h.translation.GetText(langCode, "tariff_location_sold_out_alert"),
+						ShowAlert:       true,
+					})
+					return
+				}
+				chosenLoc = &locs[i]
+				break
+			}
+			if chosenLoc == nil {
+				return
+			}
+		}
+	}
+
 	// Скидка от pending-промокода на полную сумму счёта за выбранный период (в т.ч. апгрейд/даунгрейд тарифа).
 	meta := h.checkoutPromoMeta(ctx, customer, invoiceType, &price)
 
@@ -483,6 +518,11 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 		}
 		h.notifyPaymentProviderUnavailable(ctx, b, update, langCode, backSell)
 		return
+	}
+	if chosenLoc != nil && purchaseId > 0 && h.purchaseRepository != nil {
+		if err := h.purchaseRepository.SetTariffLocation(ctx, purchaseId, chosenLoc.ID, chosenLoc.Name); err != nil {
+			slog.Error("save tariff location", "error", err, "purchase", purchaseId)
+		}
 	}
 
 	langCode := update.CallbackQuery.From.LanguageCode
@@ -707,6 +747,44 @@ func (h Handler) appendPlategaRenewExtraRows(keyboard [][]models.InlineKeyboardB
 		})
 	}
 	return keyboard
+}
+
+func (h Handler) renderTariffLocationChoice(
+	ctx context.Context,
+	b *bot.Bot,
+	update *models.Update,
+	locs []database.TariffLocation,
+	tidStr, month, invoiceType string,
+	extra int,
+	langCode string,
+) {
+	callback := update.CallbackQuery.Message.Message
+	keyboard := make([][]models.InlineKeyboardButton, 0, len(locs)+1)
+	soldLabel := h.translation.GetText(langCode, "tariff_location_sold_out")
+	for _, loc := range locs {
+		label := loc.Name
+		if loc.SoldOut {
+			label = soldLabel + ": " + loc.Name
+		}
+		data := paymentCallbackQuery(tidStr, month, invoiceType, "", extra) + fmt.Sprintf("&l=%d", loc.ID)
+		if len(data) > 64 {
+			slog.Error("tariff location callback too long", "len", len(data), "location", loc.ID)
+			continue
+		}
+		keyboard = append(keyboard, []models.InlineKeyboardButton{{
+			Text:         label,
+			CallbackData: data,
+		}})
+	}
+	back := fmt.Sprintf("%s?tid=%s&month=%s&amount=0&extra=%d", CallbackSell, tidStr, month, extra)
+	keyboard = append(keyboard, []models.InlineKeyboardButton{
+		h.translation.WithButton(langCode, "back_button", models.InlineKeyboardButton{CallbackData: back}),
+	})
+	text := h.translation.GetText(langCode, "tariff_pick_location")
+	_, err := editCallbackOriginToHTMLText(ctx, b, callback, text, models.ParseModeHTML, models.InlineKeyboardMarkup{
+		InlineKeyboard: keyboard,
+	}, nil)
+	logEditError("tariff location choice", err)
 }
 
 func paymentCallbackQuery(tidStr, month, invoiceType, amount string, extra int) string {

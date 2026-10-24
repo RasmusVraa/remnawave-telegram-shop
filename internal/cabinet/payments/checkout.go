@@ -149,6 +149,8 @@ type CreateRequest struct {
 	IdempotencyKey string
 	// RenewExtraHwid — если true, при наличии активных extra_hwid добавляем их продление к счёту (как в Telegram-боте).
 	RenewExtraHwid bool
+	// LocationID — площадка тарифа со списком локаций. Пусто, если у тарифа локаций нет.
+	LocationID *int64
 }
 
 // CreateResult — ответ для POST /cabinet/api/payments/checkout.
@@ -177,10 +179,10 @@ type StatusResult struct {
 
 	// Реквизиты чека на экране успешной оплаты. Всё читается из уже
 	// загруженного purchase — дополнительных запросов в БД не добавляют.
-	PaymentID   int64      `json:"payment_id,omitempty"`
-	Amount      float64    `json:"amount,omitempty"`
-	Currency    string     `json:"currency,omitempty"`
-	InvoiceType string     `json:"invoice_type,omitempty"`
+	PaymentID   int64   `json:"payment_id,omitempty"`
+	Amount      float64 `json:"amount,omitempty"`
+	Currency    string  `json:"currency,omitempty"`
+	InvoiceType string  `json:"invoice_type,omitempty"`
 	// PaidAt — момент оплаты; если провайдер его не проставил, отдаём время
 	// создания счёта: на чеке пустая строка времени выглядит как сбой.
 	PaidAt *time.Time `json:"paid_at,omitempty"`
@@ -269,6 +271,10 @@ func (s *CheckoutService) Create(ctx context.Context, accountID int64, req Creat
 	if err != nil {
 		return nil, err
 	}
+	location, err := s.resolveTariffLocation(ctx, tariffID, req.LocationID)
+	if err != nil {
+		return nil, err
+	}
 
 	amount, _, _, meta := s.applyCheckoutDiscounts(ctx, customer, invoiceType, amount)
 
@@ -322,6 +328,12 @@ func (s *CheckoutService) Create(ctx context.Context, accountID int64, req Creat
 		return nil, fmt.Errorf("payments: create purchase: %w", err)
 	}
 
+	if location != nil && purchaseID > 0 {
+		if err := s.purchases.SetTariffLocation(ctx, purchaseID, location.ID, location.Name); err != nil {
+			return nil, fmt.Errorf("payments: save location: %w", err)
+		}
+	}
+
 	if err := s.checkouts.AttachPurchase(ctx, checkout.ID, purchaseID, returnURL); err != nil {
 		// Purchase создан, но link не обновился — это легко лечится: GetStatus
 		// увидит cabinet_checkout со status='new' и purchase_id=nil, и в этот
@@ -339,6 +351,43 @@ func (s *CheckoutService) Create(ctx context.Context, accountID int64, req Creat
 		Status:     repository.CheckoutStatusPending,
 		PaymentURL: paymentURL,
 	}, nil
+}
+
+// resolveTariffLocation проверяет выбор площадки, если у тарифа есть локации.
+// nil, nil — у тарифа локаций нет, выбор не нужен.
+func (s *CheckoutService) resolveTariffLocation(ctx context.Context, tariffID, locationID *int64) (*database.TariffLocation, error) {
+	if tariffID == nil || *tariffID <= 0 || s.tariffs == nil {
+		return nil, nil
+	}
+	locs, err := s.tariffs.ListLocations(ctx, *tariffID)
+	if err != nil {
+		return nil, fmt.Errorf("payments: list locations: %w", err)
+	}
+	if len(locs) == 0 {
+		return nil, nil
+	}
+	available := 0
+	for _, loc := range locs {
+		if !loc.SoldOut {
+			available++
+		}
+	}
+	if available == 0 {
+		return nil, fmt.Errorf("%w: location_sold_out", ErrInvalidInput)
+	}
+	if locationID == nil || *locationID <= 0 {
+		return nil, fmt.Errorf("%w: location_required", ErrInvalidInput)
+	}
+	for i := range locs {
+		if locs[i].ID != *locationID {
+			continue
+		}
+		if locs[i].SoldOut {
+			return nil, fmt.Errorf("%w: location_sold_out", ErrInvalidInput)
+		}
+		return &locs[i], nil
+	}
+	return nil, fmt.Errorf("%w: location_invalid", ErrInvalidInput)
 }
 
 // Preview считает сумму к оплате без создания checkout (та же логика, что Create → resolveAmount).

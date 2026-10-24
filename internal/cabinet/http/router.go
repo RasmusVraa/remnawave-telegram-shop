@@ -705,6 +705,17 @@ func registerAPIRoutes(
 		}),
 	)
 
+	// PUT /me/broadcast — отказ от массовой рассылки.
+	api.Handle("/cabinet/api/me/broadcast",
+		methodRouter(map[string]http.Handler{
+			http.MethodPut: middleware.Chain(
+				http.HandlerFunc(me.PutBroadcast),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.CSRF(),
+			),
+		}),
+	)
+
 	// PUT /me/language.
 	api.Handle("/cabinet/api/me/language",
 		methodRouter(map[string]http.Handler{

@@ -49,24 +49,25 @@ func NewAdminPayments(
 // --- DTOs -------------------------------------------------------------------
 
 type adminPaymentListItemDTO struct {
-	ID           int64   `json:"id"`
-	CustomerID   int64   `json:"customer_id"`
-	TelegramID   int64   `json:"telegram_id,string"`
-	Username     *string `json:"telegram_username"`
-	PanelLogin   *string `json:"panel_login,omitempty"`
-	Amount       float64 `json:"amount"`
-	Currency     string  `json:"currency"`
-	Month        int     `json:"month"`
-	ExtraHwid    int     `json:"extra_hwid"`
-	InvoiceType  string  `json:"invoice_type"`
-	PurchaseKind string  `json:"purchase_kind"`
-	Status       string  `json:"status"`
-	CreatedAt    string  `json:"created_at"`
-	PaidAt       *string `json:"paid_at"`
-	TariffID     *int64  `json:"tariff_id,omitempty"`
-	TariffName   *string `json:"tariff_name,omitempty"`
-	PromoCodeID  *int64  `json:"promo_code_id,omitempty"`
-	PromoCode    *string `json:"promo_code,omitempty"`
+	ID             int64   `json:"id"`
+	CustomerID     int64   `json:"customer_id"`
+	TelegramID     int64   `json:"telegram_id,string"`
+	Username       *string `json:"telegram_username"`
+	PanelLogin     *string `json:"panel_login,omitempty"`
+	Amount         float64 `json:"amount"`
+	Currency       string  `json:"currency"`
+	Month          int     `json:"month"`
+	ExtraHwid      int     `json:"extra_hwid"`
+	InvoiceType    string  `json:"invoice_type"`
+	PurchaseKind   string  `json:"purchase_kind"`
+	Status         string  `json:"status"`
+	CreatedAt      string  `json:"created_at"`
+	PaidAt         *string `json:"paid_at"`
+	TariffID       *int64  `json:"tariff_id,omitempty"`
+	TariffName     *string `json:"tariff_name,omitempty"`
+	TariffLocation *string `json:"tariff_location_name,omitempty"`
+	PromoCodeID    *int64  `json:"promo_code_id,omitempty"`
+	PromoCode      *string `json:"promo_code,omitempty"`
 }
 
 type adminPaymentDetailDTO struct {
@@ -184,6 +185,10 @@ func (h *AdminPaymentsHandler) mapRowsToDTOs(ctx context.Context, rows []databas
 			if name, ok := tariffNames[*r.TariffID]; ok && name != "" {
 				dto.TariffName = &name
 			}
+		}
+		if r.TariffLocationName != nil && strings.TrimSpace(*r.TariffLocationName) != "" {
+			name := strings.TrimSpace(*r.TariffLocationName)
+			dto.TariffLocation = &name
 		}
 		if r.PromoCodeID != nil {
 			if code, ok := promoCodes[*r.PromoCodeID]; ok && code != "" {

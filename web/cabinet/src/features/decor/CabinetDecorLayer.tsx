@@ -1,4 +1,4 @@
-import { decorEffectForTheme } from './decorThemes'
+import { decorEffectForTheme, type DecorThemeId } from './decorThemes'
 import { isDecorColorOnlyTheme } from './decorThemeAdmin'
 import { useCabinetDecorTheme } from './useCabinetDecorTheme'
 import { CabinetDecorScene } from './CabinetDecorScene'
@@ -20,8 +20,9 @@ import {
  * Слой частиц между фоном (cabinet-shell-gradient) и контентом.
  * Монтировать внутри layout сразу после градиента.
  */
-export function CabinetDecorLayer() {
-  const theme = useCabinetDecorTheme()
+export function CabinetDecorLayer({ theme: themeProp }: { theme?: DecorThemeId } = {}) {
+  const fromHook = useCabinetDecorTheme()
+  const theme = themeProp ?? fromHook
   const effect = decorEffectForTheme(theme)
 
   if (theme === 'off' || isDecorColorOnlyTheme(theme)) return null
@@ -69,7 +70,7 @@ export function CabinetDecorLayer() {
 
   return (
     <div className="cabinet-decor-layer" aria-hidden>
-      <CabinetDecorScene />
+      <CabinetDecorScene theme={theme} />
       {fx}
     </div>
   )

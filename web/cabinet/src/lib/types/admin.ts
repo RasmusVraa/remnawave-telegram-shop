@@ -406,6 +406,7 @@ export interface AdminPaymentListItemDTO {
   paid_at?: string | null
   tariff_id?: number | null
   tariff_name?: string | null
+  tariff_location_name?: string | null
   promo_code_id?: number | null
   promo_code?: string | null
 }
@@ -489,6 +490,14 @@ export interface AdminTariffPriceDTO {
   amount_stars?: number | null
 }
 
+export interface AdminTariffLocationDTO {
+  id: number
+  name: string
+  sort_order: number
+  sold_out: boolean
+  country_code?: string | null
+}
+
 export interface AdminTariffDTO {
   id: number
   slug: string
@@ -505,6 +514,7 @@ export interface AdminTariffDTO {
   description?: string | null
   description_detail?: string | null
   prices: AdminTariffPriceDTO[]
+  locations?: AdminTariffLocationDTO[]
 }
 
 /** Ход применения состава сквадов тарифа к действующим подписчикам. */

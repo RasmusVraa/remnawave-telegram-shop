@@ -25,7 +25,7 @@ func NewCustomerRepository(poll *pgxpool.Pool) *CustomerRepository {
 
 // customerSelectColumns порядок полей для SELECT (не использовать * — совместимость со схемой).
 // Порядок столбцов синхронизирован со всеми Scan-вызовами и с struct Customer.
-const customerSelectColumns = "id, telegram_id, expire_at, created_at, subscription_link, language, extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start, subscription_period_months, loyalty_xp, telegram_username, is_web_only, legal_accepted_at, remnawave_user_id, remnawave_short_uuid"
+const customerSelectColumns = "id, telegram_id, expire_at, created_at, subscription_link, language, extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start, subscription_period_months, loyalty_xp, telegram_username, is_web_only, legal_accepted_at, remnawave_user_id, remnawave_short_uuid, broadcast_opt_out"
 
 type Customer struct {
 	ID                       int64      `db:"id"`
@@ -53,6 +53,9 @@ type Customer struct {
 	RemnawaveUserID *int64 `db:"remnawave_user_id"`
 	// RemnawaveShortUUID — shortUuid профиля панели (используется в публичных ссылках).
 	RemnawaveShortUUID *string `db:"remnawave_short_uuid"`
+	// BroadcastOptOut — клиент отказался от массовых рассылок. Сервисные
+	// напоминания об окончании подписки этим флагом не глушатся.
+	BroadcastOptOut bool `db:"broadcast_opt_out"`
 }
 
 func scanCustomer(sc interface{ Scan(dest ...any) error }, c *Customer) error {
@@ -74,7 +77,20 @@ func scanCustomer(sc interface{ Scan(dest ...any) error }, c *Customer) error {
 		&c.LegalAcceptedAt,
 		&c.RemnawaveUserID,
 		&c.RemnawaveShortUUID,
+		&c.BroadcastOptOut,
 	)
+}
+
+// SetBroadcastOptOut включает или снимает отказ от массовой рассылки.
+func (cr *CustomerRepository) SetBroadcastOptOut(ctx context.Context, customerID int64, optOut bool) error {
+	tag, err := cr.pool.Exec(ctx, `UPDATE customer SET broadcast_opt_out = $2 WHERE id = $1`, customerID, optOut)
+	if err != nil {
+		return fmt.Errorf("set broadcast opt out: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return pgx.ErrNoRows
+	}
+	return nil
 }
 
 // BroadcastRecipient is a Telegram user with language for localized broadcast keyboards.
@@ -821,7 +837,7 @@ func (cr *CustomerRepository) GetBroadcastRecipients(ctx context.Context, audien
 		return nil, fmt.Errorf("unknown broadcast audience: %s", audience)
 	}
 
-	buildSelect = buildSelect.Where(sq.Eq{"is_web_only": false})
+	buildSelect = buildSelect.Where(sq.Eq{"is_web_only": false, "broadcast_opt_out": false})
 
 	sqlStr, args, err := buildSelect.ToSql()
 	if err != nil {

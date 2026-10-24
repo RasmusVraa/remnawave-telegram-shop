@@ -92,7 +92,7 @@ export default function CabinetStatusPage() {
 
   return (
     <AppLayout>
-      <PageReveal className="space-y-4">
+      <PageReveal className="cabinet-status-page space-y-4">
         <RevealItem>
           <div>
             <h1 className="font-heading text-2xl font-bold tracking-tight sm:text-3xl">{t('cabinetStatus.title')}</h1>

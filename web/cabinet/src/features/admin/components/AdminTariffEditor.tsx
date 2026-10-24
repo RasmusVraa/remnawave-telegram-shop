@@ -10,6 +10,8 @@ import {
   Server,
   Coins,
   FileText,
+  MapPin,
+  Trash2,
   Smartphone,
   HardDrive,
   RotateCcw,
@@ -39,6 +41,7 @@ import {
   useAdminTariffSquads,
   STRATEGIES,
   type AdminTariff,
+  type AdminTariffLocation,
   type CreateTariffInput,
 } from '../hooks/useAdminTariffs'
 import {
@@ -133,7 +136,7 @@ function PresetChips({
   )
 }
 
-type TariffEditorTabId = 'basic' | 'traffic' | 'servers' | 'prices' | 'description'
+type TariffEditorTabId = 'basic' | 'traffic' | 'servers' | 'locations' | 'prices' | 'description'
 
 const TARIFF_EDITOR_TABS: {
   id: TariffEditorTabId
@@ -144,6 +147,7 @@ const TARIFF_EDITOR_TABS: {
   { id: 'basic', labelKey: 'admin.tariffs.tabBasic', icon: Settings, accent: 'slate' },
   { id: 'traffic', labelKey: 'admin.tariffs.tabTraffic', icon: Gauge, accent: 'blue' },
   { id: 'servers', labelKey: 'admin.tariffs.tabServers', icon: Server, accent: 'indigo' },
+  { id: 'locations', labelKey: 'admin.tariffs.tabLocations', icon: MapPin, accent: 'emerald' },
   { id: 'prices', labelKey: 'admin.tariffs.tabPrices', icon: Coins, accent: 'amber' },
   { id: 'description', labelKey: 'admin.tariffs.tabDescription', icon: FileText, accent: 'violet' },
 ]
@@ -216,6 +220,7 @@ export interface TariffFormData {
   description_detail: string
   rub: [number, number, number, number]
   stars: [number | null, number | null, number | null, number | null]
+  locations: AdminTariffLocation[]
 }
 
 type TariffValidationErrors = Partial<Record<TariffEditorTabId, string[]>>
@@ -279,6 +284,13 @@ function tariffToForm(t?: AdminTariff | null): TariffFormData {
     description_detail: t?.description_detail ?? '',
     rub,
     stars,
+    locations: (t?.locations ?? []).map((loc) => ({
+      id: loc.id,
+      name: loc.name,
+      sort_order: loc.sort_order,
+      sold_out: loc.sold_out,
+      country_code: loc.country_code ?? '',
+    })),
   }
 }
 
@@ -307,6 +319,15 @@ function formToCreateInput(f: TariffFormData): CreateTariffInput {
     description_detail: f.description_detail.trim() || null,
     rub: f.rub,
     stars: f.stars,
+    locations: f.locations
+      .map((loc, index) => ({
+        id: loc.id,
+        name: loc.name.trim(),
+        sort_order: index,
+        sold_out: loc.sold_out,
+        country_code: (loc.country_code ?? '').trim().toUpperCase() || null,
+      }))
+      .filter((loc) => loc.name !== ''),
   }
 }
 
@@ -325,6 +346,7 @@ function formToUpdateFields(f: TariffFormData): Record<string, unknown> {
     description_detail: input.description_detail,
     rub: input.rub,
     stars: input.stars,
+    locations: input.locations,
   }
   // slug намеренно не отправляем: он идентификатор тарифа и при редактировании
   // не меняется (раньше это выражалось условием `if (!original)`, которое в
@@ -675,6 +697,83 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
                   dirty={isDirty}
                 />
               )}
+            </section>
+          )}
+
+          {activeTab === 'locations' && (
+            <section className="space-y-3">
+              <p className="text-xs text-muted-foreground">{t('admin.tariffs.locationHint')}</p>
+              {form.locations.map((loc, index) => (
+                <div key={`${loc.id}-${index}`} className="flex items-center gap-2">
+                  <input
+                    className="admin-input w-14 shrink-0 px-2 py-2 text-center uppercase"
+                    maxLength={2}
+                    value={loc.country_code ?? ''}
+                    placeholder="DE"
+                    aria-label="DE"
+                    onChange={(e) => {
+                      const country_code = e.target.value.toUpperCase()
+                      setForm((prev) => ({
+                        ...prev,
+                        locations: prev.locations.map((row, i) => (i === index ? { ...row, country_code } : row)),
+                      }))
+                    }}
+                  />
+                  <input
+                    className="admin-input min-w-0 flex-1 px-3 py-2"
+                    maxLength={80}
+                    value={loc.name}
+                    placeholder={t('admin.tariffs.locationName')}
+                    aria-label={t('admin.tariffs.locationName')}
+                    onChange={(e) => {
+                      const name = e.target.value
+                      setForm((prev) => ({
+                        ...prev,
+                        locations: prev.locations.map((row, i) => (i === index ? { ...row, name } : row)),
+                      }))
+                    }}
+                  />
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <AdminCheckbox
+                      checked={loc.sold_out}
+                      aria-label={t('admin.tariffs.locationSoldOut')}
+                      onChange={(sold_out) => {
+                        setForm((prev) => ({
+                          ...prev,
+                          locations: prev.locations.map((row, i) => (i === index ? { ...row, sold_out } : row)),
+                        }))
+                      }}
+                    />
+                    {t('admin.tariffs.locationSoldOut')}
+                  </label>
+                  <button
+                    type="button"
+                    className="inline-flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                    aria-label={t('admin.tariffs.removeLocation')}
+                    onClick={() => {
+                      setForm((prev) => ({
+                        ...prev,
+                        locations: prev.locations.filter((_, i) => i !== index),
+                      }))
+                    }}
+                  >
+                    <Trash2 className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-md border border-border/60 px-3 py-1.5 text-xs font-medium hover:bg-accent"
+                onClick={() =>
+                  setForm((prev) => ({
+                    ...prev,
+                    locations: [...prev.locations, { id: 0, name: '', sort_order: prev.locations.length, sold_out: false, country_code: '' }],
+                  }))
+                }
+              >
+                <Plus className="size-3.5" aria-hidden />
+                {t('admin.tariffs.addLocation')}
+              </button>
             </section>
           )}
 

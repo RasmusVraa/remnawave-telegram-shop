@@ -945,7 +945,7 @@ func lockCustomerByID(ctx context.Context, tx pgx.Tx, id int64) (*database.Custo
 	const q = `SELECT id, telegram_id, expire_at, created_at, subscription_link, language,
 		extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start,
 		subscription_period_months, loyalty_xp, telegram_username, is_web_only,
-		remnawave_user_id, remnawave_short_uuid
+		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out
 		FROM customer WHERE id = $1 FOR UPDATE`
 	row := tx.QueryRow(ctx, q, id)
 	var c database.Customer
@@ -953,7 +953,7 @@ func lockCustomerByID(ctx context.Context, tx pgx.Tx, id int64) (*database.Custo
 		&c.ID, &c.TelegramID, &c.ExpireAt, &c.CreatedAt, &c.SubscriptionLink, &c.Language,
 		&c.ExtraHwid, &c.ExtraHwidExpiresAt, &c.CurrentTariffID, &c.SubscriptionPeriodStart,
 		&c.SubscriptionPeriodMonths, &c.LoyaltyXP, &c.TelegramUsername, &c.IsWebOnly,
-		&c.RemnawaveUserID, &c.RemnawaveShortUUID,
+		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -968,7 +968,7 @@ func lockCustomerByTelegramID(ctx context.Context, tx pgx.Tx, telegramID int64) 
 	const q = `SELECT id, telegram_id, expire_at, created_at, subscription_link, language,
 		extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start,
 		subscription_period_months, loyalty_xp, telegram_username, is_web_only,
-		remnawave_user_id, remnawave_short_uuid
+		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out
 		FROM customer WHERE telegram_id = $1 FOR UPDATE`
 	row := tx.QueryRow(ctx, q, telegramID)
 	var c database.Customer
@@ -976,7 +976,7 @@ func lockCustomerByTelegramID(ctx context.Context, tx pgx.Tx, telegramID int64) 
 		&c.ID, &c.TelegramID, &c.ExpireAt, &c.CreatedAt, &c.SubscriptionLink, &c.Language,
 		&c.ExtraHwid, &c.ExtraHwidExpiresAt, &c.CurrentTariffID, &c.SubscriptionPeriodStart,
 		&c.SubscriptionPeriodMonths, &c.LoyaltyXP, &c.TelegramUsername, &c.IsWebOnly,
-		&c.RemnawaveUserID, &c.RemnawaveShortUUID,
+		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1053,7 +1053,8 @@ func applyWinnerMergedFields(ctx context.Context, tx pgx.Tx, targetID int64, win
 			is_web_only                   = $11,
 			remnawave_user_id             = $12,
 			remnawave_short_uuid          = $13,
-			telegram_username             = COALESCE(telegram_username, $10)
+			telegram_username             = COALESCE(telegram_username, $10),
+			broadcast_opt_out             = $14
 		WHERE id = $1`,
 		targetID,
 		winner.ExpireAt,
@@ -1068,6 +1069,7 @@ func applyWinnerMergedFields(ctx context.Context, tx pgx.Tx, targetID int64, win
 		!hasRealTelegram,
 		winner.RemnawaveUserID,
 		winner.RemnawaveShortUUID,
+		winner.BroadcastOptOut || loser.BroadcastOptOut,
 	)
 	return err
 }

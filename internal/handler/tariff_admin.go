@@ -36,6 +36,10 @@ const (
 	tariffCallbackCancel = "tf_ca"
 	tariffCallbackWizCan = "tf_wc"
 	tariffCallbackDs     = "tf_ds"
+	tariffCallbackLoc    = "tf_loc"
+	tariffCallbackLocTog = "tf_lt"
+	tariffCallbackLocDel = "tf_ld"
+	tariffCallbackLocAdd = "tf_la"
 )
 
 type tariffWizardDraft struct {
@@ -187,7 +191,7 @@ func (h Handler) ensureStandardTariff(ctx context.Context) error {
 		SortOrder:                 1,
 		IsActive:                  true,
 		DeviceLimit:               dev,
-		TrafficLimitBytes:       tb,
+		TrafficLimitBytes:         tb,
 		TrafficLimitResetStrategy: config.TrafficLimitResetStrategy(),
 		ActiveInternalSquadUUIDs:  squadStr,
 		ExternalSquadUUID:         extPtr,
@@ -339,6 +343,8 @@ func (h Handler) AdminTariffCallbackRouter(ctx context.Context, b *bot.Bot, upda
 		h.AdminTariffEditCancelHandler(ctx, b, update)
 	case tariffCallbackWizCan:
 		h.AdminTariffWizardCancelHandler(ctx, b, update)
+	case tariffCallbackLoc, tariffCallbackLocTog, tariffCallbackLocDel, tariffCallbackLocAdd:
+		h.AdminTariffLocationsHandler(ctx, b, update)
 	default:
 		_, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{CallbackQueryID: update.CallbackQuery.ID})
 	}
@@ -585,6 +591,20 @@ func (h Handler) AdminTariffTextHandler(ctx context.Context, b *bot.Bot, update 
 			adminTariffReset(adminID)
 			h.sendAdminTariffFullCard(ctx, b, adminID, lang, tid, h.translation.GetText(lang, "tariff_edit_saved_description"))
 			return
+		case "location":
+			name, code, ok := parseTariffLocationInput(text)
+			if !ok {
+				_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: adminID, Text: h.translation.GetText(lang, "tariff_locations_bad")})
+				return
+			}
+			if err := h.tariffRepository.InsertLocation(ctx, editID, name, code); err != nil {
+				_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: adminID, Text: h.translation.GetText(lang, "tariff_locations_bad")})
+				return
+			}
+			tid := editID
+			adminTariffReset(adminID)
+			h.sendAdminTariffLocations(ctx, b, adminID, 0, lang, tid)
+			return
 		}
 	}
 }
@@ -685,8 +705,9 @@ func (h Handler) AdminTariffViewHandler(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 	prices, _ := h.tariffRepository.ListPricesForTariff(ctx, id)
+	locs, _ := h.tariffRepository.ListLocations(ctx, id)
 	nPur, _ := h.tariffRepository.CountPurchasesForTariff(ctx, id)
-	text := h.formatTariffCard(lang, t, prices, nPur)
+	text := h.formatTariffCard(lang, t, prices, locs, nPur)
 	kb := h.tariffAdminCardKeyboard(lang, id, t)
 	_, err = b.EditMessageText(ctx, &bot.EditMessageTextParams{
 		ChatID:      msg.Chat.ID,
@@ -718,6 +739,7 @@ func (h Handler) tariffAdminCardKeyboard(lang string, id int64, t *database.Tari
 		{h.translation.WithButton(lang, "tariff_btn_tier", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackTL, id)})},
 		{h.translation.WithButton(lang, "tariff_btn_prices", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackEp, id)})},
 		{h.translation.WithButton(lang, "tariff_btn_servers", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackSrv, id)})},
+		{h.translation.WithButton(lang, "tariff_btn_locations", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackLoc, id)})},
 		{
 			h.translation.WithButton(lang, activeLabel, models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackToggle, id)}),
 			h.translation.WithButton(lang, "tariff_btn_delete", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?i=%d", tariffCallbackDel, id)}),
@@ -732,8 +754,9 @@ func (h Handler) sendAdminTariffFullCard(ctx context.Context, b *bot.Bot, adminI
 		return
 	}
 	prices, _ := h.tariffRepository.ListPricesForTariff(ctx, tid)
+	locs, _ := h.tariffRepository.ListLocations(ctx, tid)
 	nPur, _ := h.tariffRepository.CountPurchasesForTariff(ctx, tid)
-	body := h.formatTariffCard(lang, t, prices, nPur)
+	body := h.formatTariffCard(lang, t, prices, locs, nPur)
 	text := body
 	if strings.TrimSpace(topBanner) != "" {
 		text = topBanner + "\n\n" + body
@@ -747,7 +770,7 @@ func (h Handler) sendAdminTariffFullCard(ctx context.Context, b *bot.Bot, adminI
 	})
 }
 
-func (h Handler) formatTariffCard(lang string, t *database.Tariff, prices []database.TariffPrice, nPurch int64) string {
+func (h Handler) formatTariffCard(lang string, t *database.Tariff, prices []database.TariffPrice, locs []database.TariffLocation, nPurch int64) string {
 	dim := config.DaysInMonth()
 	var sb strings.Builder
 	name := escapeHTML(displayTariffName(t))
@@ -771,6 +794,18 @@ func (h Handler) formatTariffCard(lang string, t *database.Tariff, prices []data
 	}
 	sb.WriteString(fmt.Sprintf(h.translation.GetText(lang, "tariff_admin_card_traffic_bullet"), trafficVal))
 	sb.WriteString(fmt.Sprintf(h.translation.GetText(lang, "tariff_admin_card_devices_bullet"), t.DeviceLimit))
+	if len(locs) == 0 {
+		sb.WriteString(h.translation.GetText(lang, "tariff_admin_card_locations_empty"))
+	} else {
+		sb.WriteString(h.translation.GetText(lang, "tariff_admin_card_locations_header"))
+		for _, loc := range locs {
+			mark := ""
+			if loc.SoldOut {
+				mark = h.translation.GetText(lang, "tariff_admin_card_location_sold")
+			}
+			sb.WriteString(fmt.Sprintf("• %s%s\n", escapeHTML(loc.Name), mark))
+		}
+	}
 	sb.WriteString(h.translation.GetText(lang, "tariff_admin_card_prices_header"))
 	for _, p := range prices {
 		days := p.Months * dim

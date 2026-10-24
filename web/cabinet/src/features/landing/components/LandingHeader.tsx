@@ -7,7 +7,9 @@ import { LangToggle } from '@/components/LangToggle'
 import { LANDING_NAV } from '../landingContent'
 import type { LandingCopy } from '../useLandingCopy'
 import type { LandingBrand } from '../useLandingBrand'
+import { HolidayTrim } from '@/features/decor/HolidayAtmosphere'
 import { Rise } from './LandingMotion'
+import { useLandingHolidayTrim } from './LandingHolidayFrame'
 
 /**
  * Шапка лендинга: прозрачная над hero, «застекляется» после прокрутки.
@@ -40,6 +42,7 @@ export function LandingHeader({
     return () => mq.removeEventListener('change', close)
   }, [menuOpen])
 
+  const holiday = useLandingHolidayTrim()
   const tryLabel = brand.authenticated ? t('landing.nav.cabinet') : t('landing.nav.try')
 
   const visibleNav = LANDING_NAV.filter((item) => {
@@ -51,6 +54,7 @@ export function LandingHeader({
 
   return (
     <header className="landing-header" data-stuck={stuck}>
+      {holiday ? <HolidayTrim theme={holiday} /> : null}
       <Rise duration={0.5}>
         <div className="mx-auto flex h-[var(--lp-header-h)] w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
           <a

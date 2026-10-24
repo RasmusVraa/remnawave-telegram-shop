@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
@@ -95,23 +95,120 @@ function FloatingParticles({ char, chars, particleClassName, fxClassName, count,
   )
 }
 
+/** Шестилучевая снежинка-кристалл: лучи с веточками + шестиугольник в центре. */
+function SnowCrystalSvg() {
+  return (
+    <svg viewBox="-12 -12 24 24" aria-hidden className="size-full overflow-visible">
+      <g stroke="currentColor" strokeWidth="1.15" strokeLinecap="round" fill="none">
+        {[0, 60, 120, 180, 240, 300].map((deg) => (
+          <g key={deg} transform={`rotate(${deg})`}>
+            <path d="M0 0 V-10.5" />
+            <path d="M0 -6.5 L-2.6 -9 M0 -6.5 L2.6 -9" />
+            <path d="M0 -3.4 L-1.8 -5.2 M0 -3.4 L1.8 -5.2" />
+          </g>
+        ))}
+      </g>
+      <circle r="1.6" fill="currentColor" />
+    </svg>
+  )
+}
+
+interface SnowFlakeStyle {
+  left: string
+  size: number
+  animationDuration: string
+  animationDelay: string
+  swayDuration: string
+  sway: number
+  opacity: number
+  /** 0 — дальний (мелкий, размытый, медленный), 2 — ближний. */
+  depth: 0 | 1 | 2
+}
+
+function buildSnowFlakes(
+  count: number,
+  opts: { sizeMin: number; sizeMax: number; durationMin: number; durationMax: number },
+): SnowFlakeStyle[] {
+  return Array.from({ length: count }, () => {
+    const t = Math.random()
+    const depth = (t < 0.45 ? 0 : t < 0.85 ? 1 : 2) as SnowFlakeStyle['depth']
+    const k = depth / 2
+    // Ближние снежинки крупнее и падают быстрее — так снегопад обретает глубину.
+    const size = opts.sizeMin + (opts.sizeMax - opts.sizeMin) * (k * 0.7 + Math.random() * 0.3)
+    const duration = opts.durationMax - (opts.durationMax - opts.durationMin) * (k * 0.75 + Math.random() * 0.25)
+    return {
+      left: `${randomBetween(-2, 100)}%`,
+      size,
+      animationDuration: `${duration}s`,
+      animationDelay: `-${randomBetween(0, duration)}s`,
+      swayDuration: `${randomBetween(2.8, 5.5)}s`,
+      sway: randomBetween(10, 34),
+      opacity: randomBetween(0.55, 0.95) * (depth === 0 ? 0.6 : 1),
+      depth,
+    }
+  })
+}
+
+/** new_year: многослойный снегопад из мягких хлопьев и редких кристаллов. */
 export function SnowEffect() {
   const desktop = useIsDesktopViewport()
-  const buildOpts = useMemo(
+  const reduced =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const flakes = useMemo(
     () =>
-      desktop
-        ? { fontMin: 16, fontMax: 30, durationMin: 8, durationMax: 18, delayMax: 12 }
-        : { fontMin: 12, fontMax: 24, durationMin: 8, durationMax: 18, delayMax: 12 },
-    [desktop],
+      reduced
+        ? []
+        : buildSnowFlakes(
+            desktop ? 64 : 30,
+            desktop
+              ? { sizeMin: 2.5, sizeMax: 8, durationMin: 9, durationMax: 22 }
+              : { sizeMin: 2, sizeMax: 6.5, durationMin: 8, durationMax: 18 },
+          ),
+    [desktop, reduced],
+  )
+  const crystals = useMemo(
+    () =>
+      reduced
+        ? []
+        : buildSnowFlakes(
+            desktop ? 9 : 4,
+            desktop
+              ? { sizeMin: 14, sizeMax: 28, durationMin: 14, durationMax: 24 }
+              : { sizeMin: 12, sizeMax: 20, durationMin: 12, durationMax: 20 },
+          ),
+    [desktop, reduced],
   )
 
+  if (flakes.length + crystals.length === 0) return null
+
+  const style = (s: SnowFlakeStyle) =>
+    ({
+      left: s.left,
+      width: s.size,
+      height: s.size,
+      opacity: s.opacity,
+      animationDuration: s.animationDuration,
+      animationDelay: s.animationDelay,
+      ['--ny-sway' as string]: `${s.sway}px`,
+      ['--ny-sway-dur' as string]: s.swayDuration,
+    }) as CSSProperties
+
   return (
-    <FloatingParticles
-      char="❄"
-      fxClassName="cabinet-decor-fx--snow"
-      particleClassName="cabinet-decor-particle--snow"
-      buildOpts={buildOpts}
-    />
+    <div className="cabinet-decor-fx cabinet-decor-fx--snow" aria-hidden>
+      {flakes.map((s, i) => (
+        <span key={`f${i}`} className={cn('cabinet-ny-flake', `cabinet-ny-flake--d${s.depth}`)} style={style(s)}>
+          <span className="cabinet-ny-flake__sway" />
+        </span>
+      ))}
+      {crystals.map((s, i) => (
+        <span key={`c${i}`} className="cabinet-ny-flake cabinet-ny-flake--crystal" style={style(s)}>
+          <span className="cabinet-ny-flake__sway">
+            <SnowCrystalSvg />
+          </span>
+        </span>
+      ))}
+    </div>
   )
 }
 
@@ -230,86 +327,236 @@ function SummerLeafSvg({ variant }: { variant: SummerLeafVariant }) {
   )
 }
 
-function PumpkinSvg() {
+/**
+ * Тыква-светильник: рёбра, хвостик с листом и вырезанная рожица, которая
+ * «горит» изнутри (мерцание — в CSS, .cabinet-hw-jack__face).
+ */
+export function JackOLanternShape() {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="size-full">
-      <path d="M12 3.5c-1.2 0-2 .8-2.6 2 .6-.3 1.3-.5 2.1-.5s1.5.2 2.1.5c-.6-1.2-1.4-2-2.6-2z" opacity="0.9" />
-      <path d="M5.5 14.5c0-4 2.9-7 6.5-7s6.5 3 6.5 7c0 3.2-2.2 5.5-5 5.5h-3c-2.8 0-5-2.3-5-5.5z" opacity="0.95" />
-      <ellipse cx="9" cy="12.5" rx="0.8" ry="1.2" fill="hsl(var(--background))" opacity="0.85" />
-      <ellipse cx="15" cy="12.5" rx="0.8" ry="1.2" fill="hsl(var(--background))" opacity="0.85" />
-      <path
-        d="M10 16c.7.7 2.3.7 3 0"
-        stroke="hsl(var(--background))"
-        strokeWidth="1.1"
-        fill="none"
-        opacity="0.75"
-      />
+    <>
+      <path d="M30 15 C30 11 29.5 7 28 4 C31 2.6 34 2.8 36 4 C34.5 7.5 34 11 34.5 15 Z" fill="hsl(95 32% 26%)" />
+      <path d="M35 7 C39 3 45 3.5 48 7 C44 7.5 40 8.5 37 11" fill="hsl(105 38% 32%)" />
+      <ellipse cx="19" cy="37" rx="15" ry="19" fill="hsl(22 86% 40%)" />
+      <ellipse cx="45" cy="37" rx="15" ry="19" fill="hsl(22 86% 40%)" />
+      <ellipse cx="25.5" cy="36" rx="13" ry="21" fill="hsl(26 92% 48%)" />
+      <ellipse cx="38.5" cy="36" rx="13" ry="21" fill="hsl(26 92% 48%)" />
+      <ellipse cx="32" cy="35.5" rx="10" ry="21.5" fill="hsl(29 96% 54%)" />
+      <ellipse cx="26" cy="23" rx="3.5" ry="6" fill="hsl(36 100% 70% / 0.35)" />
+      <g className="cabinet-hw-jack__face">
+        <path d="M17 31 L24.5 24.5 L27 33 Z" />
+        <path d="M47 31 L39.5 24.5 L37 33 Z" />
+        <path d="M32 33 L29.5 38 H34.5 Z" />
+        <path d="M14.5 41 C20 49 44 49 49.5 41 C46 42.5 44 43 42 43 L40 46 L37.5 43.5 H26.5 L24 46 L22 43 C20 43 18 42.5 14.5 41 Z" />
+      </g>
+    </>
+  )
+}
+
+export function JackOLanternSvg({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 64 60" aria-hidden className={cn('size-full overflow-visible', className)}>
+      <JackOLanternShape />
     </svg>
   )
 }
 
-interface PopParticleStyle {
+function BatSvg() {
+  return (
+    <svg viewBox="0 0 64 32" fill="currentColor" aria-hidden className="size-full overflow-visible">
+      <g className="cabinet-hw-bat__wing cabinet-hw-bat__wing--l">
+        <path d="M30 11 C24 6 14 5 3 9 C7.5 11 9 14 8 18 C11 15.5 14 15.5 16 19 C18 15.5 21 15.5 23 19 C25 15.5 28 15 30 16 Z" />
+      </g>
+      <g className="cabinet-hw-bat__wing cabinet-hw-bat__wing--r">
+        <path d="M34 11 C40 6 50 5 61 9 C56.5 11 55 14 56 18 C53 15.5 50 15.5 48 19 C46 15.5 43 15.5 41 19 C39 15.5 36 15 34 16 Z" />
+      </g>
+      <ellipse cx="32" cy="14.5" rx="3.6" ry="6" />
+      <path d="M29.2 9.5 L29.6 4.5 L31.3 7.6 H32.7 L34.4 4.5 L34.8 9.5 Z" />
+    </svg>
+  )
+}
+
+function GhostSvg() {
+  return (
+    <svg viewBox="0 0 40 48" aria-hidden className="size-full overflow-visible">
+      <path
+        className="cabinet-hw-ghost__body"
+        d="M20 2 C10 2 4 10 4 20 V44 L9 40 L14 45 L20 40 L26 45 L31 40 L36 44 V20 C36 10 30 2 20 2 Z"
+      />
+      <ellipse cx="14.5" cy="19" rx="2.6" ry="3.6" className="cabinet-hw-ghost__eye" />
+      <ellipse cx="25.5" cy="19" rx="2.6" ry="3.6" className="cabinet-hw-ghost__eye" />
+      <ellipse cx="20" cy="28" rx="3" ry="4" className="cabinet-hw-ghost__eye" />
+    </svg>
+  )
+}
+
+/** Паук на нити: тело + 8 лапок. Цвет — currentColor. */
+export function SpiderSvg() {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden className="size-full overflow-visible">
+      <g stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none">
+        <path d="M9 11 L4 7 L2 9" />
+        <path d="M8.5 13 L3 12 L1.5 14.5" />
+        <path d="M8.5 15 L3.5 17 L3 20" />
+        <path d="M9.5 17 L6 21 L6.5 23" />
+        <path d="M15 11 L20 7 L22 9" />
+        <path d="M15.5 13 L21 12 L22.5 14.5" />
+        <path d="M15.5 15 L20.5 17 L21 20" />
+        <path d="M14.5 17 L18 21 L17.5 23" />
+      </g>
+      <ellipse cx="12" cy="15" rx="4" ry="5" />
+      <circle cx="12" cy="8.6" r="2.8" />
+      <circle cx="10.9" cy="8.4" r="0.7" fill="hsl(28 100% 60%)" />
+      <circle cx="13.1" cy="8.4" r="0.7" fill="hsl(28 100% 60%)" />
+    </svg>
+  )
+}
+
+interface HalloweenSprite {
   left: string
   top: string
   size: number
   animationDuration: string
   animationDelay: string
+  tilt: number
+  /** false — спрайт лежит под колонкой контента (поля нет). */
+  inGutter: boolean
 }
 
-function buildPopStyles(
+/** Ширина колонки контента кабинета (max-w-5xl + внутренние отступы). */
+const CONTENT_WIDTH_PX = 1100
+
+/**
+ * Если по бокам от контента есть поле, тыквы держим в нём, чтобы не
+ * выглядывали из-за карточек; иначе (телефон, узкий ПК) — по всей ширине.
+ */
+function buildLanternStyles(
   count: number,
-  opts?: { sizeMin?: number; sizeMax?: number; durationMin?: number; durationMax?: number },
-): PopParticleStyle[] {
-  const sizeMin = opts?.sizeMin ?? 48
-  const sizeMax = opts?.sizeMax ?? 96
-  const durationMin = opts?.durationMin ?? 2.2
-  const durationMax = opts?.durationMax ?? 4.2
-  return Array.from({ length: count }, () => {
-    const timing = staggeredTiming(durationMin, durationMax)
+  opts: { sizeMin: number; sizeMax: number; durationMin: number; durationMax: number },
+): HalloweenSprite[] {
+  const vw = typeof window === 'undefined' ? 0 : window.innerWidth
+  const gutter = (vw - CONTENT_WIDTH_PX) / 2
+  return Array.from({ length: count }, (_, i) => {
+    const timing = staggeredTiming(opts.durationMin, opts.durationMax)
+    const size = randomBetween(opts.sizeMin, opts.sizeMax)
+    let left: string
+    const inGutter = gutter >= opts.sizeMax + 24
+    if (inGutter) {
+      const x = randomBetween(8, gutter - size - 8)
+      left = `${i % 2 === 0 ? x : vw - x - size}px`
+    } else {
+      left = `${randomBetween(2, 80)}%`
+    }
     return {
-      left: `${randomBetween(2, 78)}%`,
-      top: `${randomBetween(12, 72)}%`,
-      size: randomBetween(sizeMin, sizeMax),
-      animationDuration: timing.animationDuration,
-      animationDelay: timing.animationDelay,
+      left,
+      top: `${randomBetween(14, 82)}%`,
+      size,
+      ...timing,
+      tilt: randomBetween(-9, 9),
+      inGutter,
     }
   })
 }
 
+function buildFlyerStyles(
+  count: number,
+  opts: { sizeMin: number; sizeMax: number; durationMin: number; durationMax: number; topMin: number; topMax: number },
+): HalloweenSprite[] {
+  return Array.from({ length: count }, () => ({
+    left: '0',
+    top: `${randomBetween(opts.topMin, opts.topMax)}%`,
+    size: randomBetween(opts.sizeMin, opts.sizeMax),
+    ...staggeredTiming(opts.durationMin, opts.durationMax),
+    tilt: 0,
+    inGutter: false,
+  }))
+}
+
+function spriteStyle(s: HalloweenSprite, extra?: CSSProperties): CSSProperties {
+  return {
+    left: s.left,
+    top: s.top,
+    width: s.size,
+    height: s.size,
+    animationDuration: s.animationDuration,
+    animationDelay: s.animationDelay,
+    ...extra,
+  }
+}
+
+/** halloween: парящие тыквы-светильники, летучие мыши и пара призраков. */
 export function PumpkinsEffect() {
   const desktop = useIsDesktopViewport()
-  const buildOpts = useMemo(
+  const reduced =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+  const lanterns = useMemo(
     () =>
-      desktop
-        ? { sizeMin: 52, sizeMax: 108, durationMin: 2.2, durationMax: 4.5 }
-        : { sizeMin: 40, sizeMax: 76, durationMin: 2, durationMax: 4 },
-    [desktop],
+      reduced
+        ? []
+        : buildLanternStyles(
+            desktop ? 6 : 2,
+            desktop
+              ? { sizeMin: 46, sizeMax: 72, durationMin: 11, durationMax: 17 }
+              : { sizeMin: 30, sizeMax: 42, durationMin: 10, durationMax: 15 },
+          ),
+    [desktop, reduced],
   )
-  const n = useMemo(() => {
-    if (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      return 0
-    }
-    return desktop ? 11 : 7
-  }, [desktop])
-  const styles = useMemo(() => buildPopStyles(n, buildOpts), [n, buildOpts])
-  if (styles.length === 0) return null
+  const bats = useMemo(
+    () =>
+      reduced
+        ? []
+        : buildFlyerStyles(
+            desktop ? 4 : 2,
+            desktop
+              ? { sizeMin: 30, sizeMax: 54, durationMin: 13, durationMax: 22, topMin: 4, topMax: 46 }
+              : { sizeMin: 24, sizeMax: 36, durationMin: 11, durationMax: 17, topMin: 4, topMax: 40 },
+          ),
+    [desktop, reduced],
+  )
+  const ghosts = useMemo(
+    () =>
+      reduced
+        ? []
+        : buildLanternStyles(
+            desktop ? 2 : 1,
+            desktop
+              ? { sizeMin: 38, sizeMax: 56, durationMin: 16, durationMax: 24 }
+              : { sizeMin: 28, sizeMax: 36, durationMin: 15, durationMax: 22 },
+          ),
+    [desktop, reduced],
+  )
+
+  if (lanterns.length + bats.length + ghosts.length === 0) return null
 
   return (
     <div className="cabinet-decor-fx cabinet-decor-fx--halloween" aria-hidden>
-      {styles.map((s, i) => (
+      {lanterns.map((s, i) => (
         <span
-          key={i}
-          className="cabinet-decor-particle cabinet-decor-particle--pumpkin-pop"
-          style={{
-            left: s.left,
-            top: s.top,
-            width: s.size,
-            height: s.size,
-            animationDuration: s.animationDuration,
-            animationDelay: s.animationDelay,
-          }}
+          key={`j${i}`}
+          className={cn('cabinet-hw-jack', !s.inGutter && 'cabinet-hw-sprite--under-content')}
+          style={spriteStyle(s, { ['--hw-tilt' as string]: `${s.tilt}deg` })}
         >
-          <PumpkinSvg />
+          <JackOLanternSvg />
+        </span>
+      ))}
+      {ghosts.map((s, i) => (
+        <span
+          key={`g${i}`}
+          className={cn('cabinet-hw-ghost', !s.inGutter && 'cabinet-hw-sprite--under-content')}
+          style={spriteStyle(s, { height: s.size * 1.2 })}
+        >
+          <GhostSvg />
+        </span>
+      ))}
+      {bats.map((s, i) => (
+        <span
+          key={`b${i}`}
+          className={cn('cabinet-hw-bat', i % 2 === 1 && 'cabinet-hw-bat--rtl')}
+          style={spriteStyle(s, { height: s.size / 2 })}
+        >
+          <span className="cabinet-hw-bat__bob">
+            <BatSvg />
+          </span>
         </span>
       ))}
     </div>

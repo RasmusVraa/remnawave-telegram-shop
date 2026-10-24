@@ -2389,17 +2389,28 @@ html.dark[data-cabinet-decor="new_year"] {
   --ring: 198 85% 52%;
 }
 
-html[data-cabinet-decor="new_year"] body {
+/* Зимняя ночь: холодное свечение сверху, лёгкий «северный» отсвет, светлее у снега. */
+html.dark[data-cabinet-decor="new_year"] body {
   background-image:
-    radial-gradient(ellipse 120% 85% at 50% -25%, hsl(198 70% 45% / 0.12), transparent 55%),
-    radial-gradient(ellipse 80% 50% at 100% 0%, hsl(150 40% 35% / 0.08), transparent 50%),
-    radial-gradient(ellipse 80% 50% at 0% 0%, hsl(350 50% 40% / 0.06), transparent 50%);
+    radial-gradient(ellipse 120% 70% at 50% -20%, hsl(205 80% 42% / 0.22), transparent 58%),
+    radial-gradient(ellipse 60% 40% at 12% 0%, hsl(170 60% 38% / 0.12), transparent 60%),
+    radial-gradient(ellipse 90% 40% at 50% 108%, hsl(205 50% 60% / 0.12), transparent 62%),
+    linear-gradient(180deg, hsl(218 50% 9%) 0%, hsl(var(--background)) 50%, hsl(214 40% 12%) 100%);
 }
 
-html[data-cabinet-decor="new_year"] .cabinet-shell-gradient {
+html.dark[data-cabinet-decor="new_year"] .cabinet-shell-gradient {
   background-image:
-    radial-gradient(ellipse 120% 85% at 50% -25%, hsl(198 70% 45% / 0.12), transparent 55%),
-    radial-gradient(ellipse 80% 50% at 100% 0%, hsl(150 40% 35% / 0.08), transparent 50%);
+    radial-gradient(ellipse 120% 70% at 50% -20%, hsl(205 80% 42% / 0.22), transparent 58%),
+    radial-gradient(ellipse 60% 40% at 12% 0%, hsl(170 60% 38% / 0.12), transparent 60%),
+    radial-gradient(ellipse 90% 40% at 50% 108%, hsl(205 50% 60% / 0.12), transparent 62%);
+}
+
+html:not(.dark)[data-cabinet-decor="new_year"] body,
+html:not(.dark)[data-cabinet-decor="new_year"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 120% 70% at 50% -20%, hsl(198 85% 70% / 0.26), transparent 58%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, hsl(350 70% 75% / 0.1), transparent 60%),
+    radial-gradient(ellipse 90% 45% at 50% 110%, hsl(205 70% 80% / 0.35), transparent 62%);
 }
 
 /* --- color accents (только палитра, без декора) --- */
@@ -2647,25 +2658,28 @@ html[data-cabinet-decor="halloween"] {
   --ring: 28 95% 48%;
 }
 
+/* Ночное небо: фиолетовый верх, лунный отсвет справа, оранжевый «горизонт» снизу. */
 html.dark[data-cabinet-decor="halloween"] body {
   background-image:
-    radial-gradient(ellipse 110% 75% at 50% -12%, hsl(28 95% 50% / 0.28), transparent 55%),
-    radial-gradient(ellipse 85% 60% at 100% 100%, hsl(280 45% 22% / 0.22), transparent 55%),
-    linear-gradient(175deg, hsl(25 35% 8%) 0%, hsl(var(--background)) 48%, hsl(20 50% 7%) 100%);
+    radial-gradient(ellipse 45% 35% at 92% 6%, hsl(45 80% 70% / 0.1), transparent 70%),
+    radial-gradient(ellipse 120% 70% at 50% -12%, hsl(275 55% 24% / 0.42), transparent 58%),
+    radial-gradient(ellipse 90% 45% at 50% 108%, hsl(26 95% 45% / 0.24), transparent 62%),
+    linear-gradient(180deg, hsl(270 35% 7%) 0%, hsl(var(--background)) 46%, hsl(22 45% 7%) 100%);
 }
 
 html.dark[data-cabinet-decor="halloween"] .cabinet-shell-gradient {
   background-image:
-    radial-gradient(ellipse 110% 75% at 50% -12%, hsl(28 95% 50% / 0.28), transparent 55%),
-    radial-gradient(ellipse 85% 60% at 100% 100%, hsl(280 45% 22% / 0.22), transparent 55%);
+    radial-gradient(ellipse 45% 35% at 92% 6%, hsl(45 80% 70% / 0.1), transparent 70%),
+    radial-gradient(ellipse 120% 70% at 50% -12%, hsl(275 55% 24% / 0.42), transparent 58%),
+    radial-gradient(ellipse 90% 45% at 50% 108%, hsl(26 95% 45% / 0.24), transparent 62%);
 }
 
 html:not(.dark)[data-cabinet-decor="halloween"] body,
 html:not(.dark)[data-cabinet-decor="halloween"] .cabinet-shell-gradient {
   background-image:
-    radial-gradient(ellipse 115% 80% at 50% -15%, hsl(28 95% 52% / 0.32), transparent 58%),
-    radial-gradient(ellipse 80% 55% at 100% 100%, hsl(25 80% 45% / 0.14), transparent 52%),
-    radial-gradient(ellipse 70% 50% at 0% 0%, hsl(280 40% 55% / 0.08), transparent 50%);
+    radial-gradient(ellipse 115% 70% at 50% -15%, hsl(275 45% 60% / 0.16), transparent 58%),
+    radial-gradient(ellipse 90% 50% at 50% 110%, hsl(28 95% 52% / 0.26), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 0% 0%, hsl(28 95% 55% / 0.12), transparent 55%);
 }
 
 /* --- valentine (розовый акцент) --- */
@@ -3574,7 +3588,16 @@ html[data-cabinet-decor="black_friday"] [data-tariff-card]::before {
     opacity: 0.75;
   }
 
-  .cabinet-decor-scene--halloween .cabinet-decor-scene__moon {
+  .cabinet-ny-bulb,
+  .cabinet-ny-star,
+  .cabinet-ny-tree__lights,
+  .cabinet-ny-ornament--blink,
+  .cabinet-ny-tree__star-glow,
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__moon,
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__fog,
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__cat-eyes,
+  .cabinet-hw-spider__drop,
+  .cabinet-hw-jack__face {
     animation: none;
   }
 
@@ -4423,4 +4446,821 @@ html[data-cabinet-decor="nebula"]:not([data-nebula-nav="pill"])
 /* В редакторе цитата со сворачиванием помечена, но не подрезана. */
 .cabinet-tg-text:not(.cabinet-tg-text--preview) blockquote.is-expandable {
   border-left-style: dashed;
+}
+
+/* ── new_year: снегопад ─────────────────────────────────────────────────── */
+
+.cabinet-ny-flake {
+  position: absolute;
+  top: -3rem;
+  display: block;
+  animation: cabinet-ny-fall linear infinite;
+  will-change: transform;
+}
+
+.cabinet-ny-flake__sway {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 9999px;
+  background: radial-gradient(circle, hsl(0 0% 100%) 0%, hsl(205 80% 96% / 0.85) 45%, transparent 72%);
+  animation: cabinet-ny-sway var(--ny-sway-dur, 4s) ease-in-out infinite alternate;
+}
+
+.cabinet-ny-flake--d0 {
+  filter: blur(1px);
+}
+
+.cabinet-ny-flake--d2 .cabinet-ny-flake__sway {
+  box-shadow: 0 0 6px hsl(200 90% 85% / 0.55);
+}
+
+.cabinet-ny-flake--crystal {
+  color: hsl(200 80% 94%);
+  filter: drop-shadow(0 0 4px hsl(200 90% 75% / 0.55));
+}
+
+.cabinet-ny-flake--crystal .cabinet-ny-flake__sway {
+  background: none;
+  border-radius: 0;
+  animation-name: cabinet-ny-sway-spin;
+}
+
+/* На светлом фоне белый снег не виден: голубые хлопья с тенью. */
+html:not(.dark) .cabinet-ny-flake__sway {
+  background: radial-gradient(circle, hsl(205 75% 72%) 0%, hsl(205 70% 78% / 0.7) 45%, transparent 72%);
+}
+
+html:not(.dark) .cabinet-ny-flake--crystal {
+  color: hsl(205 70% 58%);
+  filter: drop-shadow(0 1px 2px hsl(205 60% 40% / 0.25));
+}
+
+html:not(.dark) .cabinet-ny-flake--crystal .cabinet-ny-flake__sway {
+  background: none;
+}
+
+/* ── new_year: небо и земля ─────────────────────────────────────────────── */
+
+.cabinet-ny-sky {
+  position: absolute;
+  inset-inline: 0;
+  top: 0;
+  height: min(100vh, 900px);
+}
+
+.cabinet-ny-star {
+  position: absolute;
+  border-radius: 9999px;
+  background: hsl(50 100% 92%);
+  box-shadow: 0 0 6px hsl(50 100% 85% / 0.8);
+  animation: cabinet-ny-twinkle ease-in-out infinite;
+}
+
+html:not(.dark) .cabinet-ny-sky {
+  display: none;
+}
+
+.cabinet-ny-ground {
+  --ny-drift-h: clamp(54px, 8vw, 110px);
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 0;
+  /*
+   * Баланс «видно, но не отвлекает»: на телефоне сцена ложится под нижние
+   * карточки и подписи — глушим сильнее; на ПК она в пустых полях по бокам.
+   */
+  opacity: 0.6;
+}
+
+html:not(.dark) .cabinet-ny-ground {
+  opacity: 0.68;
+}
+
+@media (min-width: 768px) {
+  .cabinet-ny-ground {
+    opacity: 0.8;
+  }
+
+  html:not(.dark) .cabinet-ny-ground {
+    opacity: 0.85;
+  }
+}
+
+@media (max-width: 639px) {
+  .cabinet-ny-ground {
+    bottom: var(--cabinet-bottom-nav-h, 0px);
+  }
+}
+
+.cabinet-ny-drifts {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  width: 100%;
+  height: var(--ny-drift-h);
+  overflow: visible;
+}
+
+.cabinet-ny-drifts__back {
+  fill: hsl(212 32% 70% / 0.55);
+}
+
+.cabinet-ny-drifts__front {
+  fill: hsl(212 38% 86% / 0.82);
+}
+
+html:not(.dark) .cabinet-ny-drifts__back {
+  fill: hsl(205 55% 86%);
+}
+
+html:not(.dark) .cabinet-ny-drifts__front {
+  fill: hsl(0 0% 100%);
+  filter: drop-shadow(0 -2px 3px hsl(205 50% 60% / 0.25));
+}
+
+.cabinet-ny-tree {
+  position: absolute;
+  left: 0.5rem;
+  bottom: calc(var(--ny-drift-h) * 0.18);
+  width: min(23vw, 150px);
+  height: auto;
+  overflow: visible;
+}
+
+.cabinet-ny-snowman {
+  position: absolute;
+  right: 0;
+  bottom: calc(var(--ny-drift-h) * 0.16);
+  width: min(32vw, 200px);
+  height: auto;
+  overflow: visible;
+}
+
+.cabinet-ny-tree__snow {
+  stroke: hsl(210 45% 96%);
+}
+
+.cabinet-ny-tree__lights {
+  stroke: hsl(48 100% 70%);
+  animation: cabinet-ny-lights 2.4s ease-in-out infinite;
+}
+
+.cabinet-ny-ornament--blink {
+  animation: cabinet-ny-ornament 3s ease-in-out infinite;
+}
+
+.cabinet-ny-ornament--blink:nth-of-type(2n) {
+  animation-delay: -1.4s;
+}
+
+.cabinet-ny-tree__star-glow {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cabinet-ny-star-glow 3.2s ease-in-out infinite;
+}
+
+.cabinet-ny-fir-bg {
+  fill: hsl(170 30% 26%);
+}
+
+.cabinet-ny-fir-bg__snow {
+  fill: hsl(210 45% 95%);
+}
+
+html:not(.dark) .cabinet-ny-fir-bg {
+  fill: hsl(165 30% 52%);
+}
+
+/* ── new_year: гирлянда под шапкой ─────────────────────────────────────── */
+
+.cabinet-ny-header {
+  z-index: 2;
+}
+
+.cabinet-ny-garland {
+  position: absolute;
+  inset-inline: 0;
+  top: -1px;
+  height: 24px;
+}
+
+.cabinet-ny-garland__wire {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: hsl(150 25% 22%);
+}
+
+html:not(.dark) .cabinet-ny-garland__wire {
+  stroke: hsl(150 20% 35%);
+}
+
+.cabinet-ny-bulb {
+  position: absolute;
+  top: 11px;
+  width: 7px;
+  height: 10px;
+  margin-left: -3.5px;
+  border-radius: 50% 50% 45% 45% / 40% 40% 60% 60%;
+  background: radial-gradient(circle at 35% 35%, hsl(0 0% 100% / 0.7), transparent 40%), var(--bulb-color);
+  box-shadow: 0 0 8px 1px var(--bulb-color);
+  transform: rotate(var(--bulb-tilt, 0deg));
+  transform-origin: 50% 0;
+  animation: cabinet-ny-bulb 4.4s ease-in-out infinite;
+  animation-delay: var(--bulb-delay, 0s);
+}
+
+.cabinet-ny-bulb::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 1.5px;
+  width: 4px;
+  height: 3.5px;
+  border-radius: 1px;
+  background: hsl(45 20% 55%);
+}
+
+@keyframes cabinet-ny-fall {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(min(100vh, 1100px) + 4rem));
+  }
+}
+
+@keyframes cabinet-ny-sway {
+  from {
+    transform: translateX(calc(var(--ny-sway, 20px) * -0.5));
+  }
+  to {
+    transform: translateX(calc(var(--ny-sway, 20px) * 0.5));
+  }
+}
+
+@keyframes cabinet-ny-sway-spin {
+  from {
+    transform: translateX(calc(var(--ny-sway, 20px) * -0.5)) rotate(-40deg);
+  }
+  to {
+    transform: translateX(calc(var(--ny-sway, 20px) * 0.5)) rotate(40deg);
+  }
+}
+
+@keyframes cabinet-ny-twinkle {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
+@keyframes cabinet-ny-lights {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes cabinet-ny-ornament {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes cabinet-ny-star-glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes cabinet-ny-bulb {
+  0%,
+  100% {
+    opacity: 0.5;
+    filter: brightness(0.8);
+  }
+  50% {
+    opacity: 1;
+    filter: brightness(1.25);
+  }
+}
+
+@media (min-width: 768px) {
+  .cabinet-ny-tree {
+    left: 1.5rem;
+    width: min(22vw, 210px);
+  }
+
+  .cabinet-ny-snowman {
+    right: 0.5rem;
+    width: min(26vw, 260px);
+  }
+
+  .cabinet-ny-bulb {
+    width: 8px;
+    height: 12px;
+    margin-left: -4px;
+  }
+}
+
+/* ── halloween: сцена (луна, паутина, кладбище, туман) и частицы ─────────── */
+
+.cabinet-decor-scene--halloween .cabinet-decor-scene__hw-horizon {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: min(45vh, 380px);
+  background:
+    radial-gradient(ellipse 60% 100% at 12% 100%, hsl(26 95% 48% / 0.3), transparent 70%),
+    radial-gradient(ellipse 60% 100% at 88% 100%, hsl(280 60% 42% / 0.26), transparent 70%);
+}
+
+html:not(.dark) .cabinet-decor-scene--halloween .cabinet-decor-scene__hw-horizon {
+  opacity: 0.6;
+}
+
+/*
+ * На телефоне и узком ПК свободного поля нет: луна выглядывает из-за правого
+ * края под шапкой, чтобы не ложиться под плашки заголовка страницы.
+ */
+.cabinet-decor-scene--halloween .cabinet-decor-scene__moon {
+  position: absolute;
+  top: 3.5rem;
+  right: -22px;
+  width: 78px;
+  height: auto;
+  --hw-moon-max: 0.8;
+  animation: cabinet-hw-moon-glow 9s ease-in-out infinite;
+}
+
+.cabinet-decor-scene__moon-bat {
+  fill: hsl(270 35% 8% / 0.82);
+}
+
+.cabinet-decor-scene--halloween .cabinet-decor-scene__web {
+  position: absolute;
+  top: 3.25rem;
+  left: 0;
+  width: min(36vw, 170px);
+  aspect-ratio: 1;
+  color: hsl(35 25% 88% / 0.2);
+}
+
+html:not(.dark) .cabinet-decor-scene--halloween .cabinet-decor-scene__web {
+  color: hsl(270 20% 30% / 0.24);
+}
+
+.cabinet-decor-scene--halloween .cabinet-decor-scene__graves {
+  position: absolute;
+  bottom: 0;
+  width: min(52vw, 360px);
+  height: auto;
+  overflow: visible;
+  /* Тот же баланс, что у new_year: на телефоне кладбище под текстом — глушим сильнее. */
+  opacity: 0.7;
+}
+
+/* Над нижним меню телефона, иначе кладбище целиком под ним; земля тянется вниз за viewBox. */
+@media (max-width: 639px) {
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__graves {
+    bottom: var(--cabinet-bottom-nav-h, 0px);
+  }
+}
+
+.cabinet-decor-scene__graves--l {
+  left: 0;
+}
+
+.cabinet-decor-scene__graves--r {
+  right: 0;
+}
+
+.cabinet-decor-scene__silhouette {
+  fill: hsl(268 40% 4%);
+  color: hsl(268 40% 4%);
+  opacity: 0.88;
+}
+
+html:not(.dark) .cabinet-decor-scene__silhouette {
+  fill: hsl(268 28% 22%);
+  color: hsl(268 28% 22%);
+  opacity: 0.32;
+}
+
+.cabinet-decor-scene__cat-eyes ellipse {
+  fill: hsl(52 100% 60%);
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cabinet-hw-blink 7s ease-in-out infinite;
+}
+
+html:not(.dark) .cabinet-decor-scene__cat-eyes ellipse {
+  fill: hsl(45 100% 50%);
+}
+
+.cabinet-decor-scene__rip {
+  fill: hsl(268 18% 26%);
+  font: 700 9px/1 system-ui, sans-serif;
+  letter-spacing: 1px;
+}
+
+html:not(.dark) .cabinet-decor-scene__rip {
+  fill: hsl(30 40% 92%);
+  opacity: 0.8;
+}
+
+html:not(.dark) .cabinet-decor-scene__ground-pumpkin {
+  opacity: 0.8;
+}
+
+.cabinet-decor-scene--halloween .cabinet-decor-scene__fog {
+  position: absolute;
+  bottom: -12px;
+  left: -25%;
+  width: 150%;
+  height: clamp(70px, 14vw, 150px);
+  background:
+    radial-gradient(ellipse 22% 60% at 18% 62%, hsl(270 30% 85% / 0.14), transparent 70%),
+    radial-gradient(ellipse 20% 50% at 52% 72%, hsl(270 30% 85% / 0.1), transparent 70%),
+    radial-gradient(ellipse 24% 55% at 84% 60%, hsl(270 30% 85% / 0.13), transparent 70%);
+  animation: cabinet-hw-fog 38s ease-in-out infinite alternate;
+}
+
+.cabinet-decor-scene--halloween .cabinet-decor-scene__fog--b {
+  bottom: 8px;
+  opacity: 0.75;
+  animation-duration: 54s;
+  animation-direction: alternate-reverse;
+}
+
+html:not(.dark) .cabinet-decor-scene--halloween .cabinet-decor-scene__fog {
+  background:
+    radial-gradient(ellipse 22% 60% at 18% 62%, hsl(270 25% 45% / 0.12), transparent 70%),
+    radial-gradient(ellipse 20% 50% at 52% 72%, hsl(270 25% 45% / 0.08), transparent 70%),
+    radial-gradient(ellipse 24% 55% at 84% 60%, hsl(270 25% 45% / 0.11), transparent 70%);
+}
+
+/* Тыквы-светильники: всплывают, покачиваются и гаснут. */
+.cabinet-hw-jack {
+  --hw-jack-max: 0.65;
+  position: absolute;
+  display: block;
+  opacity: 0;
+  filter: drop-shadow(0 0 14px hsl(28 100% 50% / 0.45));
+  animation: cabinet-hw-jack-float ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+html:not(.dark) .cabinet-hw-jack {
+  filter: drop-shadow(0 3px 8px hsl(26 90% 40% / 0.3));
+}
+
+.cabinet-hw-jack__face {
+  fill: hsl(48 100% 66%);
+  animation: cabinet-hw-candle 3.4s linear infinite;
+}
+
+html:not(.dark) .cabinet-hw-jack__face {
+  fill: hsl(42 100% 58%);
+  animation: none;
+}
+
+.cabinet-hw-ghost {
+  position: absolute;
+  display: block;
+  opacity: 0;
+  filter: drop-shadow(0 0 10px hsl(260 60% 85% / 0.35));
+  animation: cabinet-hw-ghost-drift ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.cabinet-hw-ghost__body {
+  fill: hsl(260 30% 96% / 0.9);
+}
+
+.cabinet-hw-ghost__eye {
+  fill: hsl(270 40% 8%);
+}
+
+html:not(.dark) .cabinet-hw-ghost {
+  filter: drop-shadow(0 2px 6px hsl(270 30% 30% / 0.28));
+}
+
+html:not(.dark) .cabinet-hw-ghost__body {
+  fill: hsl(0 0% 100%);
+}
+
+/*
+ * В светлой теме карточки непрозрачные: тыква или призрак под колонкой
+ * контента выглядывали бы из-за них обрубками. Без бокового поля прячем.
+ */
+html:not(.dark) .cabinet-hw-sprite--under-content {
+  display: none;
+}
+
+/* Летучая мышь: внешний span летит по горизонтали, внутренний качается, крылья машут. */
+.cabinet-hw-bat {
+  position: absolute;
+  display: block;
+  color: hsl(272 30% 12%);
+  filter: drop-shadow(0 0 6px hsl(28 95% 55% / 0.4));
+  animation: cabinet-hw-bat-fly linear infinite;
+  will-change: transform;
+}
+
+.cabinet-hw-bat--rtl {
+  animation-direction: reverse;
+}
+
+html:not(.dark) .cabinet-hw-bat {
+  color: hsl(270 35% 14% / 0.72);
+  filter: none;
+}
+
+.cabinet-hw-bat__bob {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: cabinet-hw-bat-bob 2.6s ease-in-out infinite alternate;
+}
+
+.cabinet-hw-bat__wing {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: cabinet-hw-bat-flap 0.26s ease-in-out infinite alternate;
+}
+
+/* Паук на нити: контейнер режет нить сверху, __drop ездит вверх-вниз. */
+.cabinet-hw-spider {
+  position: absolute;
+  display: block;
+  width: 16px;
+  overflow: hidden;
+  pointer-events: none;
+  color: hsl(275 20% 72% / 0.8);
+}
+
+html:not(.dark) .cabinet-hw-spider {
+  color: hsl(270 30% 12% / 0.8);
+}
+
+.cabinet-hw-spider__drop {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: cabinet-hw-spider-drop 10s ease-in-out infinite;
+}
+
+.cabinet-hw-spider__drop::before {
+  content: "";
+  flex: 1;
+  width: 1px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.cabinet-hw-spider__body {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin-top: -2px;
+}
+
+.cabinet-hw-spider--web {
+  left: calc(37.5% - 8px);
+  top: 37.5%;
+  height: 130px;
+}
+
+.cabinet-decor-hw-header {
+  z-index: 2;
+}
+
+.cabinet-decor-hw-header__line {
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    hsl(28 95% 52%) 18%,
+    hsl(275 70% 62%) 50%,
+    hsl(28 95% 52%) 82%,
+    transparent
+  );
+  box-shadow: 0 0 12px hsl(28 95% 50% / 0.5);
+  opacity: 0.85;
+}
+
+.cabinet-hw-spider--header {
+  top: 100%;
+  right: 16%;
+  height: 58px;
+}
+
+.cabinet-hw-spider--header .cabinet-hw-spider__drop {
+  animation-name: cabinet-hw-spider-peek;
+  animation-duration: 16s;
+}
+
+@keyframes cabinet-hw-moon-glow {
+  0%,
+  100% {
+    opacity: calc(var(--hw-moon-max, 1) * 0.8);
+    transform: scale(1);
+  }
+  50% {
+    opacity: calc(var(--hw-moon-max, 1) * 0.95);
+    transform: scale(1.03);
+  }
+}
+
+@keyframes cabinet-hw-blink {
+  0%,
+  90%,
+  96%,
+  100% {
+    transform: scaleY(1);
+  }
+  93% {
+    transform: scaleY(0.1);
+  }
+}
+
+@keyframes cabinet-hw-fog {
+  from {
+    transform: translateX(-8%);
+  }
+  to {
+    transform: translateX(8%);
+  }
+}
+
+@keyframes cabinet-hw-jack-float {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) rotate(var(--hw-tilt, 0deg)) scale(0.9);
+  }
+  16% {
+    opacity: var(--hw-jack-max, 0.85);
+  }
+  50% {
+    transform: translateY(-12px) rotate(calc(var(--hw-tilt, 0deg) * -1)) scale(1);
+  }
+  84% {
+    opacity: var(--hw-jack-max, 0.85);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-38px) rotate(var(--hw-tilt, 0deg)) scale(0.95);
+  }
+}
+
+@keyframes cabinet-hw-candle {
+  0%,
+  100% {
+    fill: hsl(48 100% 66%);
+  }
+  18% {
+    fill: hsl(40 100% 56%);
+  }
+  21% {
+    fill: hsl(52 100% 76%);
+  }
+  47% {
+    fill: hsl(44 100% 62%);
+  }
+  72% {
+    fill: hsl(53 100% 78%);
+  }
+}
+
+@keyframes cabinet-hw-ghost-drift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 24px);
+  }
+  20% {
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(28px, -16px);
+  }
+  80% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-8px, -52px);
+  }
+}
+
+@keyframes cabinet-hw-bat-fly {
+  from {
+    transform: translateX(-12vw);
+  }
+  to {
+    transform: translateX(110vw);
+  }
+}
+
+@keyframes cabinet-hw-bat-bob {
+  from {
+    transform: translateY(-14px) rotate(-4deg);
+  }
+  to {
+    transform: translateY(14px) rotate(5deg);
+  }
+}
+
+@keyframes cabinet-hw-bat-flap {
+  from {
+    transform: scaleY(1);
+  }
+  to {
+    transform: scaleY(-0.5);
+  }
+}
+
+@keyframes cabinet-hw-spider-drop {
+  0%,
+  100% {
+    transform: translateY(-62%);
+  }
+  45%,
+  60% {
+    transform: translateY(0);
+  }
+  52% {
+    transform: translateY(-5%);
+  }
+}
+
+/* С шапки паук спускается целиком из-за кромки и потом прячется обратно. */
+@keyframes cabinet-hw-spider-peek {
+  0%,
+  20% {
+    transform: translateY(-100%);
+  }
+  38%,
+  62% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8%);
+  }
+  80%,
+  100% {
+    transform: translateY(-100%);
+  }
+}
+
+@media (min-width: 768px) {
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__web {
+    width: min(20vw, 230px);
+  }
+
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__graves {
+    width: min(34vw, 460px);
+    opacity: 0.9;
+  }
+
+  .cabinet-hw-jack {
+    --hw-jack-max: 0.85;
+  }
+}
+
+/* Широкий экран: луна целиком в правом поле рядом с колонкой контента. */
+@media (min-width: 1400px) {
+  .cabinet-decor-scene--halloween .cabinet-decor-scene__moon {
+    top: 5.5rem;
+    right: max(8px, calc((100vw - 1100px) / 4 - 65px));
+    width: 130px;
+    --hw-moon-max: 1;
+  }
 }

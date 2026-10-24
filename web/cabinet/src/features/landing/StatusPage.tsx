@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { api } from '@/lib/api'
 import { useLandingBrand } from './useLandingBrand'
 import { useLandingCopy } from './useLandingCopy'
+import { LandingHolidayFrame } from './components/LandingHolidayFrame'
 import { LandingHeader } from './components/LandingHeader'
 import { LandingFooter } from './components/LandingFooter'
 import { Rise } from './components/LandingMotion'
@@ -74,11 +75,7 @@ export default function StatusPage() {
     (available ? t('landing.status.leadProbes') : t('landing.status.whatBody'))
 
   return (
-    <div className="landing-root">
-      <div className="landing-backdrop" aria-hidden>
-        <div className="landing-backdrop__wash" />
-      </div>
-      <div className="relative z-10">
+    <LandingHolidayFrame>
         <LandingHeader brand={brand} copy={copy} />
         <main className="mx-auto max-w-6xl px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
           <Rise>
@@ -150,8 +147,7 @@ export default function StatusPage() {
           </div>
         </main>
         <LandingFooter brand={brand} />
-      </div>
-    </div>
+    </LandingHolidayFrame>
   )
 }
 

@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError, type TariffItem } from '@/lib/api'
+import { TariffLocationPicker } from '@/features/checkout/TariffLocationPicker'
 import { newIdempotencyKey, cn } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -55,6 +56,7 @@ export default function CheckoutPage() {
 
   const [provider, setProvider] = useState<Provider | null>(null)
   const [renewExtraHwid, setRenewExtraHwid] = useState<boolean | null>(null)
+  const [locationId, setLocationId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -80,6 +82,13 @@ export default function CheckoutPage() {
   const tariff: TariffItem | undefined = tariffsData?.tariffs.find(
     (t) => t.slug === tariffSlug && t.months === months,
   ) ?? tariffsData?.tariffs.find((t) => t.slug === tariffSlug)
+  const locations = tariff?.locations ?? []
+  const needsLocation = locations.length > 0
+  const allLocationsSoldOut = needsLocation && locations.every((loc) => loc.sold_out)
+
+  useEffect(() => {
+    setLocationId(null)
+  }, [tariff?.id, tariff?.slug, tariff?.months])
 
   const previewTariffId =
     tariffsData?.sales_mode === 'tariffs' && tariff != null && tariff.id != null && tariff.id > 0
@@ -127,6 +136,10 @@ export default function CheckoutPage() {
   async function handlePay() {
     if (!selectedProvider) return
     if (!tariff) { setError(t('errors.unknown')); return }
+    if (needsLocation && locationId == null) {
+      setError(allLocationsSoldOut ? t('checkout.allLocationsSoldOut') : t('checkout.locationRequired'))
+      return
+    }
     setError(null)
     setLoading(true)
 
@@ -143,6 +156,7 @@ export default function CheckoutPage() {
           provider: selectedProvider,
           tariffId,
           renewExtraHwid: shouldAskExtraRenew ? Boolean(renewExtraHwid) : false,
+          locationId: needsLocation ? locationId : undefined,
         },
         idempotencyKey,
       )
@@ -155,7 +169,11 @@ export default function CheckoutPage() {
         if (err.status === 429) {
           setError(t('errors.tooManyRequests'))
         } else if (err.status === 400 || err.status === 422) {
-          setError(t('checkout.notAvailable'))
+          const body = err.body
+          if (body.includes('location_sold_out')) setError(t('checkout.locationSoldOut'))
+          else if (body.includes('location_required')) setError(t('checkout.locationRequired'))
+          else if (body.includes('location_invalid')) setError(t('checkout.locationInvalid'))
+          else setError(t('checkout.notAvailable'))
         } else {
           setError(t('errors.unknown'))
         }
@@ -177,7 +195,8 @@ export default function CheckoutPage() {
     Boolean(selectedProvider) &&
     Boolean(tariff) &&
     availableProviders.length > 0 &&
-    (!shouldAskExtraRenew || renewExtraHwid != null)
+    (!shouldAskExtraRenew || renewExtraHwid != null) &&
+    (!needsLocation || (locationId != null && !allLocationsSoldOut))
   const payButtonDisabled = !canInitiatePay || loading
   const disabledPayButtonClass =
     'disabled:opacity-100 disabled:bg-[hsl(174_31.2%_76.18%)] disabled:text-[hsl(0_0%_100%_/_57%)] disabled:brightness-100 dark:disabled:bg-primary dark:disabled:text-primary-foreground dark:disabled:brightness-[.45]'
@@ -341,6 +360,16 @@ export default function CheckoutPage() {
               </div>
             </CardContent>
           </Card>
+          </RevealItem>
+        )}
+
+        {needsLocation && (
+          <RevealItem>
+            <TariffLocationPicker
+              locations={locations}
+              locationId={locationId}
+              onSelect={setLocationId}
+            />
           </RevealItem>
         )}
 

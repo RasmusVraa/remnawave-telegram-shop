@@ -696,7 +696,7 @@ export function StatusMap({ nodes, intervalMin }: { nodes: StatusMapNode[]; inte
 
       {dueAt != null && <ProbeCountdown dueAt={dueAt} />}
 
-      <ul className="absolute right-3 top-3 hidden flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-200 sm:flex sm:max-w-[28rem]">
+      <ul className="landing-status-map__legend absolute right-3 top-3 hidden flex-wrap justify-end gap-x-3 gap-y-1 text-xs text-slate-200 sm:flex sm:max-w-[28rem]">
         <li className="inline-flex items-center gap-1.5">
           <span className="landing-status-dot landing-status-dot--up" />
           {t('landing.status.mapLegendUp')}

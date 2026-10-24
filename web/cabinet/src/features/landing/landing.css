@@ -1570,3 +1570,139 @@ html[data-cabinet-decor="black_friday"] .landing-root {
 @keyframes lp-bob {
   50% { transform: translateY(-7px); }
 }
+
+/* Хеллоуин и Новый год: не подмена теней, а другое полотно, шапка, карточки и карта. */
+
+html[data-cabinet-decor="halloween"] .landing-root {
+  --background: 275 46% 8%;
+  --foreground: 32 40% 96%;
+  --card: 272 32% 12%;
+  --border: 28 42% 32%;
+  --muted-foreground: 28 18% 76%;
+  --primary: 28 95% 56%;
+  --secondary: 272 28% 16%;
+  --lp-cyan: 28 95% 56%;
+  --lp-violet: 274 62% 64%;
+  background-color: #140816;
+  color: #fff4ea;
+}
+
+html[data-cabinet-decor="new_year"] .landing-root {
+  --background: 214 48% 8%;
+  --foreground: 200 40% 97%;
+  --card: 214 36% 13%;
+  --border: 198 30% 32%;
+  --muted-foreground: 200 18% 76%;
+  --primary: 198 90% 62%;
+  --secondary: 214 32% 16%;
+  --lp-cyan: 198 90% 62%;
+  --lp-violet: 168 55% 62%;
+  background-color: #07131f;
+  color: #f3fbff;
+}
+
+html[data-cabinet-decor="halloween"] .landing-header,
+html[data-cabinet-decor="halloween"] .landing-footer {
+  background-color: rgb(20 8 22 / 0.9);
+  border-bottom-color: hsl(28 80% 48% / 0.45);
+}
+
+html[data-cabinet-decor="new_year"] .landing-header,
+html[data-cabinet-decor="new_year"] .landing-footer {
+  background-color: rgb(7 19 31 / 0.9);
+  border-bottom-color: hsl(198 70% 62% / 0.4);
+}
+
+html[data-cabinet-decor="halloween"] .landing-card,
+html[data-cabinet-decor="halloween"] .landing-stat,
+html[data-cabinet-decor="halloween"] .landing-callout,
+html[data-cabinet-decor="halloween"] .landing-status-note {
+  border-color: hsl(28 75% 48% / 0.4);
+  background-color: hsl(272 32% 11% / 0.78);
+  background-image: linear-gradient(165deg, hsl(28 50% 18% / 0.35), hsl(272 32% 10% / 0.82));
+  box-shadow:
+    inset 0 1px 0 hsl(32 90% 70% / 0.14),
+    0 16px 36px hsl(270 40% 4% / 0.4);
+}
+
+html[data-cabinet-decor="new_year"] .landing-card,
+html[data-cabinet-decor="new_year"] .landing-stat,
+html[data-cabinet-decor="new_year"] .landing-callout,
+html[data-cabinet-decor="new_year"] .landing-status-note {
+  border-color: hsl(198 60% 70% / 0.35);
+  background-color: hsl(214 40% 12% / 0.78);
+  background-image: linear-gradient(165deg, hsl(198 40% 24% / 0.28), hsl(214 40% 10% / 0.84));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.2),
+    0 16px 36px hsl(214 50% 4% / 0.4);
+}
+
+html[data-cabinet-decor="halloween"] .landing-status-map {
+  background:
+    radial-gradient(circle at 84% 12%, hsl(32 95% 58% / 0.28), transparent 26%),
+    linear-gradient(180deg, #1a0c22, #2a120e);
+  border-color: hsl(28 70% 46% / 0.4);
+}
+
+html[data-cabinet-decor="halloween"] .landing-status-map__land {
+  fill: #3a2450;
+  stroke: #6a3d28;
+}
+
+html[data-cabinet-decor="halloween"] .landing-status-map__line {
+  stroke: hsl(28 95% 62% / 0.85);
+}
+
+html[data-cabinet-decor="new_year"] .landing-status-map {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%, hsl(168 70% 55% / 0.22), transparent 60%),
+    linear-gradient(180deg, #071422, #123044);
+  border-color: hsl(198 60% 70% / 0.35);
+}
+
+html[data-cabinet-decor="new_year"] .landing-status-map__land {
+  fill: #d5e8f4;
+  stroke: #8fb4c9;
+}
+
+html[data-cabinet-decor="new_year"] .landing-status-map__line {
+  stroke: hsl(198 90% 46% / 0.8);
+}
+
+/* Ледяная заливка карты светлая: легенда и подписи сидят на тёмной плашке. */
+html[data-cabinet-decor="new_year"] .landing-status-map__legend {
+  color: #f4fbff;
+  background: rgb(6 24 40 / 0.9);
+  border: 1px solid hsl(198 45% 78% / 0.4);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  box-shadow: 0 8px 18px rgb(4 16 28 / 0.35);
+}
+
+html[data-cabinet-decor="new_year"] .landing-status-map__tag {
+  color: #10283a;
+  text-shadow: 0 0 3px #fff, 0 1px 0 #fff, 0 0 8px #fff !important;
+}
+
+html[data-cabinet-decor="new_year"] .landing-status-map__leaders path {
+  stroke: #3e647c;
+}
+
+/* Земля внизу экрана наезжает на таймлайн и карту — на лендинге её нет, сцена остаётся в небе и шапке. */
+.landing-root .holiday-ground {
+  display: none;
+}
+
+html[data-cabinet-decor="halloween"] .landing-cta--solid,
+html[data-cabinet-decor="halloween"] .landing-header .landing-cta {
+  background: hsl(28 95% 56%);
+  color: #2a1208;
+  box-shadow: 0 10px 28px -12px hsl(28 95% 48% / 0.8);
+}
+
+html[data-cabinet-decor="new_year"] .landing-cta--solid,
+html[data-cabinet-decor="new_year"] .landing-header .landing-cta {
+  background: hsl(198 90% 62%);
+  color: #062033;
+  box-shadow: 0 10px 28px -12px hsl(198 90% 48% / 0.75);
+}

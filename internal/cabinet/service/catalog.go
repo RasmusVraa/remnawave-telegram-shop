@@ -56,20 +56,29 @@ type Price struct {
 	MonthlyBaseRub int `json:"monthly_base_rub"`
 }
 
+// LocationView — площадка тарифа «свой сервер». SoldOut нельзя выбрать при оплате.
+type LocationView struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	SoldOut     bool   `json:"sold_out"`
+	CountryCode string `json:"country_code,omitempty"`
+}
+
 // TariffView — один тариф в ответе витрины.
 //
 // id == 0 и slug == "classic" зарезервированы за виртуальным тарифом в режиме
 // classic — чтобы фронту было за что закрепиться при выборе.
 type TariffView struct {
-	ID                        int64   `json:"id"`
-	Slug                      string  `json:"slug"`
-	Name                      *string `json:"name,omitempty"`
-	Description               *string `json:"description,omitempty"`
-	DescriptionDetail         *string `json:"description_detail,omitempty"`
-	DeviceLimit               int     `json:"device_limit"`
-	TrafficLimitBytes         int64   `json:"traffic_limit_bytes"`
-	TrafficLimitResetStrategy string  `json:"traffic_limit_reset_strategy"`
-	Prices                    []Price `json:"prices"`
+	ID                        int64          `json:"id"`
+	Slug                      string         `json:"slug"`
+	Name                      *string        `json:"name,omitempty"`
+	Description               *string        `json:"description,omitempty"`
+	DescriptionDetail         *string        `json:"description_detail,omitempty"`
+	DeviceLimit               int            `json:"device_limit"`
+	TrafficLimitBytes         int64          `json:"traffic_limit_bytes"`
+	TrafficLimitResetStrategy string         `json:"traffic_limit_reset_strategy"`
+	Prices                    []Price        `json:"prices"`
+	Locations                 []LocationView `json:"locations,omitempty"`
 }
 
 // Response — корневой объект `GET /cabinet/api/tariffs`.
@@ -109,7 +118,11 @@ func (c *Catalog) Get(ctx context.Context) (*Response, error) {
 			if err != nil {
 				return nil, fmt.Errorf("catalog: list prices for tariff %d: %w", t.ID, err)
 			}
-			resp.Tariffs = append(resp.Tariffs, buildTariffsModeView(t, prices))
+			locs, lerr := c.tariffs.ListLocations(ctx, t.ID)
+			if lerr != nil {
+				return nil, fmt.Errorf("catalog: list locations for tariff %d: %w", t.ID, lerr)
+			}
+			resp.Tariffs = append(resp.Tariffs, buildTariffsModeView(t, prices, locs))
 		}
 	default:
 		// classic — одна виртуальная карточка.
@@ -120,7 +133,7 @@ func (c *Catalog) Get(ctx context.Context) (*Response, error) {
 
 // buildTariffsModeView превращает строку tariff + список tariff_price в публичный вид.
 // Порядок строк определяется базой (ListPricesForTariff ORDER BY months ASC).
-func buildTariffsModeView(t database.Tariff, prices []database.TariffPrice) TariffView {
+func buildTariffsModeView(t database.Tariff, prices []database.TariffPrice, locs []database.TariffLocation) TariffView {
 	price1 := 0
 	for _, p := range prices {
 		if p.Months == 1 {
@@ -145,6 +158,16 @@ func buildTariffsModeView(t database.Tariff, prices []database.TariffPrice) Tari
 			AmountRub:      p.AmountRub,
 			MonthlyBaseRub: price1 * p.Months,
 		})
+	}
+	if len(locs) > 0 {
+		v.Locations = make([]LocationView, 0, len(locs))
+		for _, loc := range locs {
+			view := LocationView{ID: loc.ID, Name: loc.Name, SoldOut: loc.SoldOut}
+			if loc.CountryCode != nil {
+				view.CountryCode = *loc.CountryCode
+			}
+			v.Locations = append(v.Locations, view)
+		}
 	}
 	return v
 }

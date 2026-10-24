@@ -39,7 +39,8 @@ export default function ProfilePage() {
   const { lang } = useTranslationWithLang()
   const navigate = useNavigate()
   const location = useLocation()
-  const { user, fetchMe } = useAuthStore()
+  const { user, fetchMe, setUser } = useAuthStore()
+  const [broadcastSaving, setBroadcastSaving] = useState(false)
   const [tab, setTab] = useState<ProfileTab>(() => tabFromHash(location.hash))
   const identity = useProfileIdentity()
 
@@ -65,6 +66,20 @@ export default function ProfilePage() {
       : null)
   const botRefUrl = referrals?.bot_start_link ?? null
   const hasReferralLinks = Boolean(botRefUrl || cabinetRefUrl)
+
+  async function toggleBroadcast() {
+    if (!user || broadcastSaving) return
+    const next = !user.broadcast_opt_out
+    setBroadcastSaving(true)
+    try {
+      await api.putBroadcast(next)
+      setUser({ ...user, broadcast_opt_out: next })
+    } catch {
+      /* оставляем прежнее значение, если сервер не принял */
+    } finally {
+      setBroadcastSaving(false)
+    }
+  }
 
   function goTab(next: ProfileTab) {
     setTab(next)
@@ -157,6 +172,33 @@ export default function ProfilePage() {
                   label={t('profile.registeredAt')}
                   value={user?.registered_at ? formatDate(user.registered_at, lang) : '—'}
                 />
+                {user?.customer_id != null && user.customer_id > 0 && (
+                  <div className="flex items-start justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <p className="text-sm text-muted-foreground">{t('profile.broadcastOptOut')}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('profile.broadcastOptOutHint')}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(user.broadcast_opt_out)}
+                      aria-label={t('profile.broadcastOptOut')}
+                      disabled={broadcastSaving}
+                      onClick={() => void toggleBroadcast()}
+                      className={cn(
+                        'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60',
+                        user.broadcast_opt_out ? 'bg-primary' : 'bg-muted',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform',
+                          user.broadcast_opt_out ? 'translate-x-5' : 'translate-x-0.5',
+                        )}
+                      />
+                    </button>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

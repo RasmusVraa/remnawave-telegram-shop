@@ -187,6 +187,9 @@ export function AdminPaymentDetailModal({ paymentId, onClose }: Props) {
                   <div className="divide-y divide-border/40">
                     <Row label={t('admin.payments.kindLabel')} value={formatPurchaseKind(data.purchase_kind, t)} />
                     {data.tariff_name && <Row label={t('admin.payments.tariff')} value={data.tariff_name} />}
+                    {data.tariff_location_name && (
+                      <Row label={t('admin.payments.location')} value={data.tariff_location_name} />
+                    )}
                     <Row label={t('admin.payments.period')} value={data.month > 0 ? t('admin.users.monthsShort', { count: data.month }) : '—'} />
                     <Row label={t('admin.payments.extraHwid')} value={data.extra_hwid > 0 ? `+${data.extra_hwid}` : '—'} />
                     <Row

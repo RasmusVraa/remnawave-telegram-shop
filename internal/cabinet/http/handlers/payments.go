@@ -30,6 +30,8 @@ type checkoutReq struct {
 	Provider string `json:"provider"`
 	// RenewExtraHwid — продлевать активные доп. HWID вместе с подпиской.
 	RenewExtraHwid bool `json:"renew_extra_hwid"`
+	// LocationID — выбранная площадка, если у тарифа заданы локации.
+	LocationID *int64 `json:"location_id,omitempty"`
 }
 
 // Checkout — POST /cabinet/api/payments/checkout.
@@ -55,6 +57,7 @@ func (h *PaymentsHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		Provider:       strings.ToLower(strings.TrimSpace(req.Provider)),
 		IdempotencyKey: idemKey,
 		RenewExtraHwid: req.RenewExtraHwid,
+		LocationID:     req.LocationID,
 	})
 	if err != nil {
 		writePaymentsErr(w, err, "checkout")
