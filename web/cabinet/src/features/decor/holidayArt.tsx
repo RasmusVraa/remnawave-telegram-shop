@@ -289,22 +289,32 @@ function OrnateLantern() {
   return (
     <svg className="holiday-figure holiday-figure--tall" viewBox="0 0 90 200" aria-hidden>
       <defs>
-        <radialGradient id="hw-flame" cx="50%" cy="35%" r="65%">
+        <radialGradient id="hw-flame" cx="50%" cy="40%" r="62%">
           <stop offset="0%" stopColor="#fff6d0" />
-          <stop offset="40%" stopColor="#ffb03a" />
+          <stop offset="55%" stopColor="#ffb03a" />
           <stop offset="100%" stopColor="#e05a10" />
         </radialGradient>
       </defs>
-      <path d="M45 18 V46" stroke="#d7c4ae" strokeWidth="2" strokeLinecap="round" />
-      <path d="M28 46 H62 L58 54 H32 Z" fill="#5a4030" />
-      <path d="M26 54 H64 L58 118 H32 Z" fill="#2a1c18" />
-      <path d="M31 60 H59 L54 112 H36 Z" fill="url(#hw-flame)" />
-      <path d="M45 60 V112 M31 78 H59 M33 96 H57" stroke="#6a3014" strokeWidth="1.4" opacity="0.7" />
-      <path d="M38 74 L45 90 L38 90 Z M48 74 L55 90 L48 90 Z" fill="#4a1c08" />
-      <path d="M32 118 H58 L45 132 Z" fill="#e08a28" />
-      <rect x="42" y="132" width="6" height="52" rx="2" fill="#3a2a22" />
-      <path d="M24 184 H66 L62 198 H28 Z" fill="#241810" />
-      <ellipse cx="45" cy="86" rx="8" ry="16" fill="#fff6d0" opacity="0.35" />
+      <circle cx="45" cy="36" r="3.2" fill="#e8d4bc" />
+      <path d="M45 39 V48" stroke="#cbb69a" strokeWidth="2.4" strokeLinecap="round" />
+      <path d="M26 52 H64 L58 64 H32 Z" fill="#3a2a22" />
+      <path d="M30 52 H60 L56 46 H34 Z" fill="#5c4334" />
+      <rect x="30" y="64" width="30" height="52" rx="2" fill="#1a120e" />
+      <rect x="34" y="68" width="22" height="44" rx="1" fill="url(#hw-flame)" />
+      <path
+        d="M45 76 C49 84 51 90 51 96 C51 104 48 110 45 110 C42 110 39 104 39 96 C39 90 41 84 45 76 Z"
+        fill="#fff1c0"
+      />
+      <path
+        d="M45 86 C47 92 48 96 48 100 C48 104 47 107 45 107 C43 107 42 104 42 100 C42 96 43 92 45 86 Z"
+        fill="#fff"
+        opacity="0.9"
+      />
+      <path d="M34 84 H56 M34 98 H56" stroke="#3a2014" strokeWidth="1.2" opacity="0.45" />
+      <path d="M28 116 H62 L58 124 H32 Z" fill="#4a3428" />
+      <rect x="42" y="124" width="6" height="52" rx="2" fill="#2c211c" />
+      <path d="M20 176 H70 L66 192 H24 Z" fill="#241810" />
+      <path d="M28 176 H62 L60 182 H30 Z" fill="#3a2a22" />
     </svg>
   )
 }

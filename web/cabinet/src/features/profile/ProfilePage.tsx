@@ -186,14 +186,16 @@ export default function ProfilePage() {
                       disabled={broadcastSaving}
                       onClick={() => void toggleBroadcast()}
                       className={cn(
-                        'relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60',
+                        'relative mt-0.5 inline-flex h-6 w-11 shrink-0 items-center rounded-full border-2 border-transparent p-0 transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                        'disabled:opacity-60',
                         user.broadcast_opt_out ? 'bg-primary' : 'bg-muted',
                       )}
                     >
                       <span
                         className={cn(
-                          'absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform',
-                          user.broadcast_opt_out ? 'translate-x-5' : 'translate-x-0.5',
+                          'pointer-events-none block size-5 rounded-full bg-white shadow-sm transition-transform',
+                          user.broadcast_opt_out ? 'translate-x-5' : 'translate-x-0',
                         )}
                       />
                     </button>
