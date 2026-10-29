@@ -6,10 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	migratepgx "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jackc/pgx/v4/pgxpool"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"log/slog"
 	"net/url"
 	"os"
@@ -44,24 +45,36 @@ func RunMigrations(ctx context.Context, migrationConfig *MigrationConfig, pool *
 		return fmt.Errorf("migrations directory does not exist: %s", absPath)
 	}
 
-	db, err := sql.Open("postgres", config.DadaBaseUrl())
+	// Миграции идут в ту же базу, что и пул приложения: раньше отдельное
+	// подключение через lib/pq брало адрес из конфига, и тест с собственным
+	// пулом мог накатить миграции не в ту базу. Пул отдельный и короткий: у
+	// приложения statement_timeout, а индекс на большой таблице строится дольше.
+	migCfg := pool.Config()
+	migCfg.MinConns, migCfg.MaxConns = 0, 2
+	delete(migCfg.ConnConfig.RuntimeParams, "statement_timeout")
+	migPool, err := pgxpool.NewWithConfig(ctx, migCfg)
 	if err != nil {
-		return fmt.Errorf("failed to connect to database: %w", err)
+		return fmt.Errorf("migration pool: %w", err)
 	}
+	defer migPool.Close()
+	db := stdlib.OpenDBFromPool(migPool)
 	defer db.Close()
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{})
 	if err != nil {
 		return fmt.Errorf("could not create migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		migrationFileURL(absPath),
-		"postgres", driver,
+		"pgx5", driver,
 	)
 	if err != nil {
 		return fmt.Errorf("migration initialization failed: %w", err)
 	}
+	// Драйвер держит соединение из пула приложения до Close: без этого оно
+	// не возвращается, и pool.Close() при остановке ждёт его вечно.
+	defer func() { _, _ = m.Close() }()
 
 	version, dirty, verErr := m.Version()
 	if verErr != nil && verErr != migrate.ErrNilVersion {
@@ -69,6 +82,17 @@ func RunMigrations(ctx context.Context, migrationConfig *MigrationConfig, pool *
 	}
 
 	if dirty && version == 3 {
+		// Down миграции 3 — это DROP TABLE referral. Автопочинка рассчитана на
+		// установку, где миграция 3 упала на первом запуске и таблица пуста;
+		// по базе с рефералами она молча стёрла бы их все.
+		hasReferrals, err := tableHasRows(ctx, migPool, "referral")
+		if err != nil {
+			return fmt.Errorf("check referral table before repairing migration 3: %w", err)
+		}
+		if hasReferrals {
+			return errors.New("migration 3 is dirty, but table referral has data: automatic repair would drop it; " +
+				"fix the schema manually and run migrate force 3")
+		}
 		slog.Warn("Detected dirty migration at version 3: forcing pointer and running down script")
 
 		if err := m.Force(int(version)); err != nil {
@@ -126,23 +150,24 @@ func RunMigrations(ctx context.Context, migrationConfig *MigrationConfig, pool *
 	return nil
 }
 func GetMigrationVersion(migrationsPath string) (uint, bool, error) {
-	db, err := sql.Open("postgres", config.DadaBaseUrl())
+	db, err := sql.Open("pgx", config.DadaBaseUrl())
 	if err != nil {
 		return 0, false, fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.Close()
 
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	driver, err := migratepgx.WithInstance(db, &migratepgx.Config{})
 	if err != nil {
 		return 0, false, fmt.Errorf("could not create migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithDatabaseInstance(
 		migrationFileURL(migrationsPath),
-		"postgres", driver)
+		"pgx5", driver)
 	if err != nil {
 		return 0, false, fmt.Errorf("migration initialization failed: %w", err)
 	}
+	defer func() { _, _ = m.Close() }()
 
 	version, dirty, err := m.Version()
 	if err != nil && err != migrate.ErrNilVersion {
@@ -154,4 +179,18 @@ func GetMigrationVersion(migrationsPath string) (uint, bool, error) {
 	}
 
 	return version, dirty, nil
+}
+
+// tableHasRows — есть ли в таблице хоть одна строка; несуществующая таблица — false.
+func tableHasRows(ctx context.Context, pool *pgxpool.Pool, table string) (bool, error) {
+	var exists bool
+	if err := pool.QueryRow(ctx, `SELECT to_regclass($1) IS NOT NULL`, table).Scan(&exists); err != nil {
+		return false, err
+	}
+	if !exists {
+		return false, nil
+	}
+	var has bool
+	err := pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM `+pgx.Identifier{table}.Sanitize()+`)`).Scan(&has)
+	return has, err
 }

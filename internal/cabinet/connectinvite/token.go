@@ -9,7 +9,8 @@
 //
 // Токен stateless: account_id и срок зашиты внутрь и закрыты HMAC, отдельной
 // таблицы под приглашения нет. Отзыв конкретного приглашения поэтому
-// невозможен — вместо него короткий TTL (см. DefaultTTL).
+// невозможен — вместо него короткий TTL (см. DefaultTTL). Разом отзываются
+// все приглашения аккаунта: при сбросе ссылки подписки (см. IssuedBefore).
 //
 // Модель угроз: токен обменивается на deep link подписки, то есть по сути
 // равен самой подписке. Он и создан, чтобы им делились с другим устройством,
@@ -89,30 +90,47 @@ func Issue(secret []byte, accountID int64, ttl time.Duration, now time.Time) (to
 	return encoding.EncodeToString(raw), expiresAt, nil
 }
 
+// IssuedBefore сообщает, выпущено ли приглашение раньше момента t.
+//
+// Время выпуска в токене не хранится, но все приглашения выпускаются с
+// DefaultTTL, поэтому оно равно сроку минус TTL. Срок округлён вниз до секунды,
+// и t округляется так же: иначе токен, выпущенный в ту же секунду сразу после
+// сброса, отклонялся бы.
+func IssuedBefore(expiresAt, t time.Time) bool {
+	return expiresAt.Add(-DefaultTTL).Before(t.Truncate(time.Second))
+}
+
 // Parse проверяет подпись и срок, возвращая account_id приглашения.
 func Parse(secret []byte, token string, now time.Time) (int64, error) {
+	accountID, _, err := ParseWithExpiry(secret, token, now)
+	return accountID, err
+}
+
+// ParseWithExpiry — Parse, который отдаёт ещё и срок приглашения: по нему
+// вызывающий отсекает приглашения, выпущенные до сброса ссылки подписки.
+func ParseWithExpiry(secret []byte, token string, now time.Time) (int64, time.Time, error) {
 	if len(secret) == 0 {
-		return 0, errors.New("connectinvite: empty secret")
+		return 0, time.Time{}, errors.New("connectinvite: empty secret")
 	}
 	raw, err := encoding.DecodeString(token)
 	if err != nil || len(raw) != tokenLen || raw[0] != tokenVersion {
-		return 0, ErrMalformed
+		return 0, time.Time{}, ErrMalformed
 	}
 	// Подпись проверяем до срока: иначе по разнице ответов «протух» и
 	// «не сходится» можно отличить существующий токен от выдуманного.
 	if !hmac.Equal(raw[payloadLen:], sign(secret, raw[:payloadLen])) {
-		return 0, ErrSignature
+		return 0, time.Time{}, ErrSignature
 	}
 
 	accountID := int64(binary.BigEndian.Uint64(raw[1:9]))
 	if accountID <= 0 {
-		return 0, ErrMalformed
+		return 0, time.Time{}, ErrMalformed
 	}
 	exp := time.Unix(int64(binary.BigEndian.Uint32(raw[9:13])), 0)
 	if !now.Before(exp) {
-		return 0, ErrExpired
+		return 0, time.Time{}, ErrExpired
 	}
-	return accountID, nil
+	return accountID, exp, nil
 }
 
 func sign(secret, payload []byte) []byte {

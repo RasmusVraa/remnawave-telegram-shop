@@ -15,9 +15,7 @@ package linking
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -32,11 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-migrate/migrate/v4"
-	migratepg "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/jackc/pgx/v4/pgxpool"
-	_ "github.com/lib/pq"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
 	"remnawave-tg-shop-bot/internal/database"
@@ -327,14 +321,13 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 	}
 	sharedPoolOnce.Do(func() {
 		ctx := context.Background()
-		pool, err := pgxpool.Connect(ctx, dsn)
+		pool, err := pgxpool.New(ctx, dsn)
 		if err != nil {
 			t.Fatalf("connect: %v", err)
 		}
-		// Миграции накатываем напрямую по DSN теста, а не через
-		// database.RunMigrations: тот берёт адрес из config.DadaBaseUrl(), то есть
-		// из env боевого бота, и уехал бы не в ту базу.
-		if err := applyMigrations(t, dsn); err != nil {
+		if err := database.RunMigrations(ctx, &database.MigrationConfig{
+			Direction: "up", MigrationsPath: migrationsDirLinking(t),
+		}, pool); err != nil {
 			t.Fatalf("migrations: %v", err)
 		}
 		sharedPool = pool
@@ -343,27 +336,6 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 		t.Fatal("pool not initialised")
 	}
 	return sharedPool
-}
-
-func applyMigrations(t *testing.T, dsn string) error {
-	t.Helper()
-	db, err := sql.Open("postgres", dsn)
-	if err != nil {
-		return fmt.Errorf("open: %w", err)
-	}
-	defer db.Close()
-	driver, err := migratepg.WithInstance(db, &migratepg.Config{})
-	if err != nil {
-		return fmt.Errorf("driver: %w", err)
-	}
-	m, err := migrate.NewWithDatabaseInstance("file://"+filepath.ToSlash(migrationsDirLinking(t)), "postgres", driver)
-	if err != nil {
-		return fmt.Errorf("init: %w", err)
-	}
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("up: %w", err)
-	}
-	return nil
 }
 
 func newMergeEnv(t *testing.T) *mergeEnv {

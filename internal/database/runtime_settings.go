@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // RuntimeSettingsRepository — key-value overrides для hot-reload config из админки.

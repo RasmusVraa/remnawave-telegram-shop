@@ -57,6 +57,9 @@ type adminUserPanelResp struct {
 	TrafficPresetsGB []int64               `json:"traffic_presets_gb"`
 	Strategies       []string              `json:"strategies"`
 	Tariffs          []adminTariffBriefDTO `json:"tariffs,omitempty"`
+	// HwidUnpinnedLimit — лимит устройств без закрепления (тариф + докупленные
+	// слоты): окно устройств сравнивает с ним закреплённое число.
+	HwidUnpinnedLimit int `json:"hwid_unpinned_limit"`
 }
 
 func mapRWToPanelDTO(rw *remnawave.User) adminRWPanelDTO {
@@ -132,9 +135,10 @@ func (h *AdminUsersHandler) Panel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := adminUserPanelResp{
-		Customer:         h.customerDTOWithStatus(ctx, cust),
-		TrafficPresetsGB: adminTrafficPresetsGB,
-		Strategies:       adminPanelStrategies,
+		Customer:          h.customerDTOWithStatus(ctx, cust),
+		TrafficPresetsGB:  adminTrafficPresetsGB,
+		Strategies:        adminPanelStrategies,
+		HwidUnpinnedLimit: cabsvc.UnpinnedDeviceLimit(ctx, h.tariffs, cust),
 	}
 
 	if squads, err := h.rw.ListInternalSquads(ctx); err == nil {
@@ -699,6 +703,82 @@ func (h *AdminUsersHandler) adminRelimitExtraAfterTariff(ctx context.Context, cu
 	}
 	_, err = h.rw.UpdateUserDeviceLimitByCustomer(ctx, cust.ID, cust.TelegramID, newLim)
 	return err
+}
+
+// SetHwidPin — PUT /cabinet/api/admin/users/{id}/hwid-pin.
+//
+// {"limit": N} закрепляет лимит устройств: дальше любая запись лимита в панель
+// (оплата, докупка, промокод, смена тарифа) подставляет N. {"limit": null}
+// снимает закрепление и возвращает расчётный лимит — базу тарифа плюс
+// действующие докупленные слоты; без пересчёта осталось бы закреплённое число,
+// только уже без защиты.
+func (h *AdminUsersHandler) SetHwidPin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id, ok := adminUsersExtractID(r.URL.Path)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var body struct {
+		Limit *int `json:"limit"`
+	}
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
+		http.Error(w, "invalid json", http.StatusBadRequest)
+		return
+	}
+	if body.Limit != nil && (*body.Limit < 1 || *body.Limit > 100) {
+		http.Error(w, "limit must be between 1 and 100", http.StatusBadRequest)
+		return
+	}
+	if !h.requireRW(w) {
+		return
+	}
+
+	ctx := r.Context()
+	cust, err := h.customers.FindById(ctx, id)
+	if err != nil {
+		slog.Error("admin users: hwid pin — find failed", "error", err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if cust == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+
+	if err := h.customers.SetHwidLimitOverride(ctx, cust.ID, body.Limit); err != nil {
+		slog.Error("admin users: hwid pin — db failed", "error", err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	limit := 0
+	if body.Limit != nil {
+		limit = *body.Limit
+	} else {
+		if err := cabsvc.CleanupExpiredExtraHwid(ctx, h.rw, h.customers, cust); err != nil {
+			slog.Warn("admin users: hwid unpin extra cleanup", "error", err.Error())
+		}
+		limit = cabsvc.UnpinnedDeviceLimit(ctx, h.tariffs, cust)
+	}
+	// Профиля в панели может ещё не быть (клиент не покупал) — закрепление
+	// сохранено и применится, когда профиль создадут.
+	if _, err := h.rw.UpdateUserDeviceLimitByCustomer(ctx, cust.ID, cust.TelegramID, limit); err != nil && !errors.Is(err, remnawave.ErrUserNotFound) {
+		slog.Error("admin users: hwid pin — rw failed", "error", err.Error())
+		http.Error(w, "remnawave operation failed", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("admin: hwid pin", "customer_id", id, "pinned", body.Limit != nil, "limit", limit, "admin_account_id", adminAccountID(r))
+	updated, err := h.customers.FindById(ctx, cust.ID)
+	if err != nil || updated == nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, mapCustomerToDTO(updated))
 }
 
 func (h *AdminUsersHandler) requireRW(w http.ResponseWriter) bool {

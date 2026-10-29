@@ -12,27 +12,58 @@
   "platforms": {
     "ios": [
       {
-        "id": "incy",
-        "name": "INCY",
+        "id": "rabbithole",
+        "name": "RabbitHole",
         "isFeatured": true,
-        "urlScheme": "incy://add/",
+        "urlScheme": "rabbithole://add/",
         "installationStep": {
           "buttons": [
             {
-              "buttonLink": "https://apps.apple.com/ru/app/incy/id6756943388",
+              "buttonLink": "https://apps.apple.com/ru/app/rabbithole-vpn-client/id6683309629",
               "buttonText": {
-                "ru": "App Store (RU)"
-              }
-            },
-            {
-              "buttonLink": "https://apps.apple.com/us/app/incy/id6756943388",
-              "buttonText": {
-                "ru": "App Store (Global)"
+                "ru": "App Store"
               }
             }
           ],
           "description": {
-            "ru": "Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+            "ru": "Откройте страницу в App Store и установите приложение RabbitHole. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+          }
+        },
+        "addSubscriptionStep": {
+          "description": {
+            "ru": "Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически."
+          }
+        },
+        "connectAndUseStep": {
+          "description": {
+            "ru": "Нажмите кнопку подключения. По умолчанию сервер выбирается автоматически, другой можно выбрать в группе «🛡️ VPN»."
+          }
+        },
+        "additionalAfterAddSubscriptionStep": {
+          "title": {
+            "ru": "Если подписка не добавилась"
+          },
+          "description": {
+            "ru": "Если после нажатия на кнопку ничего не произошло, скопируйте ссылку подписки на странице «Подписка» и добавьте её в RabbitHole вручную."
+          }
+        }
+      },
+      {
+        "id": "incy",
+        "name": "INCY",
+        "isFeatured": false,
+        "urlScheme": "incy://add/",
+        "installationStep": {
+          "buttons": [
+            {
+              "buttonLink": "https://apps.apple.com/us/app/incy/id6756943388",
+              "buttonText": {
+                "ru": "App Store (другой регион)"
+              }
+            }
+          ],
+          "description": {
+            "ru": "⚠️ INCY удалён из российского App Store. Чтобы скачать или обновить его, нужен Apple ID другой страны (например, США). Если не хотите менять регион — выберите RabbitHole.\n\nОткройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
           }
         },
         "addSubscriptionStep": {
@@ -70,26 +101,18 @@
         "installationStep": {
           "buttons": [
             {
-              "buttonLink": "https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973",
-              "buttonText": {
-                "en": "RU App Store",
-                "fa": "اپ استور روسیه",
-                "ru": "App Store для России"
-              }
-            },
-            {
               "buttonLink": "https://apps.apple.com/us/app/happ-proxy-utility/id6504287215",
               "buttonText": {
                 "en": "Global App Store",
                 "fa": "اپ استور جهانی",
-                "ru": "Глобальный App Store"
+                "ru": "App Store (другой регион)"
               }
             }
           ],
           "description": {
             "en": "Open the page in App Store and install the app.\n\nLaunch it, in the VPN configuration permission window click Allow and enter your passcode.",
             "fa": "صفحه را در App Store باز کنید و برنامه را نصب کنید. آن را اجرا کنید، در پنجره مجوز پیکربندی VPN روی Allow کلیک کنید و رمز عبور خود را وارد کنید.",
-            "ru": "Откройте страницу в App Store и установите приложение.\n\nЗапустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+            "ru": "⚠️ Happ удалён из российского App Store. Чтобы скачать или обновить его, нужен Apple ID другой страны (например, США). Если не хотите менять регион — выберите RabbitHole.\n\nОткройте страницу в App Store и установите приложение.\n\nЗапустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
           }
         },
         "addSubscriptionStep": {
@@ -305,27 +328,58 @@
     ],
     "macos": [
       {
-        "id": "incy",
-        "name": "INCY",
+        "id": "rabbithole",
+        "name": "RabbitHole",
         "isFeatured": true,
-        "urlScheme": "incy://add/",
+        "urlScheme": "rabbithole://add/",
         "installationStep": {
           "buttons": [
             {
-              "buttonLink": "https://apps.apple.com/ru/app/incy/id6756943388",
+              "buttonLink": "https://apps.apple.com/ru/app/rabbithole-vpn-client/id6683309629",
               "buttonText": {
-                "ru": "App Store (RU)"
-              }
-            },
-            {
-              "buttonLink": "https://apps.apple.com/us/app/incy/id6756943388",
-              "buttonText": {
-                "ru": "App Store (Global)"
+                "ru": "App Store"
               }
             }
           ],
           "description": {
-            "ru": "Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+            "ru": "Откройте страницу в App Store и установите приложение RabbitHole. Оно работает на Mac с процессором Apple (M1 и новее). Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+          }
+        },
+        "addSubscriptionStep": {
+          "description": {
+            "ru": "Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически."
+          }
+        },
+        "connectAndUseStep": {
+          "description": {
+            "ru": "Нажмите кнопку подключения. По умолчанию сервер выбирается автоматически, другой можно выбрать в группе «🛡️ VPN»."
+          }
+        },
+        "additionalAfterAddSubscriptionStep": {
+          "title": {
+            "ru": "Если подписка не добавилась"
+          },
+          "description": {
+            "ru": "Если после нажатия на кнопку ничего не произошло, скопируйте ссылку подписки на странице «Подписка» и добавьте её в RabbitHole вручную."
+          }
+        }
+      },
+      {
+        "id": "incy",
+        "name": "INCY",
+        "isFeatured": false,
+        "urlScheme": "incy://add/",
+        "installationStep": {
+          "buttons": [
+            {
+              "buttonLink": "https://apps.apple.com/us/app/incy/id6756943388",
+              "buttonText": {
+                "ru": "App Store (другой регион)"
+              }
+            }
+          ],
+          "description": {
+            "ru": "⚠️ INCY удалён из российского App Store. Чтобы скачать или обновить его, нужен Apple ID другой страны (например, США). Если не хотите менять регион — выберите RabbitHole.\n\nОткройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
           }
         },
         "addSubscriptionStep": {

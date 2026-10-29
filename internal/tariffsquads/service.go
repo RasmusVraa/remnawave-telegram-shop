@@ -20,6 +20,7 @@ import (
 
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/remnawave"
+	"remnawave-tg-shop-bot/utils"
 )
 
 // Ошибки валидации запроса — обработчик переводит их в 400/409.
@@ -271,7 +272,7 @@ func (s *Service) Start(ctx context.Context, tariffID int64, add, remove []uuid.
 		"tariff_id", tariffID, "add", uuidsToStrings(add), "remove", uuidsToStrings(remove),
 		"active_customers", len(customers), "admin_account_id", adminAccountID)
 
-	go s.process(run, customers)
+	utils.Go("tariff squads apply", func() { s.process(run, customers) })
 
 	return run.clone(), nil
 }
@@ -316,7 +317,12 @@ func (s *Service) process(run *Run, customers []database.Customer) {
 		go func() {
 			defer wg.Done()
 			for cust := range jobs {
-				s.applyOne(ctx, run, index, cust)
+				// Паника на одном клиенте не должна останавливать воркер:
+				// иначе отправитель заданий навсегда встал бы на канале.
+				func() {
+					defer utils.LogPanic("tariff squads apply customer")
+					s.applyOne(ctx, run, index, cust)
+				}()
 			}
 		}()
 	}

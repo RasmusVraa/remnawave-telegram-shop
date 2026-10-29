@@ -144,7 +144,7 @@ export default function VerifyEmailPage() {
     setConfirmLoading(true)
     setError(null)
     try {
-      const data = await api.confirmEmail(code)
+      const data = await api.confirmEmail(code, emailFromState.trim() || undefined)
       setToken(data.access_token)
       await fetchMe()
       navigate('/dashboard', { replace: true })

@@ -9,10 +9,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 import { api, ApiError } from '@/lib/api'
 import { cn, formatDate } from '@/lib/utils'
 import { shareLink } from '@/lib/share'
+import { SubscriptionLinkResetLink } from '@/features/subscription/SubscriptionLinkReset'
 
 /**
  * Перенос подписки на устройство, с которого в кабинет не зайти.
@@ -96,10 +98,13 @@ export function ConnectInviteModal({
   open,
   subscriptionLink,
   onClose,
+  onResetLink,
 }: {
   open: boolean
   subscriptionLink: string
   onClose: () => void
+  /** Сброс ссылки: тихая строка под сырой ссылкой, там, откуда её и брали. */
+  onResetLink?: () => void
 }) {
   const { t } = useTranslation()
   const { lang } = useTranslationWithLang()
@@ -110,6 +115,7 @@ export function ConnectInviteModal({
   // и конечное состояние в один кадр и анимации не случилось бы вовсе.
   const [mounted, setMounted] = useState(open)
   const [visible, setVisible] = useState(false)
+  const { sheetRef, handlers: dragHandlers } = useSheetDragDismiss({ open, onDismiss: onClose })
 
   useEffect(() => {
     if (open) {
@@ -171,12 +177,13 @@ export function ConnectInviteModal({
       onClick={onClose}
     >
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label={t('connectInvite.cardTitle')}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'max-h-[88vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background/95 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] backdrop-blur-sm transition-[opacity,transform] duration-[250ms] ease-out sm:max-h-[90vh] sm:rounded-2xl sm:p-5 sm:pb-5',
+          'max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background/95 p-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] backdrop-blur-sm transition-[opacity,transform] duration-[250ms] ease-out sm:max-h-[90vh] sm:rounded-2xl sm:p-5 sm:pb-5',
           // На мобиле лист выезжает снизу, на десктопе диалог подрастает из
           // центра — движение совпадает с тем, откуда элемент появляется.
           visible
@@ -184,10 +191,16 @@ export function ConnectInviteModal({
             : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-[0.97]',
         )}
       >
-        {/* Полоска-ручка: на мобиле она объясняет, что это лист, а не экран. */}
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30 sm:hidden" aria-hidden />
+        {/* Полоска-ручка: на мобиле она объясняет, что это лист, а не экран.
+            За неё и за заголовок лист тянут вниз, чтобы закрыть. */}
+        <div
+          className="-mx-4 -mt-4 mb-1 flex cursor-grab touch-none justify-center pb-2 pt-4 sm:hidden"
+          {...dragHandlers}
+        >
+          <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+        </div>
 
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="mb-3 flex touch-none items-start justify-between gap-3 sm:touch-auto" {...dragHandlers}>
           <div className="min-w-0">
             <p className="font-heading text-lg font-semibold">{t('connectInvite.modalTitle')}</p>
           </div>
@@ -280,18 +293,19 @@ export function ConnectInviteModal({
 
         {/* Сырая ссылка подписки — для ручной вставки в приложение, когда гайд
             не помог. Свёрнута: рядовому пользователю она ничего не говорит. */}
-        {/* pb-2 снизу: раскрывашка — последний элемент листа, и на одном
-            padding модалки текстовая строка прилипала к нижнему краю. */}
         {subscriptionLink && (
-          <div className="mt-4 border-t border-border pb-2 pt-3">
+          <div className="mt-4 border-t border-border pt-1">
+            {/* Строка во всю высоту пальца (44px), а не по высоте мелкого
+                текста: это последний элемент листа, и по узкой полоске у
+                нижнего края промахивались. */}
             <button
               type="button"
               onClick={() => setManualOpen((v) => !v)}
               aria-expanded={manualOpen}
-              className="flex w-full items-center justify-between gap-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {t('connectInvite.manualToggle')}
-              <ChevronDown size={14} className={cn('transition-transform', manualOpen && 'rotate-180')} />
+              <ChevronDown size={16} className={cn('transition-transform', manualOpen && 'rotate-180')} />
             </button>
             {/* Раскрытие через grid-template-rows 0fr↔1fr — тот же приём, что у
                 подпанелей докупки устройств: высоту не приходится измерять, и
@@ -333,6 +347,13 @@ export function ConnectInviteModal({
                   </div>
                   {linkCopyState === 'failed' && (
                     <p className="mt-2 text-xs text-destructive">{t('common.copyFailed')}</p>
+                  )}
+                  {onResetLink && (
+                    <SubscriptionLinkResetLink
+                      onClick={onResetLink}
+                      label={t('linkReset.inviteEntry')}
+                      className="mt-2"
+                    />
                   )}
                 </div>
               </div>

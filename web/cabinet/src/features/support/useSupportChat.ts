@@ -26,7 +26,11 @@ export function useSupportChat(enabled: boolean, modalOpen: boolean) {
     queryKey: CONVERSATION_KEY,
     queryFn: () => api.supportConversation(),
     enabled: enabled && modalOpen,
-    refetchInterval: enabled && modalOpen ? 5_000 : false,
+    // Пока ИИ «печатает», опрашиваем чаще, чтобы ответ появился сразу, как придёт.
+    refetchInterval: (query) => {
+      if (!enabled || !modalOpen) return false
+      return query.state.data?.support_typing ? 2_000 : 5_000
+    },
     staleTime: 0,
     retry: 1,
   })

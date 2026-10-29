@@ -24,6 +24,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/auth/tokens"
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
+	"remnawave-tg-shop-bot/internal/pgerr"
 )
 
 // oauthGoogleProviderWrapper — тонкая обёртка вокруг *googleoauth.GoogleProvider.
@@ -81,12 +82,15 @@ var ErrTelegramOIDCDisabled = errors.New("auth: telegram oidc disabled")
 // ============================================================================
 
 // pendingLink — запись ожидающего подтверждения Google-OAuth логина.
+// pendingLink — вход через Google/Яндекс/VK, email которого совпал с уже
+// существующим аккаунтом. Привязка ждёт подтверждения по ссылке из письма.
 type pendingLink struct {
-	accountID   int64
-	googleSub   string
-	googleEmail string
-	rawProfile  []byte
-	expiresAt   time.Time
+	accountID      int64
+	provider       string
+	providerUserID string
+	providerEmail  string
+	rawProfile     []byte
+	expiresAt      time.Time
 }
 
 const pendingLinkTTL = 15 * time.Minute
@@ -150,16 +154,62 @@ func (s *pendingLinkStore) runGC(ctx context.Context) {
 // SetGoogle подключает Google OAuth provider. ctx нужен для GC горутины.
 func (s *Service) SetGoogle(ctx context.Context, p *googleoauth.GoogleProvider) {
 	s.googleProvider = &oauthGoogleProviderWrapper{p: p}
-	s.linkStore = newPendingLinkStore()
-	s.linkStore.runGC(ctx)
+	s.ensureLinkStore(ctx)
 }
 
 func (s *Service) SetYandex(ctx context.Context, p *googleoauth.YandexProvider) {
 	s.yandexProvider = &oauthYandexProviderWrapper{p: p}
+	s.ensureLinkStore(ctx)
 }
 
 func (s *Service) SetVK(ctx context.Context, p *googleoauth.VKProvider) {
 	s.vkProvider = &oauthVKProviderWrapper{p: p}
+	s.ensureLinkStore(ctx)
+}
+
+// ensureLinkStore — хранилище привязок, ждущих подтверждения по письму, общее для
+// всех провайдеров; создаётся с первым из них.
+func (s *Service) ensureLinkStore(ctx context.Context) {
+	if s.linkStore != nil {
+		return
+	}
+	s.linkStore = newPendingLinkStore()
+	s.linkStore.runGC(ctx)
+}
+
+// requestOAuthEmailLink — вход через провайдера с email уже существующего
+// аккаунта. Сразу привязывать нельзя: аккаунт с этим email мог заранее
+// зарегистрировать кто угодно, не подтвердив почту, а провайдер не всегда
+// подтверждает email сам. Тогда вход жертвы через провайдера отдал бы её
+// аккаунту атакующего. Поэтому на email аккаунта уходит ссылка, и привязка
+// происходит только по ней — то есть только у владельца почты.
+func (s *Service) requestOAuthEmailLink(ctx context.Context, acc *repository.Account, provider, providerUserID, providerEmail string, rawProfile []byte) (GoogleCallbackResult, error) {
+	var empty GoogleCallbackResult
+	if acc.Status != repository.AccountStatusActive {
+		return empty, ErrInvalidCredentials
+	}
+	if s.linkStore == nil || acc.Email == nil {
+		return empty, ErrGoogleLinkEmailConflict
+	}
+	linkToken, _, err := tokens.Generate(0)
+	if err != nil {
+		return empty, fmt.Errorf("%s callback: gen link token: %w", provider, err)
+	}
+	s.linkStore.save(linkToken, pendingLink{
+		accountID:      acc.ID,
+		provider:       provider,
+		providerUserID: providerUserID,
+		providerEmail:  providerEmail,
+		rawProfile:     rawProfile,
+	})
+	to := normalizeEmail(*acc.Email)
+	confirmURL := cabinetAppURL(s.cfg.PublicURL, "/cabinet/api/auth/oauth/confirm?token="+url.QueryEscape(linkToken))
+	if sendErr := s.mailer.SendOAuthLinkConfirm(ctx, to, acc.Language, provider, confirmURL); sendErr != nil {
+		slog.Warn("oauth callback: send link confirm email", "provider", provider, "error", sendErr)
+	}
+	return GoogleCallbackResult{
+		LinkCtx: &GoogleLinkContext{MaskedEmail: maskEmail(to)},
+	}, ErrGoogleLinkRequired
 }
 
 func (s *Service) SetTelegramOIDC(ctx context.Context, p *googleoauth.TelegramOIDCProvider) {
@@ -351,25 +401,15 @@ func (s *Service) GoogleCallback(
 	if normEmail != "" {
 		existingAcc, err := s.accounts.FindByEmail(ctx, normEmail)
 		if err == nil {
-			// Email занят → pending link.
-			linkToken, _, genErr := tokens.Generate(0)
-			if genErr != nil {
-				return empty, fmt.Errorf("google callback: gen link token: %w", genErr)
+			// Email занят. Ссылку на привязку шлём, только если Google сам
+			// подтвердил этот адрес: иначе Google-аккаунт с чужим неподтверждённым
+			// адресом получал бы ссылку в ящик владельца, и её мог открыть
+			// почтовый сканер ссылок.
+			if !info.EmailVerified {
+				return empty, ErrGoogleLinkEmailConflict
 			}
 			rawProfile, _ := json.Marshal(info)
-			s.linkStore.save(linkToken, pendingLink{
-				accountID:   existingAcc.ID,
-				googleSub:   info.Sub,
-				googleEmail: info.Email,
-				rawProfile:  rawProfile,
-			})
-			confirmURL := cabinetAppURL(s.cfg.PublicURL, "/cabinet/api/auth/google/confirm?token="+url.QueryEscape(linkToken))
-			if sendErr := s.mailer.SendGoogleLinkConfirm(ctx, normEmail, existingAcc.Language, confirmURL); sendErr != nil {
-				slog.Warn("google callback: send link confirm email", "error", sendErr)
-			}
-			return GoogleCallbackResult{
-				LinkCtx: &GoogleLinkContext{MaskedEmail: maskEmail(normEmail)},
-			}, ErrGoogleLinkRequired
+			return s.requestOAuthEmailLink(ctx, existingAcc, repository.ProviderGoogle, info.Sub, info.Email, rawProfile)
 		}
 		if !errors.Is(err, repository.ErrNotFound) {
 			return empty, fmt.Errorf("google callback: find by email: %w", err)
@@ -402,16 +442,6 @@ func (s *Service) GoogleCallback(
 	}
 	s.reactivateIdentityAfterOAuth(ctx, acc.ID, repository.ProviderGoogle, info.Sub)
 	return GoogleCallbackResult{Pair: pair}, nil
-}
-
-func isPGUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	return strings.Contains(msg, "23505") ||
-		strings.Contains(msg, "unique_violation") ||
-		strings.Contains(msg, "duplicate key")
 }
 
 // googleOAuthLinkFlow — привязка Google к аккаунту linkAccount_id (после OAuth).
@@ -487,7 +517,7 @@ func (s *Service) googleOAuthLinkFlow(
 
 	rawProfile, _ := json.Marshal(info)
 	if _, err := s.ids.Create(ctx, acc.ID, repository.ProviderGoogle, info.Sub, info.Email, rawProfile); err != nil {
-		if isPGUniqueViolation(err) {
+		if pgerr.IsUniqueViolation(err) {
 			ident2, e2 := s.ids.FindByProvider(ctx, repository.ProviderGoogle, info.Sub)
 			if e2 == nil && ident2.AccountID == acc.ID {
 				_ = s.accounts.UpdateLastLogin(ctx, acc.ID)
@@ -536,8 +566,9 @@ func (s *Service) googleOAuthLinkFlow(
 // GoogleLinkConfirm — пользователь кликнул ссылку из письма; привязываем
 // Google identity к существующему аккаунту и выдаём сессию.
 func (s *Service) GoogleLinkConfirm(ctx context.Context, token, userAgent, ip string) (*TokenPair, error) {
-	if s.googleProvider == nil || s.linkStore == nil {
-		return nil, ErrGoogleDisabled
+	if s.linkStore == nil {
+		// Ни один провайдер не подключён — ожидающих привязок быть не может.
+		return nil, ErrInvalidToken
 	}
 	link, ok := s.linkStore.pop(token)
 	if !ok {
@@ -551,8 +582,8 @@ func (s *Service) GoogleLinkConfirm(ctx context.Context, token, userAgent, ip st
 		return nil, ErrInvalidCredentials
 	}
 	// Создаём identity. Ошибка UNIQUE-нарушения — допустима (повторный confirm).
-	if _, err := s.ids.Create(ctx, acc.ID, repository.ProviderGoogle, link.googleSub, link.googleEmail, link.rawProfile); err != nil {
-		slog.Debug("google link confirm: create identity (may be duplicate)", "error", err)
+	if _, err := s.ids.Create(ctx, acc.ID, link.provider, link.providerUserID, link.providerEmail, link.rawProfile); err != nil {
+		slog.Debug("oauth link confirm: create identity (may be duplicate)", "provider", link.provider, "error", err)
 	}
 	_ = s.accounts.UpdateLastLogin(ctx, acc.ID)
 	s.ensureCustomer(ctx, acc.ID, acc.Language)
@@ -560,7 +591,7 @@ func (s *Service) GoogleLinkConfirm(ctx context.Context, token, userAgent, ip st
 	if err != nil {
 		return nil, err
 	}
-	s.reactivateIdentityAfterOAuth(ctx, acc.ID, repository.ProviderGoogle, link.googleSub)
+	s.reactivateIdentityAfterOAuth(ctx, acc.ID, link.provider, link.providerUserID)
 	return pair, nil
 }
 
@@ -694,20 +725,12 @@ func (s *Service) oauthLoginFlowGeneric(
 
 	if providerEmail != "" {
 		existingAcc, err := s.accounts.FindByEmail(ctx, providerEmail)
-		if err == nil && existingAcc.Status == repository.AccountStatusActive {
-			if _, ierr := s.ids.Create(ctx, existingAcc.ID, provider, providerUserID, providerEmail, rawProfile); ierr != nil && !isPGUniqueViolation(ierr) {
-				return empty, fmt.Errorf("%s callback: create identity by email: %w", providerLog, ierr)
-			}
-			_ = s.accounts.UpdateLastLogin(ctx, existingAcc.ID)
-			s.ensureCustomer(ctx, existingAcc.ID, existingAcc.Language)
-			pair, ierr := s.issueSession(ctx, existingAcc, uuid.New(), userAgent, ip)
-			if ierr != nil {
-				return empty, ierr
-			}
-			s.reactivateIdentityAfterOAuth(ctx, existingAcc.ID, provider, providerUserID)
-			return GoogleCallbackResult{Pair: pair}, nil
+		if err == nil {
+			// Раньше аккаунт привязывался сразу — по одному совпадению email,
+			// даже если почта у аккаунта не подтверждена.
+			return s.requestOAuthEmailLink(ctx, existingAcc, provider, providerUserID, providerEmail, rawProfile)
 		}
-		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		if !errors.Is(err, repository.ErrNotFound) {
 			return empty, fmt.Errorf("%s callback: find by email: %w", providerLog, err)
 		}
 	}
@@ -783,15 +806,11 @@ func (s *Service) oauthLinkFlowGeneric(
 	if providerEmail != "" {
 		existingAcc, err := s.accounts.FindByEmail(ctx, providerEmail)
 		if err == nil && existingAcc.ID != linkAccountID {
-			if s.saveMergeEmailPeerClaim != nil {
-				if err := s.saveMergeEmailPeerClaim(ctx, linkAccountID, existingAcc.ID); err != nil {
-					return linkMeta, fmt.Errorf("%s link: save merge claim by email: %w", providerLog, err)
-				}
-				if provider == repository.ProviderYandex {
-					return linkMeta, ErrYandexMergeRequired
-				}
-				return linkMeta, ErrVKMergeRequired
-			}
+			// Как у Google: совпадение email не повод сливать аккаунты. Заявка на
+			// слияние без доказательства, что вы владеете вторым аккаунтом,
+			// позволила бы поглотить чужой аккаунт через провайдера с чужим
+			// неподтверждённым адресом. Объединить свои аккаунты можно через
+			// привязку почты — там владение подтверждается паролем или кодом.
 			if provider == repository.ProviderYandex {
 				return linkMeta, ErrYandexLinkEmailConflict
 			}
@@ -924,7 +943,7 @@ func (s *Service) TelegramOIDCStart(in TelegramOIDCStartInput) (string, error) {
 	return res.RedirectURL, nil
 }
 
-func (s *Service) TelegramOIDCCallback(ctx context.Context, state, code, userAgent, ip string) (*TelegramOIDCCallbackResult, error) {
+func (s *Service) TelegramOIDCCallback(ctx context.Context, state, code, userAgent, ip, refreshFromCookie string) (*TelegramOIDCCallbackResult, error) {
 	if s.telegramOIDC == nil || s.telegramOIDC.p == nil {
 		return nil, ErrTelegramOIDCDisabled
 	}
@@ -934,6 +953,17 @@ func (s *Service) TelegramOIDCCallback(ctx context.Context, state, code, userAge
 	}
 	switch cb.Mode {
 	case googleoauth.TelegramOIDCModeLink:
+		// Как у Google/Yandex/VK: привязываем только в браузере владельца аккаунта
+		// из state. Иначе атакующий отдаёт жертве свою ссылку на oauth.telegram.org,
+		// и её Telegram (вплоть до ADMIN_TELEGRAM_ID) привязывается к его аккаунту.
+		linkRes := &TelegramOIDCCallbackResult{Mode: cb.Mode}
+		sessAccID, err := s.accountIDFromValidRefresh(ctx, refreshFromCookie)
+		if err != nil {
+			return linkRes, err
+		}
+		if sessAccID != cb.AccountID {
+			return linkRes, ErrGoogleLinkSessionMismatch
+		}
 		hasMerge, err := s.linkTelegramIdentity(ctx, cb.AccountID, cb.TelegramID, cb.Username)
 		if err != nil {
 			return nil, err

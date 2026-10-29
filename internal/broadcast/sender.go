@@ -2,6 +2,8 @@ package broadcast
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -18,7 +20,7 @@ import (
 const (
 	batchSize             = 29
 	delayBetweenBatches   = time.Second
-	adminResultMessageFmt = "✅ Рассылка завершена!\n\n📊 Статистика:\n• Всего пользователей: %d\n• Успешно отправлено: %d\n• Ошибок: %d"
+	adminResultMessageFmt = "✅ Рассылка завершена!\n\n📊 Статистика:\n• Всего пользователей: %d\n• Успешно отправлено: %d\n• Ошибок: %d\n• Из них заблокировали бота: %d"
 
 	// Разметка одна на всех получателей, поэтому её поломка — не сбой доставки,
 	// а ошибка в тексте: шлём админу причину, а не счётчик ошибок.
@@ -28,30 +30,101 @@ const (
 // Sender отправляет массовые сообщения через Telegram-бота.
 type Sender struct {
 	customers *database.CustomerRepository
-	tm        *translation.Manager
+	// history — журнал рассылок; nil отключает запись (тесты, старые вызовы).
+	history *database.BroadcastRepository
+	tm      *translation.Manager
 }
 
-func NewSender(customers *database.CustomerRepository, tm *translation.Manager) *Sender {
-	return &Sender{customers: customers, tm: tm}
+func NewSender(customers *database.CustomerRepository, history *database.BroadcastRepository, tm *translation.Manager) *Sender {
+	return &Sender{customers: customers, history: history, tm: tm}
 }
 
-// Send рассылает сообщение выбранной аудитории. При adminID != 0 шлёт итог админу в Telegram.
+// SendOptions — как рассылку записать в историю.
+type SendOptions struct {
+	// Source — откуда запущена: database.BroadcastSourceCabinet или ...Telegram.
+	Source string
+	// BroadcastID — запись истории, заведённая заранее: кабинету её id нужен в
+	// ответе, чтобы показывать ход отправки. 0 — Send заведёт запись сам.
+	BroadcastID int64
+	// MediaName — имя прикреплённого файла, только для истории.
+	MediaName string
+}
+
+// HistoryRecord — запись истории для сообщения, которое собираются разослать.
+func HistoryRecord(source string, audiences []string, tariffID *int64, msg Message, mediaName string) database.BroadcastRecord {
+	rec := database.BroadcastRecord{
+		Source:    source,
+		Audiences: audiences,
+		TariffID:  tariffID,
+		Text:      msg.Text,
+		ParseMode: string(msg.ParseMode),
+		MediaName: mediaName,
+	}
+	if msg.Media != nil {
+		rec.MediaKind = string(msg.Media.Kind)
+		rec.MediaFileID = msg.Media.FileID
+	}
+	if buttons, err := json.Marshal(msg.Buttons); err == nil {
+		rec.Buttons = buttons
+	}
+	return rec
+}
+
+// historyLog — запись хода одной рассылки. Сбой записи только логируется:
+// из-за истории рассылка останавливаться не должна.
+type historyLog struct {
+	repo *database.BroadcastRepository
+	id   int64
+}
+
+func (h historyLog) progress(ctx context.Context, c database.BroadcastCounters) {
+	if h.repo == nil || h.id == 0 {
+		return
+	}
+	if err := h.repo.UpdateProgress(ctx, h.id, c); err != nil {
+		slog.Warn("broadcast: history progress", "id", h.id, "error", err)
+	}
+}
+
+func (h historyLog) finish(ctx context.Context, status string, c database.BroadcastCounters, errText string) {
+	if h.repo == nil || h.id == 0 {
+		return
+	}
+	if err := h.repo.Finish(ctx, h.id, status, c, errText); err != nil {
+		slog.Warn("broadcast: history finish", "id", h.id, "error", err)
+	}
+}
+
+// Send рассылает сообщение выбранным сегментам аудитории; человек из нескольких
+// сегментов получит его один раз. При adminID != 0 шлёт итог админу в Telegram.
+// Ход и итог пишутся в историю рассылок.
 func (s *Sender) Send(
 	ctx context.Context,
 	b *bot.Bot,
 	adminID int64,
-	audience string,
+	audiences []string,
 	tariffID *int64,
 	msg Message,
+	opts SendOptions,
 ) SendResult {
 	result := SendResult{}
 	if s == nil || s.customers == nil || b == nil {
 		return result
 	}
 
-	recipients, err := s.customers.GetBroadcastRecipients(ctx, audience, tariffID)
+	history := historyLog{repo: s.history, id: opts.BroadcastID}
+	if history.repo != nil && history.id == 0 {
+		id, err := history.repo.Create(ctx, HistoryRecord(opts.Source, audiences, tariffID, msg, opts.MediaName))
+		if err != nil {
+			slog.Warn("broadcast: history create", "error", err)
+		}
+		history.id = id
+	}
+
+	recipients, err := s.customers.GetBroadcastRecipientsForAudiences(ctx, audiences, tariffID)
 	if err != nil {
-		slog.Error("broadcast: get recipients", "error", err, "audience", audience)
+		slog.Error("broadcast: get recipients", "error", err, "audiences", audiences)
+		history.finish(ctx, database.BroadcastStatusFailed, database.BroadcastCounters{}, err.Error())
 		if adminID != 0 {
 			_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: adminID,
@@ -62,6 +135,7 @@ func (s *Sender) Send(
 	}
 
 	if len(recipients) == 0 {
+		history.finish(ctx, database.BroadcastStatusFailed, database.BroadcastCounters{}, "no recipients")
 		if adminID != 0 {
 			_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: adminID,
@@ -80,7 +154,18 @@ func (s *Sender) Send(
 	}
 	sentCount := 0
 	failedCount := 0
+	// blockedCount — часть failedCount: получатель закрыл бота или удалил аккаунт.
+	blockedCount := 0
 	var aborted error
+	counters := func() database.BroadcastCounters {
+		return database.BroadcastCounters{
+			Total:   eligibleUsers,
+			Sent:    sentCount,
+			Blocked: blockedCount,
+			Failed:  failedCount - blockedCount,
+		}
+	}
+	history.progress(ctx, counters())
 
 	for i := 0; i < totalUsers; i += batchSize {
 		end := i + batchSize
@@ -93,11 +178,16 @@ func (s *Sender) Send(
 			if utils.IsSyntheticTelegramID(rec.TelegramID) {
 				continue
 			}
-			markup := BuildReplyMarkup(s.tm, rec.Language, msg.Buttons)
+			markup := BuildReplyMarkup(s.tm, rec.Language, msg.Buttons, rec.TelegramID)
 			_, sendErr := Deliver(ctx, b, rec.TelegramID, msg, markup)
 			if sendErr != nil {
 				slog.Warn("broadcast: send message", "userId", rec.TelegramID, "error", sendErr)
 				failedCount++
+				// 403 — «bot was blocked by the user» или удалённый аккаунт: до
+				// этого человека не достучаться, и это не сбой рассылки.
+				if errors.Is(sendErr, bot.ErrorForbidden) {
+					blockedCount++
+				}
 				/*
 				 * Битую разметку ловим на первом же получателе.
 				 *
@@ -119,19 +209,27 @@ func (s *Sender) Send(
 		if aborted != nil {
 			break
 		}
+		history.progress(ctx, counters())
 		if end < totalUsers {
 			time.Sleep(delayBetweenBatches)
 		}
 	}
 
 	result = SendResult{
-		TotalUsers:  eligibleUsers,
-		SentCount:   sentCount,
-		FailedCount: failedCount,
+		TotalUsers:   eligibleUsers,
+		SentCount:    sentCount,
+		FailedCount:  failedCount,
+		BlockedCount: blockedCount,
+	}
+
+	if aborted != nil {
+		history.finish(ctx, database.BroadcastStatusAborted, counters(), aborted.Error())
+	} else {
+		history.finish(ctx, database.BroadcastStatusDone, counters(), "")
 	}
 
 	if adminID != 0 {
-		text := fmt.Sprintf(adminResultMessageFmt, eligibleUsers, sentCount, failedCount)
+		text := fmt.Sprintf(adminResultMessageFmt, eligibleUsers, sentCount, failedCount, blockedCount)
 		if aborted != nil {
 			text = fmt.Sprintf(adminAbortedMessageFmt, aborted)
 		}
@@ -143,7 +241,9 @@ func (s *Sender) Send(
 		"eligibleUsers", eligibleUsers,
 		"sent", sentCount,
 		"failed", failedCount,
-		"audience", audience,
+		"blocked", blockedCount,
+		"audiences", audiences,
+		"historyId", history.id,
 	)
 	return result
 }

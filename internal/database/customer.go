@@ -11,8 +11,8 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type CustomerRepository struct {
@@ -25,7 +25,7 @@ func NewCustomerRepository(poll *pgxpool.Pool) *CustomerRepository {
 
 // customerSelectColumns порядок полей для SELECT (не использовать * — совместимость со схемой).
 // Порядок столбцов синхронизирован со всеми Scan-вызовами и с struct Customer.
-const customerSelectColumns = "id, telegram_id, expire_at, created_at, subscription_link, language, extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start, subscription_period_months, loyalty_xp, telegram_username, is_web_only, legal_accepted_at, remnawave_user_id, remnawave_short_uuid, broadcast_opt_out"
+const customerSelectColumns = "id, telegram_id, expire_at, created_at, subscription_link, language, extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start, subscription_period_months, loyalty_xp, telegram_username, is_web_only, legal_accepted_at, remnawave_user_id, remnawave_short_uuid, broadcast_opt_out, hwid_limit_override"
 
 type Customer struct {
 	ID                       int64      `db:"id"`
@@ -56,6 +56,10 @@ type Customer struct {
 	// BroadcastOptOut — клиент отказался от массовых рассылок. Сервисные
 	// напоминания об окончании подписки этим флагом не глушатся.
 	BroadcastOptOut bool `db:"broadcast_opt_out"`
+	// HwidLimitOverride — лимит устройств, закреплённый админом. Пока он задан,
+	// любая запись лимита в панель подставляет его вместо расчётного
+	// (см. remnawave.Client.SetHwidLimitPin); nil — обычный расчёт.
+	HwidLimitOverride *int `db:"hwid_limit_override"`
 }
 
 func scanCustomer(sc interface{ Scan(dest ...any) error }, c *Customer) error {
@@ -78,6 +82,7 @@ func scanCustomer(sc interface{ Scan(dest ...any) error }, c *Customer) error {
 		&c.RemnawaveUserID,
 		&c.RemnawaveShortUUID,
 		&c.BroadcastOptOut,
+		&c.HwidLimitOverride,
 	)
 }
 
@@ -293,6 +298,41 @@ func (cr *CustomerRepository) SetLegalAcceptedAt(ctx context.Context, customerID
 	})
 }
 
+// SetHwidLimitOverride закрепляет лимит устройств клиента; nil снимает закрепление.
+func (cr *CustomerRepository) SetHwidLimitOverride(ctx context.Context, customerID int64, limit *int) error {
+	var v any
+	if limit != nil {
+		v = *limit
+	}
+	return cr.UpdateFields(ctx, customerID, map[string]interface{}{
+		"hwid_limit_override": v,
+	})
+}
+
+// HwidLimitOverride возвращает закреплённый лимит клиента: по id, если он
+// известен, иначе по telegram_id (часть записей в панель знает только его).
+// ok=false — клиента нет или лимит не закреплён.
+func (cr *CustomerRepository) HwidLimitOverride(ctx context.Context, customerID, telegramID int64) (limit int, ok bool, err error) {
+	var v *int
+	if customerID > 0 {
+		err = cr.pool.QueryRow(ctx,
+			`SELECT hwid_limit_override FROM customer WHERE id = $1`, customerID).Scan(&v)
+	} else {
+		err = cr.pool.QueryRow(ctx,
+			`SELECT hwid_limit_override FROM customer WHERE telegram_id = $1`, telegramID).Scan(&v)
+	}
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, false, nil
+		}
+		return 0, false, fmt.Errorf("load hwid_limit_override: %w", err)
+	}
+	if v == nil {
+		return 0, false, nil
+	}
+	return *v, true, nil
+}
+
 // SetRemnawaveIdentity сохраняет идентификатор профиля панели Remnawave у клиента.
 //
 // Вызывается лениво: как только профиль резолвится любым способом (stream по
@@ -324,6 +364,70 @@ func (cr *CustomerRepository) SetRemnawaveIdentity(ctx context.Context, customer
 		`UPDATE customer SET remnawave_user_id = $2, remnawave_short_uuid = $3 WHERE id = $1`,
 		customerID, remnawaveUserID, short); err != nil {
 		return fmt.Errorf("set remnawave identity: %w", err)
+	}
+	return nil
+}
+
+// SubscriptionLinkResetAt возвращает момент последнего сброса ссылки подписки
+// клиентом; nil — ни разу не сбрасывал.
+//
+// Колонка читается отдельным запросом, а не через customerSelectColumns: так
+// миграция остаётся аддитивной и не трогает все места, где сканируется клиент.
+func (cr *CustomerRepository) SubscriptionLinkResetAt(ctx context.Context, customerID int64) (*time.Time, error) {
+	var at *time.Time
+	err := cr.pool.QueryRow(ctx,
+		`SELECT subscription_link_reset_at FROM customer WHERE id = $1`, customerID).Scan(&at)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("load subscription_link_reset_at: %w", err)
+	}
+	return at, nil
+}
+
+// ClaimSubscriptionLinkReset атомарно ставит отметку сброса, если с прошлого
+// прошло не меньше cooldown. Возвращает прежнее значение (для отката, если сброс
+// в панели не удастся) и ok=false, когда пауза ещё не вышла: два одновременных
+// нажатия не уйдут в панель оба.
+func (cr *CustomerRepository) ClaimSubscriptionLinkReset(ctx context.Context, customerID int64, cooldown time.Duration) (prev *time.Time, ok bool, err error) {
+	prev, err = cr.SubscriptionLinkResetAt(ctx, customerID)
+	if err != nil {
+		return nil, false, err
+	}
+	tag, err := cr.pool.Exec(ctx,
+		`UPDATE customer SET subscription_link_reset_at = NOW()
+		 WHERE id = $1
+		   AND (subscription_link_reset_at IS NULL
+		        OR subscription_link_reset_at <= NOW() - make_interval(secs => $2))`,
+		customerID, cooldown.Seconds())
+	if err != nil {
+		return nil, false, fmt.Errorf("claim subscription link reset: %w", err)
+	}
+	return prev, tag.RowsAffected() == 1, nil
+}
+
+// RestoreSubscriptionLinkReset возвращает отметку сброса к прежнему значению:
+// панель сброс не выполнила, и паузу клиенту засчитывать нечестно.
+func (cr *CustomerRepository) RestoreSubscriptionLinkReset(ctx context.Context, customerID int64, prev *time.Time) error {
+	if _, err := cr.pool.Exec(ctx,
+		`UPDATE customer SET subscription_link_reset_at = $2 WHERE id = $1`, customerID, prev); err != nil {
+		return fmt.Errorf("restore subscription link reset: %w", err)
+	}
+	return nil
+}
+
+// SetSubscriptionLinkAfterReset записывает новую ссылку и shortUuid, выданные
+// панелью при сбросе.
+func (cr *CustomerRepository) SetSubscriptionLinkAfterReset(ctx context.Context, customerID int64, link, shortUUID string) error {
+	var short *string
+	if s := strings.TrimSpace(shortUUID); s != "" {
+		short = &s
+	}
+	if _, err := cr.pool.Exec(ctx,
+		`UPDATE customer SET subscription_link = $2, remnawave_short_uuid = COALESCE($3, remnawave_short_uuid) WHERE id = $1`,
+		customerID, link, short); err != nil {
+		return fmt.Errorf("set subscription link after reset: %w", err)
 	}
 	return nil
 }
@@ -436,6 +540,7 @@ func (cr *CustomerRepository) UpdateFields(ctx context.Context, id int64, update
 		"telegram_username":          {},
 		"is_web_only":                {},
 		"legal_accepted_at":          {},
+		"hwid_limit_override":        {},
 	}
 
 	buildUpdate := sq.Update("customer").
@@ -454,26 +559,16 @@ func (cr *CustomerRepository) UpdateFields(ctx context.Context, id int64, update
 		return fmt.Errorf("failed to build update query: %w", err)
 	}
 
-	tx, err := cr.pool.Begin(ctx)
+	// Один UPDATE — транзакция не нужна. Раньше она была, и при rowsAffected == 0
+	// (клиента удалили между чтением и записью) возврат шёл без Rollback:
+	// соединение навсегда оставалось в открытой транзакции. Метод зовётся на
+	// каждый апдейт бота, и MaxConns таких случаев останавливали бот и кабинет.
+	result, err := cr.pool.Exec(ctx, sql, args...)
 	if err != nil {
-		return fmt.Errorf("failed to begin transaction: %w", err)
-	}
-
-	result, err := tx.Exec(ctx, sql, args...)
-	if err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return fmt.Errorf("failed to rollback transaction: %w", err)
-		}
 		return fmt.Errorf("failed to update customer: %w", err)
 	}
-
-	rowsAffected := result.RowsAffected()
-	if rowsAffected == 0 {
+	if result.RowsAffected() == 0 {
 		return fmt.Errorf("no customer found with id: %s", utils.MaskHalfInt64(id))
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	return nil
 }
@@ -511,103 +606,157 @@ func (cr *CustomerRepository) FindByTelegramIds(ctx context.Context, telegramIDs
 	return customers, nil
 }
 
+// customerBatchRows — строк в одном запросе CreateBatch/UpdateBatch. У PostgreSQL
+// предел 65535 параметров на запрос, и без разбиения синхронизация падала бы
+// примерно на 16 тыс. новых клиентов (4 параметра на строку).
+const customerBatchRows = 1000
+
+// CreateBatch вставляет клиентов пачками в одной транзакции: либо все, либо никто.
 func (cr *CustomerRepository) CreateBatch(ctx context.Context, customers []Customer) error {
 	if len(customers) == 0 {
 		return nil
 	}
-	builder := sq.Insert("customer").
-		Columns("telegram_id", "expire_at", "language", "subscription_link").
-		PlaceholderFormat(sq.Dollar)
-	for _, cust := range customers {
-		builder = builder.Values(cust.TelegramID, cust.ExpireAt, cust.Language, cust.SubscriptionLink)
-	}
-	sqlStr, args, err := builder.ToSql()
-	if err != nil {
-		return fmt.Errorf("failed to build batch insert query: %w", err)
-	}
-
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
-	_, err = cr.pool.Exec(ctx, sqlStr, args...)
-	if err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return fmt.Errorf("failed to rollback transaction: %w", err)
+	for start := 0; start < len(customers); start += customerBatchRows {
+		chunk := customers[start:min(start+customerBatchRows, len(customers))]
+		builder := sq.Insert("customer").
+			Columns("telegram_id", "expire_at", "language", "subscription_link").
+			PlaceholderFormat(sq.Dollar)
+		for _, cust := range chunk {
+			builder = builder.Values(cust.TelegramID, cust.ExpireAt, cust.Language, cust.SubscriptionLink)
 		}
-		return fmt.Errorf("failed to execute batch insert: %w", err)
+		sqlStr, args, err := builder.ToSql()
+		if err != nil {
+			return fmt.Errorf("failed to build batch insert query: %w", err)
+		}
+		// Через tx, а не pool: раньше запрос шёл мимо транзакции, и она лишь
+		// держала второе соединение.
+		if _, err := tx.Exec(ctx, sqlStr, args...); err != nil {
+			return fmt.Errorf("failed to execute batch insert: %w", err)
+		}
 	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	return nil
 }
 
+// UpdateBatch обновляет срок и ссылку подписки пачками в одной транзакции.
 func (cr *CustomerRepository) UpdateBatch(ctx context.Context, customers []Customer) error {
 	if len(customers) == 0 {
 		return nil
 	}
-	query := "UPDATE customer SET expire_at = c.expire_at, subscription_link = c.subscription_link FROM (VALUES "
-	var args []interface{}
-	for i, cust := range customers {
-		if i > 0 {
-			query += ", "
-		}
-		query += fmt.Sprintf("($%d::bigint, $%d::timestamp, $%d::text)", i*3+1, i*3+2, i*3+3)
-		args = append(args, cust.TelegramID, cust.ExpireAt, cust.SubscriptionLink)
-	}
-	query += ") AS c(telegram_id, expire_at, subscription_link) WHERE customer.telegram_id = c.telegram_id"
-
 	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	_, err = cr.pool.Exec(ctx, query, args...)
-	if err != nil {
-		if err := tx.Rollback(ctx); err != nil {
-			return fmt.Errorf("failed to rollback transaction: %w", err)
-		}
-		return fmt.Errorf("failed to execute batch update: %w", err)
-	}
+	defer func() { _ = tx.Rollback(ctx) }()
 
+	for start := 0; start < len(customers); start += customerBatchRows {
+		chunk := customers[start:min(start+customerBatchRows, len(customers))]
+		var query strings.Builder
+		query.WriteString("UPDATE customer SET expire_at = c.expire_at, subscription_link = c.subscription_link FROM (VALUES ")
+		args := make([]interface{}, 0, len(chunk)*3)
+		for i, cust := range chunk {
+			if i > 0 {
+				query.WriteString(", ")
+			}
+			// timestamptz, как у колонки: с ::timestamp часовой пояс отбрасывался,
+			// и при TimeZone сервера не UTC срок подписки сдвигался.
+			fmt.Fprintf(&query, "($%d::bigint, $%d::timestamptz, $%d::text)", i*3+1, i*3+2, i*3+3)
+			args = append(args, cust.TelegramID, cust.ExpireAt, cust.SubscriptionLink)
+		}
+		query.WriteString(") AS c(telegram_id, expire_at, subscription_link) WHERE customer.telegram_id = c.telegram_id")
+		if _, err := tx.Exec(ctx, query.String(), args...); err != nil {
+			return fmt.Errorf("failed to execute batch update: %w", err)
+		}
+	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
 	return nil
 }
 
-// DeleteByNotInTelegramIds удаляет строки customer, которых нет в списке telegram_id
-// из Remnawave-синхронизации. Web-only клиенты кабинета (is_web_only=TRUE) не трогаем —
-// у них нет telegram_id в ответе панели, иначе каждый Sync стирал бы кабинетских пользователей.
-// См. docs/cabinet/audit-telegram-id.md, раздел 1.6.
-func (cr *CustomerRepository) DeleteByNotInTelegramIds(ctx context.Context, telegramIDs []int64) error {
+// ErrSyncTooManyDeletions — синхронизация собралась удалить слишком большую
+// долю клиентов. Так выглядит сбой панели или смена формата её ответа, а не
+// реальная чистка, поэтому удаление не выполняется.
+var ErrSyncTooManyDeletions = errors.New("sync: too many customers missing from panel")
+
+// Предохранитель удаления: больше syncDeleteMaxPercent % бот-клиентов и при
+// этом больше syncDeleteFreeRows строк за один запуск не удаляем.
+const (
+	syncDeleteMaxPercent = 20
+	syncDeleteFreeRows   = 10
+)
+
+// syncDeletableWhere — клиенты, которых синхронизация вправе удалить: бот-клиент
+// (не web-only), не привязан к кабинету, его нет в панели ($1) и у него нет
+// истории. Покупки (включая неоплаченные счета), рефералы, партнёрка и
+// использованные промокоды ушли бы каскадом — вместе с деньгами и правом на
+// одноразовые бонусы, — поэтому такие строки остаются в БД.
+const syncDeletableWhere = `
+	c.is_web_only = FALSE
+	AND c.telegram_id <> ALL($1::bigint[])
+	AND NOT EXISTS (SELECT 1 FROM cabinet_account_customer_link l WHERE l.customer_id = c.id)
+	AND NOT EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = c.id)
+	AND NOT EXISTS (SELECT 1 FROM referral r WHERE r.referrer_id = c.telegram_id OR r.referee_id = c.telegram_id)
+	AND NOT EXISTS (SELECT 1 FROM partner pt WHERE pt.customer_id = c.id)
+	AND NOT EXISTS (SELECT 1 FROM partner_attribution pa WHERE pa.customer_id = c.id)
+	AND NOT EXISTS (SELECT 1 FROM promo_redemption pr WHERE pr.customer_id = c.id)`
+
+// SyncDeleteResult — итог удаления при синхронизации.
+type SyncDeleteResult struct {
+	Deleted int64 // удалено строк
+	Kept    int64 // нет в панели, но оставлены: есть история или привязка к кабинету
+}
+
+// DeleteMissingFromPanel удаляет клиентов, пропавших из панели (telegramIDs —
+// все Telegram ID из её ответа). Клиенты с историей, web-only и привязанные к
+// кабинету не удаляются. Если к удалению набирается слишком много строк,
+// ничего не удаляет и возвращает ErrSyncTooManyDeletions.
+func (cr *CustomerRepository) DeleteMissingFromPanel(ctx context.Context, telegramIDs []int64) (SyncDeleteResult, error) {
+	var res SyncDeleteResult
 	if len(telegramIDs) == 0 {
-		// Не удаляем клиентов, связанных с cabinet_account, даже если их нет в панели.
-		// Иначе после sync рвётся account<->customer link и кабинет bootstrap'ит synthetic web-only customer.
-		_, err := cr.pool.Exec(ctx, `
-			DELETE FROM customer c
-			 WHERE c.is_web_only = FALSE
-			   AND NOT EXISTS (
-			     SELECT 1 FROM cabinet_account_customer_link l WHERE l.customer_id = c.id
-			   )`)
-		if err != nil {
-			return fmt.Errorf("failed to delete customers: %w", err)
-		}
-		return nil
+		// Пустой список означал бы «удалить всех» — так выглядит только сбой.
+		return res, ErrSyncTooManyDeletions
 	}
-	_, err := cr.pool.Exec(ctx, `
-		DELETE FROM customer c
-		 WHERE c.is_web_only = FALSE
-		   AND c.telegram_id <> ALL($1::bigint[])
-		   AND NOT EXISTS (
-		     SELECT 1 FROM cabinet_account_customer_link l WHERE l.customer_id = c.id
-		   )`, telegramIDs)
+	tx, err := cr.pool.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to delete customers: %w", err)
+		return res, fmt.Errorf("begin sync delete: %w", err)
 	}
-	return nil
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var missing, total, deletable int64
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*) FILTER (WHERE c.telegram_id <> ALL($1::bigint[])), count(*)
+		  FROM customer c
+		 WHERE c.is_web_only = FALSE`, telegramIDs).Scan(&missing, &total); err != nil {
+		return res, fmt.Errorf("count customers missing from panel: %w", err)
+	}
+	if err := tx.QueryRow(ctx, `SELECT count(*) FROM customer c WHERE `+syncDeletableWhere, telegramIDs).Scan(&deletable); err != nil {
+		return res, fmt.Errorf("count deletable customers: %w", err)
+	}
+	res.Kept = missing - deletable
+	if deletable > syncDeleteFreeRows && deletable*100 > total*syncDeleteMaxPercent {
+		return res, fmt.Errorf("%w: %d of %d", ErrSyncTooManyDeletions, deletable, total)
+	}
+	if deletable == 0 {
+		return res, nil
+	}
+	ct, err := tx.Exec(ctx, `DELETE FROM customer c WHERE `+syncDeletableWhere, telegramIDs)
+	if err != nil {
+		return res, fmt.Errorf("delete customers missing from panel: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return res, fmt.Errorf("commit sync delete: %w", err)
+	}
+	res.Deleted = ct.RowsAffected()
+	return res, nil
 }
 
 // HasCabinetLink проверяет, привязан ли customer к cabinet_account.
@@ -797,6 +946,28 @@ func (cr *CustomerRepository) GetInactiveTelegramIds(ctx context.Context) ([]int
 // tariffID ограничивает сегменты active_paid / inactive_paid по customer.current_tariff_id (режим tariffs).
 // Web-only клиенты кабинета исключаются (нет доставки в Telegram).
 func (cr *CustomerRepository) GetBroadcastRecipients(ctx context.Context, audience string, tariffID *int64) ([]BroadcastRecipient, error) {
+	return cr.GetBroadcastRecipientsForAudiences(ctx, []string{audience}, tariffID)
+}
+
+// GetBroadcastRecipientsForAudiences — получатели сразу нескольких сегментов.
+//
+// Сегменты собираются одним запросом через OR, а не склейкой нескольких
+// списков: строка customer в выборке одна на человека, поэтому тот, кто попал
+// в два выбранных сегмента, получит сообщение один раз. tariffID действует на
+// платные сегменты так же, как в одиночном выборе.
+func (cr *CustomerRepository) GetBroadcastRecipientsForAudiences(ctx context.Context, audiences []string, tariffID *int64) ([]BroadcastRecipient, error) {
+	normalized, err := NormalizeBroadcastAudiences(audiences)
+	if err != nil {
+		return nil, err
+	}
+	if len(normalized) == 0 {
+		return nil, errors.New("no broadcast audience selected")
+	}
+	if normalized[0] == BroadcastAudienceTestBroadcast {
+		// Тестовая рассылка уходит только админу (ADMIN_TELEGRAM_ID), минуя фильтры аудитории.
+		return cr.testBroadcastRecipients(ctx)
+	}
+
 	now := time.Now()
 	buildSelect := sq.Select("telegram_id", "language").
 		From("customer").
@@ -807,34 +978,37 @@ func (cr *CustomerRepository) GetBroadcastRecipients(ctx context.Context, audien
 	paidSubscription := sq.Expr(`EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
 	noPaidSubscription := sq.Expr(`NOT EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
 
-	switch audience {
-	case BroadcastAudienceAll:
-		// no extra filter
-	case BroadcastAudienceActive, BroadcastAudienceActiveAll:
-		buildSelect = buildSelect.Where(activeVPN)
-	case BroadcastAudienceInactive, BroadcastAudienceInactiveAll:
-		buildSelect = buildSelect.Where(inactiveVPN)
-	case BroadcastAudienceActivePaid:
-		ap := sq.And{activeVPN, paidSubscription}
-		if tariffID != nil {
-			ap = sq.And{ap, sq.Eq{"current_tariff_id": *tariffID}}
+	// «Все» поглощает остальные сегменты ещё в NormalizeBroadcastAudiences,
+	// так что здесь он может прийти только один и фильтра не добавляет.
+	if normalized[0] != BroadcastAudienceAll {
+		var segments sq.Or
+		for _, audience := range normalized {
+			switch audience {
+			case BroadcastAudienceActiveAll:
+				segments = append(segments, activeVPN)
+			case BroadcastAudienceInactiveAll:
+				segments = append(segments, inactiveVPN)
+			case BroadcastAudienceActivePaid:
+				ap := sq.And{activeVPN, paidSubscription}
+				if tariffID != nil {
+					ap = sq.And{ap, sq.Eq{"current_tariff_id": *tariffID}}
+				}
+				segments = append(segments, ap)
+			case BroadcastAudienceActiveTrial:
+				segments = append(segments, sq.And{activeVPN, noPaidSubscription})
+			case BroadcastAudienceInactivePaid:
+				ip := sq.And{inactiveVPN, paidSubscription}
+				if tariffID != nil {
+					ip = sq.And{ip, sq.Eq{"current_tariff_id": *tariffID}}
+				}
+				segments = append(segments, ip)
+			case BroadcastAudienceInactiveTrial:
+				segments = append(segments, sq.And{inactiveVPN, noPaidSubscription})
+			default:
+				return nil, fmt.Errorf("unknown broadcast audience: %s", audience)
+			}
 		}
-		buildSelect = buildSelect.Where(ap)
-	case BroadcastAudienceActiveTrial:
-		buildSelect = buildSelect.Where(sq.And{activeVPN, noPaidSubscription})
-	case BroadcastAudienceInactivePaid:
-		ip := sq.And{inactiveVPN, paidSubscription}
-		if tariffID != nil {
-			ip = sq.And{ip, sq.Eq{"current_tariff_id": *tariffID}}
-		}
-		buildSelect = buildSelect.Where(ip)
-	case BroadcastAudienceInactiveTrial:
-		buildSelect = buildSelect.Where(sq.And{inactiveVPN, noPaidSubscription})
-	case BroadcastAudienceTestBroadcast:
-		// Тестовая рассылка уходит только админу (ADMIN_TELEGRAM_ID), минуя фильтры аудитории.
-		return cr.testBroadcastRecipients(ctx)
-	default:
-		return nil, fmt.Errorf("unknown broadcast audience: %s", audience)
+		buildSelect = buildSelect.Where(segments)
 	}
 
 	buildSelect = buildSelect.Where(sq.Eq{"is_web_only": false, "broadcast_opt_out": false})

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Referral struct {
@@ -48,11 +48,14 @@ func NewReferralRepository(pool *pgxpool.Pool) *ReferralRepository {
 	return &ReferralRepository{pool: pool, ledger: NewReferralBonusLedgerRepository(pool)}
 }
 
+// Create привязывает приглашённого к рефереру. У приглашённого одна связь
+// (UNIQUE referee_id, миграция 000055): если она уже есть, возвращает nil, nil —
+// первая связь остаётся, вторая молча не создаётся.
 func (r *ReferralRepository) Create(ctx context.Context, referrerID, refereeID int64) (*Referral, error) {
 	query := sq.Insert("referral").
 		Columns("referrer_id", "referee_id", "used_at", "bonus_granted").
 		Values(referrerID, refereeID, sq.Expr("NOW()"), false).
-		Suffix("RETURNING id, referrer_id, referee_id, used_at, bonus_granted").
+		Suffix("ON CONFLICT (referee_id) DO NOTHING RETURNING id, referrer_id, referee_id, used_at, bonus_granted").
 		PlaceholderFormat(sq.Dollar)
 
 	sql, args, err := query.ToSql()
@@ -63,6 +66,9 @@ func (r *ReferralRepository) Create(ctx context.Context, referrerID, refereeID i
 	row := r.pool.QueryRow(ctx, sql, args...)
 	var ref Referral
 	if err := row.Scan(&ref.ID, &ref.ReferrerID, &ref.RefereeID, &ref.UsedAt, &ref.BonusGranted); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, fmt.Errorf("failed to scan inserted referral: %w", err)
 	}
 	return &ref, nil

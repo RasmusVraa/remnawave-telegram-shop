@@ -1,9 +1,14 @@
 package yookasa
 
 import (
+	"fmt"
+	"math"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
+
+	"remnawave-tg-shop-bot/internal/database"
 )
 
 type Payment struct {
@@ -25,6 +30,31 @@ type Payment struct {
 
 func (p *Payment) IsCancelled() bool {
 	return p.Status == "canceled"
+}
+
+// MatchesPurchase проверяет, что платёж выставлен именно этой покупке: тип
+// счёта, id платежа и сумма в рублях. Покупка находится по purchaseId из
+// metadata, поэтому без сверки чужой (или более дешёвый) платёж мог бы
+// зачесться не той покупке.
+func (p *Payment) MatchesPurchase(pu *database.Purchase) error {
+	if pu.InvoiceType != database.InvoiceTypeYookasa {
+		return fmt.Errorf("purchase invoice type is %q", pu.InvoiceType)
+	}
+	if pu.YookasaID == nil || *pu.YookasaID != p.ID {
+		return fmt.Errorf("purchase yookasa_id %v differs from payment id %s", pu.YookasaID, p.ID)
+	}
+	if p.Amount.Currency != "RUB" {
+		return fmt.Errorf("payment currency %q", p.Amount.Currency)
+	}
+	paid, err := strconv.ParseFloat(p.Amount.Value, 64)
+	if err != nil {
+		return fmt.Errorf("payment amount %q: %w", p.Amount.Value, err)
+	}
+	// Счёт создаётся на int(amount) — см. PaymentService.createYookasaInvoice.
+	if math.Abs(paid-math.Trunc(pu.Amount)) >= 0.01 {
+		return fmt.Errorf("payment amount %s differs from purchase amount %.2f", p.Amount.Value, pu.Amount)
+	}
+	return nil
 }
 
 type PaymentRequest struct {

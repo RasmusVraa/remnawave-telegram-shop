@@ -18,6 +18,7 @@ var cabinetDecorThemeIDs = []string{
 	"neon",
 	"ocean",
 	"new_year",
+	"new_year_2",
 	"slate",
 	"carbon",
 	"aurora",
@@ -30,6 +31,7 @@ var cabinetDecorThemeIDs = []string{
 	"sunset",
 	"orange",
 	"halloween",
+	"halloween_2",
 	"yellow",
 	"summer",
 	"black_friday",
@@ -854,7 +856,7 @@ func applyInt64Field(set func(int64) error) func(string) error {
 
 func applyFloatField(set func(float64) error) func(string) error {
 	return func(value string) error {
-		v, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		v, err := parseFiniteFloat(value)
 		if err != nil {
 			return fmt.Errorf("invalid number")
 		}

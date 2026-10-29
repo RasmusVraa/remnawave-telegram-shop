@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { X, type LucideIcon } from 'lucide-react'
 
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { cn } from '@/lib/utils'
 import { rwIconToneClassNames, type RwIconTone } from '../utils/rwStatusStyles'
 import {
@@ -63,6 +64,7 @@ export function AdminModal({
   iconAccent,
 }: AdminModalProps) {
   const { t } = useTranslation()
+  const { sheetRef, handlers: dragHandlers } = useSheetDragDismiss({ open, onDismiss: onClose })
 
   const iconStyles =
     iconTone !== 'default'
@@ -97,6 +99,7 @@ export function AdminModal({
       onClick={onClose}
     >
         <div
+          ref={sheetRef}
           onClick={(e) => e.stopPropagation()}
           className={cn(
             'cabinet-elevated-card admin-modal-panel flex max-h-[min(92dvh,100%)] w-full flex-col overflow-hidden',
@@ -107,7 +110,14 @@ export function AdminModal({
             panelClassName,
           )}
         >
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 px-5 py-4">
+          {/* Ручка шторки: за неё и за заголовок окно тянут вниз, чтобы закрыть. */}
+          <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-2.5 sm:hidden" {...dragHandlers}>
+            <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+          </div>
+          <div
+            className="flex shrink-0 touch-none items-center justify-between gap-3 border-b border-border/70 px-5 pb-4 pt-2 sm:touch-auto sm:pt-4"
+            {...dragHandlers}
+          >
             <div className="flex min-w-0 items-center gap-3">
               {Icon && (
                 <div
@@ -135,9 +145,19 @@ export function AdminModal({
               <X className="size-4" />
             </button>
           </div>
-          <div className={cn('min-h-0 flex-1 overflow-y-auto p-5', bodyClassName)}>{children}</div>
+          {/* Нижний отступ с учётом кнопок навигации Android несёт последний
+              блок: футер, а без него — тело окна. */}
+          <div
+            className={cn(
+              'min-h-0 flex-1 overflow-y-auto p-5',
+              !footer && 'pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] sm:pb-5',
+              bodyClassName,
+            )}
+          >
+            {children}
+          </div>
           {footer && (
-            <div className="shrink-0 border-t border-border/70 bg-muted/25 px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] dark:bg-secondary/25">
+            <div className="shrink-0 border-t border-border/70 bg-muted/25 px-5 py-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] dark:bg-secondary/25 sm:pb-4">
               {footer}
             </div>
           )}

@@ -92,6 +92,9 @@ type SubscriptionHwidExtra struct {
 	PriceRubMonth   int  `json:"price_rub_month"`
 	StarsPriceMonth int  `json:"stars_price_month"`
 	DaysLeft        int  `json:"days_left"`
+	// Pinned — лимит закреплён админом: докупки и уменьшения нет, вместо
+	// них кабинет показывает пояснение.
+	Pinned bool `json:"pinned"`
 }
 
 // SubscriptionResponse — корневой объект `GET /cabinet/api/me/subscription`.
@@ -113,7 +116,18 @@ type SubscriptionResponse struct {
 	IsTrial bool `json:"is_trial"`
 	// HwidExtra — настройки и лимиты докупки HWID; nil если HWID_EXTRA_DEVICES_ENABLED=false.
 	HwidExtra *SubscriptionHwidExtra `json:"hwid_extra,omitempty"`
+	// LinkResetAt — когда клиент последний раз сбрасывал ссылку подписки.
+	// По нему отклоняются приглашения, выпущенные до сброса.
+	LinkResetAt *time.Time `json:"link_reset_at,omitempty"`
+	// LinkResetAvailableAt — с какого момента сброс снова доступен; только
+	// пока пауза после прошлого сброса не вышла.
+	LinkResetAvailableAt *time.Time `json:"link_reset_available_at,omitempty"`
 }
+
+// SubscriptionLinkResetCooldown — пауза между сбросами ссылки. Повторный сброс
+// сразу после первого отключил бы устройства, которые клиент только что
+// подключил заново, а частые вызовы revoke лишний раз нагружают панель.
+const SubscriptionLinkResetCooldown = 10 * time.Minute
 
 type LoyaltyHistoryItem struct {
 	PurchaseID    int64      `json:"purchase_id"`
@@ -208,6 +222,14 @@ func (s *Subscription) Get(ctx context.Context, accountID int64) (*SubscriptionR
 		SubscriptionLink:         customer.SubscriptionLink,
 		SubscriptionPeriodMonths: customer.SubscriptionPeriodMonths,
 		LoyaltyXP:                customer.LoyaltyXP,
+	}
+	if resetAt, err := s.customers.SubscriptionLinkResetAt(ctx, customer.ID); err != nil {
+		slog.Warn("subscription: link reset time", "customer_id", customer.ID, "error", err)
+	} else if resetAt != nil {
+		resp.LinkResetAt = resetAt
+		if next := resetAt.Add(SubscriptionLinkResetCooldown); next.After(time.Now()) {
+			resp.LinkResetAvailableAt = &next
+		}
 	}
 	if rwUser != nil {
 		used := rwUser.UserTraffic.UsedTrafficBytes / bytesPerGB
@@ -307,6 +329,13 @@ func (s *Subscription) Get(ctx context.Context, accountID int64) (*SubscriptionR
 			canInc := maxCap > 0 && lim.CurrentLimit < maxCap
 			block.CanIncrease = canInc && lim.DaysLeft > 0
 			block.CanDecrease = lim.CurrentLimit > lim.BaseLimit
+			if IsHwidLimitPinned(customer) {
+				block.Pinned = true
+				block.BaseLimit = lim.CurrentLimit
+				block.ExtraActive = 0
+				block.CanIncrease = false
+				block.CanDecrease = false
+			}
 		}
 		resp.HwidExtra = block
 	}
@@ -372,9 +401,9 @@ func (s *Subscription) LoyaltyHistory(ctx context.Context, accountID int64, limi
 	}
 
 	type histEv struct {
-		ts       time.Time
-		tie      string
-		item     LoyaltyHistoryItem
+		ts   time.Time
+		tie  string
+		item LoyaltyHistoryItem
 	}
 	evts := make([]histEv, 0, len(paid)+32)
 
@@ -576,11 +605,11 @@ func (s *Subscription) clearRWSubscriptionInDB(ctx context.Context, c *database.
 		return c, nil
 	}
 	updates := map[string]interface{}{
-		"expire_at":                    nil,
-		"subscription_link":            nil,
-		"current_tariff_id":            nil,
-		"subscription_period_start":    nil,
-		"subscription_period_months":   nil,
+		"expire_at":                  nil,
+		"subscription_link":          nil,
+		"current_tariff_id":          nil,
+		"subscription_period_start":  nil,
+		"subscription_period_months": nil,
 	}
 	if err := s.customers.UpdateFields(ctx, c.ID, updates); err != nil {
 		return c, err

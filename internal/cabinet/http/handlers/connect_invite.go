@@ -136,7 +136,7 @@ func (h *ConnectInviteHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	token := strings.TrimSpace(r.URL.Query().Get("t"))
-	accountID, err := connectinvite.Parse(h.secret, token, time.Now())
+	accountID, expiresAt, err := connectinvite.ParseWithExpiry(h.secret, token, time.Now())
 	if err != nil {
 		if errors.Is(err, connectinvite.ErrExpired) {
 			writeJSON(w, http.StatusGone, map[string]string{"error": "invite_expired"})
@@ -158,6 +158,13 @@ func (h *ConnectInviteHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 		}
 		slog.Error("connect-invite: resolve failed", "account_id", accountID, "error", err.Error())
 		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	// Владелец сбросил ссылку подписки — значит, отзывал доступ. Приглашение,
+	// выпущенное раньше, иначе выдало бы гостю уже новую ссылку: Resolve
+	// берёт её из подписки в момент открытия.
+	if resp.LinkResetAt != nil && connectinvite.IssuedBefore(expiresAt, *resp.LinkResetAt) {
+		writeJSON(w, http.StatusGone, map[string]string{"error": "invite_expired"})
 		return
 	}
 	if resp.SubscriptionLink == nil || strings.TrimSpace(*resp.SubscriptionLink) == "" {

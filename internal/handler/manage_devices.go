@@ -69,13 +69,21 @@ func (h Handler) ManageDevicesCallbackHandler(ctx context.Context, b *bot.Bot, u
 	}
 	title := fmt.Sprintf("%s\n\n📱 Устройства: %d / %s", h.translation.GetText(langCode, "manage_devices_title"), deviceCount, formatDeviceLimit(deviceLimitValue, langCode))
 
+	// Закреплённый админом лимит докупкой не меняется — вместо кнопки пояснение.
+	pinned := customer.HwidLimitOverride != nil
+	if pinned {
+		title += "\n\n" + h.translation.GetText(langCode, "hwid_pinned_by_admin")
+	}
+
 	var keyboard [][]models.InlineKeyboardButton
 	keyboard = append(keyboard, []models.InlineKeyboardButton{
 		h.translation.WithButton(langCode, "devices_button", models.InlineKeyboardButton{CallbackData: CallbackDevices}),
 	})
-	keyboard = append(keyboard, []models.InlineKeyboardButton{
-		h.translation.WithButton(langCode, "add_device_button", models.InlineKeyboardButton{CallbackData: CallbackAddDevice}),
-	})
+	if !pinned {
+		keyboard = append(keyboard, []models.InlineKeyboardButton{
+			h.translation.WithButton(langCode, "add_device_button", models.InlineKeyboardButton{CallbackData: CallbackAddDevice}),
+		})
+	}
 	keyboard = append(keyboard, []models.InlineKeyboardButton{
 		h.translation.WithButton(langCode, "back_button", models.InlineKeyboardButton{CallbackData: CallbackConnect}),
 	})

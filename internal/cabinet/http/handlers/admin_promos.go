@@ -7,8 +7,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"remnawave-tg-shop-bot/internal/database"
+	"remnawave-tg-shop-bot/internal/pgerr"
 )
 
 func extractPromoID(path string) (int64, bool) {
@@ -123,6 +126,56 @@ type createPromoReq struct {
 	DiscountMaxSubscriptionPaymentsPerCustomer int        `json:"discount_max_subscription_payments_per_customer"`
 }
 
+// validateCreatePromo проверяет параметры нового промокода и возвращает
+// машинное сообщение для админки (см. formatAdminApiError) или "". Раньше
+// проверялось только наличие кода и типа: скидка 0 % или 150 %, отрицательные
+// дни и неизвестный тип сохранялись как есть.
+func validateCreatePromo(req *createPromoReq, now time.Time) string {
+	code := strings.TrimSpace(req.Code)
+	if n := utf8.RuneCountInString(code); n < 2 || n > 64 || strings.HasPrefix(code, "__") {
+		return "invalid promo code"
+	}
+	for _, r := range code {
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '_' && r != '-' {
+			return "invalid promo code"
+		}
+	}
+	positive := func(v *int) bool { return v != nil && *v > 0 }
+	switch req.Type {
+	case database.PromoTypeSubscriptionDays:
+		if !positive(req.SubscriptionDays) {
+			return "subscription days must be positive"
+		}
+	case database.PromoTypeTrial:
+		if !positive(req.TrialDays) {
+			return "trial days must be positive"
+		}
+	case database.PromoTypeExtraHwid:
+		if !positive(req.ExtraHwidDelta) {
+			return "extra hwid delta must be positive"
+		}
+	case database.PromoTypeDiscount:
+		if req.DiscountPercent == nil || *req.DiscountPercent < 1 || *req.DiscountPercent > 100 {
+			return "discount percent must be 1-100"
+		}
+		if req.DiscountTTLHours != nil && *req.DiscountTTLHours < 0 {
+			return "discount ttl must not be negative"
+		}
+		if req.DiscountMaxSubscriptionPaymentsPerCustomer < 0 {
+			return "discount max payments must not be negative"
+		}
+	default:
+		return "invalid promo type"
+	}
+	if req.MaxUses != nil && *req.MaxUses <= 0 {
+		return "max uses must be positive"
+	}
+	if req.ValidUntil != nil && !req.ValidUntil.After(now) {
+		return "valid until is in the past"
+	}
+	return ""
+}
+
 // Create — POST /cabinet/api/admin/promos
 func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -136,6 +189,10 @@ func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.Type) == "" {
 		http.Error(w, "code and type are required", http.StatusBadRequest)
+		return
+	}
+	if msg := validateCreatePromo(&req, time.Now()); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
 
@@ -158,6 +215,12 @@ func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	id, err := h.promos.Create(r.Context(), &p)
 	if err != nil {
+		// Код уникален без учёта регистра, в том числе среди выключенных
+		// промокодов. Раньше повтор отдавал 500, и было непонятно, что не так.
+		if pgerr.IsUniqueViolation(err) {
+			http.Error(w, "promo code already exists", http.StatusConflict)
+			return
+		}
 		slog.Error("admin promos create", "error", err.Error())
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

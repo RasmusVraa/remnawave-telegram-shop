@@ -62,15 +62,7 @@ func (r *Client) createOrUpdateUserWithTariffProfile(ctx context.Context, custom
 	if existingUser == nil {
 		return r.createUserWithTariffProfile(ctx, customerID, telegramID, days, profile)
 	}
-	return r.updateUserWithTariffProfile(ctx, existingUser, days, profile, baseExpire)
-}
-
-func isPanelUsernameExistsErr(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "a019") && strings.Contains(msg, "username already exists")
+	return r.updateUserWithTariffProfile(ctx, customerID, telegramID, existingUser, days, profile, baseExpire)
 }
 
 func (r *Client) findUserByUsername(ctx context.Context, username string) (*User, error) {
@@ -90,7 +82,7 @@ func (r *Client) findUserByUsername(ctx context.Context, username string) (*User
 	return nil, nil
 }
 
-func (r *Client) updateUserWithTariffProfile(ctx context.Context, existingUser *User, days int, profile TariffPaidProfile, baseExpire *time.Time) (*User, error) {
+func (r *Client) updateUserWithTariffProfile(ctx context.Context, customerID, telegramID int64, existingUser *User, days int, profile TariffPaidProfile, baseExpire *time.Time) (*User, error) {
 	expireBase := existingUser.ExpireAt
 	if baseExpire != nil {
 		expireBase = *baseExpire
@@ -117,6 +109,7 @@ func (r *Client) updateUserWithTariffProfile(ctx context.Context, existingUser *
 		lim := profile.BaseDeviceLimit
 		userUpdate.HwidDeviceLimit = &lim
 	}
+	r.pinHwidLimitField(ctx, customerID, telegramID, &userUpdate.HwidDeviceLimit)
 	if profile.ExternalSquadUUID != uuid.Nil {
 		u := profile.ExternalSquadUUID
 		userUpdate.ExternalSquadUuid = &u
@@ -171,6 +164,7 @@ func (r *Client) createUserWithTariffProfile(ctx context.Context, customerID int
 		lim := profile.BaseDeviceLimit
 		createReq.HwidDeviceLimit = &lim
 	}
+	r.pinHwidLimitField(ctx, customerID, telegramID, &createReq.HwidDeviceLimit)
 	if profile.ExternalSquadUUID != uuid.Nil {
 		u := profile.ExternalSquadUUID
 		createReq.ExternalSquadUuid = &u

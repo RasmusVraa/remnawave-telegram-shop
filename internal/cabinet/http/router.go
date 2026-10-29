@@ -19,7 +19,7 @@ import (
 	"time"
 
 	"github.com/go-telegram/bot"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"remnawave-tg-shop-bot/internal/broadcast"
 	adminauth "remnawave-tg-shop-bot/internal/cabinet/admin/auth"
@@ -28,6 +28,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/auth/password"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/ratelimit"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/service"
+	"remnawave-tg-shop-bot/internal/cabinet/auth/tokens"
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
 	"remnawave-tg-shop-bot/internal/cabinet/http/handlers"
@@ -138,6 +139,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		AntiEnumLatency:   300 * time.Millisecond,
 		PasswordParams:    password.DefaultParams(),
 		PasswordPolicy:    password.DefaultPolicy(),
+		EmailCodeKey:      tokens.EmailVerifyOTPKey(cabcfg.JWTSecret()),
 	}, accountRepo, identityRepo, sessionRepo, evRepo, prRepo, jwtIssuer, mailer, customerBootstrap, emailMergeCodesRepo)
 	authSvc.SetTelegramCustomerLookup(customerRepo, linkRepo)
 
@@ -332,12 +334,17 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	connectTokenLim := ratelimit.New(ratelimit.Rule{Count: 30, Interval: time.Minute})
 
 	deleteAcctLim := ratelimit.New(ratelimit.Rule{Count: 5, Interval: time.Hour})
+	// Смена пароля проверяет текущий пароль: без лимита украденная сессия
+	// подбирала бы его, а каждая попытка — это Argon2id на 64 MiB.
+	passwordChangeAcctLim := ratelimit.New(ratelimit.Rule{Count: 5, Interval: 15 * time.Minute})
 	trialActivateAcctLim := ratelimit.New(ratelimit.Rule{Count: 5, Interval: time.Hour})
 	supportAcctLim := ratelimit.New(ratelimit.Rule{Count: 10, Interval: time.Minute})
-	// Webhook от support-bot: 100/min/IP — внутренний endpoint, но защита от flood при утечке секрета
-	supportWebhookIPLim := ratelimit.New(ratelimit.Rule{Count: 100, Interval: time.Minute})
+	// Webhook от support-bot: внутренний endpoint, но защита от flood при утечке секрета.
+	// Кроме ответов бот шлёт сюда «печатает…» каждые ~5 с по каждому тикету, где думает ИИ,
+	// поэтому 300/min/IP — запас на десяток одновременных диалогов.
+	supportWebhookIPLim := ratelimit.New(ratelimit.Rule{Count: 300, Interval: time.Minute})
 
-	for _, lim := range []*ratelimit.Limiter{loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim} {
+	for _, lim := range []*ratelimit.Limiter{loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim} {
 		lim.RunGC(ctx)
 	}
 
@@ -381,7 +388,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	adminTariffsHandler := handlers.NewAdminTariffs(tariffRepo, tariffSquadsSvc)
 	adminLoyaltyHandler := handlers.NewAdminLoyalty(loyaltyRepo, customerRepo, purchaseRepo)
 	adminPartnersHandler := handlers.NewAdminPartners(partnerRepo, customerRepo, config.BotURL(), partnerNotifier)
-	adminBroadcastHandler := handlers.NewAdminBroadcast(customerRepo, tariffRepo, broadcastSender, tgBot)
+	adminBroadcastHandler := handlers.NewAdminBroadcast(customerRepo, tariffRepo, database.NewBroadcastRepository(pool), broadcastSender, tgBot)
 	adminInfraHandler := handlers.NewAdminInfra(rw, infraBillingRepo)
 	adminSettingsHandler := handlers.NewAdminSettings(runtimeSettingsRepo)
 	adminSquadsHandler := handlers.NewAdminSquads(rw)
@@ -392,7 +399,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 
 	registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
 		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
-		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
+		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim)
 
 	statusTargets := statusprobe.NewKVTargets(runtimeSettingsRepo)
@@ -494,7 +501,7 @@ func registerCabinetRootRedirects(mux *http.ServeMux) {
 			if q := r.URL.RawQuery; q != "" {
 				target += "?" + q
 			}
-			http.Redirect(w, r, target, http.StatusFound)
+			http.Redirect(w, r, target, http.StatusFound) //nolint:gosec // G710: путь фиксирован, переносится только query
 		})
 	}
 }
@@ -538,7 +545,7 @@ func registerAPIRoutes(
 	adminSquads *handlers.AdminSquadsHandler,
 	adminSync *handlers.AdminSyncHandler,
 	adminAcctLim,
-	loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
+	loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 	oauthIPLim, telegramIPLim, linkAcctLim *ratelimit.Limiter,
 ) {
 	// Healthz — без middleware, открыт всем.
@@ -734,6 +741,7 @@ func registerAPIRoutes(
 				http.HandlerFunc(me.PutPassword),
 				middleware.RequireAuth(jwtIssuer),
 				middleware.CSRF(),
+				middleware.RateLimit(passwordChangeAcctLim, accountKey("me_password")),
 			),
 		}),
 	)
@@ -841,6 +849,9 @@ func registerAPIRoutes(
 		onlyPOST(middleware.Chain(
 			http.HandlerFunc(me.PostTrialActivate),
 			middleware.RequireAuth(jwtIssuer),
+			// Как подписка и оплата: иначе пробный брали на несуществующие
+			// адреса — регистрация, пропуск кода, вход по паролю.
+			middleware.RequireVerifiedEmail(),
 			middleware.CSRF(),
 			middleware.RateLimit(trialActivateAcctLim, accountKey("trial_activate")),
 		)),
@@ -872,6 +883,17 @@ func registerAPIRoutes(
 			middleware.RequireVerifiedEmail(),
 			middleware.CSRF(),
 			middleware.RateLimit(subscriptionAcctLim, accountKey("devices_delete")),
+		)),
+	)
+	// Сброс ссылки подписки: редкое и разрушительное действие, частоту держит
+	// пауза в БД (см. SubscriptionLinkResetCooldown), лимит здесь — от перебора.
+	api.Handle("/cabinet/api/me/subscription/reset-link",
+		onlyPOST(middleware.Chain(
+			http.HandlerFunc(me.ResetSubscriptionLink),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireVerifiedEmail(),
+			middleware.CSRF(),
+			middleware.RateLimit(subscriptionAcctLim, accountKey("subscription_reset_link")),
 		)),
 	)
 	api.Handle("/cabinet/api/me/devices/rename",
@@ -945,15 +967,21 @@ func registerAPIRoutes(
 				),
 			}),
 		)
-		// GET /auth/google/confirm?token=... — подтверждение привязки по ссылке из письма.
-		api.Handle("/cabinet/api/auth/google/confirm",
-			methodRouter(map[string]http.Handler{
-				http.MethodGet: middleware.Chain(
-					http.HandlerFunc(oauthH.GoogleLinkConfirm),
-					middleware.RateLimit(oauthIPLim, ipKey("google_confirm")),
-				),
-			}),
-		)
+		// GET /auth/oauth/confirm?token=... — страница подтверждения привязки по
+		// ссылке из письма (Google/Яндекс/VK), POST — сама привязка. Старый путь
+		// /auth/google/confirm оставлен для писем, отправленных до обновления.
+		oauthConfirm := methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(oauthH.GoogleLinkConfirm),
+				middleware.RateLimit(oauthIPLim, ipKey("google_confirm")),
+			),
+			http.MethodPost: middleware.Chain(
+				http.HandlerFunc(oauthH.GoogleLinkConfirm),
+				middleware.RateLimit(oauthIPLim, ipKey("google_confirm")),
+			),
+		})
+		api.Handle("/cabinet/api/auth/oauth/confirm", oauthConfirm)
+		api.Handle("/cabinet/api/auth/google/confirm", oauthConfirm)
 		// POST /auth/telegram — Widget или MiniApp. Rate-limit 10/min/IP.
 		api.Handle("/cabinet/api/auth/telegram",
 			onlyPOST(middleware.Chain(
@@ -1592,6 +1620,28 @@ func registerAPIRoutes(
 			middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_send")),
 		)),
 	)
+	api.Handle("/cabinet/api/admin/broadcast/history",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(adminBroadcast.History),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_history")),
+			),
+		}),
+	)
+	// Отдельный ключ лимита: страница опрашивает идущую рассылку раз в пару
+	// секунд, и общий с историей лимит съедался бы этим опросом.
+	api.Handle("/cabinet/api/admin/broadcast/history/",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(adminBroadcast.HistoryItem),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_history_item")),
+			),
+		}),
+	)
 	api.Handle("/cabinet/api/admin/broadcast/upload-media",
 		onlyPOST(middleware.Chain(
 			http.HandlerFunc(adminBroadcast.UploadMedia),
@@ -1679,14 +1729,22 @@ func registerAPIRoutes(
 
 	// Admin Sync
 	if adminSync != nil {
+		// POST запускает синхронизацию в фоне, GET отдаёт итог последнего запуска.
 		api.Handle("/cabinet/api/admin/sync",
-			onlyPOST(middleware.Chain(
-				http.HandlerFunc(adminSync.TriggerSync),
-				middleware.RequireAuth(jwtIssuer),
-				middleware.RequireAdmin(adminChecker),
-				middleware.CSRF(),
-				middleware.RateLimit(adminAcctLim, accountKey("admin_sync")),
-			)),
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(adminSync.Status),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RequireAdmin(adminChecker),
+				),
+				http.MethodPost: middleware.Chain(
+					http.HandlerFunc(adminSync.TriggerSync),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RequireAdmin(adminChecker),
+					middleware.CSRF(),
+					middleware.RateLimit(adminAcctLim, accountKey("admin_sync")),
+				),
+			}),
 		)
 	}
 }

@@ -145,6 +145,15 @@ type deleteUserDeviceRequest struct {
 	Hwid   string `json:"hwid"`
 }
 
+// deleteAllUserDevicesRequest — тело POST /api/hwid/devices/delete-all.
+type deleteAllUserDevicesRequest struct {
+	UserID int64 `json:"userId"`
+}
+
+// revokeUserSubscriptionRequest — тело POST /api/users/{userId}/actions/revoke.
+// Пустой объект: shortUuid генерирует панель, revokeOnlyPasswords=false.
+type revokeUserSubscriptionRequest struct{}
+
 // extendUserRequest — тело POST /api/users/{userId}/actions/extend.
 type extendUserRequest struct {
 	Days int `json:"days"`

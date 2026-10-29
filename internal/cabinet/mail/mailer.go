@@ -68,7 +68,8 @@ func (m *Mailer) SendPasswordReset(ctx context.Context, toEmail, language string
 
 // GoogleLinkConfirmData — контекст шаблона google_link_confirm_*.
 type GoogleLinkConfirmData struct {
-	ConfirmURL string
+	ConfirmURL   string
+	ProviderName string // «Google», «Яндекс ID», «VK ID»
 }
 
 // TelegramLinkedData — контекст шаблона telegram_linked_*.
@@ -89,12 +90,31 @@ func (m *Mailer) SendTelegramLinked(ctx context.Context, toEmail, language, merg
 	return m.render(ctx, tplName, subject, toEmail, TelegramLinkedData{MergeResult: mergeResult})
 }
 
-// SendGoogleLinkConfirm отправляет письмо подтверждения привязки Google.
-// Вызывается, когда Google-email совпадает с уже существующим cabinet_account.
-func (m *Mailer) SendGoogleLinkConfirm(ctx context.Context, toEmail, language string, confirmURL string) error {
+// SendOAuthLinkConfirm отправляет письмо подтверждения привязки внешнего входа
+// (Google, Яндекс, VK). Вызывается, когда email провайдера совпадает с уже
+// существующим cabinet_account: привязать можно только по ссылке из этого письма.
+func (m *Mailer) SendOAuthLinkConfirm(ctx context.Context, toEmail, language, provider, confirmURL string) error {
 	tplName := pickTemplate("google_link_confirm", language)
 	subject := subjectFor("google_link_confirm", language)
-	return m.render(ctx, tplName, subject, toEmail, GoogleLinkConfirmData{ConfirmURL: confirmURL})
+	return m.render(ctx, tplName, subject, toEmail, GoogleLinkConfirmData{
+		ConfirmURL:   confirmURL,
+		ProviderName: oauthProviderName(provider, language),
+	})
+}
+
+// oauthProviderName — название провайдера для текста письма.
+func oauthProviderName(provider, language string) string {
+	switch provider {
+	case "yandex":
+		if language == "en" {
+			return "Yandex ID"
+		}
+		return "Яндекс ID"
+	case "vk":
+		return "VK ID"
+	default:
+		return "Google"
+	}
 }
 
 // SendEmailMergeCode отправляет 6-значный код подтверждения merge email-аккаунта,
@@ -145,9 +165,9 @@ func subjectFor(kind, language string) string {
 		return "Сброс пароля"
 	case "google_link_confirm":
 		if language == "en" {
-			return "Confirm Google account link"
+			return "Confirm sign-in method link"
 		}
-		return "Подтверждение привязки Google"
+		return "Подтверждение привязки способа входа"
 	case "telegram_linked":
 		if language == "en" {
 			return "Sign-in method updated"

@@ -23,7 +23,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 	langCode := update.Message.From.LanguageCode
 	existingCustomer, err := h.customerRepository.FindByTelegramId(ctx, update.Message.Chat.ID)
 	if err != nil {
-		slog.Error("error finding customer by telegram id", err)
+		slog.Error("error finding customer by telegram id", "error", err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 			Language:   langCode,
 		})
 		if err != nil {
-			slog.Error("error creating customer", err)
+			slog.Error("error creating customer", "error", err)
 			return
 		}
 
@@ -47,7 +47,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 
 		err = h.customerRepository.UpdateFields(ctx, existingCustomer.ID, updates)
 		if err != nil {
-			slog.Error("Error updating customer", err)
+			slog.Error("Error updating customer", "error", err)
 			return
 		}
 	}
@@ -61,7 +61,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 	})
 
 	if err != nil {
-		slog.Error("Error sending removing reply keyboard", err)
+		slog.Error("Error sending removing reply keyboard", "error", err)
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 	})
 
 	if err != nil {
-		slog.Error("Error deleting message", err)
+		slog.Error("Error deleting message", "error", err)
 		return
 	}
 
@@ -95,7 +95,7 @@ func (h Handler) StartCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 
 	existingCustomer, err := h.customerRepository.FindByTelegramId(ctxWithTime, callback.From.ID)
 	if err != nil {
-		slog.Error("error finding customer by telegram id", err)
+		slog.Error("error finding customer by telegram id", "error", err)
 		return
 	}
 
@@ -108,7 +108,7 @@ func (h Handler) StartCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 	inlineKeyboard := h.buildStartKeyboard(existingCustomer, langCode)
 	err = h.sendStartMenuAfterCallback(ctxWithTime, b, update, langCode, inlineKeyboard, existingCustomer, displayName)
 	if err != nil {
-		slog.Error("Error sending /start message", err)
+		slog.Error("Error sending /start message", "error", err)
 	}
 }
 
@@ -198,7 +198,7 @@ func resolveGreetingImageInputFile(raw string) (models.InputFile, func(), error)
 	if strings.HasPrefix(lv, "http://") || strings.HasPrefix(lv, "https://") {
 		return &models.InputFileString{Data: value}, func() {}, nil
 	}
-	absPath := value
+	var absPath string
 	if !filepath.IsAbs(value) {
 		absPath = filepath.Clean(filepath.Join(".", value))
 	} else {

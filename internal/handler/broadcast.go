@@ -15,6 +15,7 @@ import (
 	"remnawave-tg-shop-bot/internal/broadcast"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
+	"remnawave-tg-shop-bot/utils"
 )
 
 // BroadcastType определяет тип рассылки
@@ -567,6 +568,7 @@ func (h Handler) broadcastButtonPickerKeyboard(lang string, flags BroadcastRecip
 		{h.broadcastToggleRow(lang, flags.Buy, "buy_button", CallbackBroadcastToggleBuy)},
 		{h.broadcastToggleRow(lang, flags.Connect, "connect_button", CallbackBroadcastToggleVPN)},
 		{h.broadcastToggleRow(lang, flags.Promo, "promo_code_button", CallbackBroadcastTogglePromo)},
+		{h.broadcastToggleRow(lang, flags.ShareReferral, "broadcast_share_referral_button", CallbackBroadcastToggleShare)},
 		{h.broadcastToggleRow(lang, flags.MainMenu, "broadcast_inline_main", CallbackBroadcastToggleMain)},
 		{
 			{Text: h.translation.GetText(lang, "broadcast_buttons_next"), CallbackData: CallbackBroadcastButtonsNext},
@@ -575,12 +577,15 @@ func (h Handler) broadcastButtonPickerKeyboard(lang string, flags BroadcastRecip
 	}
 }
 
-func (h Handler) buildBroadcastReplyMarkup(lang string, flags BroadcastRecipientButtons) models.ReplyMarkup {
-	return broadcast.BuildReplyMarkup(h.translation, lang, flags)
+// buildBroadcastReplyMarkup — клавиатура предпросмотра. В «Пригласить друга»
+// попадает реферальная ссылка самого админа: так видно, что кнопка рабочая,
+// а получатели получат каждый свою.
+func (h Handler) buildBroadcastReplyMarkup(lang string, flags BroadcastRecipientButtons, adminID int64) models.ReplyMarkup {
+	return broadcast.BuildReplyMarkup(h.translation, lang, flags, adminID)
 }
 
 func (h Handler) broadcastButtonsSummaryLine(lang string, flags BroadcastRecipientButtons) string {
-	if !flags.Buy && !flags.MainMenu && !flags.Promo && !flags.Connect {
+	if flags.IsEmpty() {
 		return h.translation.GetText(lang, "broadcast_buttons_none")
 	}
 	var parts []string
@@ -592,6 +597,9 @@ func (h Handler) broadcastButtonsSummaryLine(lang string, flags BroadcastRecipie
 	}
 	if flags.Promo {
 		parts = append(parts, h.translation.GetButton(lang, "promo_code_button").Text)
+	}
+	if flags.ShareReferral {
+		parts = append(parts, h.translation.GetButton(lang, "broadcast_share_referral_button").Text)
 	}
 	if flags.MainMenu {
 		parts = append(parts, h.translation.GetButton(lang, "broadcast_inline_main").Text)
@@ -731,6 +739,8 @@ func (h Handler) BroadcastButtonToggleHandler(ctx context.Context, b *bot.Bot, u
 		flags.Promo = !flags.Promo
 	case CallbackBroadcastToggleVPN:
 		flags.Connect = !flags.Connect
+	case CallbackBroadcastToggleShare:
+		flags.ShareReferral = !flags.ShareReferral
 	default:
 		broadcastState.mu.Unlock()
 		return
@@ -798,7 +808,7 @@ func (h Handler) BroadcastButtonsNextHandler(ctx context.Context, b *bot.Bot, up
 
 	// Предпросмотр рисуется тем же кодом, что и сама рассылка: иначе админ
 	// подтверждает одно, а получатели видят другое.
-	markup := h.buildBroadcastReplyMarkup(lang, flags)
+	markup := h.buildBroadcastReplyMarkup(lang, flags, adminID)
 	previewMsg, previewErr := broadcast.Deliver(ctx, b, adminID, broadcast.Message{
 		Text:     messageText,
 		Entities: entities,
@@ -894,7 +904,9 @@ func (h Handler) BroadcastConfirmHandler(ctx context.Context, b *bot.Bot, update
 		Text:   h.translation.GetText(lang, "broadcast_started_wait"),
 	})
 
-	go h.sendBroadcast(ctx, b, adminID, messageText, entCopy, draftMedia, flagsCopy, broadcastType, tariffFilter)
+	utils.Go("bot broadcast", func() {
+		h.sendBroadcast(ctx, b, adminID, messageText, entCopy, draftMedia, flagsCopy, broadcastType, tariffFilter)
+	})
 }
 
 // BroadcastCancelHandler обрабатывает отмену рассылки
@@ -969,7 +981,7 @@ func (h Handler) sendBroadcast(ctx context.Context, b *bot.Bot, adminID int64, m
 		slog.Error("broadcast sender not configured")
 		return
 	}
-	h.broadcastSender.Send(ctx, b, adminID, audience, tf, broadcast.Message{
+	h.broadcastSender.Send(ctx, b, adminID, []string{audience}, tf, broadcast.Message{
 		Text: messageText,
 		// Форматирование приходит готовыми entities из исходного сообщения
 		// админа, поэтому ParseMode здесь не нужен и вреден: Bot API принимает
@@ -977,5 +989,5 @@ func (h Handler) sendBroadcast(ctx context.Context, b *bot.Bot, adminID int64, m
 		Entities: entities,
 		Media:    media,
 		Buttons:  flags,
-	})
+	}, broadcast.SendOptions{Source: database.BroadcastSourceTelegram})
 }

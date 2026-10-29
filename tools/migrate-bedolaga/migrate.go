@@ -14,7 +14,7 @@ import (
 	"remnawave-tg-shop-bot/utils"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Migrator struct {
@@ -82,7 +82,7 @@ func (m *Migrator) Run(ctx context.Context) error {
 		m.rep.addProblem("compat_warning", "source", src.caps.HintGeneration, w)
 	}
 
-	target, err := pgxpool.Connect(ctx, m.cfg.Target.DatabaseURL)
+	target, err := pgxpool.New(ctx, m.cfg.Target.DatabaseURL)
 	if err != nil {
 		return fmt.Errorf("connect target db: %w", err)
 	}
@@ -240,7 +240,7 @@ func (m *Migrator) stepTariffs(ctx context.Context) error {
 		name := t.Name
 		desc := t.Description
 
-		status := "ok"
+		var status string
 		ourID := int64(0)
 		if prev, ok := bySlug[slug]; ok {
 			ourID = prev.ID

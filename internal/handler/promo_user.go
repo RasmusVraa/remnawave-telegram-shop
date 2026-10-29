@@ -105,6 +105,9 @@ func (h Handler) UserPromoMessageHandler(ctx context.Context, b *bot.Bot, update
 			case promo.ActivateErrTariffMismatch:
 				_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: update.Message.Chat.ID, ParseMode: models.ParseModeHTML, Text: h.translation.GetText(lang, "promo_err_tariff_mismatch"), ReplyMarkup: models.InlineKeyboardMarkup{InlineKeyboard: back}})
 				return
+			case promo.ActivateErrHwidPinned:
+				_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: update.Message.Chat.ID, ParseMode: models.ParseModeHTML, Text: h.translation.GetText(lang, "promo_err_hwid_pinned"), ReplyMarkup: models.InlineKeyboardMarkup{InlineKeyboard: back}})
+				return
 			default:
 				_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: update.Message.Chat.ID, ParseMode: models.ParseModeHTML, Text: h.translation.GetText(lang, "promo_apply_failed"), ReplyMarkup: models.InlineKeyboardMarkup{InlineKeyboard: back}})
 				return

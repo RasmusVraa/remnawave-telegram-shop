@@ -49,7 +49,8 @@ func GenerateToken() (string, error) {
 //
 // Domain задаётся вызывающим кодом — должен совпадать с refresh-cookie Domain.
 func SetCookie(w http.ResponseWriter, token, domain, path string, maxAge int, secure bool) {
-	http.SetCookie(w, &http.Cookie{
+	// HttpOnly=false намеренно: double-submit, SPA читает токен (см. выше).
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124
 		Name:     CookieName,
 		Value:    token,
 		Path:     path,
@@ -64,7 +65,8 @@ func SetCookie(w http.ResponseWriter, token, domain, path string, maxAge int, se
 // ClearCookie сбрасывает csrf_token cookie (logout, reset password).
 // secure должен совпадать с тем, как cookie была выставлена, иначе браузер её не сотрёт.
 func ClearCookie(w http.ResponseWriter, domain, path string, secure bool) {
-	http.SetCookie(w, &http.Cookie{
+	// HttpOnly=false намеренно: double-submit, SPA читает токен (см. выше).
+	http.SetCookie(w, &http.Cookie{ //nolint:gosec // G124
 		Name:     CookieName,
 		Value:    "",
 		Path:     path,

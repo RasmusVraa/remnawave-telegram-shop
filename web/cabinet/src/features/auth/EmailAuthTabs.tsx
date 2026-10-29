@@ -30,6 +30,8 @@ export type EmailAuthTabsProps = {
    * (он специфичен для login-страницы; для register можно просто передать пустые значения)
    */
   googleLinkPending?: boolean
+  /** Название провайдера в тексте «проверьте почту» (Google, Яндекс ID, VK ID). */
+  googleLinkProvider?: string
   googleMaskedEmail?: string
 }
 
@@ -39,6 +41,7 @@ export function EmailAuthTabs({
   from,
   referralCode,
   googleLinkPending = false,
+  googleLinkProvider = 'Google',
   googleMaskedEmail = '',
 }: EmailAuthTabsProps) {
   const { t } = useTranslation()
@@ -223,7 +226,7 @@ export function EmailAuthTabs({
               {googleLinkPending && (
                 <Alert>
                   <AlertDescription>
-                    {t('auth.googleLinkPending', { email: googleMaskedEmail || '—' })}
+                    {t('auth.googleLinkPending', { email: googleMaskedEmail || '—', provider: googleLinkProvider })}
                   </AlertDescription>
                 </Alert>
               )}

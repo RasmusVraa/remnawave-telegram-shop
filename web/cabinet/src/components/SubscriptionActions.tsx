@@ -28,10 +28,18 @@ export function RenewSubscriptionButton({ days }: { days: number | null | undefi
   if (tone === 'calm') return null
 
   if (tone === 'warn') {
+    // Янтарь лежит на сплошной подложке: на голых 10% сквозь кнопку
+    // просвечивала карточка, и она выглядела полупрозрачной.
     return (
       <Link
         to="/tariffs"
-        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-amber-400/50 bg-amber-500/10 px-4 text-sm font-semibold text-amber-800 transition-colors hover:bg-amber-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:text-amber-300"
+        className={cn(
+          'inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg border px-4 text-sm font-semibold transition-[background,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'border-amber-400/80 bg-amber-50 text-amber-800 shadow-[0_6px_16px_-10px_rgb(217_119_6/0.55)] hover:bg-amber-100',
+          'dark:border-amber-400/65 dark:text-amber-300 dark:shadow-[0_6px_18px_-10px_rgb(245_158_11/0.6)]',
+          'dark:[background:linear-gradient(180deg,rgb(245_158_11/0.26),rgb(245_158_11/0.16)),hsl(var(--background))]',
+          'dark:hover:[background:linear-gradient(180deg,rgb(245_158_11/0.34),rgb(245_158_11/0.22)),hsl(var(--background))]',
+        )}
       >
         <Zap size={15} />
         {t('subscriptionPage.renewSubscription')}

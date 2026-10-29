@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type bedolagaTariff struct {
@@ -82,7 +82,7 @@ type sourceDB struct {
 }
 
 func openSource(ctx context.Context, dsn string) (*sourceDB, error) {
-	pool, err := pgxpool.Connect(ctx, dsn)
+	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("connect bedolaga db: %w", err)
 	}

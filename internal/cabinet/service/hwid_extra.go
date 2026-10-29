@@ -91,6 +91,44 @@ func CleanupExpiredExtraHwid(ctx context.Context, rw *remnawave.Client, customer
 	return nil
 }
 
+// IsHwidLimitPinned — лимит устройств закреплён админом: докупка и промокоды
+// на устройства клиенту недоступны, они ничего бы не изменили.
+func IsHwidLimitPinned(c *database.Customer) bool {
+	return c != nil && c.HwidLimitOverride != nil
+}
+
+// BillableExtraSlots — доп. слоты, которые можно продлить вместе с подпиской.
+// При закреплённом лимите — ни одного: продление ничего бы не изменило.
+func BillableExtraSlots(c *database.Customer) int {
+	if IsHwidLimitPinned(c) {
+		return 0
+	}
+	return ActiveExtraSlots(c)
+}
+
+// UnpinnedDeviceLimit — лимит, который был бы у клиента без закрепления:
+// база текущего тарифа (без тарифа — PAID_HWID_LIMIT или fallback из env)
+// плюс действующие докупленные слоты.
+func UnpinnedDeviceLimit(ctx context.Context, tariffs *database.TariffRepository, c *database.Customer) int {
+	base := config.PaidHwidLimit()
+	if base <= 0 {
+		base = config.GetHwidFallbackDeviceLimit()
+	}
+	if tariffs != nil && c != nil && c.CurrentTariffID != nil && *c.CurrentTariffID > 0 {
+		if t, err := tariffs.GetByID(ctx, *c.CurrentTariffID); err == nil && t != nil && t.DeviceLimit > 0 {
+			base = t.DeviceLimit
+		}
+	}
+	if base < 1 {
+		base = 1
+	}
+	limit := base + ActiveExtraSlots(c)
+	if maxL := config.HwidMaxDevices(); maxL > 0 && limit > maxL {
+		limit = maxL
+	}
+	return limit
+}
+
 // BuildHwidExtraLimits собирает лимиты после опциональной очистки протухшего extra (caller передаёт уже загруженного customer и rw user).
 func BuildHwidExtraLimits(customer *database.Customer, rwUser *remnawave.User) HwidExtraLimits {
 	cur := CurrentDeviceLimitFromRW(rwUser)

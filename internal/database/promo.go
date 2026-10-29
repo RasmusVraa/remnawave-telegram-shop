@@ -8,8 +8,8 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // PendingDiscountUnlimitedPayments — значение subscription_payments_remaining: безлимит оплат до истечения TTL.
@@ -59,6 +59,41 @@ type PendingDiscount struct {
 	UntilFirstPurchase  bool       `db:"until_first_purchase"`
 	CreatedAt           time.Time  `db:"created_at"`
 	SubscriptionPaymentsRemaining int `db:"subscription_payments_remaining"`
+}
+
+// openInvoiceWindow — сколько неоплаченный счёт со скидкой держит её за собой.
+// Кассы закрывают счёт за минуты–часы, но статус в базе не всегда доходит до
+// cancel: счёт Platega месячной давности так и остаётся new и иначе занимал
+// бы скидку навсегда. Счета Stars не истекают — их отменяет
+// CancelOpenTelegramPurchasesWithPromo.
+const openInvoiceWindow = "24 hours"
+
+// CountOpenPurchasesWithPromo — неоплаченные (new/pending) счета клиента со
+// скидкой по этому промокоду за последние сутки: каждый из них ещё может быть
+// оплачен со скидкой.
+func (r *PromoRepository) CountOpenPurchasesWithPromo(ctx context.Context, customerID, promoCodeID int64) (int, error) {
+	var n int
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*) FROM purchase
+		 WHERE customer_id = $1 AND promo_code_id = $2 AND status IN ('new', 'pending')
+		   AND created_at > now() - $3::interval`,
+		customerID, promoCodeID, openInvoiceWindow).Scan(&n)
+	return n, err
+}
+
+// CancelOpenTelegramPurchasesWithPromo отменяет неоплаченные счета Stars клиента
+// с этим промокодом. Ссылка на счёт Stars не истекает, поэтому такой счёт иначе
+// держал бы скидку вечно; оплату отменённого счёта отклоняет pre_checkout.
+func (r *PromoRepository) CancelOpenTelegramPurchasesWithPromo(ctx context.Context, customerID, promoCodeID int64) (int64, error) {
+	ct, err := r.pool.Exec(ctx, `
+		UPDATE purchase SET status = 'cancel'
+		 WHERE customer_id = $1 AND promo_code_id = $2 AND invoice_type = 'telegram'
+		   AND status IN ('new', 'pending')`,
+		customerID, promoCodeID)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 type PromoRepository struct {

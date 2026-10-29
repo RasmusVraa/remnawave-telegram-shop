@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Confirm Google account link</title>
+<title>Confirm {{ .ProviderName }} account link</title>
 </head>
 <body style="margin:0;padding:24px;background:#f4f5f7;font-family:Segoe UI,Arial,sans-serif;color:#222;">
 <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;box-shadow:0 4px 16px rgba(0,0,0,0.04);">
-    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">Link your Google account</h1>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">Someone attempted to sign in via Google using an email address that matches your account. If this was you, click the button below to confirm linking Google to your cabinet.</p>
+    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">Link your {{ .ProviderName }} account</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">Someone attempted to sign in via {{ .ProviderName }} using an email address that matches your account. If this was you, click the button below to confirm linking {{ .ProviderName }} to your cabinet.</p>
     <p style="margin:24px 0;text-align:center;">
         <a href="{{ .ConfirmURL }}" style="display:inline-block;padding:12px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Confirm link</a>
     </p>
     <p style="margin:0 0 8px;font-size:13px;color:#666;">If the button doesn't work, open the link manually:</p>
     <p style="margin:0 0 16px;font-size:13px;word-break:break-all;"><a href="{{ .ConfirmURL }}" style="color:#2563eb;">{{ .ConfirmURL }}</a></p>
     <p style="margin:0 0 8px;font-size:13px;color:#666;">The link is valid for 15 minutes.</p>
-    <p style="margin:24px 0 0;font-size:12px;color:#999;">If you didn't try to sign in via Google — just ignore this email. Your account is safe.</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#999;">If you didn't try to sign in via {{ .ProviderName }} — just ignore this email. Your account is safe.</p>
 </div>
 </body>
 </html>

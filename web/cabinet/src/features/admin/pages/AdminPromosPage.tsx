@@ -20,6 +20,7 @@ import {
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { Card } from '@/components/ui/card'
+import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import {
   useAdminPromoList,
@@ -37,6 +38,7 @@ import { AdminModal } from '../components/AdminModal'
 import { AdminConfirmModal } from '../components/AdminConfirmModal'
 import { AdminCheckboxField } from '../components/AdminCheckbox'
 import { useAdminMutationFeedback } from '../hooks/useAdminMutationFeedback'
+import { formatAdminApiError } from '../utils/formatAdminApiError'
 import { truncatePreview } from '../utils/truncatePreview'
 import { formatAdminCustomerLabel } from '../utils/formatAdminCustomerLabel'
 import { resolvePromoDisplayStatus, type PromoDisplayStatus } from '../utils/promoStatus'
@@ -90,15 +92,37 @@ function statusBadge(promo: Pick<AdminPromoCode, 'active' | 'valid_until'>, t: T
   )
 }
 
-function CreatePromoModal({ onClose, onCreate }: { onClose: () => void; onCreate: (d: CreatePromoInput) => void }) {
+function CreatePromoModal({
+  onClose,
+  onCreate,
+  error,
+  codeTaken,
+  pending,
+  onEdit,
+}: {
+  onClose: () => void
+  onCreate: (d: CreatePromoInput) => void
+  /** Ошибка создания — показывается в самом окне: под ним сообщение страницы не видно. */
+  error: string | null
+  /** Код уже занят — подсвечиваем поле кода. */
+  codeTaken: boolean
+  pending: boolean
+  /** Пользователь изменил форму — старая ошибка больше не актуальна. */
+  onEdit: () => void
+}) {
   const { t } = useTranslation()
   const [form, setForm] = useState<CreatePromoInput>({
     code: '',
     type: 'subscription_days',
+    // Скидка по умолчанию — на одну оплату: 0 означает «без ограничения» и
+    // раньше молча ставился любому созданному здесь скидочному промокоду.
+    discount_max_subscription_payments_per_customer: 1,
   })
 
-  const set = <K extends keyof CreatePromoInput>(k: K, v: CreatePromoInput[K]) =>
+  const set = <K extends keyof CreatePromoInput>(k: K, v: CreatePromoInput[K]) => {
+    onEdit()
     setForm((p) => ({ ...p, [k]: v }))
+  }
 
   return (
     <AdminModal open onClose={onClose} title={t('admin.promos.createTitle')} panelClassName="sm:max-w-lg" icon={TicketPercent} iconAccent="violet">
@@ -106,11 +130,16 @@ function CreatePromoModal({ onClose, onCreate }: { onClose: () => void; onCreate
           <div>
             <label className="mb-1 block text-sm font-medium">{t('admin.promos.code')}</label>
             <input
-              className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+              className={cn(
+                'admin-input w-full rounded-lg border bg-background px-3 py-2 text-sm',
+                codeTaken ? 'border-destructive ring-1 ring-destructive' : 'border-border',
+              )}
+              aria-invalid={codeTaken}
               value={form.code}
               onChange={(e) => set('code', e.target.value.toUpperCase())}
               placeholder="PROMO2024"
             />
+            {codeTaken && <p className="mt-1 text-xs text-destructive">{t('admin.promos.codeTaken')}</p>}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">{t('admin.promos.type')}</label>
@@ -152,6 +181,11 @@ function CreatePromoModal({ onClose, onCreate }: { onClose: () => void; onCreate
                 <label className="mb-1 block text-sm font-medium">{t('admin.promos.discountTTL')}</label>
                 <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.discount_ttl_hours ?? ''} onChange={(e) => set('discount_ttl_hours', e.target.value ? Number(e.target.value) : null)} />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium">{t('admin.promos.discountMaxPayments')}</label>
+                <input type="number" min={0} className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.discount_max_subscription_payments_per_customer ?? 0} onChange={(e) => set('discount_max_subscription_payments_per_customer', e.target.value ? Number(e.target.value) : 0)} />
+                <p className="mt-1 text-xs text-muted-foreground">{t('admin.promos.discountMaxPaymentsHint')}</p>
+              </div>
             </>
           )}
           <div>
@@ -168,13 +202,18 @@ function CreatePromoModal({ onClose, onCreate }: { onClose: () => void; onCreate
             label={t('admin.promos.firstPurchaseOnly')}
           />
       </div>
+      {error && (
+        <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {error}
+        </div>
+      )}
       <div className="mt-4 flex justify-end gap-2 border-t border-border/50 pt-4">
           <button className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent" onClick={onClose}>
             {t('admin.cancel')}
           </button>
           <button
             className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-            disabled={!form.code.trim() || !form.type}
+            disabled={!form.code.trim() || !form.type || pending}
             onClick={() => onCreate(form)}
           >
             {t('admin.create')}
@@ -777,14 +816,27 @@ export default function AdminPromosPage() {
 
   const totalPages = data ? Math.ceil(data.total / data.limit) : 1
 
+  const [createError, setCreateError] = useState<{ message: string; codeTaken: boolean } | null>(null)
+
   const handleCreate = (input: CreatePromoInput) => {
+    setCreateError(null)
     create.mutate(input, {
-      ...handlers(t('admin.feedback.saved')),
       onSuccess: () => {
         handlers(t('admin.feedback.saved')).onSuccess()
         setShowCreate(false)
       },
+      onError: (err) => {
+        setCreateError({
+          message: formatAdminApiError(err, t),
+          codeTaken: err instanceof ApiError && err.status === 409,
+        })
+      },
     })
+  }
+
+  const closeCreate = () => {
+    setShowCreate(false)
+    setCreateError(null)
   }
 
   return (
@@ -865,7 +917,16 @@ export default function AdminPromosPage() {
         )}
       </div>
 
-      {showCreate && <CreatePromoModal onClose={() => setShowCreate(false)} onCreate={handleCreate} />}
+      {showCreate && (
+        <CreatePromoModal
+          onClose={closeCreate}
+          onCreate={handleCreate}
+          error={createError?.message ?? null}
+          codeTaken={createError?.codeTaken ?? false}
+          pending={create.isPending}
+          onEdit={() => setCreateError(null)}
+        />
+      )}
     </AdminLayout>
   )
 }

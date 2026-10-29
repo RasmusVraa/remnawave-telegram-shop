@@ -45,9 +45,9 @@ export function SubscriptionExpireAtBlock({ expireAt, lang, days, isActive, clas
         <p className={cn('text-[11px] uppercase tracking-[0.14em]', skin.label)}>
           {expired ? t('subscriptionPage.expiredBlockTitle') : t('subscriptionPage.expireAt')}
         </p>
-        <p className="text-[0.95rem] font-medium">
-          {!expired && expireAt ? formatDate(expireAt, lang) : '—'}
-        </p>
+        {/* У истёкшей подписки даты нет — прочерк на её месте выбивался из
+            блока, хватает заголовка и подсказки. */}
+        {!expired && expireAt && <p className="text-[0.95rem] font-medium">{formatDate(expireAt, lang)}</p>}
         <p className={cn('text-xs', skin.note)}>
           {expired
             ? t('subscriptionPage.expiredRestoreHint')

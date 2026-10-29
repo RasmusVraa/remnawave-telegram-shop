@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -561,6 +562,9 @@ func ExternalSquadUUID() uuid.UUID {
 	return conf.externalSquadUUID
 }
 
+// Price — цена периода в рублях (classic). Для периода, которого нет в продаже,
+// — 0: раньше любой месяц вне 1/3/6/12 стоил как один, и подделанная кнопка
+// бота продавала month=120 по цене месяца.
 func Price(month int) int {
 	switch month {
 	case 1:
@@ -572,10 +576,11 @@ func Price(month int) int {
 	case 12:
 		return conf.price12
 	default:
-		return conf.price1
+		return 0
 	}
 }
 
+// StarsPrice — цена периода в Stars (classic); 0 — периода нет в продаже (см. Price).
 func StarsPrice(month int) int {
 	switch month {
 	case 1:
@@ -587,7 +592,7 @@ func StarsPrice(month int) int {
 	case 12:
 		return conf.starsPrice12
 	default:
-		return conf.starsPrice1
+		return 0
 	}
 }
 func TelegramToken() string {
@@ -877,11 +882,25 @@ func envFloatDefault(key string, def float64) float64 {
 	if v == "" {
 		return def
 	}
-	f, err := strconv.ParseFloat(strings.Replace(v, ",", ".", 1), 64)
+	f, err := parseFiniteFloat(strings.Replace(v, ",", ".", 1))
 	if err != nil {
 		log.Panicf("invalid float in %q: %v", key, err)
 	}
 	return f
+}
+
+// parseFiniteFloat — ParseFloat, который не принимает NaN и ±Inf. strconv их
+// понимает («NaN», «inf»), а проверки вида v < 0 || v > 100 NaN пропускают:
+// любое сравнение с ним ложно. NaN в проценте партнёрки превращал балансы в NaN.
+func parseFiniteFloat(s string) (float64, error) {
+	f, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if err != nil {
+		return 0, err
+	}
+	if math.IsNaN(f) || math.IsInf(f, 0) {
+		return 0, fmt.Errorf("%q is not a finite number", s)
+	}
+	return f, nil
 }
 
 // clampPercent — процент всегда в 0..100. Отрицательный процент означал бы
@@ -1461,7 +1480,7 @@ func InitConfig() {
 		if v == "" {
 			return 0
 		}
-		f, err := strconv.ParseFloat(v, 64)
+		f, err := parseFiniteFloat(v)
 		if err != nil || f < 0 {
 			return 0
 		}

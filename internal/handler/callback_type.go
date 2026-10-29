@@ -21,7 +21,6 @@ const (
 	CallbackAddDeviceConfirm  = "add_device_confirm"
 	CallbackAddDeviceApply    = "add_device_apply"
 	CallbackAddDevicePayment  = "add_device_payment"
-	CallbackRenewExtraHwid    = "renew_extra_hwid"
 	CallbackPurchaseHistory   = "purchase_history"
 	CallbackBroadcastConfirm  = "broadcast_confirm"
 	CallbackBroadcastCancel   = "broadcast_cancel"
@@ -47,6 +46,7 @@ const (
 	CallbackBroadcastTogglePromo = "bc_t_prm"
 	CallbackBroadcastToggleVPN   = "bc_t_vpn"
 	CallbackBroadcastToggleBuy   = "bc_t_buy"
+	CallbackBroadcastToggleShare = "bc_t_ref"
 	CallbackBroadcastButtonsNext = "bc_next"
 
 	CallbackAdminPanel   = "admin_panel"

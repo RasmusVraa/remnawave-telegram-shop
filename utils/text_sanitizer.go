@@ -83,15 +83,6 @@ var (
 		"report": true,
 	}
 
-	dangerousKeywords = map[string]bool{
-		"telegram": true,
-		"service":  true,
-		"system":   true,
-		"security": true,
-		"safety":   true,
-		"support":  true,
-	}
-
 	dangerousCombinations = [][]string{
 		{"telegram", "support"},
 		{"telegram", "admin"},

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"remnawave-tg-shop-bot/internal/broadcast"
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
 	cabinethttp "remnawave-tg-shop-bot/internal/cabinet/http"
+	cabrepo "remnawave-tg-shop-bot/internal/cabinet/repository"
 	cabstartup "remnawave-tg-shop-bot/internal/cabinet/startup"
 	"remnawave-tg-shop-bot/internal/cache"
 	"remnawave-tg-shop-bot/internal/config"
@@ -29,16 +31,18 @@ import (
 	"remnawave-tg-shop-bot/internal/remnawave"
 	"remnawave-tg-shop-bot/internal/remnawavewebhook"
 	"remnawave-tg-shop-bot/internal/sync"
+	"remnawave-tg-shop-bot/internal/tgclient"
 	"remnawave-tg-shop-bot/internal/translation"
 	"remnawave-tg-shop-bot/internal/tribute"
 	"remnawave-tg-shop-bot/internal/yookasa"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/robfig/cron/v3"
 )
 
@@ -51,8 +55,9 @@ var (
 
 // main - главная функция приложения, инициализирует все компоненты бота и запускает его
 func main() {
-	// Создаем контекст с обработкой сигналов прерывания (Ctrl+C) для корректного завершения
-	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	// Контекст отменяется по Ctrl+C и по SIGTERM (docker stop, Kubernetes) —
+	// без SIGTERM процесс обрывался посреди обработки, не дождавшись ничего.
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
 	// Инициализация конфигурации из переменных окружения
@@ -121,10 +126,10 @@ func main() {
 	cache := cache.NewCache(30 * time.Minute)
 
 	// Создание репозиториев для работы с данными в БД
-	customerRepository := database.NewCustomerRepository(pool) // Работа с пользователями
-	purchaseRepository := database.NewPurchaseRepository(pool) // Работа с покупками
-	tariffRepository := database.NewTariffRepository(pool)     // Тарифы (SALES_MODE=tariffs)
-	referralRepository := database.NewReferralRepository(pool)             // Работа с реферальной системой
+	customerRepository := database.NewCustomerRepository(pool)                  // Работа с пользователями
+	purchaseRepository := database.NewPurchaseRepository(pool)                  // Работа с покупками
+	tariffRepository := database.NewTariffRepository(pool)                      // Тарифы (SALES_MODE=tariffs)
+	referralRepository := database.NewReferralRepository(pool)                  // Работа с реферальной системой
 	referralLedgerRepository := database.NewReferralBonusLedgerRepository(pool) // Журнал реферальных начислений
 	promoRepository := database.NewPromoRepository(pool)
 	statsRepository := database.NewStatsRepository(pool)
@@ -146,6 +151,7 @@ func main() {
 	// Инициализация клиентов для работы с внешними сервисами
 	cryptoPayClient := cryptopay.NewCryptoPayClient(config.CryptoPayUrl(), config.CryptoPayToken())                // Криптоплатежи
 	remnawaveClient := remnawave.NewClient(config.RemnawaveUrl(), config.RemnawaveToken(), config.RemnawaveMode()) // Remnawave API
+	remnawaveClient.SetHwidLimitPin(customerRepository.HwidLimitOverride)                                          // Закреплённые админом лимиты устройств
 	yookasaClient := yookasa.NewClient(config.YookasaUrl(), config.YookasaShopId(), config.YookasaSecretKey())     // YooKassa платежи
 	plategaClient := platega.NewClient(config.PlategaMerchantID(), config.PlategaSecret())
 
@@ -172,20 +178,22 @@ func main() {
 	}
 
 	// Создание экземпляра Telegram бота с 3 воркерами для параллельной обработки запросов
-	botOptions := []bot.Option{bot.WithWorkers(3)}
+	botInflight := &handler.Inflight{}
+	botOptions := []bot.Option{bot.WithWorkers(3), bot.WithMiddlewares(handler.RecoverMiddleware(botInflight))}
+	// Значения по умолчанию go-telegram/bot: long poll и таймаут клиента — минута.
+	botPollTimeout := time.Minute
+	var botHTTP tgclient.Doer = &http.Client{Timeout: botPollTimeout}
 	if proxyURL := config.TelegramProxyURL(); proxyURL != "" {
 		parsedURL, err := url.Parse(proxyURL)
 		if err != nil {
 			slog.Error("Invalid TELEGRAM_PROXY_URL, proxy disabled", "error", err)
 		} else {
-			transport := &http.Transport{
-				Proxy: http.ProxyURL(parsedURL),
-			}
-			botOptions = append(botOptions, bot.WithHTTPClient(30*time.Second, &http.Client{
-				Transport: transport,
-			}))
+			botPollTimeout = 30 * time.Second
+			botHTTP = &http.Client{Transport: &http.Transport{Proxy: http.ProxyURL(parsedURL)}}
 		}
 	}
+	// Общий лимит отправки и повтор после 429 — для всех сообщений процесса.
+	botOptions = append(botOptions, bot.WithHTTPClient(botPollTimeout, tgclient.New(botHTTP, tgclient.SendsPerSecond)))
 	b, err := bot.New(config.TelegramToken(), botOptions...)
 	if err != nil {
 		panic(err)
@@ -218,9 +226,10 @@ func main() {
 	// Настройка cron-задачи для проверки статуса счетов (каждые 5 секунд)
 	// CryptoPay; YooKassa и Platega — поллинг только если не задан соответствующий WEBHOOK_URL.
 	cronScheduler := setupInvoiceChecker(purchaseRepository, cryptoPayClient, paymentService, yookasaClient, plategaClient, heleketReconciler)
+	var schedulers []*cron.Cron
 	if cronScheduler != nil {
 		cronScheduler.Start()
-		defer cronScheduler.Stop()
+		schedulers = append(schedulers, cronScheduler)
 	}
 
 	// Инициализация сервиса уведомлений о подписках
@@ -231,6 +240,7 @@ func main() {
 	// Отправляет уведомления пользователям об истечении подписки
 	subscriptionNotificationCronScheduler := subscriptionChecker(subService, infraBillingNotifyService)
 	subscriptionNotificationCronScheduler.Start()
+	schedulers = append(schedulers, subscriptionNotificationCronScheduler)
 
 	// Lifecycle notifications cron (отдельно от daily 16:00)
 	var lifecycleCronScheduler *cron.Cron
@@ -248,15 +258,15 @@ func main() {
 		)
 		lifecycleCronScheduler = lifecycleChecker(lifecycleService)
 		lifecycleCronScheduler.Start()
+		schedulers = append(schedulers, lifecycleCronScheduler)
 		slog.Info("Lifecycle notifications cron started", "schedule", config.LifecycleCron())
 	}
-	defer subscriptionNotificationCronScheduler.Stop()
 
 	// Воркер переотправки чеков «Мой налог».
 	if receiptQueue.Enabled() {
 		receiptCronScheduler := receiptRetryChecker(receiptQueue)
 		receiptCronScheduler.Start()
-		defer receiptCronScheduler.Stop()
+		schedulers = append(schedulers, receiptCronScheduler)
 		slog.Info("Moynalog receipt retry cron started",
 			"schedule", config.MoynalogRetryCron(), "maxAge", config.MoynalogRetryMaxAge())
 	}
@@ -272,14 +282,28 @@ func main() {
 	// а выключение программы не должно замораживать уже заработанное.
 	partnerHoldCronScheduler := partnerHoldReleaser(partnerRepository)
 	partnerHoldCronScheduler.Start()
-	defer partnerHoldCronScheduler.Stop()
+	schedulers = append(schedulers, partnerHoldCronScheduler)
 	slog.Info("Partner hold release cron started", "holdDays", config.PartnerHoldDays())
+
+	// Истёкшие сессии и коды кабинета раньше копились вечно. Таблицы есть и
+	// без CABINET_ENABLED (миграции общие), пустая таблица делает тик бесплатным.
+	cabinetCleanupScheduler := cabinetExpiredCleaner(pool)
+	cabinetCleanupScheduler.Start()
+	schedulers = append(schedulers, cabinetCleanupScheduler)
 
 	// Инициализация сервиса синхронизации с Remnawave
 	syncService := sync.NewSyncService(remnawaveClient, customerRepository)
 
 	// Создание главного обработчика всех команд и callback'ов бота
-	h := handler.NewHandler(syncService, paymentService, tm, customerRepository, purchaseRepository, tariffRepository, cryptoPayClient, yookasaClient, referralRepository, partnerRepository, cache, promoRepository, promoService, remnawaveClient, statsRepository, infraBillingRepository, loyaltyTierRepository)
+	// Один отправитель на бота и кабинет: история рассылок общая.
+	broadcastRepository := database.NewBroadcastRepository(pool)
+	if n, err := broadcastRepository.MarkInterrupted(ctx); err != nil {
+		slog.Warn("broadcast history: mark interrupted", "error", err)
+	} else if n > 0 {
+		slog.Warn("broadcast history: broadcasts interrupted by restart", "count", n)
+	}
+	broadcastSender := broadcast.NewSender(customerRepository, broadcastRepository, tm)
+	h := handler.NewHandler(syncService, paymentService, tm, customerRepository, purchaseRepository, tariffRepository, cryptoPayClient, yookasaClient, referralRepository, partnerRepository, cache, promoRepository, promoService, remnawaveClient, statsRepository, infraBillingRepository, loyaltyTierRepository, broadcastSender)
 
 	// Получение информации о боте (username и т.д.)
 	// Используем контекст с таймаутом для GetMe, чтобы избежать зависания при проблемах с сетью
@@ -397,6 +421,7 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastTogglePromo, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleVPN, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleBuy, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleShare, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastButtonsNext, bot.MatchTypeExact, h.BroadcastButtonsNextHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 
 	// Админ-панель и промокоды
@@ -557,7 +582,6 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackAddDevicePayment, bot.MatchTypePrefix, h.AddDevicePaymentCallbackHandler, h.SuspiciousUserFilterMiddleware, h.CreateCustomerIfNotExistMiddleware, h.RequireLegalAcceptanceMiddleware, h.AnswerCallbackQueryMiddleware)
 
 	// Callback для продления доп. устройств
-	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackRenewExtraHwid, bot.MatchTypePrefix, h.RenewExtraHwidCallbackHandler, h.SuspiciousUserFilterMiddleware, h.CreateCustomerIfNotExistMiddleware, h.RequireLegalAcceptanceMiddleware, h.AnswerCallbackQueryMiddleware)
 
 	// Callback для истории операций (с префиксом, т.к. содержит параметры страницы)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackPurchaseHistory, bot.MatchTypePrefix, h.PurchaseHistoryCallbackHandler, h.SuspiciousUserFilterMiddleware, h.CreateCustomerIfNotExistMiddleware, h.RequireLegalAcceptanceMiddleware, h.AnswerCallbackQueryMiddleware)
@@ -844,7 +868,7 @@ func main() {
 		mux.Handle(config.GetYookasaWebHookURL(), yookasa.NewWebhookHandler(yookasaClient, paymentService, purchaseRepository))
 	}
 	if config.IsPlategaEnabled() && strings.TrimSpace(config.GetPlategaWebHookURL()) != "" {
-		mux.Handle(config.GetPlategaWebHookURL(), platega.NewWebhookHandler(purchaseRepository, paymentService, config.PlategaMerchantID(), config.PlategaSecret()))
+		mux.Handle(config.GetPlategaWebHookURL(), platega.NewWebhookHandler(purchaseRepository, paymentService, plategaClient, config.PlategaMerchantID(), config.PlategaSecret()))
 	}
 	// Монтируем по наличию реквизитов, а не по тумблеру: способ оплаты можно
 	// включить из админки без рестарта, и тогда счета создавались бы, а колбэк
@@ -863,7 +887,6 @@ func main() {
 	// cabcfg.InitConfig() вызван ранее (сразу после миграций), здесь только
 	// монтируем роуты.
 	if cabcfg.IsEnabled() {
-		broadcastSender := broadcast.NewSender(customerRepository, tm)
 		if err := cabinethttp.Mount(ctx, mux, pool, paymentService, remnawaveClient, promoService, syncService, b, broadcastSender); err != nil {
 			panic(fmt.Errorf("failed to mount cabinet routes: %w", err))
 		}
@@ -871,9 +894,16 @@ func main() {
 	}
 
 	// Запуск HTTP сервера в отдельной горутине
+	// Без таймаутов медленный клиент держит соединение сколько угодно, и
+	// сотня таких соединений съедает сервер (slowloris). Ответы у нас короткие:
+	// долгие операции админки (синхронизация, рассылка) идут в фоне.
 	srv := &http.Server{
-		Addr:    fmt.Sprintf(":%d", config.GetHealthCheckPort()),
-		Handler: mux,
+		Addr:              fmt.Sprintf(":%d", config.GetHealthCheckPort()),
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      90 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 	go func() {
 		log.Printf("Server listening on %s", srv.Addr)
@@ -894,56 +924,88 @@ func main() {
 	// Запуск бота (блокирующий вызов, работает до получения сигнала прерывания)
 	b.Start(ctx)
 
-	// Корректное завершение HTTP сервера при остановке бота
-	log.Println("Shutting down health server…")
-	shutdownCtx, shutCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer shutCancel()
-	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("Health server shutdown error: %v", err)
+	shutdown(srv, botInflight, schedulers, pool)
+}
+
+// shutdownTimeout — сколько ждём незавершённую работу при остановке. Docker
+// после SIGTERM ждёт 10 секунд и убивает процесс, поэтому укладываемся в 9.
+const shutdownTimeout = 9 * time.Second
+
+// shutdown останавливает процесс по порядку: перестаёт принимать HTTP (вебхуки
+// оплат, кабинет) и дожидается начатых запросов, затем дожидается начатых
+// обработчиков бота и задач cron, и только потом закрывает пул БД — иначе
+// начатая выдача подписки обрывалась бы на полпути.
+func shutdown(srv *http.Server, botInflight *handler.Inflight, schedulers []*cron.Cron, pool *pgxpool.Pool) {
+	slog.Info("Shutting down…")
+	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	defer cancel()
+
+	// Новые задачи cron не стартуют с этого момента; начатые ждём ниже.
+	cronDone := make([]context.Context, 0, len(schedulers))
+	for _, c := range schedulers {
+		cronDone = append(cronDone, c.Stop())
 	}
+	if err := srv.Shutdown(ctx); err != nil {
+		slog.Error("HTTP server shutdown", "error", err)
+	}
+	if left := botInflight.Wait(ctx); left > 0 {
+		slog.Warn("Shutdown: bot handlers still running", "count", left)
+	}
+	for _, done := range cronDone {
+		select {
+		case <-done.Done():
+		case <-ctx.Done():
+			slog.Warn("Shutdown: cron job still running")
+		}
+	}
+	pool.Close()
+	slog.Info("Shutdown complete")
 }
 
 // fullHealthHandler - HTTP обработчик для проверки здоровья сервиса
 // Проверяет доступность базы данных и Remnawave API
 // Используется для мониторинга и healthcheck в оркестраторах (Docker, Kubernetes и т.д.)
+//
+// Эндпоинт открыт наружу, поэтому по компонентам отдаёт только «ok»/«fail»:
+// текст ошибки раскрывал адреса и внутренности БД и панели. Подробности
+// пишутся в лог. Версия остаётся — по ней проверяют, что выкатилось.
 func fullHealthHandler(pool *pgxpool.Pool, rw *remnawave.Client) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		status := map[string]string{
-			"status":    "ok",
-			"db":        "ok",
-			"rw":        "ok",
-			"time":      time.Now().Format(time.RFC3339),
-			"version":   Version,
-			"commit":    Commit,
-			"buildDate": BuildDate,
-		}
+		resp := struct {
+			Status    string `json:"status"`
+			DB        string `json:"db"`
+			Remnawave string `json:"remnawave"`
+			Time      string `json:"time"`
+			Version   string `json:"version"`
+			Commit    string `json:"commit"`
+			BuildDate string `json:"buildDate"`
+		}{Status: "ok", DB: "ok", Remnawave: "ok", Time: time.Now().Format(time.RFC3339),
+			Version: Version, Commit: Commit, BuildDate: BuildDate}
 
 		// Проверка доступности базы данных PostgreSQL
 		dbCtx, dbCancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer dbCancel()
 		if err := pool.Ping(dbCtx); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			status["status"] = "fail"
-			status["db"] = "error: " + err.Error()
+			slog.Error("healthcheck: database", "error", err)
+			resp.Status, resp.DB = "fail", "fail"
 		}
 
 		// Проверка доступности Remnawave API
 		rwCtx, rwCancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer rwCancel()
 		if err := rw.Ping(rwCtx); err != nil {
-			w.WriteHeader(http.StatusServiceUnavailable)
-			status["status"] = "fail"
-			status["rw"] = "error: " + err.Error()
+			slog.Error("healthcheck: remnawave", "error", err)
+			resp.Status, resp.Remnawave = "fail", "fail"
 		}
 
-		if status["status"] == "ok" {
-			w.WriteHeader(http.StatusOK)
+		code := http.StatusOK
+		if resp.Status != "ok" {
+			code = http.StatusServiceUnavailable
 		}
-
-		// Возвращаем JSON с результатами проверки
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintf(w, `{"status":"%s","db":"%s","remnawave":"%s","time":"%s","version":"%s","commit":"%s","buildDate":"%s"}`,
-			status["status"], status["db"], status["rw"], status["time"], status["version"], status["commit"], status["buildDate"])
+		w.Header().Set("Cache-Control", "no-store")
+		w.WriteHeader(code)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 }
 
@@ -975,7 +1037,7 @@ func isAdminMiddleware(next bot.HandlerFunc) bot.HandlerFunc {
 // Запускается каждый день в 16:00 (формат cron: "0 16 * * *")
 // Отправляет уведомления пользователям об истечении подписки
 func subscriptionChecker(subService *notification.SubscriptionService, infraNotify *notification.InfraBillingNotifyService) *cron.Cron {
-	c := cron.New()
+	c := newCron()
 
 	// Добавляем задачу: каждый день в 16:00 проверять истечение подписок
 	_, err := c.AddFunc("0 16 * * *", func() {
@@ -1000,7 +1062,7 @@ func subscriptionChecker(subService *notification.SubscriptionService, infraNoti
 // lifecycleChecker - настраивает cron для lifecycle-уведомлений (no-connect, win-back, trial expiring)
 // Запускается по расписанию из LIFECYCLE_CRON (по умолчанию каждые 30 минут)
 func lifecycleChecker(lifecycleService *notification.LifecycleService) *cron.Cron {
-	c := cron.New()
+	c := newCron()
 
 	cronSchedule := config.LifecycleCron()
 	_, err := c.AddFunc(cronSchedule, func() {
@@ -1021,7 +1083,7 @@ func lifecycleChecker(lifecycleService *notification.LifecycleService) *cron.Cro
 // Ошибка тика не фатальна: следующий час подберёт всё, что не успело раскрыться,
 // потому что выборка идёт по состоянию строк, а не по времени последнего запуска.
 func partnerHoldReleaser(partners *database.PartnerRepository) *cron.Cron {
-	c := cron.New()
+	c := newCron()
 
 	_, err := c.AddFunc("0 * * * *", func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
@@ -1044,10 +1106,33 @@ func partnerHoldReleaser(partners *database.PartnerRepository) *cron.Cron {
 	return c
 }
 
+// cabinetExpiredCleaner — раз в сутки удаляет сессии и одноразовые коды
+// кабинета, истёкшие больше недели назад.
+func cabinetExpiredCleaner(pool *pgxpool.Pool) *cron.Cron {
+	c := newCron()
+	_, err := c.AddFunc("30 4 * * *", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		deleted, err := cabrepo.PurgeExpired(ctx, pool, time.Now().Add(-cabrepo.ExpiredRetention))
+		if err != nil {
+			slog.Error("Error purging expired cabinet sessions and codes", "error", err)
+		}
+		for table, n := range deleted {
+			if n > 0 {
+				slog.Info("Purged expired cabinet rows", "table", table, "rows", n)
+			}
+		}
+	})
+	if err != nil {
+		panic(fmt.Sprintf("Failed to add cabinet cleanup cron job: %v", err))
+	}
+	return c
+}
+
 // receiptRetryChecker - cron переотправки чеков «Мой налог», застрявших из-за
 // недоступности ФНС или протухшей авторизации. Расписание — MOYNALOG_RETRY_CRON.
 func receiptRetryChecker(receiptQueue *receipt.Service) *cron.Cron {
-	c := cron.New()
+	c := newCron()
 
 	_, err := c.AddFunc(config.MoynalogRetryCron(), func() {
 		// Своя граница по времени: тик не должен висеть вечно, если ФНС
@@ -1077,13 +1162,74 @@ func initDatabase(ctx context.Context, connString string) (*pgxpool.Pool, error)
 	config.MaxConns = 20 // Максимальное количество одновременных соединений
 	config.MinConns = 5  // Минимальное количество соединений (поддерживается постоянно)
 
-	return pgxpool.ConnectConfig(ctx, config)
+	// Пул один на всё: бот, кабинет, cron, статистика. Без ограничений один
+	// зависший запрос или забытая открытой транзакция держали бы соединение и
+	// блокировки сколько угодно, и пул в 20 соединений кончался бы. Значения из
+	// строки подключения (options=...) имеют приоритет. Миграции идут отдельным
+	// пулом без statement_timeout — см. database.RunMigrations.
+	if _, ok := config.ConnConfig.RuntimeParams["statement_timeout"]; !ok {
+		config.ConnConfig.RuntimeParams["statement_timeout"] = "30s"
+	}
+	if _, ok := config.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"]; !ok {
+		config.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = "5min"
+	}
+
+	return pgxpool.NewWithConfig(ctx, config)
 }
 
 // setupInvoiceChecker - настраивает cron-задачи для проверки статуса счетов
 // heleketPollTimeout — потолок на один обход pending-счетов Heleket, чтобы
 // зависший ответ кассы не держал задачу до следующего запуска.
 const heleketPollTimeout = 4 * time.Minute
+
+// invoicePollTimeout — потолок на один проход поллера CryptoPay, YooKassa и
+// Platega. Запуск каждые 5 секунд, но проход с медленной кассой или панелью
+// может длиться дольше — тогда следующие запуски пропускаются, а не копятся.
+const invoicePollTimeout = 2 * time.Minute
+
+// invoicePollJob оборачивает проход поллера касс. Проходы не накладываются:
+// иначе два прохода шли бы по одному списку pending и упирались в блокировку
+// покупки. Паника в проходе не роняет процесс — без recover она убила бы вместе
+// с поллером и бота, и кабинет, и приём вебхуков.
+func invoicePollJob(run func(ctx context.Context)) cron.Job {
+	return cron.NewChain(
+		cron.Recover(cronSlogLogger{}),
+		cron.SkipIfStillRunning(cron.DiscardLogger),
+	).Then(cron.FuncJob(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), invoicePollTimeout)
+		defer cancel()
+		run(ctx)
+	}))
+}
+
+// newCron создаёт планировщик, у которого любая задача переживает свою панику
+// и не запускается повторно, пока не закончился предыдущий проход. У robfig/cron
+// по умолчанию нет ни того ни другого: паника в задаче роняла весь процесс.
+func newCron(opts ...cron.Option) *cron.Cron {
+	chain := cron.WithChain(cron.Recover(cronSlogLogger{}), cron.SkipIfStillRunning(cron.DiscardLogger))
+	return cron.New(append([]cron.Option{chain}, opts...)...)
+}
+
+// cronSlogLogger направляет сообщения cron (в первую очередь пойманные паники) в slog.
+type cronSlogLogger struct{}
+
+func (cronSlogLogger) Info(msg string, keysAndValues ...interface{}) {
+	slog.Info("cron: "+msg, keysAndValues...)
+}
+
+func (cronSlogLogger) Error(err error, msg string, keysAndValues ...interface{}) {
+	slog.Error("cron: "+msg, append([]interface{}{"error", err}, keysAndValues...)...)
+}
+
+// logProcessPurchaseError пишет ошибку обработки покупки из поллера. Занятая
+// блокировка — не сбой: покупку прямо сейчас доводит вебхук или соседний проход.
+func logProcessPurchaseError(msg string, err error, args ...any) {
+	if errors.Is(err, database.ErrPurchaseLocked) {
+		slog.Info(msg+": purchase is being processed elsewhere", args...)
+		return
+	}
+	slog.Error(msg, append(args, "error", err)...)
+}
 
 // Проверяет оплаченные счета в CryptoPay и YooKassa каждые 5 секунд
 // Если счет оплачен, обрабатывает покупку и активирует подписку
@@ -1107,17 +1253,16 @@ func setupInvoiceChecker(
 	if !config.CryptoPayHasCredentials() && !yookPoll && !plategaPoll && !heleketPoll {
 		return nil
 	}
-	c := cron.New(cron.WithSeconds()) // Включаем поддержку секунд в расписании
+	c := newCron(cron.WithSeconds()) // Включаем поддержку секунд в расписании
 
 	// Задача для проверки счетов CryptoPay (каждые 5 секунд)
 	if config.CryptoPayHasCredentials() {
-		_, err := c.AddFunc("*/5 * * * * *", func() {
+		_, err := c.AddJob("*/5 * * * * *", invoicePollJob(func(ctx context.Context) {
 			if !config.IsCryptoPayEnabled() {
 				return
 			}
-			ctx := context.Background()
 			checkCryptoPayInvoice(ctx, purchaseRepository, cryptoPayClient, paymentService)
-		})
+		}))
 
 		if err != nil {
 			panic(err)
@@ -1126,13 +1271,12 @@ func setupInvoiceChecker(
 
 	// Задача для проверки счетов YooKassa (каждые 5 секунд), если нет вебхука
 	if yookPoll {
-		_, err := c.AddFunc("*/5 * * * * *", func() {
+		_, err := c.AddJob("*/5 * * * * *", invoicePollJob(func(ctx context.Context) {
 			if !config.IsYookasaEnabled() {
 				return
 			}
-			ctx := context.Background()
 			checkYookasaInvoice(ctx, purchaseRepository, yookasaClient, paymentService)
-		})
+		}))
 
 		if err != nil {
 			panic(err)
@@ -1140,13 +1284,12 @@ func setupInvoiceChecker(
 	}
 
 	if plategaPoll && plategaClient != nil && plategaClient.IsConfigured() {
-		_, err := c.AddFunc("*/5 * * * * *", func() {
+		_, err := c.AddJob("*/5 * * * * *", invoicePollJob(func(ctx context.Context) {
 			if !config.IsPlategaEnabled() {
 				return
 			}
-			ctx := context.Background()
 			checkPlategaInvoice(ctx, purchaseRepository, plategaClient, paymentService)
-		})
+		}))
 		if err != nil {
 			panic(err)
 		}
@@ -1164,7 +1307,7 @@ func setupInvoiceChecker(
 		// Оплату по ним всё равно не вернуть, поэтому pending дозакрываем всегда.
 		// Проходы не должны накладываться: при большом числе pending один обход
 		// длится дольше периода, и два поллера пошли бы по одному списку.
-		_, err := c.AddJob(schedule, cron.NewChain(cron.SkipIfStillRunning(cron.DiscardLogger)).Then(cron.FuncJob(func() {
+		_, err := c.AddJob(schedule, cron.NewChain(cron.Recover(cronSlogLogger{}), cron.SkipIfStillRunning(cron.DiscardLogger)).Then(cron.FuncJob(func() {
 			ctx, cancel := context.WithTimeout(context.Background(), heleketPollTimeout)
 			defer cancel()
 			heleketReconciler.PollPending(ctx)
@@ -1217,6 +1360,11 @@ func checkYookasaInvoice(
 			continue
 		}
 
+		if err := invoice.MatchesPurchase(&purchase); err != nil {
+			slog.Error("YooKassa payment does not match purchase", "purchaseId", purchase.ID, "error", err)
+			continue
+		}
+
 		// Если счет отменен, отменяем покупку в нашей системе
 		if invoice.IsCancelled() {
 			err := paymentService.CancelYookassaPayment(purchase.ID)
@@ -1242,7 +1390,7 @@ func checkYookasaInvoice(
 		purchaseId := int(purchase.ID)
 		err = paymentService.ProcessPurchaseById(ctxWithValue, purchase.ID)
 		if err != nil {
-			slog.Error("Error processing invoice", "invoiceId", invoice.ID, "purchaseId", purchaseId, "error", err)
+			logProcessPurchaseError("yookassa poll: process purchase", err, "invoiceId", invoice.ID, "purchaseId", purchaseId)
 		} else {
 			slog.Info("Invoice processed", "invoiceId", invoice.ID, "purchaseId", purchaseId)
 		}
@@ -1295,8 +1443,12 @@ func checkPlategaInvoice(
 					slog.Error("platega poll: cancel", "purchaseId", purchase.ID, "error", cancelErr)
 				}
 			case platega.StatusConfirmed:
+				if err := platega.CheckTransaction(tx, &purchase); err != nil {
+					slog.Error("platega poll: transaction does not match purchase", "purchaseId", purchase.ID, "error", err)
+					continue
+				}
 				if err := paymentService.ProcessPurchaseById(ctx, purchase.ID); err != nil {
-					slog.Error("platega poll: process purchase", "purchaseId", purchase.ID, "error", err)
+					logProcessPurchaseError("platega poll: process purchase", err, "purchaseId", purchase.ID)
 				} else {
 					slog.Info("platega poll: processed", "purchaseId", purchase.ID)
 				}
@@ -1352,10 +1504,18 @@ func checkCryptoPayInvoice(
 	// Обрабатываем оплаченные счета
 	for _, invoice := range *invoices {
 		if invoice.InvoiceID != nil && invoice.IsPaid() {
-			// Извлекаем данные из payload счета (формат: "purchaseId=123&username=user")
-			payload := strings.Split(invoice.Payload, "&")
-			purchaseID, err := strconv.Atoi(strings.Split(payload[0], "=")[1])
-			username := strings.Split(payload[1], "=")[1]
+			// Извлекаем данные из payload счета (формат: "purchaseId=123&username=user").
+			// username не экранируется при создании счёта, поэтому разбираем вручную, а
+			// не url.ParseQuery. Счёт с битым payload пропускаем: раньше индексация без
+			// проверок паниковала, и один такой счёт останавливал обработку всех.
+			idPart, userPart, _ := strings.Cut(invoice.Payload, "&")
+			idStr, _ := strings.CutPrefix(idPart, "purchaseId=")
+			purchaseID, err := strconv.Atoi(idStr)
+			if err != nil || purchaseID <= 0 {
+				slog.Error("cryptopay poll: no purchase id in invoice payload", "invoiceId", invoice.InvoiceID)
+				continue
+			}
+			username := strings.TrimPrefix(userPart, "username=")
 			// Передаем username в контексте для логирования
 			ctxWithUsername := context.WithValue(ctx, remnawave.CtxKeyUsername, username)
 			feeAmt := ""
@@ -1375,7 +1535,7 @@ func checkCryptoPayInvoice(
 			})
 			err = paymentService.ProcessPurchaseById(ctxPaid, int64(purchaseID))
 			if err != nil {
-				slog.Error("Error processing invoice", "invoiceId", invoice.InvoiceID, "purchaseId", purchaseID, "error", err)
+				logProcessPurchaseError("cryptopay poll: process purchase", err, "invoiceId", invoice.InvoiceID, "purchaseId", purchaseID)
 			} else {
 				slog.Info("Invoice processed", "invoiceId", invoice.InvoiceID, "purchaseId", purchaseID)
 			}

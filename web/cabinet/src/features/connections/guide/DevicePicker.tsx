@@ -142,7 +142,7 @@ export function DevicePicker({ open, onClose, text, platforms, platform, onPlatf
         aria-label={text.pickerTitle}
         data-shown={shown}
         className={cn(
-          'cg-sheet relative flex max-h-[90dvh] w-full flex-col gap-3 overflow-y-auto border border-border bg-card px-4 pb-6 text-card-foreground shadow-2xl',
+          'cg-sheet relative flex max-h-[90dvh] w-full flex-col gap-3 overflow-y-auto border border-border bg-card px-4 pb-[max(1.5rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] text-card-foreground shadow-2xl',
           'rounded-t-3xl md:max-w-[460px] md:rounded-3xl md:pb-4 md:pt-4',
           'dark:border-white/10 dark:bg-[#141d2e]',
         )}

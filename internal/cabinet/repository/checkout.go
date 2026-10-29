@@ -4,11 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"remnawave-tg-shop-bot/internal/pgerr"
 )
 
 // CheckoutProvider — enum cabinet_checkout.provider (CHECK в миграции 000017).
@@ -98,7 +99,7 @@ func (r *CheckoutRepo) Create(ctx context.Context, accountID int64, idempotencyK
 		RETURNING ` + checkoutSelectCols
 	c, err := scanCheckout(r.pool.QueryRow(ctx, q, accountID, idempotencyKey, provider))
 	if err != nil {
-		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+		if pgerr.IsUniqueViolation(err) {
 			return nil, ErrCheckoutConflict
 		}
 		return nil, fmt.Errorf("create checkout: %w", err)

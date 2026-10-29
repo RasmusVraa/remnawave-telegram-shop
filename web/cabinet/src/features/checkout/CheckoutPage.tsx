@@ -2,49 +2,28 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CreditCard, Bitcoin, AlertCircle, Star } from 'lucide-react'
-import { createPortal } from 'react-dom'
+import { AlertCircle } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
 import { Skeleton } from '@/components/ui/skeleton'
-import { PlategaPaymentExpand, type PlategaMethodId } from '@/components/PlategaPaymentExpand'
-import { ProviderMethodButton } from '@/components/ProviderMethodButton'
-import { HeleketBrandIcon } from '@/components/BrandIcons'
 import { PageTitleWithBack } from '@/components/PageTitleWithBack'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError, type TariffItem } from '@/lib/api'
 import { TariffLocationPicker } from '@/features/checkout/TariffLocationPicker'
-import { newIdempotencyKey, cn } from '@/lib/utils'
+import { newIdempotencyKey } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
-import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
-import { LegalContinueDisclaimer } from '@/components/LegalContinueDisclaimer'
 import { formatNumber } from '@/lib/format'
-
-type Provider =
-  | 'yookassa'
-  | 'cryptopay'
-  | 'telegram'
-  | 'platega_sbp'
-  | 'platega_cards'
-  | 'platega_acquiring'
-  | 'platega_worldwide'
-  | 'platega_crypto'
-  | 'heleket'
-
-const PROVIDER_ORDER: Provider[] = [
-  'yookassa',
-  'platega_sbp',
-  'platega_cards',
-  'platega_acquiring',
-  'platega_worldwide',
-  'platega_crypto',
-  'cryptopay',
-  'telegram',
-  'heleket',
-]
+import { AdminToggleSwitch } from '@/features/admin/components/AdminToggleSwitch'
+import {
+  CheckoutPayButton,
+  PROVIDER_ORDER,
+  ProviderPickerCard,
+  SummaryRow,
+  useProviderEnabled,
+  type Provider,
+} from '@/features/checkout/checkoutShared'
 
 export default function CheckoutPage() {
   const { t } = useTranslation()
@@ -66,7 +45,6 @@ export default function CheckoutPage() {
     queryFn: () => api.tariffs(),
     staleTime: 5 * 60_000,
   })
-  const { data: bootstrap } = useAuthBootstrap()
   const { data: subscription } = useQuery({
     queryKey: ['subscription'],
     queryFn: () => api.subscription(),
@@ -75,8 +53,10 @@ export default function CheckoutPage() {
   const extraHwidActive = subscription?.hwid_extra?.extra_active ?? 0
   const shouldAskExtraRenew = extraHwidActive > 0
 
+  // Докупленные места по умолчанию продлеваются: человек продлевает то, что
+  // у него уже есть. Цена мест видна в строке переключателя и входит в «Итого».
   useEffect(() => {
-    setRenewExtraHwid(shouldAskExtraRenew ? null : false)
+    setRenewExtraHwid(shouldAskExtraRenew)
   }, [shouldAskExtraRenew])
 
   const tariff: TariffItem | undefined = tariffsData?.tariffs.find(
@@ -95,17 +75,7 @@ export default function CheckoutPage() {
       ? tariff.id
       : undefined
 
-  const providerEnabled: Record<Provider, boolean> = {
-    yookassa: bootstrap?.payment_providers?.yookassa ?? true,
-    cryptopay: bootstrap?.payment_providers?.cryptopay ?? true,
-    telegram: bootstrap?.payment_providers?.telegram ?? false,
-    platega_sbp: bootstrap?.payment_providers?.platega_sbp ?? false,
-    platega_cards: bootstrap?.payment_providers?.platega_cards ?? false,
-    platega_acquiring: bootstrap?.payment_providers?.platega_acquiring ?? false,
-    platega_worldwide: bootstrap?.payment_providers?.platega_worldwide ?? false,
-    platega_crypto: bootstrap?.payment_providers?.platega_crypto ?? false,
-    heleket: bootstrap?.payment_providers?.heleket ?? false,
-  }
+  const providerEnabled = useProviderEnabled()
   const defaultPreviewProvider =
     PROVIDER_ORDER.find((p) => providerEnabled[p]) ?? ('yookassa' as Provider)
   const selectedProviderForPreview: Provider = provider ?? defaultPreviewProvider
@@ -128,6 +98,17 @@ export default function CheckoutPage() {
     enabled: Boolean(tariff) && !tariffsLoading && (!shouldAskExtraRenew || renewExtraHwid != null),
     staleTime: 30_000,
   })
+
+  // Цена мест нужна и при выключенном переключателе — чтобы человек видел,
+  // сколько стоит включить. Ключ совпадает с основным при включённом, кэш общий.
+  const { data: previewWithExtra } = useQuery({
+    queryKey: ['paymentPreview', tariff?.months, previewTariffId, tariffsData?.sales_mode, selectedProviderForPreview, true],
+    queryFn: () => api.paymentPreview(tariff!.months, previewTariffId, selectedProviderForPreview, true),
+    enabled: Boolean(tariff) && !tariffsLoading && shouldAskExtraRenew,
+    staleTime: 30_000,
+  })
+  const extraHwidAmount = previewWithExtra?.extra_hwid_included ? previewWithExtra.extra_hwid_amount_rub : undefined
+  const extraHwidUnit = previewWithExtra?.currency === 'STARS' ? t('checkout.stars') : t('checkout.rub')
 
   const amountValue = preview?.amount ?? preview?.amount_rub ?? tariff?.price_rub ?? 0
   const amountSuffix = preview?.currency === 'STARS' ? t('checkout.stars') : t('checkout.rub')
@@ -198,8 +179,6 @@ export default function CheckoutPage() {
     (!shouldAskExtraRenew || renewExtraHwid != null) &&
     (!needsLocation || (locationId != null && !allLocationsSoldOut))
   const payButtonDisabled = !canInitiatePay || loading
-  const disabledPayButtonClass =
-    'disabled:opacity-100 disabled:bg-[hsl(174_31.2%_76.18%)] disabled:text-[hsl(0_0%_100%_/_57%)] disabled:brightness-100 dark:disabled:bg-primary dark:disabled:text-primary-foreground dark:disabled:brightness-[.45]'
 
   return (
     <AppLayout>
@@ -257,6 +236,27 @@ export default function CheckoutPage() {
                         : String(tariff.device_limit)
                     }
                   />
+                )}
+                {shouldAskExtraRenew && (
+                  <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-foreground">{t('checkout.extraHwidRenewToggle')}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {extraHwidAmount != null
+                          ? t('checkout.extraHwidRenewToggleHint', {
+                              slots: t('subscriptionPage.slotsCount', { count: extraHwidActive }),
+                              amount: formatNumber(extraHwidAmount),
+                              unit: extraHwidUnit,
+                            })
+                          : t('subscriptionPage.slotsCount', { count: extraHwidActive })}
+                      </p>
+                    </div>
+                    <AdminToggleSwitch
+                      checked={Boolean(renewExtraHwid)}
+                      onChange={setRenewExtraHwid}
+                      aria-label={t('checkout.extraHwidRenewToggle')}
+                    />
+                  </div>
                 )}
                 {showTariffSwitchBreakdown && preview && (
                   <div className="space-y-2 rounded-lg border border-border/80 bg-muted/35 px-3 py-2.5 text-xs dark:border-border dark:bg-muted/25">
@@ -317,52 +317,6 @@ export default function CheckoutPage() {
         </Card>
         </RevealItem>
 
-        {/* Provider selection */}
-        {shouldAskExtraRenew && (
-          <RevealItem>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium text-muted-foreground">
-                {t('checkout.extraHwidRenewTitle')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                {t('checkout.extraHwidRenewHint', { n: extraHwidActive })}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className={cn(
-                    'border-emerald-300/80 text-emerald-700 hover:bg-emerald-500/10 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-500/15',
-                    renewExtraHwid === true &&
-                      'bg-emerald-500/15 border-emerald-400/80 dark:border-emerald-700 dark:bg-emerald-900/40',
-                  )}
-                  onClick={() => setRenewExtraHwid(true)}
-                >
-                  {t('checkout.extraHwidRenewYes')}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  className={cn(
-                    'border-rose-300/80 text-rose-700 hover:bg-rose-500/10 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-500/15',
-                    renewExtraHwid === false &&
-                      'bg-rose-500/15 border-rose-400/80 dark:border-rose-700 dark:bg-rose-900/40',
-                  )}
-                  onClick={() => setRenewExtraHwid(false)}
-                >
-                  {t('checkout.extraHwidRenewNo')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-          </RevealItem>
-        )}
-
         {needsLocation && (
           <RevealItem>
             <TariffLocationPicker
@@ -373,61 +327,14 @@ export default function CheckoutPage() {
           </RevealItem>
         )}
 
+        {/* Provider selection */}
         <RevealItem>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-medium text-muted-foreground">
-              {t('checkout.chooseProvider')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {availableProviders.includes('yookassa') && (
-              <ProviderMethodButton
-                selected={selectedProvider === 'yookassa'}
-                onClick={() => setProvider('yookassa')}
-                icon={<CreditCard size={18} className="text-primary" />}
-                label={t('checkout.card')}
-                description="YooKassa"
-              />
-            )}
-            {availableProviders.includes('cryptopay') && (
-              <ProviderMethodButton
-                selected={selectedProvider === 'cryptopay'}
-                onClick={() => setProvider('cryptopay')}
-                icon={<Bitcoin size={18} className="text-orange-500" />}
-                label={t('checkout.crypto')}
-                description="CryptoPay"
-              />
-            )}
-            <PlategaPaymentExpand
-              enabled={providerEnabled}
-              selected={provider}
-              onSelect={(id: PlategaMethodId) => setProvider(id)}
-              variant="checkout"
-            />
-            {availableProviders.includes('telegram') && (
-              <ProviderMethodButton
-                selected={selectedProvider === 'telegram'}
-                onClick={() => setProvider('telegram')}
-                icon={<Star size={18} className="text-amber-500" />}
-                label={t('checkout.telegramStars')}
-                description="Telegram Stars"
-              />
-            )}
-            {availableProviders.includes('heleket') && (
-              <ProviderMethodButton
-                selected={selectedProvider === 'heleket'}
-                onClick={() => setProvider('heleket')}
-                icon={<HeleketBrandIcon className="h-[18px] w-[18px]" />}
-                label={t('checkout.otherCrypto')}
-                description="Heleket"
-              />
-            )}
-            {availableProviders.length === 0 && (
-              <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
-            )}
-          </CardContent>
-        </Card>
+          <ProviderPickerCard
+            providerEnabled={providerEnabled}
+            provider={provider}
+            selectedProvider={selectedProvider}
+            onSelect={setProvider}
+          />
         </RevealItem>
 
         {error && (
@@ -439,48 +346,14 @@ export default function CheckoutPage() {
           </RevealItem>
         )}
 
-        <RevealItem className="hidden sm:block space-y-2">
-          <Button
-            className={cn('w-full', !loading && disabledPayButtonClass)}
-            size="lg"
-            disabled={payButtonDisabled}
-            loading={loading}
-            onClick={handlePay}
-          >
-            {t('checkout.pay')}
-            {tariff ? ` ${formatNumber(amountValue)} ${amountSuffix}` : ''}
-          </Button>
-          <LegalContinueDisclaimer siteLinks={bootstrap?.site_links} />
-        </RevealItem>
-
-        {/* Mobile spacer: fixed pay bar + legal line should not overlap content */}
-        <div className="sm:hidden h-[5.5rem]" aria-hidden />
+        <CheckoutPayButton
+          label={`${t('checkout.pay')}${tariff ? ` ${formatNumber(amountValue)} ${amountSuffix}` : ''}`}
+          disabled={payButtonDisabled}
+          loading={loading}
+          onPay={handlePay}
+        />
       </PageReveal>
 
-      {/*
-        Mobile: шторка от кнопки до низа экрана, нижнее меню (z-50) лежит поверх неё.
-        Без подложки способы оплаты просвечивали сквозь текст согласия.
-        z-[39] — под выпадающим мобильным меню (z-40).
-      */}
-      {typeof document !== 'undefined' &&
-        createPortal(
-          <div className="cabinet-pay-scrim sm:hidden fixed inset-x-0 bottom-0 z-[39] px-3 pt-8 pb-[calc(var(--cabinet-bottom-nav-h,calc(73px+var(--cabinet-tg-safe-bottom)))+0.375rem)]">
-            <div className="mx-auto flex w-full max-w-lg flex-col gap-1.5">
-              <Button
-                className={cn('w-full shadow-none', !loading && disabledPayButtonClass)}
-                size="lg"
-                disabled={payButtonDisabled}
-                loading={loading}
-                onClick={handlePay}
-              >
-                {t('checkout.pay')}
-                {tariff ? ` ${formatNumber(amountValue)} ${amountSuffix}` : ''}
-              </Button>
-              <LegalContinueDisclaimer siteLinks={bootstrap?.site_links} variant="short" />
-            </div>
-          </div>,
-          document.body,
-        )}
     </AppLayout>
   )
 }
@@ -499,21 +372,6 @@ function checkoutScenarioI18nKey(scenario: string | undefined): string {
   }
   if (!scenario) return 'checkout.scenarioUnknown'
   return map[scenario] ?? 'checkout.scenarioUnknown'
-}
-
-function SummaryRow({
-  label,
-  value,
-}: {
-  label: string
-  value: React.ReactNode
-}) {
-  return (
-    <div className="flex items-center justify-between gap-4">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="font-medium text-right">{value}</span>
-    </div>
-  )
 }
 
 function pluralizeMonths(n: number): string {

@@ -18,6 +18,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
@@ -54,6 +55,8 @@ type Config struct {
 	AntiEnumLatency   time.Duration // целевая длительность login/register/forgot для равномерного тайминга
 	PasswordParams    password.Params
 	PasswordPolicy    password.Policy
+	// EmailCodeKey — ключ HMAC для кодов подтверждения email (tokens.EmailVerifyOTPKey).
+	EmailCodeKey []byte
 }
 
 // Service — фасад аутентификации.
@@ -360,7 +363,7 @@ func (s *Service) sendVerifyEmail(ctx context.Context, acc *repository.Account) 
 	if err := s.evs.InvalidateForAccount(ctx, acc.ID); err != nil {
 		return err
 	}
-	code, hash, err := tokens.GenerateEmailVerifyOTP()
+	code, hash, err := tokens.GenerateEmailVerifyOTP(s.cfg.EmailCodeKey)
 	if err != nil {
 		return err
 	}
@@ -751,42 +754,72 @@ func (s *Service) ChangePassword(ctx context.Context, accountID int64, currentPa
 	return s.issueSession(ctx, acc, uuid.New(), userAgent, ip)
 }
 
-// ConfirmEmail применяет код из письма (6 цифр) или старый base64url-токен из ссылки:
-// помечает email_verified_at и сразу выдаёт сессию (как login).
-func (s *Service) ConfirmEmail(ctx context.Context, token, userAgent, ip string) (*TokenPair, error) {
+// maxEmailCodeAttempts — сколько догадок принимает один код из письма. Вместе
+// с поиском в пределах аккаунта это шанс 5 из 10^6 подобрать код — дальше
+// нужен новый, а его выдача ограничена по email.
+const maxEmailCodeAttempts = 5
+
+// ConfirmEmail применяет код из письма (6 цифр) или старый base64url-токен из
+// ссылки: помечает email_verified_at и сразу выдаёт сессию (как login).
+//
+// Код из шести цифр проверяется только против живого кода одного аккаунта:
+// по email из запроса, а без него — по refresh-сессии залогиненного
+// пользователя. Раньше код искался по всей таблице, и перебор 000000…999999
+// давал сессию в любом аккаунте с живым кодом. Сессию выдавать по-прежнему
+// можно: верный код доказывает владение почтой, а владелец почты и так войдёт
+// через сброс пароля.
+func (s *Service) ConfirmEmail(ctx context.Context, token, email, refreshFromCookie, userAgent, ip string) (*TokenPair, error) {
 	token = strings.TrimSpace(token)
 	if token == "" {
 		return nil, ErrInvalidToken
 	}
-	var hash [32]byte
+	var ev *repository.EmailVerification
 	if tokens.IsEmailVerifyOTP(token) {
-		hash = tokens.HashEmailVerifyOTP(token)
-	} else {
 		var err error
-		hash, err = tokens.HashString(token)
+		ev, err = s.checkEmailCode(ctx, token, email, refreshFromCookie)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// Старые ссылки из писем: 256 бит, перебором не подобрать — ищем по хэшу.
+		hash, err := tokens.HashString(token)
 		if err != nil {
 			return nil, ErrInvalidToken
 		}
-	}
-	ev, err := s.evs.FindByHash(ctx, hash)
-	if err != nil {
-		if errors.Is(err, repository.ErrNotFound) {
+		ev, err = s.evs.FindByHash(ctx, hash)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrInvalidToken
+			}
+			return nil, fmt.Errorf("find ev: %w", err)
+		}
+		if !ev.IsUsable() {
 			return nil, ErrInvalidToken
 		}
-		return nil, fmt.Errorf("find ev: %w", err)
 	}
-	if !ev.IsUsable() {
+	consumed, err := s.evs.Consume(ctx, ev.ID)
+	if err != nil {
+		return nil, err
+	}
+	if !consumed {
+		return nil, ErrInvalidToken
+	}
+	acc, err := s.accounts.FindByID(ctx, ev.AccountID)
+	if err != nil {
+		return nil, fmt.Errorf("confirm: find account: %w", err)
+	}
+	if acc.Status != repository.AccountStatusActive {
 		return nil, ErrInvalidToken
 	}
 	if err := s.accounts.MarkEmailVerified(ctx, ev.AccountID); err != nil {
 		return nil, err
 	}
-	if err := s.evs.MarkUsed(ctx, ev.ID); err != nil {
-		slog.Warn("confirm: mark ev used failed", "error", err)
-	}
-	acc, err := s.accounts.FindByID(ctx, ev.AccountID)
+	// Перечитываем: токен выписывается по acc, а прочитан он до подтверждения.
+	// Без этого в выданном access-токене было email_verified=false, и до
+	// следующего refresh кабинет получал 403 на подписке и оплате.
+	acc, err = s.accounts.FindByID(ctx, ev.AccountID)
 	if err != nil {
-		return nil, fmt.Errorf("confirm: find account: %w", err)
+		return nil, fmt.Errorf("confirm: reload account: %w", err)
 	}
 	// Defensive bootstrap: если линк customer отсутствует (редкий случай), подшьём.
 	s.ensureCustomer(ctx, acc.ID, acc.Language)
@@ -797,6 +830,53 @@ func (s *Service) ConfirmEmail(ctx context.Context, token, userAgent, ip string)
 		}
 	}
 	return s.issueSession(ctx, acc, uuid.New(), userAgent, ip)
+}
+
+// checkEmailCode находит живой код аккаунта и сверяет с ним догадку, засчитывая
+// попытку до сравнения. Любой отказ — ErrInvalidToken, чтобы ответ не выдавал,
+// существует ли email.
+func (s *Service) checkEmailCode(ctx context.Context, code, email, refreshFromCookie string) (*repository.EmailVerification, error) {
+	var accountID int64
+	if email = normalizeEmail(email); email != "" {
+		acc, err := s.accounts.FindByEmail(ctx, email)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, ErrInvalidToken
+			}
+			return nil, fmt.Errorf("confirm: find account by email: %w", err)
+		}
+		accountID = acc.ID
+	} else {
+		id, err := s.accountIDFromValidRefresh(ctx, refreshFromCookie)
+		if err != nil {
+			// Ни email, ни сессии: искать код не в чем.
+			return nil, ErrInvalidToken
+		}
+		accountID = id
+	}
+
+	ev, err := s.evs.FindActiveForAccount(ctx, accountID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrInvalidToken
+		}
+		return nil, fmt.Errorf("find ev: %w", err)
+	}
+	reserved, err := s.evs.ReserveAttempt(ctx, ev.ID, maxEmailCodeAttempts)
+	if err != nil {
+		return nil, err
+	}
+	if !reserved {
+		return nil, ErrInvalidToken
+	}
+	keyed := tokens.HashEmailVerifyOTPKeyed(s.cfg.EmailCodeKey, code)
+	// Коды, выданные до появления ключа, хэшированы голым sha256.
+	legacy := tokens.HashEmailVerifyOTP(code)
+	if subtle.ConstantTimeCompare(ev.TokenHash, keyed[:]) != 1 &&
+		subtle.ConstantTimeCompare(ev.TokenHash, legacy[:]) != 1 {
+		return nil, ErrInvalidToken
+	}
+	return ev, nil
 }
 
 type LinkEmailResult struct {

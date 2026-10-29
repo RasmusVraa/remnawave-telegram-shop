@@ -219,7 +219,9 @@ func isRetryableError(err error) bool {
 
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		return netErr.Timeout() || netErr.Temporary()
+		// Temporary устарел, но отделяет обрывы соединения от постоянных
+		// ошибок — без него чеки при сбое сети не переотправлялись бы.
+		return netErr.Timeout() || netErr.Temporary() //nolint:staticcheck // SA1019
 	}
 
 	return errors.Is(err, ErrRetryable) || errors.Is(err, ErrAuth)
@@ -353,8 +355,8 @@ func (c *Client) sendIncomeRequest(ctx context.Context, incomeURL string, reqBod
 		// Проверяем сетевые ошибки
 		var netErr net.Error
 		if errors.As(err, &netErr) {
-			if netErr.Timeout() || netErr.Temporary() {
-				slog.Warn("Network error (retryable)", "error", err, "timeout", netErr.Timeout(), "temporary", netErr.Temporary())
+			if netErr.Timeout() || netErr.Temporary() { //nolint:staticcheck // SA1019, см. isRetryableError
+				slog.Warn("Network error (retryable)", "error", err, "timeout", netErr.Timeout(), "temporary", netErr.Temporary()) //nolint:staticcheck // SA1019
 				return "", fmt.Errorf("%w: %w", ErrRetryable, err)
 			}
 		}

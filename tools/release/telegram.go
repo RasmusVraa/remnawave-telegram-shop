@@ -41,18 +41,20 @@ type telegramAPIResponse struct {
 	Result      json.RawMessage `json:"result"`
 }
 
-func sendTelegramHTML(cfg telegramConfig, html string) error {
+// sendTelegramHTML отправляет пост и возвращает его message_id: на него
+// отвечает альбом скриншотов.
+func sendTelegramHTML(cfg telegramConfig, html string) (int, error) {
 	if strings.TrimSpace(cfg.Token) == "" {
-		return fmt.Errorf("RELEASE_TG_BOT_TOKEN is empty")
+		return 0, fmt.Errorf("RELEASE_TG_BOT_TOKEN is empty")
 	}
 	if strings.TrimSpace(cfg.ChatID) == "" {
-		return fmt.Errorf("RELEASE_TG_CHAT_ID is empty")
+		return 0, fmt.Errorf("RELEASE_TG_CHAT_ID is empty")
 	}
 	if strings.TrimSpace(html) == "" {
-		return fmt.Errorf("telegram message is empty")
+		return 0, fmt.Errorf("telegram message is empty")
 	}
 	if n := utf8.RuneCountInString(html); n > telegramMaxMessageRunes {
-		return fmt.Errorf("telegram message is %d runes (limit %d); shorten Telegram section in RELEASE_NOTES.md", n, telegramMaxMessageRunes)
+		return 0, fmt.Errorf("telegram message is %d runes (limit %d); shorten Telegram section in RELEASE_NOTES.md", n, telegramMaxMessageRunes)
 	}
 
 	reqBody := sendMessageRequest{
@@ -67,28 +69,42 @@ func sendTelegramHTML(cfg telegramConfig, html string) error {
 
 	payload, err := json.Marshal(reqBody)
 	if err != nil {
-		return fmt.Errorf("marshal telegram request: %w", err)
+		return 0, fmt.Errorf("marshal telegram request: %w", err)
 	}
 
-	resp, err := postTelegram(cfg, payload)
+	result, err := callTelegram(cfg, "sendMessage", "application/json", payload)
 	if err != nil {
-		return err
+		return 0, err
+	}
+	var msg struct {
+		MessageID int `json:"message_id"`
+	}
+	// Пост уже ушёл: без message_id альбом просто не станет ответом на него.
+	_ = json.Unmarshal(result, &msg)
+	return msg.MessageID, nil
+}
+
+// callTelegram вызывает метод Bot API и возвращает поле result ответа.
+func callTelegram(cfg telegramConfig, method, contentType string, payload []byte) (json.RawMessage, error) {
+	resp, err := postTelegram(cfg, method, contentType, payload)
+	if err != nil {
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read telegram response: %w", err)
+		return nil, fmt.Errorf("read telegram response: %w", err)
 	}
 
 	var apiResp telegramAPIResponse
 	if err := json.Unmarshal(body, &apiResp); err != nil {
-		return fmt.Errorf("decode telegram response: %w (status=%d body=%s)", err, resp.StatusCode, truncate(string(body), 200))
+		return nil, fmt.Errorf("decode telegram response: %w (status=%d body=%s)", err, resp.StatusCode, truncate(string(body), 200))
 	}
 	if !apiResp.OK {
-		return fmt.Errorf("telegram API error: %s", apiResp.Description)
+		return nil, fmt.Errorf("telegram API error (%s): %s", method, apiResp.Description)
 	}
-	return nil
+	return apiResp.Result, nil
 }
 
 // postTelegram отправляет запрос через прокси, а если тот недоступен — напрямую.
@@ -99,8 +115,8 @@ func sendTelegramHTML(cfg telegramConfig, html string) error {
 // невозможность его разобрать. На любую другую ошибку — включая таймаут и любой
 // ответ API — повтора нет: запрос мог долететь, и вторая попытка отправила бы
 // анонс в канал дважды.
-func postTelegram(cfg telegramConfig, payload []byte) (*http.Response, error) {
-	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/sendMessage", cfg.Token)
+func postTelegram(cfg telegramConfig, method, contentType string, payload []byte) (*http.Response, error) {
+	apiURL := fmt.Sprintf("https://api.telegram.org/bot%s/%s", cfg.Token, method)
 
 	attempt := func(proxyURL string) (*http.Response, error) {
 		client, err := newTelegramHTTPClient(proxyURL)
@@ -111,7 +127,7 @@ func postTelegram(cfg telegramConfig, payload []byte) (*http.Response, error) {
 		if err != nil {
 			return nil, fmt.Errorf("build telegram request: %w", err)
 		}
-		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Type", contentType)
 		return client.Do(req)
 	}
 
@@ -123,15 +139,15 @@ func postTelegram(cfg telegramConfig, payload []byte) (*http.Response, error) {
 	proxyConfigured := strings.TrimSpace(cfg.ProxyURL) != ""
 	if !proxyConfigured || !isProxyUnreachable(err) {
 		// Не оборачиваем ошибку net/http: в ней полный URL с токеном бота.
-		return nil, fmt.Errorf("telegram sendMessage failed (proxy=%q): %s",
-			emptyAs(cfg.ProxyURL, "none"), sanitizeDialError(err))
+		return nil, fmt.Errorf("telegram %s failed (proxy=%q): %s",
+			method, emptyAs(cfg.ProxyURL, "none"), sanitizeDialError(err))
 	}
 
 	fmt.Printf("telegram: прокси %s недоступен, пробую напрямую\n", cfg.ProxyURL)
 	resp, err = attempt("")
 	if err != nil {
-		return nil, fmt.Errorf("telegram sendMessage failed (прокси %q недоступен, прямое соединение тоже): %s",
-			cfg.ProxyURL, sanitizeDialError(err))
+		return nil, fmt.Errorf("telegram %s failed (прокси %q недоступен, прямое соединение тоже): %s",
+			method, cfg.ProxyURL, sanitizeDialError(err))
 	}
 	return resp, nil
 }

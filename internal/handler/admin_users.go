@@ -1599,6 +1599,19 @@ func (h Handler) AdminUserHwPresetSetHandler(ctx context.Context, b *bot.Bot, up
 	if err != nil || cust == nil {
 		return
 	}
+	// Лимит закреплён в кабинете: пресет меняет само закреплённое число,
+	// иначе клиент Remnawave тут же подставил бы прежнее.
+	if cust.HwidLimitOverride != nil {
+		if err := h.customerRepository.SetHwidLimitOverride(ctx, cust.ID, &limit); err != nil {
+			slog.Error("admin hw preset set pin", "error", err)
+			_, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+				CallbackQueryID: cb.ID,
+				Text:            h.translation.GetText(cb.From.LanguageCode, "admin_user_action_error"),
+				ShowAlert:       true,
+			})
+			return
+		}
+	}
 	if _, err := h.remnawaveClient.UpdateUserDeviceLimitByCustomer(ctx, cust.ID, cust.TelegramID, limit); err != nil {
 		slog.Error("admin hw preset set", "error", err)
 		_, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{

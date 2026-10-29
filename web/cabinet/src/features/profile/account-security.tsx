@@ -47,6 +47,7 @@ export function ChangePasswordCollapsible({ onSuccess }: { onSuccess: (token: st
       if (err instanceof ApiError) {
         if (err.status === 401) setError(t('errors.invalidCredentials'))
         else if (err.status === 400) setError(t('errors.passwordMin'))
+        else if (err.status === 429) setError(t('errors.tooManyRequests'))
         else setError(t('errors.unknown'))
       } else setError(t('errors.unknown'))
     } finally {

@@ -1,9 +1,13 @@
 package broadcast
 
 import (
+	"net/url"
+
 	"github.com/go-telegram/bot/models"
 
+	botcfg "remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/translation"
+	"remnawave-tg-shop-bot/utils"
 )
 
 const (
@@ -15,7 +19,8 @@ const (
 )
 
 // BuildReplyMarkup строит inline-клавиатуру под рассылку для языка получателя.
-func BuildReplyMarkup(tm *translation.Manager, lang string, flags RecipientButtons) models.ReplyMarkup {
+// telegramID — получатель: в кнопку «Пригласить друга» уходит его реферальная ссылка.
+func BuildReplyMarkup(tm *translation.Manager, lang string, flags RecipientButtons, telegramID int64) models.ReplyMarkup {
 	if tm == nil || flags.IsEmpty() {
 		return nil
 	}
@@ -33,6 +38,13 @@ func BuildReplyMarkup(tm *translation.Manager, lang string, flags RecipientButto
 		rows = append(rows, []models.InlineKeyboardButton{
 			tm.WithButton(lang, "promo_code_button", models.InlineKeyboardButton{CallbackData: callbackEnterPromo + inlineQuerySuffix}),
 		})
+	}
+	if flags.ShareReferral {
+		if u := referralShareURL(tm, lang, telegramID); u != "" {
+			rows = append(rows, []models.InlineKeyboardButton{
+				tm.WithButton(lang, "broadcast_share_referral_button", models.InlineKeyboardButton{URL: u}),
+			})
+		}
 	}
 	if flags.MainMenu {
 		rows = append(rows, []models.InlineKeyboardButton{
@@ -70,6 +82,20 @@ func cabinetLinkRows(tm *translation.Manager, lang string, keys []string) [][]mo
 		}
 	}
 	return rows
+}
+
+// referralShareURL — t.me/share/url: Telegram открывает выбор чата, и другу
+// уходит текст приглашения с личной ссылкой получателя рассылки. Ссылку
+// собрать не из чего (бот ещё не узнал своё имя) — кнопку не рисуем.
+func referralShareURL(tm *translation.Manager, lang string, telegramID int64) string {
+	ref := utils.ReferralStartURL(botcfg.BotURL(), telegramID)
+	if ref == "" {
+		return ""
+	}
+	q := url.Values{}
+	q.Set("url", ref)
+	q.Set("text", tm.GetText(lang, "broadcast_share_referral_text"))
+	return "https://t.me/share/url?" + q.Encode()
 }
 
 func connectRow(tm *translation.Manager, lang string) []models.InlineKeyboardButton {

@@ -16,7 +16,9 @@ func wrapMetricsBasicAuth(inner http.Handler) http.Handler {
 		user := cabcfg.MetricsUser()
 		pass := cabcfg.MetricsPassword()
 		if user == "" && pass == "" {
-			inner.ServeHTTP(w, r)
+			// Без логина и пароля метрики закрыты: раньше они отдавались любому,
+			// а в них число сессий, клиентов и карта всех маршрутов API.
+			http.NotFound(w, r)
 			return
 		}
 		if user == "" || pass == "" {

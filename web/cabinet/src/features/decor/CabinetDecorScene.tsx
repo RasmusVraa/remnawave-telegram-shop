@@ -1,8 +1,7 @@
 import { cn } from '@/lib/utils'
 
-import { HolidayAtmosphere } from './HolidayAtmosphere'
-
 import type { DecorThemeId } from './decorThemes'
+import { HolidayAtmosphere } from './HolidayAtmosphere'
 import { useCabinetDecorTheme } from './useCabinetDecorTheme'
 
 function SummerTree() {
@@ -139,10 +138,12 @@ function NebulaGlow() {
 function SceneContent({ theme }: { theme: DecorThemeId }) {
   switch (theme) {
     case 'new_year':
+    case 'new_year_2':
       return <HolidayAtmosphere theme="new_year" />
     case 'summer':
       return <SummerTree />
     case 'halloween':
+    case 'halloween_2':
       return <HolidayAtmosphere theme="halloween" />
     case 'spring':
       return <SpringScene />

@@ -11,10 +11,15 @@ interface ThemeToggleProps {
 
 export function ThemeToggle({ className }: ThemeToggleProps) {
   const lightAllowed = useLightThemeAllowed()
+  // useTheme при монтировании применяет сохранённую тему — без разрешения
+  // светлой его не зовём, иначе он перебил бы принудительную тёмную.
+  if (!lightAllowed) return null
+  return <ThemeToggleButton className={className} />
+}
+
+function ThemeToggleButton({ className }: ThemeToggleProps) {
   const { theme, toggle } = useTheme()
   const { t } = useTranslation()
-
-  if (!lightAllowed) return null
 
   return (
     <Button

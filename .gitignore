@@ -355,6 +355,8 @@ localtests/
 
 # Локальная заметка по релизу (генерируется skill)
 RELEASE_NOTES.md
+# Скриншоты к посту релиза (tools/release шлёт их альбомом) — только для публикации.
+/release-screenshots/
 
 # JVM crash / replay dumps (не коммитить)
 hs_err_pid*.log
@@ -382,3 +384,6 @@ remnawave-bedolaga-telegram-bot-main
 
 # Локальные зависимости фронтенда
 node_modules/
+
+# Черновые HTML-макеты для обсуждения дизайна — в код не входят
+.claude/mockups/

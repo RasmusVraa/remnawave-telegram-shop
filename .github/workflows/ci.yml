@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      # Интеграционные тесты (//go:build integration) идут в одноразовую базу:
+      # миграции, денежные пути, блокировки покупок, синхронизация.
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: go vet
+        run: go vet ./... && go vet -tags=integration ./...
+
+      - name: Unit tests (race)
+        run: go test -race -count=1 ./...
+
+      - name: Integration tests
+        env:
+          CABINET_INTEGRATION_PG: postgres://postgres:ci@localhost:5432/ci?sslmode=disable
+        # -p 1: пакеты делят одну базу, а часть тестов считает строки по всей таблице.
+        run: go test -tags=integration -count=1 -p 1 ./internal/...
+
+      - name: Forbid sensitive slog fields in cabinet
+        run: bash scripts/cabinet-forbid-sensitive-slogs.sh
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: govulncheck
+        # Стандартная библиотека проверяется той версии Go, что в toolchain
+        # go.mod: её уязвимости закрываются обновлением тулчейна.
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...

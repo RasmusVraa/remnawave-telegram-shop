@@ -3,7 +3,7 @@ package heleket
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
+	"crypto/md5" //nolint:gosec // G501: подпись Heleket определена их API как md5
 	"crypto/subtle"
 	"encoding/base64"
 	"encoding/hex"
@@ -123,7 +123,7 @@ func marshalBody(v any) ([]byte, error) {
 // Sign — подпись Heleket: md5( base64(тело) + API_KEY ).
 func Sign(body []byte, apiKey string) string {
 	encoded := base64.StdEncoding.EncodeToString(body)
-	sum := md5.Sum([]byte(encoded + apiKey))
+	sum := md5.Sum([]byte(encoded + apiKey)) //nolint:gosec // G401: см. импорт
 	return hex.EncodeToString(sum[:])
 }
 

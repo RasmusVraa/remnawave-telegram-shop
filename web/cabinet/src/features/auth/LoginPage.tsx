@@ -40,16 +40,29 @@ function botHandleFromLink(input: string | undefined): string | null {
   }
 }
 
+function isOAuthLinkPendingReason(reason: string | null): boolean {
+  return reason === 'google_link_email_confirmation_required' || reason === 'oauth_link_email_confirmation_required'
+}
+
+function oauthProviderLabel(provider: string, t: (key: string) => string): string {
+  if (provider === 'yandex') return t('auth.socialYandex')
+  if (provider === 'vk') return t('auth.socialVK')
+  return t('auth.socialGoogle')
+}
+
 export default function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const [[googleLinkPending, googleMaskedEmail]] = useState(() => {
+  // Вход через Google/Яндекс/VK с email уже существующего аккаунта: привязка ждёт
+  // подтверждения по ссылке из письма. status=error — вход отклонён.
+  const [[googleLinkPending, googleMaskedEmail, linkProvider, oauthErrorReason]] = useState(() => {
     const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '')
     const oldPending = sp.get('google_link') === 'pending'
-    const newPending = sp.get('status') === 'merge_verification_required' && sp.get('reason_code') === 'google_link_email_confirmation_required'
-    return [oldPending || newPending, sp.get('masked_email') ?? ''] as const
+    const newPending = sp.get('status') === 'merge_verification_required' && isOAuthLinkPendingReason(sp.get('reason_code'))
+    const errorReason = sp.get('status') === 'error' ? (sp.get('reason_code') ?? '') : ''
+    return [oldPending || newPending, sp.get('masked_email') ?? '', sp.get('provider') ?? 'google', errorReason] as const
   })
   const referralFromUrl = acquisitionCodeFromQuery(searchParams)
   const { data: bootstrap } = useAuthBootstrap()
@@ -72,8 +85,9 @@ export default function LoginPage() {
 
   useEffect(() => {
     const oldPending = searchParams.get('google_link') === 'pending'
-    const newPending = searchParams.get('status') === 'merge_verification_required' && searchParams.get('reason_code') === 'google_link_email_confirmation_required'
-    if (!oldPending && !newPending) return
+    const newPending = searchParams.get('status') === 'merge_verification_required' && isOAuthLinkPendingReason(searchParams.get('reason_code'))
+    const oauthError = searchParams.get('status') === 'error' && Boolean(searchParams.get('reason_code'))
+    if (!oldPending && !newPending && !oauthError) return
     navigate('/login', { replace: true })
   }, [searchParams, navigate])
   const justVerified = (location.state as { verified?: boolean })?.verified === true
@@ -167,7 +181,20 @@ export default function LoginPage() {
 
           {googleLinkPending && (
             <Alert>
-              <AlertDescription>{t('auth.googleLinkPending', { email: googleMaskedEmail || '—' })}</AlertDescription>
+              <AlertDescription>
+                {t('auth.googleLinkPending', { email: googleMaskedEmail || '—', provider: oauthProviderLabel(linkProvider, t) })}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {oauthErrorReason === 'email_conflict_with_another_account' && (
+            <Alert variant="destructive">
+              <AlertDescription>{t('auth.oauthEmailConflict', { provider: oauthProviderLabel(linkProvider, t) })}</AlertDescription>
+            </Alert>
+          )}
+          {oauthErrorReason === 'account_blocked' && (
+            <Alert variant="destructive">
+              <AlertDescription>{t('auth.oauthAccountBlocked')}</AlertDescription>
             </Alert>
           )}
 
@@ -226,6 +253,7 @@ export default function LoginPage() {
               referralCode={referralFromUrl || undefined}
               googleLinkPending={googleLinkPending}
               googleMaskedEmail={googleMaskedEmail}
+              googleLinkProvider={oauthProviderLabel(linkProvider, t)}
             />
 
             <LegalContinueDisclaimer siteLinks={bootstrap?.site_links} className="pt-1" />

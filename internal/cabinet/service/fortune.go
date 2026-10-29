@@ -18,7 +18,7 @@ import (
 	"remnawave-tg-shop-bot/internal/remnawave"
 	"remnawave-tg-shop-bot/utils"
 
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // FortuneRewardTypesOrder — стабильный порядок секторов на UI (индекс = sector_index в API).

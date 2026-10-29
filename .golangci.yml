@@ -1,0 +1,47 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - gosec
+    - sloglint
+    - bodyclose
+  settings:
+    staticcheck:
+      # Стилистика (QF*, ST*) отключена: на ней сотни замечаний без пользы.
+      checks: ["all", "-QF*", "-ST*"]
+    errcheck:
+      # Закрытие тела ответа, файла и откат транзакции в defer — обычная идиома:
+      # ошибку там некому обработать.
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - (mime/multipart.File).Close
+        - (*database/sql.DB).Close
+        - (github.com/jackc/pgx/v5.Tx).Rollback
+    gosec:
+      excludes:
+        - G115 # переполнение при преобразовании int: значения в коде ограничены
+        - G304 # чтение файла по пути из конфига администратора
+        - G301 # права на каталоги в утилитах
+        - G306 # права на файлы в утилитах
+        - G101 # «пароль в коде» — срабатывает на имена ключей настроек
+        - G117 # поле Password в теле запроса к API «Мой налог»
+    sloglint:
+      # Ошибка без ключа давала в логах !BADKEY.
+      no-mixed-args: true
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters: [gosec, errcheck]
+      - path: ^tools/
+        linters: [gosec]

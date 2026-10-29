@@ -79,3 +79,35 @@ func TestParseMalformed(t *testing.T) {
 		}
 	}
 }
+
+// Сброс ссылки подписки отзывает приглашения, выпущенные раньше него, и не
+// трогает выпущенные после — даже в ту же секунду.
+func TestIssuedBefore(t *testing.T) {
+	reset := time.Unix(1_700_000_000, 600_000_000) // .6 с — проверяем округление
+
+	cases := []struct {
+		name   string
+		issued time.Time
+		want   bool
+	}{
+		{"за минуту до сброса", reset.Add(-time.Minute), true},
+		{"за секунду до сброса", reset.Add(-time.Second), true},
+		{"в ту же секунду после сброса", reset.Add(200 * time.Millisecond), false},
+		{"через минуту после сброса", reset.Add(time.Minute), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			token, _, err := Issue(testSecret, 7, DefaultTTL, tc.issued)
+			if err != nil {
+				t.Fatalf("issue: %v", err)
+			}
+			_, exp, err := ParseWithExpiry(testSecret, token, reset.Add(time.Hour))
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if got := IssuedBefore(exp, reset); got != tc.want {
+				t.Fatalf("IssuedBefore = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

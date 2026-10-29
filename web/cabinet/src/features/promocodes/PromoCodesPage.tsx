@@ -39,6 +39,7 @@ export default function PromoCodesPage() {
       setResult(null)
       if (e instanceof ApiError) {
         const raw = e.body || ''
+        if (raw.includes('hwid_pinned')) return setError(t('promocodes.errors.hwid_pinned'))
         if (raw.includes('already_used')) return setError(t('promocodes.errors.already_used'))
         if (raw.includes('inactive')) return setError(t('promocodes.errors.inactive'))
         if (raw.includes('not_found')) return setError(t('promocodes.errors.not_found'))

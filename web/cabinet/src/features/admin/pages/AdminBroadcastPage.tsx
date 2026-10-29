@@ -1,11 +1,13 @@
-import { useMemo, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
   AlertTriangle,
+  Check,
   Eye,
   Film,
+  History,
   Image as ImageIcon,
   ImagePlus,
   Megaphone,
@@ -20,7 +22,7 @@ import {
 
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { AdminBroadcastMediaKind } from '@/lib/types/admin'
+import type { AdminBroadcastHistoryItemDTO, AdminBroadcastMediaKind } from '@/lib/types/admin'
 
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
@@ -36,9 +38,22 @@ import {
   type BroadcastButtonsState,
 } from '../components/BroadcastButtonsPicker'
 import { useAdminBootstrap } from '../hooks/useAdminBootstrap'
+import { useAdminShell } from '../layout/AdminShellContext'
 import { formatAdminApiError } from '../utils/formatAdminApiError'
 import { BROADCAST_LINK_KEYS, broadcastLinkLabelKey } from '../utils/broadcastLinks'
 import { telegramTextLength } from '../utils/telegramHtml'
+import {
+  clearBroadcastDraft,
+  loadBroadcastDraft,
+  normalizeBroadcastButtons,
+  saveBroadcastDraft,
+} from '../utils/broadcastDraft'
+import {
+  BroadcastHistoryDetail,
+  BroadcastHistoryList,
+  BroadcastResultCard,
+  broadcastItemHtml,
+} from '../components/BroadcastHistory'
 
 interface AudienceItem {
   audience: string
@@ -65,6 +80,7 @@ const defaultButtons: BroadcastButtonsState = {
   connect: false,
   promo: false,
   main_menu: false,
+  share_referral: false,
   links: [],
 }
 
@@ -85,17 +101,54 @@ function useBroadcastTariffs(enabled: boolean) {
 
 /**
  * Число получателей считает сервер: у платных сегментов оно зависит от фильтра
- * по тарифу, и цифра из списка аудиторий там уже неверна. Запрос идёт сам при
- * смене выбора — раньше для этого была отдельная кнопка «Предпросмотр», и до
- * подтверждения отправки админ не знал, скольким людям уйдёт сообщение.
+ * по тарифу, а при нескольких сегментах один человек может быть в двух сразу —
+ * сумма цифр из списка аудиторий тогда врёт. Запрос идёт сам при смене выбора:
+ * раньше для этого была отдельная кнопка «Предпросмотр», и до подтверждения
+ * отправки админ не знал, скольким людям уйдёт сообщение.
  */
-function useRecipientCount(audience: string, tariffId: number | null) {
+function useRecipientCount(audiences: string[], tariffId: number | null) {
   return useQuery({
-    queryKey: ['admin-broadcast-count', audience, tariffId],
-    queryFn: () => api.adminBroadcastPreview({ audience, tariff_id: tariffId }),
+    queryKey: ['admin-broadcast-count', audiences, tariffId],
+    queryFn: () => api.adminBroadcastPreview({ audiences, tariff_id: tariffId }),
+    enabled: audiences.length > 0,
     staleTime: 30_000,
   })
 }
+
+const PAID_AUDIENCES = ['active_paid', 'inactive_paid']
+
+const HISTORY_PAGE_SIZE = 20
+const HISTORY_KEY = ['admin-broadcast-history'] as const
+
+function useBroadcastHistory() {
+  return useInfiniteQuery({
+    queryKey: HISTORY_KEY,
+    queryFn: ({ pageParam }) => api.adminBroadcastHistory({ limit: HISTORY_PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, pages) => {
+      const loaded = pages.reduce((n, p) => n + p.items.length, 0)
+      return loaded < lastPage.total ? loaded : undefined
+    },
+    staleTime: 15_000,
+  })
+}
+
+/**
+ * Рассылка, за которой следит карточка над формой. Пока она идёт, страница
+ * спрашивает о ней раз в две секунды: пачки уходят раз в секунду, чаще не
+ * изменится ничего.
+ */
+function useWatchedBroadcast(id: number | null) {
+  return useQuery({
+    queryKey: ['admin-broadcast-history-item', id],
+    queryFn: () => api.adminBroadcastHistoryItem(id as number),
+    enabled: id !== null,
+    refetchInterval: (query) => (query.state.data?.status === 'running' ? 2000 : false),
+  })
+}
+
+/** compose и preview — вкладки формы на телефоне; history — список рассылок везде. */
+type BroadcastView = 'compose' | 'preview' | 'history'
 
 export default function AdminBroadcastPage() {
   const { t } = useTranslation()
@@ -104,21 +157,68 @@ export default function AdminBroadcastPage() {
   const { data: bootstrap } = useAdminBootstrap()
   const { data, isLoading } = useAudiences()
 
-  const [selectedAudience, setSelectedAudience] = useState('active_all')
-  const [selectedTariff, setSelectedTariff] = useState<number | null>(null)
-  const [html, setHtml] = useState('')
-  const [buttons, setButtons] = useState<BroadcastButtonsState>(defaultButtons)
-  const [media, setMedia] = useState<UploadedMedia | null>(null)
+  // Черновик читается один раз: дальше форма — источник правды, а хранилище догоняет её.
+  const [draft] = useState(loadBroadcastDraft)
+  const [selectedAudiences, setSelectedAudiences] = useState<string[]>(
+    draft?.audiences.length ? draft.audiences : ['active_all'],
+  )
+  const [selectedTariff, setSelectedTariff] = useState<number | null>(draft?.tariffId ?? null)
+  const [html, setHtml] = useState(draft?.html ?? '')
+  const [editorSeed, setEditorSeed] = useState(draft?.html ?? '')
+  const [buttons, setButtons] = useState<BroadcastButtonsState>(draft?.buttons ?? defaultButtons)
+  // previewUrl пустой: картинка предпросмотра жила в памяти прошлой вкладки.
+  const [media, setMedia] = useState<UploadedMedia | null>(
+    draft?.media ? { ...draft.media, previewUrl: '' } : null,
+  )
+  const [draftSaved, setDraftSaved] = useState(Boolean(draft))
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [sendSuccess, setSendSuccess] = useState<string | null>(null)
-  const [mobileTab, setMobileTab] = useState<'compose' | 'preview'>('compose')
+  const [view, setView] = useState<BroadcastView>('compose')
   const [resetKey, setResetKey] = useState(0)
+  const [watchedId, setWatchedId] = useState<number | null>(null)
+  const [detailItem, setDetailItem] = useState<AdminBroadcastHistoryItemDTO | null>(null)
+
+  const history = useBroadcastHistory()
+  const { data: watched } = useWatchedBroadcast(watchedId)
+  // Строка идущей рассылки берёт свежие цифры из опроса: список перечитывается
+  // реже, и без этого карточка и строка показывали бы разное.
+  const historyItems = useMemo(
+    () =>
+      (history.data?.pages.flatMap((p) => p.items) ?? []).map((item) =>
+        watched && item.id === watched.id ? watched : item,
+      ),
+    [history.data, watched],
+  )
+  const historyTotal = history.data?.pages[0]?.total ?? 0
+
+  /*
+   * Рассылку, запущенную до перезагрузки страницы (или из Telegram-админки),
+   * подхватываем из истории: иначе после F5 о ней в кабинете ни слова до
+   * самого конца.
+   */
+  const pickedRunningRef = useRef(false)
+  useEffect(() => {
+    if (pickedRunningRef.current || !history.data) return
+    pickedRunningRef.current = true
+    const latest = history.data.pages[0]?.items[0]
+    if (latest?.status === 'running') setWatchedId(latest.id)
+  }, [history.data])
+
+  // Рассылка закончилась — строка в списке тоже должна показать итог.
+  const watchedStatus = watched?.status
+  useEffect(() => {
+    if (watchedStatus && watchedStatus !== 'running') {
+      queryClient.invalidateQueries({ queryKey: HISTORY_KEY })
+    }
+  }, [watchedStatus, queryClient])
 
   const isTariffsMode = bootstrap?.sales_mode === 'tariffs'
   const { data: tariffsData } = useBroadcastTariffs(isTariffsMode)
-  const { data: countData, isFetching: countLoading } = useRecipientCount(selectedAudience, selectedTariff)
+  const hasAudience = selectedAudiences.length > 0
+  const hasPaidAudience = selectedAudiences.some((aud) => PAID_AUDIENCES.includes(aud))
+  const { data: countData, isFetching: countLoading } = useRecipientCount(selectedAudiences, selectedTariff)
 
-  const recipientCount = countData?.recipient_count ?? null
+  const recipientCount = hasAudience ? (countData?.recipient_count ?? null) : 0
   const hasContent = Boolean(html.trim() || media)
   const limit = media ? LIMIT_CAPTION : LIMIT_TEXT
   const length = useMemo(() => telegramTextLength(html), [html])
@@ -139,21 +239,30 @@ export default function AdminBroadcastPage() {
   const sendMutation = useMutation({
     mutationFn: () =>
       api.adminBroadcastSend({
-        audience: selectedAudience,
+        audiences: selectedAudiences,
         tariff_id: selectedTariff,
         text: html,
         buttons,
-        media: media ? { file_id: media.file_id, kind: media.kind } : null,
+        media: media ? { file_id: media.file_id, kind: media.kind, name: media.name } : null,
       }),
     onSuccess: (res) => {
       setConfirmOpen(false)
+      clearBroadcastDraft()
       setHtml('')
+      setEditorSeed('')
       setResetKey((v) => v + 1)
       setButtons(defaultButtons)
       if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl)
       setMedia(null)
-      setSendSuccess(t('admin.broadcast.started', { count: res.recipient_count }))
+      // Ход и итог покажет карточка; строка «запущена» — только если история не записалась.
+      if (res.broadcast_id) {
+        setWatchedId(res.broadcast_id)
+        setSendSuccess(null)
+      } else {
+        setSendSuccess(t('admin.broadcast.started', { count: res.recipient_count }))
+      }
       queryClient.invalidateQueries({ queryKey: ['admin-broadcast-audiences'] })
+      queryClient.invalidateQueries({ queryKey: HISTORY_KEY })
     },
     onError: () => setConfirmOpen(false),
   })
@@ -168,6 +277,7 @@ export default function AdminBroadcastPage() {
     inactive_paid: t('admin.broadcast.audience.inactivePaid'),
     inactive_trial: t('admin.broadcast.audience.inactiveTrial'),
   }
+  const selectedAudienceLabels = selectedAudiences.map((aud) => audienceLabels[aud] ?? aud)
 
   const selectedButtonLabels = [
     buttons.buy ? t('admin.broadcast.buttons.buy') : null,
@@ -176,8 +286,30 @@ export default function AdminBroadcastPage() {
       t(broadcastLinkLabelKey(key)),
     ),
     buttons.promo ? t('admin.broadcast.buttons.promo') : null,
+    buttons.share_referral ? t('admin.broadcast.buttons.shareReferral') : null,
     buttons.main_menu ? t('admin.broadcast.buttons.mainMenu') : null,
   ].filter(Boolean) as string[]
+
+  /** «Взять за основу»: форма получает текст, аудитории, кнопки и вложение рассылки. */
+  function reuseBroadcast(item: AdminBroadcastHistoryItemDTO) {
+    const text = broadcastItemHtml(item)
+    setHtml(text)
+    setEditorSeed(text)
+    setResetKey((v) => v + 1)
+    setSelectedAudiences(item.audiences.length ? item.audiences : ['active_all'])
+    setSelectedTariff(item.tariff_id)
+    setButtons(normalizeBroadcastButtons(item.buttons))
+    if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl)
+    setMedia(
+      item.media_kind && item.media_file_id
+        ? { file_id: item.media_file_id, kind: item.media_kind, name: item.media_name, previewUrl: '' }
+        : null,
+    )
+    setDetailItem(null)
+    setSendSuccess(null)
+    setView('compose')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
 
   function clearMedia() {
     if (media?.previewUrl) URL.revokeObjectURL(media.previewUrl)
@@ -185,7 +317,26 @@ export default function AdminBroadcastPage() {
     setSendSuccess(null)
   }
 
-  const canSend = hasContent && !overLimit && !sendMutation.isPending
+  const canSend = hasAudience && hasContent && !overLimit && !sendMutation.isPending
+
+  /*
+   * Запись с задержкой: на каждое нажатие клавиши переписывать localStorage
+   * незачем, а полсекунды — меньше, чем нужно, чтобы успеть закрыть вкладку.
+   */
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDraftSaved(
+        saveBroadcastDraft({
+          html,
+          audiences: selectedAudiences,
+          tariffId: selectedTariff,
+          buttons,
+          media: media ? { file_id: media.file_id, kind: media.kind, name: media.name } : null,
+        }) && hasContent,
+      )
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [html, selectedAudiences, selectedTariff, buttons, media, hasContent])
 
   const preview = (
     <div className="rounded-lg border border-border/50 bg-card">
@@ -198,15 +349,24 @@ export default function AdminBroadcastPage() {
           html={html}
           mediaUrl={media?.previewUrl}
           mediaKind={media?.kind}
+          mediaPlaceholder={
+            media && !media.previewUrl
+              ? t('admin.broadcast.previewMediaFromDraft', { name: media.name || '—' })
+              : undefined
+          }
           buttons={buttons}
         />
 
         <dl className="space-y-1 text-sm">
           <SummaryRow label={t('admin.broadcast.audienceTitle')}>
-            {audienceLabels[selectedAudience] ?? selectedAudience}
+            {/* Переносом, а не многоточием: сегментов теперь несколько, и
+                обрезанный хвост списка прятал как раз второй из них. */}
+            <span className={cn('block whitespace-normal', !hasAudience && 'text-destructive')}>
+              {hasAudience ? selectedAudienceLabels.join(', ') : t('admin.broadcast.audienceNone')}
+            </span>
           </SummaryRow>
           <SummaryRow label={t('admin.broadcast.recipients')}>
-            {countLoading || recipientCount === null ? '…' : recipientCount}
+            {hasAudience && (countLoading || recipientCount === null) ? '…' : recipientCount}
           </SummaryRow>
           <SummaryRow label={t('admin.broadcast.buttonsTitle')}>
             {selectedButtonLabels.length || t('admin.broadcast.buttons.none')}
@@ -237,6 +397,38 @@ export default function AdminBroadcastPage() {
           title={t('admin.broadcast.title')}
           subtitle={t('admin.broadcast.subtitle')}
           accent="indigo"
+          actions={
+            // На ПК история — отдельный режим страницы; на телефоне — третья вкладка.
+            <div className={surface('well', 'hidden gap-1 rounded-xl p-1 lg:flex')} role="tablist">
+              {(
+                [
+                  ['compose', t('admin.broadcast.history.newBroadcast')],
+                  ['history', t('admin.broadcast.history.tab')],
+                ] as const
+              ).map(([key, label]) => {
+                const active = key === 'history' ? view === 'history' : view !== 'history'
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setView(key)}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors',
+                      active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {key === 'history' && <History className="size-4" />}
+                    {label}
+                    {key === 'history' && historyTotal > 0 && (
+                      <span className="text-xs tabular-nums text-muted-foreground">{historyTotal}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          }
         />
 
         {sendSuccess && (
@@ -245,59 +437,92 @@ export default function AdminBroadcastPage() {
 
         {/* На узком экране форма и предпросмотр — две вкладки: иначе за
             результатом приходится листать через весь экран и обратно. */}
-        <div className={surface('well', 'flex gap-1 rounded-xl p-1 lg:hidden')}>
-          {(['compose', 'preview'] as const).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              role="tab"
-              aria-selected={mobileTab === tab}
-              onClick={() => setMobileTab(tab)}
-              className={cn(
-                'flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-colors',
-                mobileTab === tab
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {tab === 'compose' ? t('admin.broadcast.compose') : t('admin.broadcast.preview')}
-            </button>
-          ))}
-        </div>
+        <StickyMobileTabs>
+          <div className={surface('well', 'flex gap-1 rounded-xl p-1')}>
+            {(['compose', 'preview', 'history'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                role="tab"
+                aria-selected={view === tab}
+                onClick={() => setView(tab)}
+                className={cn(
+                  'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-semibold transition-colors',
+                  view === tab ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <span className="truncate">
+                  {tab === 'compose'
+                    ? t('admin.broadcast.compose')
+                    : tab === 'preview'
+                      ? // Короткое слово: «Предпросмотр» третьей вкладкой на 390 px не помещается.
+                        t('admin.broadcast.previewTab')
+                      : t('admin.broadcast.history.tab')}
+                </span>
+              </button>
+            ))}
+          </div>
+        </StickyMobileTabs>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-          <div className={cn('min-w-0 space-y-4', mobileTab === 'preview' && 'hidden lg:block')}>
+        {watched && watchedId !== null && (
+          <BroadcastResultCard
+            item={watched}
+            audienceLabels={audienceLabels}
+            onDetails={() => setDetailItem(watched)}
+            onDismiss={() => setWatchedId(null)}
+          />
+        )}
+
+        {view === 'history' && (
+          <BroadcastHistoryList
+            items={historyItems}
+            isLoading={history.isLoading}
+            hasMore={Boolean(history.hasNextPage)}
+            loadingMore={history.isFetchingNextPage}
+            onLoadMore={() => history.fetchNextPage()}
+            onOpen={setDetailItem}
+            audienceLabels={audienceLabels}
+          />
+        )}
+
+        <div
+          className={cn(
+            'grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start',
+            view === 'history' && 'hidden',
+          )}
+        >
+          <div className={cn('min-w-0 space-y-4', view === 'preview' && 'hidden lg:block')}>
             <BroadcastAudienceSelector
               audiences={data?.audiences ?? []}
               isLoading={isLoading}
-              selectedAudience={selectedAudience}
-              onSelectAudience={(audience) => {
-                setSelectedAudience(audience)
-                setSelectedTariff(null)
+              selectedAudiences={selectedAudiences}
+              onChange={(next) => {
+                setSelectedAudiences(next)
+                if (!next.some((aud) => PAID_AUDIENCES.includes(aud))) setSelectedTariff(null)
                 setSendSuccess(null)
               }}
               audienceLabels={audienceLabels}
+              recipientCount={countLoading ? null : recipientCount}
             >
-              {isTariffsMode &&
-                (selectedAudience === 'active_paid' || selectedAudience === 'inactive_paid') && (
-                  <>
-                    <label className="mb-1.5 block text-xs text-muted-foreground">
-                      {t('admin.broadcast.filterTariff')}
-                    </label>
-                    <AdminSelect<number>
-                      value={selectedTariff}
-                      allowEmpty
-                      emptyLabel={t('admin.broadcast.allTariffs')}
-                      placeholder={t('admin.broadcast.allTariffs')}
-                      ariaLabel={t('admin.broadcast.filterTariff')}
-                      options={(tariffsData?.tariffs ?? []).map((tariff) => ({
-                        value: tariff.id,
-                        label: tariff.name,
-                      }))}
-                      onChange={setSelectedTariff}
-                    />
-                  </>
-                )}
+              {isTariffsMode && hasPaidAudience && (
+                <>
+                  <label className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('admin.broadcast.filterTariff')}
+                  </label>
+                  <AdminSelect<number>
+                    value={selectedTariff}
+                    allowEmpty
+                    emptyLabel={t('admin.broadcast.allTariffs')}
+                    placeholder={t('admin.broadcast.allTariffs')}
+                    ariaLabel={t('admin.broadcast.filterTariff')}
+                    options={(tariffsData?.tariffs ?? []).map((tariff) => ({
+                      value: tariff.id,
+                      label: tariff.name,
+                    }))}
+                    onChange={setSelectedTariff}
+                  />
+                </>
+              )}
             </BroadcastAudienceSelector>
 
             {/* Сообщение */}
@@ -307,9 +532,16 @@ export default function AdminBroadcastPage() {
                   2
                 </span>
                 <span className="text-sm font-semibold">{t('admin.broadcast.compose')}</span>
+                {draftSaved && (
+                  <span className="ml-auto flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                    <Check className="size-3.5 shrink-0 text-emerald-500" />
+                    <span className="truncate">{t('admin.broadcast.draftSaved')}</span>
+                  </span>
+                )}
                 <span
                   className={cn(
-                    'ml-auto text-xs tabular-nums',
+                    'shrink-0 text-xs tabular-nums',
+                    !draftSaved && 'ml-auto',
                     overLimit ? 'font-semibold text-destructive' : 'text-muted-foreground',
                   )}
                 >
@@ -319,6 +551,7 @@ export default function AdminBroadcastPage() {
 
               <TelegramHtmlEditor
                 resetKey={resetKey}
+                initialHtml={editorSeed}
                 onChange={(next) => {
                   setHtml(next)
                   setSendSuccess(null)
@@ -432,7 +665,7 @@ export default function AdminBroadcastPage() {
           <div
             className={cn(
               'min-w-0 lg:sticky lg:top-4',
-              mobileTab === 'compose' && 'hidden lg:block',
+              view === 'compose' && 'hidden lg:block',
             )}
           >
             {preview}
@@ -441,7 +674,12 @@ export default function AdminBroadcastPage() {
       </div>
 
       {/* Панель отправки на телефоне: кнопка всегда под рукой, а не в конце формы. */}
-      <div className="fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-border/60 bg-card/95 px-4 py-2.5 backdrop-blur lg:hidden">
+      <div
+        className={cn(
+          'fixed inset-x-0 bottom-0 z-30 flex items-center gap-3 border-t border-border/60 bg-card/95 px-4 py-2.5 backdrop-blur lg:hidden',
+          view === 'history' && 'hidden',
+        )}
+      >
         <span className="text-xs leading-tight text-muted-foreground">
           {t('admin.broadcast.recipients')}
           <b className="block text-base text-foreground tabular-nums">
@@ -458,6 +696,14 @@ export default function AdminBroadcastPage() {
           {t('admin.broadcast.send')}
         </button>
       </div>
+
+      <BroadcastHistoryDetail
+        item={detailItem}
+        onClose={() => setDetailItem(null)}
+        onReuse={reuseBroadcast}
+        replacesDraft={hasContent}
+        audienceLabels={audienceLabels}
+      />
 
       <AdminConfirmModal
         open={confirmOpen}
@@ -477,7 +723,11 @@ export default function AdminBroadcastPage() {
             <p className="text-sm text-muted-foreground">{t('admin.broadcast.confirmLead')}</p>
             <dl className={surface('raised', 'divide-y divide-border/60 rounded-lg')}>
               <ConfirmRow icon={Users} label={t('admin.broadcast.audienceTitle')}>
-                {audienceLabels[selectedAudience] ?? selectedAudience}
+                {selectedAudienceLabels.map((name) => (
+                  <span key={name} className="block">
+                    {name}
+                  </span>
+                ))}
               </ConfirmRow>
               <ConfirmRow icon={UsersRound} label={t('admin.broadcast.recipients')}>
                 {recipientCount === null ? '…' : recipientCount}
@@ -510,6 +760,32 @@ export default function AdminBroadcastPage() {
         }
       />
     </AdminLayout>
+  )
+}
+
+/**
+ * Полоса вкладок липнет под шапку: раньше она уезжала вверх вместе с формой, и
+ * чтобы из кнопок под сообщением глянуть предпросмотр, приходилось сначала
+ * долистать до начала страницы. Шапка на телефоне прячется при прокрутке вниз
+ * (до md), и полоса тогда поднимается к самому краю — так же, как панель
+ * периода на странице статистики.
+ *
+ * Отдельный компонент, потому что useAdminShell работает только внутри
+ * AdminLayout, а сама страница его и рисует.
+ */
+function StickyMobileTabs({ children }: { children: React.ReactNode }) {
+  const { mobileHeaderVisible } = useAdminShell()
+  return (
+    <div
+      className={cn(
+        'sticky z-40 -mx-3 border-b border-border/80 bg-card/92 px-3 py-2 backdrop-blur-xl transition-[top] duration-200 ease-out sm:-mx-4 sm:px-4 dark:border-primary/12 lg:hidden',
+        mobileHeaderVisible
+          ? 'top-[calc(3.5rem+var(--cabinet-tg-safe-top))]'
+          : 'top-[var(--cabinet-tg-safe-top)] md:top-[calc(3.5rem+var(--cabinet-tg-safe-top))]',
+      )}
+    >
+      {children}
+    </div>
   )
 }
 

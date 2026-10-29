@@ -70,6 +70,8 @@ func promoErrorKindSlug(kind promo.ActivateErrKind) string {
 		return "pending_discount"
 	case promo.ActivateErrTariffMismatch:
 		return "tariff_mismatch"
+	case promo.ActivateErrHwidPinned:
+		return "hwid_pinned"
 	default:
 		return "generic"
 	}

@@ -11,6 +11,7 @@ import {
   useAdminUserDevices,
   useAdminUserSetHwidLimit,
   useAdminUserExtraHwid,
+  useAdminUserSetHwidPin,
   type AdminUserPanelResponse,
 } from '../../hooks/useAdminUsers'
 
@@ -36,23 +37,34 @@ export function AdminUserDevicesModal({
   const customer = panel.customer
   const totalLimit = rw.hwid_device_limit ?? 1
   const storedExtra = customer?.extra_hwid ?? 0
-  const initialBase = baseLimitFromTotal(totalLimit, customer)
+  const initialPin = customer?.hwid_limit_override ?? null
+  const initialPinned = initialPin != null
+  const unpinnedLimit = panel.hwid_unpinned_limit
+  // Пока лимит закреплён, в панели лежит закреплённое число, а не тариф +
+  // слоты: базу для обычного режима считаем от расчётного лимита.
+  const unpinnedTotal = initialPinned ? (unpinnedLimit ?? totalLimit) : totalLimit
+  const initialBase = baseLimitFromTotal(unpinnedTotal, customer)
 
   const { data: devicesData, isLoading: devicesLoading } = useAdminUserDevices(open ? userId : null)
   const setHwid = useAdminUserSetHwidLimit(userId)
   const extraHwid = useAdminUserExtraHwid(userId)
+  const setPin = useAdminUserSetHwidPin(userId)
 
   const [draftBase, setDraftBase] = useState(initialBase)
   const [draftExtra, setDraftExtra] = useState(storedExtra)
+  const [pinned, setPinned] = useState(initialPinned)
+  const [draftPin, setDraftPin] = useState(initialPin ?? totalLimit)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (open) {
-      setDraftBase(baseLimitFromTotal(totalLimit, customer))
+      setDraftBase(initialBase)
       setDraftExtra(storedExtra)
+      setPinned(initialPinned)
+      setDraftPin(initialPin ?? totalLimit)
       setError(null)
     }
-  }, [open, totalLimit, storedExtra, customer])
+  }, [open, initialBase, storedExtra, initialPinned, initialPin, totalLimit])
 
   const handleClose = () => {
     setError(null)
@@ -61,8 +73,11 @@ export function AdminUserDevicesModal({
 
   const targetTotal = draftBase + draftExtra
   const extraDelta = draftExtra - storedExtra
-  const totalChanged = targetTotal !== totalLimit
-  const hasChanges = draftBase !== initialBase || extraDelta !== 0
+  const totalChanged = targetTotal !== unpinnedTotal
+  const pinChanged = pinned !== initialPinned || (pinned && draftPin !== initialPin)
+  const hasChanges = pinned
+    ? pinChanged
+    : pinChanged || draftBase !== initialBase || extraDelta !== 0
 
   const handleSave = async () => {
     setError(null)
@@ -73,11 +88,20 @@ export function AdminUserDevicesModal({
     }
 
     try {
-      if (extraDelta !== 0) {
-        await extraHwid.mutateAsync(extraDelta)
-      }
-      if (totalChanged) {
-        await setHwid.mutateAsync(targetTotal)
+      if (pinned) {
+        await setPin.mutateAsync(draftPin)
+      } else {
+        // Снятие закрепления сервер сам пересчитывает в тариф + слоты;
+        // правки базы и слотов, если были, ложатся уже поверх.
+        if (initialPinned) {
+          await setPin.mutateAsync(null)
+        }
+        if (extraDelta !== 0) {
+          await extraHwid.mutateAsync(extraDelta)
+        }
+        if (totalChanged) {
+          await setHwid.mutateAsync(targetTotal)
+        }
       }
       onSuccess?.(t('admin.feedback.saved'))
       handleClose()
@@ -88,7 +112,7 @@ export function AdminUserDevicesModal({
     }
   }
 
-  const isPending = setHwid.isPending || extraHwid.isPending
+  const isPending = setHwid.isPending || extraHwid.isPending || setPin.isPending
 
   return (
     <AdminModal
@@ -122,6 +146,11 @@ export function AdminUserDevicesModal({
           draftExtra={draftExtra}
           onDraftBaseChange={setDraftBase}
           onDraftExtraChange={setDraftExtra}
+          pinned={pinned}
+          onPinnedChange={setPinned}
+          draftPin={draftPin}
+          onDraftPinChange={setDraftPin}
+          unpinnedLimit={unpinnedLimit}
           onSuccess={(msg) => onSuccess?.(msg ?? t('admin.feedback.deviceDeleted'))}
           onError={(e) => {
             const msg = formatAdminApiError(e, t)

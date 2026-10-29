@@ -14,6 +14,7 @@ interface BroadcastButtons {
   connect: boolean
   promo: boolean
   main_menu: boolean
+  share_referral: boolean
   links: BroadcastLinkKey[]
 }
 
@@ -22,6 +23,12 @@ interface AdminBroadcastMessagePreviewProps {
   html: string
   mediaUrl?: string | null
   mediaKind?: AdminBroadcastMediaKind
+  /**
+   * Текст на месте вложения, когда файл есть, а показать его нечем: черновик
+   * после перезагрузки, запись в истории. Файл лежит в Telegram, картинки у
+   * кабинета нет.
+   */
+  mediaPlaceholder?: string
   buttons: BroadcastButtons
 }
 
@@ -36,12 +43,14 @@ export function AdminBroadcastMessagePreview({
   html,
   mediaUrl,
   mediaKind,
+  mediaPlaceholder,
   buttons,
 }: AdminBroadcastMessagePreviewProps) {
   const { t } = useTranslation()
   const bodyRef = useRef<HTMLDivElement>(null)
 
-  // Порядок повторяет BuildReplyMarkup: купить, мой VPN, разделы кабинета, промокод, меню.
+  // Порядок повторяет BuildReplyMarkup: купить, мой VPN, разделы кабинета, промокод,
+  // пригласить друга, меню.
   const inlineButtons = [
     buttons.buy ? t('admin.broadcast.buttons.buy') : null,
     buttons.connect ? t('admin.broadcast.buttons.connect') : null,
@@ -49,6 +58,7 @@ export function AdminBroadcastMessagePreview({
       t(broadcastLinkLabelKey(key)),
     ),
     buttons.promo ? t('admin.broadcast.buttons.promo') : null,
+    buttons.share_referral ? t('admin.broadcast.buttons.shareReferral') : null,
     buttons.main_menu ? t('admin.broadcast.buttons.mainMenu') : null,
   ].filter(Boolean) as string[]
 
@@ -72,18 +82,27 @@ export function AdminBroadcastMessagePreview({
   }, [])
 
   const caption = html.trim()
+  const hasMedia = Boolean(mediaUrl || mediaKind)
 
   return (
     // Оба вида Telegram: светлый чат в светлой теме, тёмный в тёмной.
     // Цвета взяты у самого Telegram и намеренно не из наших токенов — это
     // изображение чужого интерфейса, декор-темы к нему отношения не имеют.
     <div className="overflow-hidden rounded-2xl border border-black/[0.06] bg-white text-[#0f0f0f] dark:border-white/[0.07] dark:bg-[#17212b] dark:text-[#f2f5f8]">
-      {mediaUrl &&
-        (mediaKind === 'video' ? (
+      {mediaUrl ? (
+        mediaKind === 'video' ? (
           <video src={mediaUrl} className="aspect-video w-full object-cover" controls muted playsInline />
         ) : (
           <img src={mediaUrl} alt="" className="aspect-video w-full object-cover" />
-        ))}
+        )
+      ) : (
+        // Пустое место с подписью честнее, чем молча пропавшее фото.
+        mediaKind && (
+          <div className="grid aspect-video w-full place-items-center bg-black/[0.04] px-6 text-center text-xs text-black/50 dark:bg-white/[0.04] dark:text-white/50">
+            {mediaPlaceholder}
+          </div>
+        )
+      )}
 
       {caption ? (
         <div
@@ -93,7 +112,7 @@ export function AdminBroadcastMessagePreview({
         />
       ) : (
         <p className="px-3 py-2.5 text-sm text-black/40 dark:text-white/45">
-          {mediaUrl ? t('admin.broadcast.previewNoText') : t('admin.broadcast.previewEmpty')}
+          {hasMedia ? t('admin.broadcast.previewNoText') : t('admin.broadcast.previewEmpty')}
         </p>
       )}
 

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -54,7 +55,8 @@ func (h *OAuthHandler) GoogleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	setOAuthStateCookie(w, redirectURL, h.cookieDomain)
+	http.Redirect(w, r, redirectURL, http.StatusFound) //nolint:gosec // G710: адрес начала OAuth строит сервер, не пользователь
 }
 
 // GoogleCallback — GET /cabinet/api/auth/google/callback?code=...&state=...
@@ -72,6 +74,10 @@ func (h *OAuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 	if state == "" || code == "" {
 		cabmetrics.RecordAuth("google_callback", "client_error")
 		http.Error(w, "missing state or code", http.StatusBadRequest)
+		return
+	}
+	if !consumeOAuthState(w, r, state, h.cookieDomain) {
+		http.Redirect(w, r, oauthStateMismatchRedirect, http.StatusFound)
 		return
 	}
 
@@ -110,6 +116,11 @@ func (h *OAuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/cabinet/login?"+q.Encode(), http.StatusFound)
 			return
 		}
+		if errors.Is(err, service.ErrGoogleLinkEmailConflict) {
+			cabmetrics.RecordAuth("google_callback", "client_error")
+			http.Redirect(w, r, "/cabinet/login?status=error&reason_code=email_conflict_with_another_account&provider=google", http.StatusFound)
+			return
+		}
 		if errors.Is(err, service.ErrInvalidToken) {
 			cabmetrics.RecordAuth("google_callback", "client_error")
 			http.Error(w, "invalid oauth state", http.StatusBadRequest)
@@ -144,7 +155,21 @@ func (h *OAuthHandler) GoogleCallback(w http.ResponseWriter, r *http.Request) {
 // GoogleLinkConfirm — GET /cabinet/api/auth/google/confirm?token=...
 // Подтверждает привязку Google к существующему аккаунту по токену из письма.
 func (h *OAuthHandler) GoogleLinkConfirm(w http.ResponseWriter, r *http.Request) {
-	token := r.URL.Query().Get("token")
+	// GET только показывает кнопку: ссылки из писем открывают почтовые сканеры,
+	// и привязка по GET происходила бы без участия человека. Форму сканеры не
+	// отправляют — привязка идёт по POST.
+	if r.Method == http.MethodGet {
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "missing token", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = oauthConfirmPage.Execute(w, map[string]string{"Action": r.URL.Path, "Token": token})
+		return
+	}
+	token := r.PostFormValue("token")
 	if token == "" {
 		cabmetrics.RecordAuth("google_link_confirm", "client_error")
 		http.Error(w, "missing token", http.StatusBadRequest)
@@ -162,14 +187,53 @@ func (h *OAuthHandler) GoogleLinkConfirm(w http.ResponseWriter, r *http.Request)
 			http.Error(w, "account blocked", http.StatusForbidden)
 			return
 		}
-		slog.Error("google link confirm failed", "error", err)
+		slog.Error("oauth link confirm failed", "error", err)
 		cabmetrics.RecordAuth("google_link_confirm", "server_error")
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 	cabmetrics.RecordAuth("google_link_confirm", "success")
 	setRefreshCookie(w, r, pair, h.cookieDomain, "/cabinet/api/auth")
-	http.Redirect(w, r, "/cabinet/dashboard", http.StatusFound)
+	http.Redirect(w, r, "/cabinet/dashboard", http.StatusSeeOther)
+}
+
+// oauthConfirmPage — страница подтверждения привязки по ссылке из письма.
+// Без скриптов и стилей: CSP кабинета их не пропускает, а здесь они не нужны.
+var oauthConfirmPage = template.Must(template.New("oauth-confirm").Parse(`<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Подтверждение входа</title></head>
+<body>
+<h1>Подтвердите привязку способа входа</h1>
+<p>Нажмите кнопку, чтобы привязать вход через внешний сервис к вашему кабинету.
+Если вы этого не запрашивали, просто закройте страницу.</p>
+<form method="post" action="{{.Action}}">
+<input type="hidden" name="token" value="{{.Token}}">
+<button type="submit">Подтвердить привязку</button>
+</form>
+</body></html>`))
+
+// redirectOAuthLoginError ведёт браузер в SPA при отказе входа через Яндекс/VK.
+func redirectOAuthLoginError(w http.ResponseWriter, r *http.Request, err error, result service.GoogleCallbackResult, provider string) bool {
+	switch {
+	case errors.Is(err, service.ErrGoogleLinkRequired) && result.LinkCtx != nil:
+		// Email провайдера совпал с существующим аккаунтом — ждём подтверждения по письму.
+		q := url.Values{}
+		q.Set("status", "merge_verification_required")
+		q.Set("reason_code", "oauth_link_email_confirmation_required")
+		q.Set("provider", provider)
+		if me := strings.TrimSpace(result.LinkCtx.MaskedEmail); me != "" {
+			q.Set("masked_email", me)
+		}
+		http.Redirect(w, r, "/cabinet/login?"+q.Encode(), http.StatusFound)
+		return true
+	case errors.Is(err, service.ErrInvalidCredentials):
+		http.Redirect(w, r, "/cabinet/login?status=error&reason_code=account_blocked&provider="+provider, http.StatusFound)
+		return true
+	case errors.Is(err, service.ErrGoogleLinkEmailConflict):
+		http.Redirect(w, r, "/cabinet/login?status=error&reason_code=email_conflict_with_another_account&provider="+provider, http.StatusFound)
+		return true
+	}
+	return false
 }
 
 func (h *OAuthHandler) YandexStart(w http.ResponseWriter, r *http.Request) {
@@ -183,7 +247,8 @@ func (h *OAuthHandler) YandexStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	setOAuthStateCookie(w, redirectURL, h.cookieDomain)
+	http.Redirect(w, r, redirectURL, http.StatusFound) //nolint:gosec // G710: адрес начала OAuth строит сервер, не пользователь
 }
 
 func (h *OAuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
@@ -191,6 +256,10 @@ func (h *OAuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 	code := strings.TrimSpace(r.URL.Query().Get("code"))
 	if state == "" || code == "" {
 		http.Error(w, "missing state or code", http.StatusBadRequest)
+		return
+	}
+	if !consumeOAuthState(w, r, state, h.cookieDomain) {
+		http.Redirect(w, r, oauthStateMismatchRedirect, http.StatusFound)
 		return
 	}
 	result, err := h.svc.YandexCallback(r.Context(), state, code, r.UserAgent(), middleware.ClientIP(r), service.RefreshCookieFromRequest(r))
@@ -202,8 +271,13 @@ func (h *OAuthHandler) YandexCallback(w http.ResponseWriter, r *http.Request) {
 				to = "/cabinet/link/merge?status=merge_required&reason_code=yandex_merge_candidate_detected&auto=1&provider=yandex"
 			case errors.Is(err, service.ErrInvalidToken):
 				to = "/cabinet/accounts?status=error&reason_code=yandex_link_session_invalid"
+			case errors.Is(err, service.ErrYandexLinkEmailConflict):
+				to = "/cabinet/accounts?status=error&reason_code=email_conflict_with_another_account&provider=yandex"
 			}
 			http.Redirect(w, r, to, http.StatusFound)
+			return
+		}
+		if redirectOAuthLoginError(w, r, err, result, "yandex") {
 			return
 		}
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -228,7 +302,8 @@ func (h *OAuthHandler) VKStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, redirectURL, http.StatusFound)
+	setOAuthStateCookie(w, redirectURL, h.cookieDomain)
+	http.Redirect(w, r, redirectURL, http.StatusFound) //nolint:gosec // G710: адрес начала OAuth строит сервер, не пользователь
 }
 
 func (h *OAuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
@@ -237,6 +312,10 @@ func (h *OAuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
 	deviceID := strings.TrimSpace(r.URL.Query().Get("device_id"))
 	if state == "" || code == "" || deviceID == "" {
 		http.Error(w, "missing state, code, or device_id", http.StatusBadRequest)
+		return
+	}
+	if !consumeOAuthState(w, r, state, h.cookieDomain) {
+		http.Redirect(w, r, oauthStateMismatchRedirect, http.StatusFound)
 		return
 	}
 	result, err := h.svc.VKCallback(r.Context(), state, code, deviceID, r.UserAgent(), middleware.ClientIP(r), service.RefreshCookieFromRequest(r))
@@ -248,8 +327,13 @@ func (h *OAuthHandler) VKCallback(w http.ResponseWriter, r *http.Request) {
 				to = "/cabinet/link/merge?status=merge_required&reason_code=vk_merge_candidate_detected&auto=1&provider=vk"
 			case errors.Is(err, service.ErrInvalidToken):
 				to = "/cabinet/accounts?status=error&reason_code=vk_link_session_invalid"
+			case errors.Is(err, service.ErrVKLinkEmailConflict):
+				to = "/cabinet/accounts?status=error&reason_code=email_conflict_with_another_account&provider=vk"
 			}
 			http.Redirect(w, r, to, http.StatusFound)
+			return
+		}
+		if redirectOAuthLoginError(w, r, err, result, "vk") {
 			return
 		}
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -283,6 +367,7 @@ func (h *OAuthHandler) TelegramOIDCStart(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	setOAuthStateCookie(w, redirectURL, h.cookieDomain)
 	http.Redirect(w, r, redirectURL, http.StatusFound)
 }
 
@@ -294,9 +379,26 @@ func (h *OAuthHandler) TelegramOIDCCallback(w http.ResponseWriter, r *http.Reque
 		http.Redirect(w, r, "/cabinet/login?status=error&reason_code=telegram_oidc_missing_code", http.StatusFound)
 		return
 	}
-	res, err := h.svc.TelegramOIDCCallback(r.Context(), state, code, r.UserAgent(), middleware.ClientIP(r))
+	if !consumeOAuthState(w, r, state, h.cookieDomain) {
+		http.Redirect(w, r, oauthStateMismatchRedirect, http.StatusFound)
+		return
+	}
+	res, err := h.svc.TelegramOIDCCallback(r.Context(), state, code, r.UserAgent(), middleware.ClientIP(r), service.RefreshCookieFromRequest(r))
 	if err != nil {
 		slog.Warn("telegram oidc callback failed", "error", err)
+		if res != nil && res.Mode == googleoauth.TelegramOIDCModeLink {
+			to := "/cabinet/accounts?status=error&reason_code=telegram_link_unknown"
+			switch {
+			case errors.Is(err, service.ErrInvalidToken):
+				to = "/cabinet/accounts?status=error&reason_code=telegram_link_session_invalid"
+			case errors.Is(err, service.ErrGoogleLinkSessionMismatch):
+				to = "/cabinet/accounts?status=error&reason_code=telegram_link_session_mismatch"
+			case errors.Is(err, bootstrap.ErrTelegramCustomerLinkedElsewhere):
+				to = "/cabinet/link/merge?status=merge_required&reason_code=telegram_merge_candidate_detected&auto=1&provider=telegram"
+			}
+			http.Redirect(w, r, to, http.StatusFound)
+			return
+		}
 		if errors.Is(err, bootstrap.ErrTelegramCustomerLinkedElsewhere) {
 			http.Redirect(w, r, "/cabinet/link/merge?status=merge_required&reason_code=telegram_merge_candidate_detected&auto=1&provider=telegram", http.StatusFound)
 			return

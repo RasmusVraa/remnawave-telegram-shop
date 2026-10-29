@@ -29,17 +29,17 @@ func (h Handler) CreateCustomerIfNotExistMiddleware(next bot.HandlerFunc) bot.Ha
 		}
 		existingCustomer, err := h.customerRepository.FindByTelegramId(ctx, telegramId)
 		if err != nil {
-			slog.Error("error finding customer by telegram id", err)
+			slog.Error("error finding customer by telegram id", "error", err)
 			return
 		}
 
 		if existingCustomer == nil {
-			existingCustomer, err = h.customerRepository.Create(ctx, &database.Customer{
+			_, err = h.customerRepository.Create(ctx, &database.Customer{
 				TelegramID: telegramId,
 				Language:   langCode,
 			})
 			if err != nil {
-				slog.Error("error creating customer", err)
+				slog.Error("error creating customer", "error", err)
 				return
 			}
 		} else {
@@ -54,7 +54,7 @@ func (h Handler) CreateCustomerIfNotExistMiddleware(next bot.HandlerFunc) bot.Ha
 
 			err = h.customerRepository.UpdateFields(ctx, existingCustomer.ID, updates)
 			if err != nil {
-				slog.Error("Error updating customer", err)
+				slog.Error("Error updating customer", "error", err)
 				return
 			}
 		}
@@ -82,7 +82,14 @@ func (h Handler) SuspiciousUserFilterMiddleware(next bot.HandlerFunc) bot.Handle
 			firstName = &update.CallbackQuery.From.FirstName
 			lastName = &update.CallbackQuery.From.LastName
 			userID = update.CallbackQuery.From.ID
-			chatID = update.CallbackQuery.Message.Message.Chat.ID
+			// Message бывает nil: кнопка под сообщением старше 48 часов
+			// (InaccessibleMessage) или из inline-режима. Тогда пишем в личку.
+			chatID = update.CallbackQuery.From.ID
+			if m := update.CallbackQuery.Message.Message; m != nil {
+				chatID = m.Chat.ID
+			} else if im := update.CallbackQuery.Message.InaccessibleMessage; im != nil {
+				chatID = im.Chat.ID
+			}
 			langCode = update.CallbackQuery.From.LanguageCode
 		} else {
 			next(ctx, b, update)
@@ -118,7 +125,7 @@ func (h Handler) SuspiciousUserFilterMiddleware(next bot.HandlerFunc) bot.Handle
 				ParseMode: models.ParseModeHTML,
 			})
 			if err != nil {
-				slog.Error("error sending suspicious user message", err)
+				slog.Error("error sending suspicious user message", "error", err)
 			}
 			return
 		}

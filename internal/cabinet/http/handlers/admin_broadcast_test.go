@@ -1,20 +1,62 @@
 package handlers
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"remnawave-tg-shop-bot/internal/broadcast"
 )
 
-func TestIsValidBroadcastAudience(t *testing.T) {
-	if !isValidBroadcastAudience("all") {
-		t.Fatal("all")
+func TestBroadcastSendReqResolveAudiences(t *testing.T) {
+	cases := []struct {
+		name     string
+		req      broadcastSendReq
+		want     []string
+		wantCode int
+	}{
+		{
+			name: "несколько сегментов",
+			req:  broadcastSendReq{Audiences: []string{"inactive_paid", "active_all"}},
+			want: []string{"active_all", "inactive_paid"},
+		},
+		{
+			// Вкладка кабинета, открытая до обновления, шлёт одно поле audience.
+			name: "старое поле audience",
+			req:  broadcastSendReq{Audience: "active_paid"},
+			want: []string{"active_paid"},
+		},
+		{
+			name: "audiences важнее audience",
+			req:  broadcastSendReq{Audience: "all", Audiences: []string{"active_trial"}},
+			want: []string{"active_trial"},
+		},
+		{name: "пусто", req: broadcastSendReq{}, wantCode: http.StatusBadRequest},
+		{name: "неизвестный сегмент", req: broadcastSendReq{Audiences: []string{"vip"}}, wantCode: http.StatusBadRequest},
+		{
+			name:     "тест вместе с настоящими",
+			req:      broadcastSendReq{Audiences: []string{"test_broadcast", "active_all"}},
+			wantCode: http.StatusBadRequest,
+		},
 	}
-	if !isValidBroadcastAudience("active_paid") {
-		t.Fatal("active_paid")
-	}
-	if isValidBroadcastAudience("unknown") {
-		t.Fatal("unknown should be invalid")
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			got, ok := tc.req.resolveAudiences(rec)
+			if tc.wantCode != 0 {
+				if ok || rec.Code != tc.wantCode {
+					t.Fatalf("ok=%v code=%d, want code %d", ok, rec.Code, tc.wantCode)
+				}
+				return
+			}
+			if !ok {
+				t.Fatalf("unexpected error %d: %s", rec.Code, rec.Body.String())
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("got %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
 

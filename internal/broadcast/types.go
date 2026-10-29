@@ -4,17 +4,23 @@ import "github.com/go-telegram/bot/models"
 
 // RecipientButtons — inline-кнопки под сообщением рассылки (как в TG-админке).
 // Links — ключи разделов кабинета (см. CabinetLinks); они рендерятся как web_app-кнопки.
+//
+// JSON-теги совпадают с полями кнопок в API кабинета: в таком виде кнопки
+// лежат в истории рассылок, и «взять за основу» подставляет их в форму как есть.
 type RecipientButtons struct {
-	Buy      bool
-	MainMenu bool
-	Promo    bool
-	Connect  bool
-	Links    []string
+	Buy      bool `json:"buy"`
+	MainMenu bool `json:"main_menu"`
+	Promo    bool `json:"promo"`
+	Connect  bool `json:"connect"`
+	// ShareReferral — «Пригласить друга»: окно «Переслать» Telegram с готовым
+	// текстом и личной реферальной ссылкой получателя.
+	ShareReferral bool     `json:"share_referral"`
+	Links         []string `json:"links"`
 }
 
 // IsEmpty — под сообщением не будет ни одной кнопки.
 func (f RecipientButtons) IsEmpty() bool {
-	return !f.Buy && !f.MainMenu && !f.Promo && !f.Connect && len(f.Links) == 0
+	return !f.Buy && !f.MainMenu && !f.Promo && !f.Connect && !f.ShareReferral && len(f.Links) == 0
 }
 
 // MediaKind — каким методом Bot API уходит прикреплённый файл.
@@ -58,4 +64,6 @@ type SendResult struct {
 	TotalUsers  int
 	SentCount   int
 	FailedCount int
+	// BlockedCount — часть FailedCount: получатель закрыл бота или удалил аккаунт.
+	BlockedCount int
 }

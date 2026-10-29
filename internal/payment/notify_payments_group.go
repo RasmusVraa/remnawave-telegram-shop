@@ -66,16 +66,6 @@ func formatClockUTC(t time.Time) string {
 	return fmt.Sprintf("%02d:%02d:%02d UTC", u.Hour(), u.Minute(), u.Second())
 }
 
-func telegramUsernameLine(c *database.Customer) string {
-	if c == nil {
-		return "(нет username)"
-	}
-	if u := telegramUsernameRaw(c); u != "" {
-		return u
-	}
-	return "(нет username)"
-}
-
 func telegramUsernameRaw(c *database.Customer) string {
 	if c == nil || c.TelegramUsername == nil {
 		return ""
@@ -365,10 +355,6 @@ func buildCancelGroupMessage(ctx context.Context, p *database.Purchase, c *datab
 	}
 	b.WriteString(cabinetWebHint(cabinet, c))
 	return b.String()
-}
-
-func (s *PaymentService) sendPaymentsGroupText(ctx context.Context, text string) {
-	s.sendPaymentsGroupHTML(ctx, text, nil)
 }
 
 // NotifyHeleketNeedsAttention зовёт админа на счёт Heleket, который нельзя

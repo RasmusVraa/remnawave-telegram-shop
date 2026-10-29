@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	tgverify "remnawave-tg-shop-bot/internal/cabinet/auth/telegram"
 	"remnawave-tg-shop-bot/internal/cabinet/mail"
@@ -945,7 +945,7 @@ func lockCustomerByID(ctx context.Context, tx pgx.Tx, id int64) (*database.Custo
 	const q = `SELECT id, telegram_id, expire_at, created_at, subscription_link, language,
 		extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start,
 		subscription_period_months, loyalty_xp, telegram_username, is_web_only,
-		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out
+		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out, hwid_limit_override
 		FROM customer WHERE id = $1 FOR UPDATE`
 	row := tx.QueryRow(ctx, q, id)
 	var c database.Customer
@@ -953,7 +953,7 @@ func lockCustomerByID(ctx context.Context, tx pgx.Tx, id int64) (*database.Custo
 		&c.ID, &c.TelegramID, &c.ExpireAt, &c.CreatedAt, &c.SubscriptionLink, &c.Language,
 		&c.ExtraHwid, &c.ExtraHwidExpiresAt, &c.CurrentTariffID, &c.SubscriptionPeriodStart,
 		&c.SubscriptionPeriodMonths, &c.LoyaltyXP, &c.TelegramUsername, &c.IsWebOnly,
-		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut,
+		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut, &c.HwidLimitOverride,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -968,7 +968,7 @@ func lockCustomerByTelegramID(ctx context.Context, tx pgx.Tx, telegramID int64) 
 	const q = `SELECT id, telegram_id, expire_at, created_at, subscription_link, language,
 		extra_hwid, extra_hwid_expires_at, current_tariff_id, subscription_period_start,
 		subscription_period_months, loyalty_xp, telegram_username, is_web_only,
-		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out
+		remnawave_user_id, remnawave_short_uuid, broadcast_opt_out, hwid_limit_override
 		FROM customer WHERE telegram_id = $1 FOR UPDATE`
 	row := tx.QueryRow(ctx, q, telegramID)
 	var c database.Customer
@@ -976,7 +976,7 @@ func lockCustomerByTelegramID(ctx context.Context, tx pgx.Tx, telegramID int64) 
 		&c.ID, &c.TelegramID, &c.ExpireAt, &c.CreatedAt, &c.SubscriptionLink, &c.Language,
 		&c.ExtraHwid, &c.ExtraHwidExpiresAt, &c.CurrentTariffID, &c.SubscriptionPeriodStart,
 		&c.SubscriptionPeriodMonths, &c.LoyaltyXP, &c.TelegramUsername, &c.IsWebOnly,
-		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut,
+		&c.RemnawaveUserID, &c.RemnawaveShortUUID, &c.BroadcastOptOut, &c.HwidLimitOverride,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -1011,6 +1011,16 @@ func moveReferrals(ctx context.Context, tx pgx.Tx, fromTgID, toTgID int64) error
 	if _, err := tx.Exec(ctx, `UPDATE referral SET referrer_id = $2 WHERE referrer_id = $1`, fromTgID, toTgID); err != nil {
 		return err
 	}
+	// У приглашённого одна связь (UNIQUE referee_id). Если приглашёнными были
+	// обе стороны слияния, оставляем одну строку — ту, по которой бонус уже
+	// начислен, иначе самую раннюю, — иначе перенос упадёт на уникальности.
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM referral
+		WHERE referee_id IN ($1, $2)
+		  AND id <> (SELECT id FROM referral WHERE referee_id IN ($1, $2) ORDER BY bonus_granted DESC, id LIMIT 1)`,
+		fromTgID, toTgID); err != nil {
+		return err
+	}
 	if _, err := tx.Exec(ctx, `UPDATE referral SET referee_id = $2 WHERE referee_id = $1`, fromTgID, toTgID); err != nil {
 		return err
 	}
@@ -1035,6 +1045,12 @@ func applyWinnerMergedFields(ctx context.Context, tx pgx.Tx, targetID int64, win
 			extraExp = loser.ExtraHwidExpiresAt
 		}
 	}
+	// Закреплённый админом лимит не должен теряться при слиянии: берём его
+	// с победителя, а если там нет — с проигравшей стороны.
+	hwidPin := winner.HwidLimitOverride
+	if hwidPin == nil {
+		hwidPin = loser.HwidLimitOverride
+	}
 	incomingUsername := pickTelegramUsername(winner, loser)
 	var unameArg any
 	if incomingUsername != nil {
@@ -1053,8 +1069,9 @@ func applyWinnerMergedFields(ctx context.Context, tx pgx.Tx, targetID int64, win
 			is_web_only                   = $11,
 			remnawave_user_id             = $12,
 			remnawave_short_uuid          = $13,
-			telegram_username             = COALESCE(telegram_username, $10),
-			broadcast_opt_out             = $14
+			hwid_limit_override           = $14,
+			broadcast_opt_out             = $15,
+			telegram_username             = COALESCE(telegram_username, $10)
 		WHERE id = $1`,
 		targetID,
 		winner.ExpireAt,
@@ -1069,6 +1086,7 @@ func applyWinnerMergedFields(ctx context.Context, tx pgx.Tx, targetID int64, win
 		!hasRealTelegram,
 		winner.RemnawaveUserID,
 		winner.RemnawaveShortUUID,
+		hwidPin,
 		winner.BroadcastOptOut || loser.BroadcastOptOut,
 	)
 	return err

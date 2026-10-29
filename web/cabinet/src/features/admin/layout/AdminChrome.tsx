@@ -85,7 +85,7 @@ export function AdminChrome({ children, hideMobileHeader }: AdminChromeProps) {
         </div>
       </header>
 
-      <div className="relative z-10 min-h-0 flex-1">
+      <div className="cabinet-shell-content relative z-10 min-h-0 flex-1">
         {children}
       </div>
     </div>

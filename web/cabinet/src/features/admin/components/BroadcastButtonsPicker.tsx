@@ -13,19 +13,22 @@ import {
 } from '../utils/broadcastLinks'
 
 /** Кнопки-действия бота: остаются в чате, кабинет не открывают. */
-type BotActionKey = 'buy' | 'promo' | 'main_menu'
+type BotActionKey = 'buy' | 'promo' | 'share_referral' | 'main_menu'
 
 export interface BroadcastButtonsState {
   buy: boolean
   connect: boolean
   promo: boolean
   main_menu: boolean
+  /** «Пригласить друга» — у каждого получателя своя реферальная ссылка. */
+  share_referral: boolean
   links: BroadcastLinkKey[]
 }
 
 const BOT_ACTIONS: { key: BotActionKey; labelKey: string }[] = [
   { key: 'buy', labelKey: 'admin.broadcast.buttons.buy' },
   { key: 'promo', labelKey: 'admin.broadcast.buttons.promo' },
+  { key: 'share_referral', labelKey: 'admin.broadcast.buttons.shareReferral' },
   { key: 'main_menu', labelKey: 'admin.broadcast.buttons.mainMenu' },
 ]
 
@@ -107,6 +110,7 @@ export function BroadcastButtonsPicker({
             ...buttons,
             buy: false,
             promo: false,
+            share_referral: false,
             main_menu: false,
             links: buttons.links.filter((k) => !EXTERNAL_LINK_KEYS.includes(k as never)),
           })

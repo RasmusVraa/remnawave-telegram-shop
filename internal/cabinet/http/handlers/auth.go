@@ -90,6 +90,9 @@ type resetReq struct {
 
 type verifyConfirmReq struct {
 	Token string `json:"token"`
+	// Email обязателен для кода из шести цифр, если пользователь не залогинен:
+	// код проверяется только против кода этого аккаунта.
+	Email string `json:"email,omitempty"`
 }
 
 type messageResp struct {
@@ -326,7 +329,7 @@ func (h *AuthHandler) ConfirmEmail(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	tp, err := h.svc.ConfirmEmail(r.Context(), req.Token, r.UserAgent(), middleware.ClientIP(r))
+	tp, err := h.svc.ConfirmEmail(r.Context(), req.Token, req.Email, service.RefreshCookieFromRequest(r), r.UserAgent(), middleware.ClientIP(r))
 	if err != nil {
 		writeServiceErr(w, err, "confirm_email")
 		return

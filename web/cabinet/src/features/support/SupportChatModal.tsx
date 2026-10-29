@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Loader2, Send, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { cn } from '@/lib/utils'
 import type { SupportMessageDTO } from '@/lib/api'
 import { useSupportChat } from '@/features/support/useSupportChat'
@@ -21,6 +22,26 @@ function inMessageBubbleClass(status?: SupportMessageDTO['delivery_status']): st
     default:
       return 'bg-primary text-primary-foreground'
   }
+}
+
+/** Точки «печатает…» как в Telegram: «.», «..», «...» и по кругу. */
+function TypingDots() {
+  const [count, setCount] = useState(1)
+  useEffect(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setCount(3)
+      return
+    }
+    const id = window.setInterval(() => setCount((c) => (c % 3) + 1), 400)
+    return () => window.clearInterval(id)
+  }, [])
+  // Невидимый хвост держит ширину строки, чтобы текст рядом не дёргался.
+  return (
+    <span aria-hidden>
+      {'.'.repeat(count)}
+      <span className="invisible">{'.'.repeat(3 - count)}</span>
+    </span>
+  )
 }
 
 type SupportChatModalProps = {
@@ -58,6 +79,11 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
   const bottomRef = useRef<HTMLDivElement>(null)
   const lastOutMsgIdRef = useRef(0)
   const { conversation, sendMutation, markReadMutation } = useSupportChat(enabled, open)
+  const drag = useSheetDragDismiss<HTMLDivElement, HTMLButtonElement>({
+    open,
+    onDismiss: onClose,
+    desktopQuery: '(min-width: 768px)',
+  })
 
   useEffect(() => {
     if (!open) {
@@ -114,6 +140,7 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
   const lastMessage = messages[messages.length - 1]
   const waitingForSupport =
     Boolean(lastMessage?.direction === 'in' && lastMessage.delivery_status === 'sent')
+  const supportTyping = waitingForSupport && Boolean(conversation.data?.support_typing)
 
   const groups = useMemo(
     () => groupByDay(conversation.data?.messages ?? [], t('supportChat.today'), t('supportChat.yesterday')),
@@ -143,24 +170,40 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
       aria-labelledby="support-chat-title"
     >
       <button
+        ref={drag.backdropRef}
         type="button"
         className="absolute inset-0 bg-neutral-950/65 backdrop-blur-sm"
         aria-label={t('common.close')}
         onClick={onClose}
       />
       <div
+        ref={drag.sheetRef}
         className={cn(
           'relative z-[1] flex w-full max-h-[min(88dvh,640px)] flex-col border border-border bg-card shadow-2xl transition-[transform,opacity] duration-300 ease-out md:max-h-[min(720px,90vh)] md:w-full md:max-w-md md:rounded-2xl',
-          'rounded-t-3xl pb-[max(0px,env(safe-area-inset-bottom))]',
+          // У поля ввода свой отступ p-3, поэтому снизу добавляем только высоту
+          // кнопок навигации Android, если окно лежит под ними.
+          'rounded-t-3xl pb-[var(--cabinet-sheet-safe-bottom)] md:pb-0',
           entered ? 'translate-y-0 opacity-100 md:scale-100' : 'translate-y-full opacity-95 md:translate-y-2 md:scale-[0.97] md:opacity-0',
         )}
       >
-        <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
+        {/* Ручка шторки: за неё и за заголовок окно тянут вниз, чтобы закрыть. */}
+        <div className="flex shrink-0 cursor-grab touch-none justify-center pb-0.5 pt-2.5 md:hidden" {...drag.handlers}>
+          <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+        </div>
+        <div
+          className="flex touch-none items-center justify-between gap-2 border-b border-border px-4 pb-3 pt-1.5 md:touch-auto md:pt-3"
+          {...drag.handlers}
+        >
           <div className="min-w-0">
             <h2 id="support-chat-title" className="text-base font-semibold">
               {t('supportChat.title')}
             </h2>
-            {waitingForSupport ? (
+            {supportTyping ? (
+              <p className="text-xs text-primary" role="status">
+                {t('supportChat.typing')}
+                <TypingDots />
+              </p>
+            ) : waitingForSupport ? (
               <p className="text-xs text-muted-foreground">{t('supportChat.waitingHint')}</p>
             ) : null}
           </div>
@@ -188,7 +231,7 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
                       <div key={m.id} className="flex gap-2">
                         <SupportAvatar />
                         <div className="min-w-0 max-w-[85%]">
-                          <div className="rounded-2xl rounded-tl-md border border-border/80 bg-muted/50 px-3 py-2 text-sm shadow-sm">
+                          <div className="whitespace-pre-wrap break-words rounded-2xl rounded-tl-md border border-border/80 bg-muted/50 px-3 py-2 text-sm shadow-sm">
                             {m.text}
                           </div>
                           <p className="mt-1 text-[11px] text-muted-foreground">{t('supportChat.supportLabel')}</p>
@@ -198,7 +241,9 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
                       <div key={m.id} className="flex flex-col items-end gap-1">
                         <div
                           className={cn(
-                            'max-w-[85%] rounded-2xl rounded-tr-md px-3 py-2 text-sm shadow-sm',
+                            // pre-wrap в обоих пузырях: переносы строк — часть сообщения (списки, шаги
+                            // в ответах поддержки и ИИ), без него текст склеивался в одну строку.
+                            'max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-tr-md px-3 py-2 text-sm shadow-sm',
                             inMessageBubbleClass(m.delivery_status),
                           )}
                         >

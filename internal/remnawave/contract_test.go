@@ -155,6 +155,26 @@ func TestContractUserLifecycle(t *testing.T) {
 		}
 	})
 
+	t.Run("revoke выдаёт новую ссылку", func(t *testing.T) {
+		before, err := c.GetUserByID(ctx, created.ID)
+		if err != nil {
+			t.Fatalf("чтение до revoke: %v", err)
+		}
+		after, err := c.RevokeUserSubscription(ctx, created.ID)
+		if err != nil {
+			t.Fatalf("RevokeUserSubscription: %v", err)
+		}
+		if after.ShortUUID == "" || after.ShortUUID == before.ShortUUID {
+			t.Fatalf("shortUuid не сменился: %q -> %q", before.ShortUUID, after.ShortUUID)
+		}
+		if after.SubscriptionUrl == "" || after.SubscriptionUrl == before.SubscriptionUrl {
+			t.Fatalf("subscriptionUrl не сменился: %q -> %q", before.SubscriptionUrl, after.SubscriptionUrl)
+		}
+		if err := c.DeleteAllUserDevices(ctx, created.ID); err != nil {
+			t.Fatalf("DeleteAllUserDevices: %v", err)
+		}
+	})
+
 	t.Run("сброс трафика", func(t *testing.T) {
 		if err := c.ResetUserTraffic(ctx, created.ID); err != nil {
 			t.Fatalf("ResetUserTraffic: %v", err)

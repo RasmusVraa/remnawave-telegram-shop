@@ -264,7 +264,9 @@ func (h Handler) SellCallbackHandler(ctx context.Context, b *bot.Bot, update *mo
 			slog.Error("Error cleaning expired extra hwid", "error", err)
 			return
 		}
-		if config.HwidExtraDevicesEnabled() && customer.ExtraHwid > 0 && customer.ExtraHwidExpiresAt != nil && customer.ExtraHwidExpiresAt.After(time.Now()) {
+		// При закреплённом админом лимите доп. устройства в счёт не входят:
+		// за них заплатили бы, а лимит остался бы закреплённым.
+		if config.HwidExtraDevicesEnabled() && customer.HwidLimitOverride == nil && customer.ExtraHwid > 0 && customer.ExtraHwidExpiresAt != nil && customer.ExtraHwidExpiresAt.After(time.Now()) {
 			monthInt := parseIntSafe(month)
 			promptText := fmt.Sprintf(h.translation.GetText(langCode, "hwid_renew_prompt"), customer.ExtraHwid, monthInt, config.HwidAddPrice()*customer.ExtraHwid*monthInt)
 			sellRenew := fmt.Sprintf("%s?month=%s&amount=%s", CallbackSell, month, amount)
@@ -317,12 +319,12 @@ func (h Handler) SellCallbackHandler(ctx context.Context, b *bot.Bot, update *mo
 		if config.RequirePaidPurchaseForStars() {
 			customer, err := h.customerRepository.FindByTelegramId(ctx, callback.Chat.ID)
 			if err != nil {
-				slog.Error("Error finding customer for stars check", err)
+				slog.Error("Error finding customer for stars check", "error", err)
 				shouldShowStarsButton = false
 			} else if customer != nil {
 				paidPurchase, err := h.purchaseRepository.FindSuccessfulPaidPurchaseByCustomer(ctx, customer.ID)
 				if err != nil {
-					slog.Error("Error checking paid purchase", err)
+					slog.Error("Error checking paid purchase", "error", err)
 					shouldShowStarsButton = false
 				} else if paidPurchase == nil {
 					shouldShowStarsButton = false
@@ -394,12 +396,17 @@ func (h Handler) SellCallbackHandler(ctx context.Context, b *bot.Bot, update *mo
 	logEditError("Error sending sell message", err)
 }
 
-func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (h Handler) PaymentCallbackHandler(_ context.Context, b *bot.Bot, update *models.Update) {
 	callback := update.CallbackQuery.Message.Message
 	callbackQuery := parseCallbackData(update.CallbackQuery.Data)
 	month, err := strconv.Atoi(callbackQuery["month"])
 	if err != nil {
-		slog.Error("Error getting month from query", err)
+		slog.Error("Error getting month from query", "error", err)
+		return
+	}
+	fromID := update.CallbackQuery.From.ID
+	if !validSubscriptionMonths(month) {
+		rejectForgedCallback("payment", "month", fromID, update.CallbackQuery.Data)
 		return
 	}
 
@@ -408,18 +415,43 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 	if !config.HwidExtraDevicesEnabled() && extra > 0 {
 		extra = 0
 	}
+	if !extraHwidAllowed(extra) {
+		rejectForgedCallback("payment", "extra", fromID, update.CallbackQuery.Data)
+		return
+	}
 	tidStr := callbackQuery["tid"]
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	customer, err := h.customerRepository.FindByTelegramId(ctx, callback.Chat.ID)
 	if err != nil {
-		slog.Error("Error finding customer", err)
+		slog.Error("Error finding customer", "error", err)
 		return
 	}
 	if customer == nil {
 		slog.Error("customer not exist", "chatID", callback.Chat.ID, "error", err)
 		return
+	}
+	if !h.invoiceTypeAllowed(ctx, customer, invoiceType) {
+		rejectForgedCallback("payment", "invoice_type", fromID, update.CallbackQuery.Data)
+		return
+	}
+	if customer.HwidLimitOverride != nil {
+		extra = 0
+	}
+	// В режиме тарифов кнопки без tid бот рисует, только когда активных тарифов
+	// нет (меню откатывается на классические цены). Иначе такой callback —
+	// попытка купить период по ценам из .env в обход тарифа.
+	if tidStr == "" && config.SalesMode() == "tariffs" && h.tariffRepository != nil {
+		active, err := h.tariffRepository.ListActive(ctx)
+		if err != nil {
+			slog.Error("list tariffs for payment", "error", err)
+			return
+		}
+		if len(active) > 0 {
+			rejectForgedCallback("payment", "missing_tariff", fromID, update.CallbackQuery.Data)
+			return
+		}
 	}
 
 	var price int
@@ -452,12 +484,18 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 	} else {
 		if invoiceType == database.InvoiceTypeTelegram {
 			price = config.StarsPrice(month)
-			if extra > 0 {
-				price += config.HwidAddStarsPrice() * extra * month
-			}
 		} else {
 			price = config.Price(month)
-			if extra > 0 {
+		}
+		// Период с нулевой ценой бот не продаёт — кнопки для него нет.
+		if price <= 0 {
+			rejectForgedCallback("payment", "price", fromID, update.CallbackQuery.Data)
+			return
+		}
+		if extra > 0 {
+			if invoiceType == database.InvoiceTypeTelegram {
+				price += config.HwidAddStarsPrice() * extra * month
+			} else {
 				price += config.HwidAddPrice() * extra * month
 			}
 		}
@@ -510,7 +548,7 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 		paymentURL, purchaseId, err = h.paymentService.CreatePurchase(ctxWithUsername, float64(price), month, customer, invoiceType, meta, tariffID, tariffExtras)
 	}
 	if err != nil {
-		slog.Error("Error creating payment", err)
+		slog.Error("Error creating payment", "error", err)
 		langCode := update.CallbackQuery.From.LanguageCode
 		backSell := fmt.Sprintf("%s?month=%d&amount=%d&extra=%d", CallbackSell, month, price, extra)
 		if tidStr != "" {
@@ -584,35 +622,44 @@ func (h Handler) PaymentCallbackHandler(ctx context.Context, b *bot.Bot, update 
 }
 
 func (h Handler) PreCheckoutCallbackHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	_, err := b.AnswerPreCheckoutQuery(ctx, &bot.AnswerPreCheckoutQueryParams{
-		PreCheckoutQueryID: update.PreCheckoutQuery.ID,
-		OK:                 true,
-	})
+	q := update.PreCheckoutQuery
+	// Последний шанс отказать до списания звёзд: раньше ответ был всегда OK,
+	// и оплачивались отменённые или чужие по сумме счета.
+	params := &bot.AnswerPreCheckoutQueryParams{PreCheckoutQueryID: q.ID, OK: true}
+	purchase, _, err := h.checkStarsPurchase(ctx, q.InvoicePayload, q.Currency, q.TotalAmount)
+	if err == nil && purchase.Status != database.PurchaseStatusNew && purchase.Status != database.PurchaseStatusPending {
+		err = fmt.Errorf("purchase %d status %q", purchase.ID, purchase.Status)
+	}
 	if err != nil {
-		slog.Error("Error sending answer pre checkout query", err)
+		slog.Warn("stars pre-checkout rejected", "error", err, "user_id", q.From.ID)
+		params.OK = false
+		params.ErrorMessage = h.translation.GetText(q.From.LanguageCode, "stars_invoice_unavailable")
+	}
+	if _, err := b.AnswerPreCheckoutQuery(ctx, params); err != nil {
+		slog.Error("Error sending answer pre checkout query", "error", err)
 	}
 }
 
 func (h Handler) SuccessPaymentHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	payload := strings.Split(update.Message.SuccessfulPayment.InvoicePayload, "&")
-	purchaseId, err := strconv.Atoi(payload[0])
-	username := payload[1]
+	sp := update.Message.SuccessfulPayment
+	purchase, username, err := h.checkStarsPurchase(ctx, sp.InvoicePayload, sp.Currency, sp.TotalAmount)
 	if err != nil {
-		slog.Error("Error parsing purchase id", err)
+		// Звёзды уже списаны: зачислять несовпавший платёж нельзя, а решить
+		// (вернуть или выдать вручную) должен админ — по charge id.
+		slog.Error("stars payment does not match purchase — check manually", "error", err,
+			"telegram_charge_id", sp.TelegramPaymentChargeID, "user_id", update.Message.From.ID)
 		return
 	}
 
 	ctxWithUsername := context.WithValue(ctx, remnawave.CtxKeyUsername, username)
-	sp := update.Message.SuccessfulPayment
 	ctxPaid := payment.WithStarsNotifyMeta(ctxWithUsername, payment.StarsNotifyMeta{
 		TelegramPaymentChargeID: sp.TelegramPaymentChargeID,
 		ProviderPaymentChargeID: sp.ProviderPaymentChargeID,
 		TotalAmount:             sp.TotalAmount,
 		Currency:                sp.Currency,
 	})
-	err = h.paymentService.ProcessPurchaseById(ctxPaid, int64(purchaseId))
-	if err != nil {
-		slog.Error("Error processing purchase", err)
+	if err := h.paymentService.ProcessPurchaseById(ctxPaid, purchase.ID); err != nil {
+		slog.Error("Error processing purchase", "error", err, "purchaseId", purchase.ID)
 	}
 }
 
@@ -713,36 +760,6 @@ func (h Handler) appendPlategaAddDevicePaymentRows(keyboard [][]models.InlineKey
 		keyboard = append(keyboard, []models.InlineKeyboardButton{
 			h.translation.WithButton(langCode, "heleket_button", models.InlineKeyboardButton{
 				CallbackData: fmt.Sprintf("%s?target=%d&invoiceType=%s", CallbackAddDevicePayment, target, database.InvoiceTypeHeleket),
-			}),
-		})
-	}
-	return keyboard
-}
-
-func (h Handler) appendPlategaRenewExtraRows(keyboard [][]models.InlineKeyboardButton, langCode string, extra, months int) [][]models.InlineKeyboardButton {
-	type row struct {
-		inv database.InvoiceType
-		key string
-	}
-	for _, r := range []row{
-		{database.InvoiceTypePlategaSBP, "platega_sbp_button"},
-		{database.InvoiceTypePlategaCards, "platega_cards_button"},
-		{database.InvoiceTypePlategaAcquiring, "platega_acquiring_button"},
-		{database.InvoiceTypePlategaWorldwide, "platega_worldwide_button"},
-		{database.InvoiceTypePlategaCrypto, "platega_crypto_button"},
-	} {
-		if plategaInvoiceEnabled(r.inv) {
-			keyboard = append(keyboard, []models.InlineKeyboardButton{
-				h.translation.WithButton(langCode, r.key, models.InlineKeyboardButton{
-					CallbackData: fmt.Sprintf("%s?extra=%d&months=%d&invoiceType=%s", CallbackRenewExtraHwid, extra, months, r.inv),
-				}),
-			})
-		}
-	}
-	if config.IsHeleketEnabled() {
-		keyboard = append(keyboard, []models.InlineKeyboardButton{
-			h.translation.WithButton(langCode, "heleket_button", models.InlineKeyboardButton{
-				CallbackData: fmt.Sprintf("%s?extra=%d&months=%d&invoiceType=%s", CallbackRenewExtraHwid, extra, months, database.InvoiceTypeHeleket),
 			}),
 		})
 	}

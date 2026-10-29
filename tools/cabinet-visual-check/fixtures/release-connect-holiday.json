@@ -1,0 +1,235 @@
+{
+ "/me/subscription": {
+  "expire_at": "2026-10-14T12:00:00Z",
+  "subscription_link": "https://example.invalid/sub/abc",
+  "subscription_period_months": 1,
+  "traffic_used_gb": 42.5,
+  "traffic_limit_gb": 200,
+  "tariff": {
+   "id": 1,
+   "slug": "base",
+   "name": "Базовый",
+   "traffic_gb": 200,
+   "device_limit": 3
+  },
+  "loyalty_xp": 1240,
+  "loyalty_tier": "silver",
+  "hwid_extra": {
+   "current_limit": 3,
+   "base_limit": 1,
+   "max_limit": 5,
+   "extra_active": 2,
+   "can_increase": true,
+   "can_decrease": true,
+   "price_rub_month": 75,
+   "stars_price_month": 40,
+   "days_left": 41
+  }
+ },
+ "/me/devices": {
+  "enabled": true,
+  "device_limit": 3,
+  "connected": 2,
+  "devices": [
+   {
+    "hwid": "hwid-android-1",
+    "platform": "android",
+    "os_version": "14",
+    "device_model": "Pixel 8",
+    "created_at": "2026-08-14T10:12:00Z",
+    "updated_at": "2026-09-01T09:30:00Z"
+   },
+   {
+    "hwid": "hwid-windows-2",
+    "platform": "windows",
+    "os_version": "10",
+    "device_model": "ПК дома",
+    "created_at": "2026-07-02T18:40:00Z",
+    "updated_at": "2026-09-02T21:05:00Z"
+   }
+  ]
+ },
+ "/me/loyalty": {
+  "enabled": true,
+  "xp": 1240,
+  "current": {
+   "id": 4,
+   "name": "Уровень 4",
+   "sort_order": 4,
+   "xp_min": 1000,
+   "discount_percent": 8
+  },
+  "next": {
+   "id": 5,
+   "name": "Уровень 5",
+   "sort_order": 5,
+   "xp_min": 4162,
+   "discount_percent": 10
+  },
+  "progress_percent": 8,
+  "xp_in_segment": 240,
+  "xp_segment_span": 3162,
+  "xp_until_next": 2922
+ },
+ "/auth/bootstrap": {
+  "brand_name": "Demo VPN",
+  "site_links": {
+   "support": "https://example.invalid/support"
+  },
+  "support_chat_enabled": false,
+  "light_theme_enabled": true
+ },
+ "/content/app-config": {
+  "config": {
+   "branding": {
+    "name": "Demo VPN",
+    "supportUrl": "https://example.invalid/support"
+   }
+  },
+  "platforms": {
+   "ios": [
+    {
+     "id": "rabbithole",
+     "name": "RabbitHole",
+     "isFeatured": true,
+     "urlScheme": "rabbithole://add/",
+     "installationStep": {
+      "buttons": [
+       {
+        "buttonLink": "https://example.invalid/store",
+        "buttonText": {
+         "ru": "App Store"
+        }
+       }
+      ],
+      "description": {
+       "ru": "Откройте страницу в App Store и установите приложение RabbitHole. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+      }
+     },
+     "addSubscriptionStep": {
+      "description": {
+       "ru": "Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически."
+      }
+     },
+     "connectAndUseStep": {
+      "description": {
+       "ru": "Нажмите кнопку подключения. По умолчанию сервер выбирается автоматически, другой можно выбрать в группе «🛡️ VPN»."
+      }
+     },
+     "additionalAfterAddSubscriptionStep": {
+      "title": {
+       "ru": "Если подписка не добавилась"
+      },
+      "description": {
+       "ru": "Если после нажатия на кнопку ничего не произошло, скопируйте ссылку подписки на странице «Подписка» и добавьте её в RabbitHole вручную."
+      }
+     }
+    },
+    {
+     "id": "happ",
+     "name": "Happ",
+     "isFeatured": false,
+     "urlScheme": "happ://add/",
+     "installationStep": {
+      "buttons": [
+       {
+        "buttonLink": "https://example.invalid/store",
+        "buttonText": {
+         "en": "Global App Store",
+         "fa": "اپ استور جهانی",
+         "ru": "App Store (другой регион)"
+        }
+       }
+      ],
+      "description": {
+       "en": "Open the page in App Store and install the app.\n\nLaunch it, in the VPN configuration permission window click Allow and enter your passcode.",
+       "fa": "صفحه را در App Store باز کنید و برنامه را نصب کنید. آن را اجرا کنید، در پنجره مجوز پیکربندی VPN روی Allow کلیک کنید و رمز عبور خود را وارد کنید.",
+       "ru": "⚠️ Happ удалён из российского App Store. Чтобы скачать или обновить его, нужен Apple ID другой страны (например, США). Если не хотите менять регион — выберите RabbitHole.\n\nОткройте страницу в App Store и установите приложение.\n\nЗапустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+      }
+     },
+     "addSubscriptionStep": {
+      "description": {
+       "en": "Click the button below — the app will open and the subscription will be added automatically",
+       "fa": "برای افزودن خودکار اشتراک روی دکمه زیر کلیک کنید - برنامه باز خواهد شد",
+       "ru": "Нажмите кнопку ниже — приложение откроется и подписка добавится автоматически."
+      }
+     },
+     "additionalAfterAddSubscriptionStep": {
+      "buttons": [
+       {
+        "buttonLink": "https://t.me/VPN_meows_news/44",
+        "buttonText": {
+         "en": "VIDEO INSTRUCTION",
+         "fa": "ویدیو راهنما",
+         "ru": "ВИДЕО ИНСТРУКЦИЯ"
+        }
+       }
+      ],
+      "title": {
+       "en": "If the subscription is not added",
+       "fa": "اگر اشتراک در برنامه نصب نشده است",
+       "ru": "Если подписка не добавилась"
+      },
+      "description": {
+       "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Happ, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
+       "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Happ به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
+       "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+      }
+     },
+     "connectAndUseStep": {
+      "description": {
+       "en": "In the main section, click the large power button in the center to connect to VPN.\n\nDon't forget to select a server from the server list. If needed, choose another server from the server list.",
+       "fa": "در بخش اصلی، دکمه بزرگ روشن/خاموش در مرکز را برای اتصال به VPN کلیک کنید. فراموش نکنید که یک سرور را از لیست سرورها انتخاب کنید. در صورت نیاز، سرور دیگری را از لیست سرورها انتخاب کنید.",
+       "ru": "Выберите сервер и нажмите большую кнопку включения в центре для подключения к VPN.\n\nПри необходимости выберите другой сервер из списка серверов."
+      }
+     }
+    },
+    {
+     "id": "incy",
+     "name": "INCY",
+     "isFeatured": false,
+     "urlScheme": "incy://add/",
+     "installationStep": {
+      "buttons": [
+       {
+        "buttonLink": "https://example.invalid/store",
+        "buttonText": {
+         "ru": "App Store (другой регион)"
+        }
+       }
+      ],
+      "description": {
+       "ru": "⚠️ INCY удалён из российского App Store. Чтобы скачать или обновить его, нужен Apple ID другой страны (например, США). Если не хотите менять регион — выберите RabbitHole.\n\nОткройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль."
+      }
+     },
+     "addSubscriptionStep": {
+      "description": {
+       "ru": "Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически."
+      }
+     },
+     "connectAndUseStep": {
+      "description": {
+       "ru": "В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов."
+      }
+     },
+     "additionalAfterAddSubscriptionStep": {
+      "buttons": [
+       {
+        "buttonLink": "https://t.me/VPN_meows_news/44",
+        "buttonText": {
+         "ru": "ВИДЕО ИНСТРУКЦИЯ"
+        }
+       }
+      ],
+      "title": {
+       "ru": "Если подписка не добавилась"
+      },
+      "description": {
+       "ru": "Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Также можно посмотреть видео инструкцию по кнопке ниже."
+      }
+     }
+    }
+   ]
+  }
+ }
+}

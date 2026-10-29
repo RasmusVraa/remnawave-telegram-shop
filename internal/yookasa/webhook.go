@@ -50,7 +50,9 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	body, err := io.ReadAll(r.Body)
+	// Уведомление ЮKassa — несколько килобайт. Без лимита любой мог
+	// прислать гигабайтное тело и держать его в памяти целиком.
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 	if err != nil {
 		slog.Error("yookassa webhook: read body error", "error", err)
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -105,6 +107,14 @@ func (h *WebhookHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if purchase.Status == database.PurchaseStatusPaid || purchase.Status == database.PurchaseStatusCancel {
 		slog.Info("yookassa webhook: purchase already finalized", "purchase_id", purchaseID, "status", purchase.Status)
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	// purchaseId берётся из metadata платежа — сверяем, что платёж именно тот,
+	// что выставлен этой покупке, и на ту же сумму.
+	if err := payment.MatchesPurchase(purchase); err != nil {
+		slog.Error("yookassa webhook: payment does not match purchase", "purchase_id", purchaseID, "payment_id", payment.ID, "error", err)
 		w.WriteHeader(http.StatusOK)
 		return
 	}

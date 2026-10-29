@@ -115,8 +115,13 @@ func (h Handler) attachReferralFromStart(ctx context.Context, code string, custo
 	if err != nil || referrer == nil {
 		return
 	}
-	if _, err := h.referralRepository.Create(ctx, referrerId, customer.TelegramID); err != nil {
+	ref, err := h.referralRepository.Create(ctx, referrerId, customer.TelegramID)
+	if err != nil {
 		slog.Error("error creating referral", "error", err)
+		return
+	}
+	if ref == nil {
+		// Приглашённый уже привязан к рефереру — первая связь остаётся.
 		return
 	}
 	slog.Info("referral created",

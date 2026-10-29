@@ -98,3 +98,37 @@ func TestApplyRuntimePatch_cabinetDecorThemeInvalid(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 }
+
+// NaN и ±Inf strconv принимает, а проверка «не меньше нуля» их пропускала.
+func TestApplyRuntimePatch_rejectsNonFiniteFloat(t *testing.T) {
+	var key string
+	for _, f := range RuntimeSettingsRegistry() {
+		if f.Type == SettingFloat {
+			key = f.Key
+			break
+		}
+	}
+	if key == "" {
+		t.Skip("no float runtime setting")
+	}
+	before := EffectiveEnv(key)
+	for _, v := range []string{"NaN", "nan", "Inf", "+Inf", "-Inf", "infinity"} {
+		if _, err := ApplyRuntimePatch(map[string]string{key: v}); err == nil {
+			t.Errorf("%s=%s accepted", key, v)
+		}
+	}
+	if after := EffectiveEnv(key); after != before {
+		t.Fatalf("%s changed from %q to %q", key, before, after)
+	}
+}
+
+func TestParseFiniteFloat(t *testing.T) {
+	if v, err := parseFiniteFloat(" 12.5 "); err != nil || v != 12.5 {
+		t.Fatalf("12.5: v=%v err=%v", v, err)
+	}
+	for _, s := range []string{"NaN", "Inf", "-inf", "abc"} {
+		if _, err := parseFiniteFloat(s); err == nil {
+			t.Errorf("%q accepted", s)
+		}
+	}
+}

@@ -1093,7 +1093,7 @@ setup_bot() {
       warn "Пароль в volume сам не меняется — только значение в .env / DATABASE_URL."
     fi
   else
-    if [[ -z "$pg_pass" || "$pg_pass" == "postgres" ]]; then
+    if [[ -z "$pg_pass" || "$pg_pass" == "postgres" || "$pg_pass" == "change_me" ]]; then
       pg_pass="$(rand_alnum)"
       info "Сгенерирован POSTGRES_PASSWORD"
     fi

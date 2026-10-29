@@ -5,6 +5,7 @@ import { Loader2, Minus, Plus, Trash2 } from 'lucide-react'
 import { DevicePlatformIcon } from '@/components/DevicePlatformIcon'
 import { cn } from '@/lib/utils'
 import { surface } from './Surface'
+import { AdminToggleSwitch } from './AdminToggleSwitch'
 import type { AdminCustomerDTO, AdminDeviceDTO } from '@/lib/types/admin'
 import { useAdminUserDeleteDevice } from '../hooks/useAdminUsers'
 import { activeExtraHwidSlots } from '../utils/deviceLimit'
@@ -104,6 +105,13 @@ interface Props {
   draftExtra: number
   onDraftBaseChange: (value: number) => void
   onDraftExtraChange: (value: number) => void
+  /** Закрепить лимит: одно число вместо «база + доп. слоты», оплаты его не трогают. */
+  pinned: boolean
+  onPinnedChange: (value: boolean) => void
+  draftPin: number
+  onDraftPinChange: (value: number) => void
+  /** Лимит без закрепления — с ним сравнивается закреплённое число. */
+  unpinnedLimit?: number
   onSuccess?: (message?: string) => void
   onError?: (err: unknown) => void
 }
@@ -125,6 +133,11 @@ export function AdminDeviceLimitEditor({
   draftExtra,
   onDraftBaseChange,
   onDraftExtraChange,
+  pinned,
+  onPinnedChange,
+  draftPin,
+  onDraftPinChange,
+  unpinnedLimit,
   onSuccess,
   onError,
 }: Props) {
@@ -134,7 +147,9 @@ export function AdminDeviceLimitEditor({
   const [confirmHwid, setConfirmHwid] = useState<string | null>(null)
 
   const connected = devices.length
-  const total = draftBase + draftExtra
+  const total = pinned ? draftPin : draftBase + draftExtra
+  const overLimit = !devicesLoading && connected > total
+  const pinBelowTariff = pinned && unpinnedLimit != null && draftPin < unpinnedLimit
   const full = total > 0 && connected >= total
   const percent = total > 0 ? Math.min(100, (connected / total) * 100) : 0
 
@@ -161,44 +176,89 @@ export function AdminDeviceLimitEditor({
           />
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-4">
-          <Stepper
-            label={t('admin.users.subscription.baseLimitTitle')}
-            hint={t('admin.users.subscription.baseLimitHint')}
-            value={draftBase}
-            onChange={onDraftBaseChange}
-            min={MIN_BASE}
-            max={MAX_TOTAL - draftExtra}
-            editable
-            decreaseLabel={t('admin.users.subscription.decreaseLimit')}
-            increaseLabel={t('admin.users.subscription.increaseLimit')}
-          />
-          <Stepper
-            label={t('admin.users.subscription.extraHwidTitle')}
-            hint={t('admin.users.subscription.extraHwidHint')}
-            value={draftExtra}
-            onChange={onDraftExtraChange}
-            min={0}
-            max={MAX_TOTAL - draftBase}
-            decreaseLabel={t('admin.users.subscription.decreaseExtra')}
-            increaseLabel={t('admin.users.subscription.increaseExtra')}
-          />
-          {/* На узком экране «Итого» уезжает на свою строку, иначе читается
-              как подпись к соседнему степперу. */}
-          <div className="w-full text-end sm:ms-auto sm:w-auto">
-            <p className="text-xs text-muted-foreground">{t('admin.users.subscription.totalLimit')}</p>
-            <p className="text-2xl font-semibold tabular-nums text-primary">{total}</p>
+        <div className="mt-4 flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-medium">{t('admin.users.subscription.pinLimitTitle')}</p>
+            <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+              {t('admin.users.subscription.pinLimitHint')}
+            </p>
           </div>
+          <AdminToggleSwitch
+            checked={pinned}
+            onChange={onPinnedChange}
+            aria-label={t('admin.users.subscription.pinLimitTitle')}
+          />
         </div>
 
-        {customer?.extra_hwid_expires_at && draftExtra > 0 && (
+        {pinned ? (
+          <div className="mt-4">
+            <Stepper
+              label={t('admin.users.subscription.pinnedLimitTitle')}
+              hint={
+                unpinnedLimit != null
+                  ? t('admin.users.subscription.pinnedLimitHint', { n: unpinnedLimit })
+                  : undefined
+              }
+              value={draftPin}
+              onChange={onDraftPinChange}
+              min={MIN_BASE}
+              max={MAX_TOTAL}
+              editable
+              decreaseLabel={t('admin.users.subscription.decreaseLimit')}
+              increaseLabel={t('admin.users.subscription.increaseLimit')}
+            />
+            {pinBelowTariff && (
+              <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+                {t('admin.users.subscription.pinBelowTariff', { n: unpinnedLimit })}
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-4">
+            <Stepper
+              label={t('admin.users.subscription.baseLimitTitle')}
+              hint={t('admin.users.subscription.baseLimitHint')}
+              value={draftBase}
+              onChange={onDraftBaseChange}
+              min={MIN_BASE}
+              max={MAX_TOTAL - draftExtra}
+              editable
+              decreaseLabel={t('admin.users.subscription.decreaseLimit')}
+              increaseLabel={t('admin.users.subscription.increaseLimit')}
+            />
+            <Stepper
+              label={t('admin.users.subscription.extraHwidTitle')}
+              hint={t('admin.users.subscription.extraHwidHint')}
+              value={draftExtra}
+              onChange={onDraftExtraChange}
+              min={0}
+              max={MAX_TOTAL - draftBase}
+              decreaseLabel={t('admin.users.subscription.decreaseExtra')}
+              increaseLabel={t('admin.users.subscription.increaseExtra')}
+            />
+            {/* На узком экране «Итого» уезжает на свою строку, иначе читается
+                как подпись к соседнему степперу. */}
+            <div className="w-full text-end sm:ms-auto sm:w-auto">
+              <p className="text-xs text-muted-foreground">{t('admin.users.subscription.totalLimit')}</p>
+              <p className="text-2xl font-semibold tabular-nums text-primary">{total}</p>
+            </div>
+          </div>
+        )}
+
+        {overLimit && (
+          <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
+            {t('admin.users.subscription.devicesOverLimit', { used: connected, limit: total })}
+          </p>
+        )}
+
+        {!pinned && customer?.extra_hwid_expires_at && draftExtra > 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
             {t('admin.users.subscription.extraHwidExpires', {
               date: formatAdminDateTime(customer.extra_hwid_expires_at, dateLocale),
             })}
           </p>
         )}
-        {storedExtra > 0 && storedActiveExtra === 0 && (
+        {!pinned && storedExtra > 0 && storedActiveExtra === 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
             {t('admin.users.subscription.extraHwidInactive', { count: storedExtra })}
           </p>

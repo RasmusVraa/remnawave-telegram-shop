@@ -22,11 +22,13 @@ func TestBuildLatestActiveTributesQuery(t *testing.T) {
 		t.Fatalf("expected SQL to contain subquery selecting latest tribute, got: %s", sql)
 	}
 
-	if !strings.Contains(sql, "status <>") {
-		t.Fatalf("expected SQL to exclude cancelled tributes, got: %s", sql)
+	// Учитываются только завершённые покупки: pending из подделанной кнопки бота
+	// не должен продлеваться автоматически.
+	if !strings.Contains(sql, "p2.status IN (") || !strings.Contains(sql, "AND status = ") {
+		t.Fatalf("expected SQL to consider only settled tributes and require paid, got: %s", sql)
 	}
 
-	expectedArgs := []interface{}{InvoiceTypeTribute, int64(10), int64(20), InvoiceTypeTribute, PurchaseStatusCancel}
+	expectedArgs := []interface{}{InvoiceTypeTribute, int64(10), int64(20), InvoiceTypeTribute, PurchaseStatusPaid, PurchaseStatusCancel, PurchaseStatusPaid}
 	if !reflect.DeepEqual(args, expectedArgs) {
 		t.Fatalf("unexpected args, want %v, got %v", expectedArgs, args)
 	}

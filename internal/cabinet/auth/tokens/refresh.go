@@ -8,6 +8,7 @@
 package tokens
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -65,20 +66,42 @@ func IsEmailVerifyOTP(s string) bool {
 	return true
 }
 
-// HashEmailVerifyOTP считает sha256 от UTF-8 строки кода (как в GenerateEmailVerifyOTP).
+// HashEmailVerifyOTP — sha256 кода без ключа. Так хэшировались коды до появления
+// ключа; функция остаётся, чтобы принимать коды, выданные до обновления.
 func HashEmailVerifyOTP(code string) [32]byte {
 	return sha256.Sum256([]byte(code))
 }
 
-// GenerateEmailVerifyOTP возвращает 6-значный код и sha256([]byte(code)) для записи в БД.
-// Entropy 20 бит — опора на rate-limit, TTL и одноразовость строки в cabinet_email_verification.
-func GenerateEmailVerifyOTP() (code string, hash [32]byte, err error) {
+// emailVerifyOTPKeyContext разводит ключ кодов с другими ключами из секрета кабинета.
+const emailVerifyOTPKeyContext = "remnawave-cabinet/email-verify-otp/v1\x00"
+
+// EmailVerifyOTPKey выводит из секрета кабинета ключ для хэша кодов. У кода
+// 10^6 вариантов: без ключа дамп БД раскрывал бы все живые коды перебором за
+// доли секунды, с ключом — только вместе с секретом.
+func EmailVerifyOTPKey(secret []byte) []byte {
+	sum := sha256.Sum256(append([]byte(emailVerifyOTPKeyContext), secret...))
+	return sum[:]
+}
+
+// HashEmailVerifyOTPKeyed — HMAC-SHA256 кода на ключе из EmailVerifyOTPKey.
+func HashEmailVerifyOTPKeyed(key []byte, code string) [32]byte {
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(code))
+	var out [32]byte
+	copy(out[:], mac.Sum(nil))
+	return out
+}
+
+// GenerateEmailVerifyOTP возвращает 6-значный код и его HMAC для записи в БД.
+// 20 бит энтропии хватает только вместе с ограничением попыток на код и
+// поиском в пределах одного аккаунта (см. service.ConfirmEmail).
+func GenerateEmailVerifyOTP(key []byte) (code string, hash [32]byte, err error) {
 	var buf [4]byte
 	if _, err := rand.Read(buf[:]); err != nil {
 		return "", [32]byte{}, fmt.Errorf("tokens: read rand: %w", err)
 	}
 	n := binary.BigEndian.Uint32(buf[:])
 	code = fmt.Sprintf("%06d", n%1000000)
-	hash = HashEmailVerifyOTP(code)
+	hash = HashEmailVerifyOTPKeyed(key, code)
 	return code, hash, nil
 }

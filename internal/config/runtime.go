@@ -159,7 +159,7 @@ func validateSettingBounds(field SettingField, value string) error {
 			return fmt.Errorf("must be <= %d", *field.MaxInt)
 		}
 	case SettingFloat:
-		v, err := strconv.ParseFloat(strings.TrimSpace(value), 64)
+		v, err := parseFiniteFloat(value)
 		if err != nil {
 			return fmt.Errorf("invalid number")
 		}

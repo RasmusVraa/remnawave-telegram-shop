@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 type CryptoPayApi interface {
@@ -41,9 +42,12 @@ type Client struct {
 	token      string
 }
 
+// httpTimeout — без него зависший ответ CryptoPay держал бы проход поллера бесконечно.
+const httpTimeout = 30 * time.Second
+
 func NewCryptoPayClient(url string, tokn string) *Client {
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: httpTimeout},
 		baseURL:    url,
 		token:      tokn,
 	}

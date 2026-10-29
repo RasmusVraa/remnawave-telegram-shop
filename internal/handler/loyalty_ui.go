@@ -113,9 +113,3 @@ func (h Handler) buildLoyaltyConnectSummaryHTML(lang string, customer *database.
 	return b.String()
 }
 
-func loyaltyTierLabelHTML(t database.LoyaltyTier) string {
-	if t.DisplayName != nil && strings.TrimSpace(*t.DisplayName) != "" {
-		return escapeHTML(strings.TrimSpace(*t.DisplayName))
-	}
-	return escapeHTML(fmt.Sprintf("#%d", t.SortOrder))
-}

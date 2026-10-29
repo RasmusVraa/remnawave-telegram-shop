@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Подтверждение привязки Google</title>
+<title>Подтверждение привязки {{ .ProviderName }}</title>
 </head>
 <body style="margin:0;padding:24px;background:#f4f5f7;font-family:Segoe UI,Arial,sans-serif;color:#222;">
 <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;box-shadow:0 4px 16px rgba(0,0,0,0.04);">
-    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">Привязка аккаунта Google</h1>
-    <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">Кто-то попытался войти через Google с адресом, совпадающим с вашим аккаунтом. Если это были вы — нажмите кнопку ниже, чтобы подтвердить привязку Google к вашему кабинету.</p>
+    <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">Привязка аккаунта {{ .ProviderName }}</h1>
+    <p style="margin:0 0 16px;font-size:15px;line-height:1.5;">Кто-то попытался войти через {{ .ProviderName }} с адресом, совпадающим с вашим аккаунтом. Если это были вы — нажмите кнопку ниже, чтобы подтвердить привязку {{ .ProviderName }} к вашему кабинету.</p>
     <p style="margin:24px 0;text-align:center;">
         <a href="{{ .ConfirmURL }}" style="display:inline-block;padding:12px 20px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;font-weight:600;">Подтвердить привязку</a>
     </p>
     <p style="margin:0 0 8px;font-size:13px;color:#666;">Если кнопка не работает, откройте ссылку вручную:</p>
     <p style="margin:0 0 16px;font-size:13px;word-break:break-all;"><a href="{{ .ConfirmURL }}" style="color:#2563eb;">{{ .ConfirmURL }}</a></p>
     <p style="margin:0 0 8px;font-size:13px;color:#666;">Ссылка действительна 15 минут.</p>
-    <p style="margin:24px 0 0;font-size:12px;color:#999;">Если вы не пытались войти через Google — просто проигнорируйте это письмо. Ваш аккаунт в безопасности.</p>
+    <p style="margin:24px 0 0;font-size:12px;color:#999;">Если вы не пытались войти через {{ .ProviderName }} — просто проигнорируйте это письмо. Ваш аккаунт в безопасности.</p>
 </div>
 </body>
 </html>

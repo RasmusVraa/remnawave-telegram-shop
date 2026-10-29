@@ -8,12 +8,12 @@ import (
 
 // ActivateResult describes a successful promo activation for user-facing messages.
 type ActivateResult struct {
-	Type                   string
-	SubscriptionDays       int
-	TrialDays              int
-	ExtraHwidDelta         int
-	DiscountPercent        int
-	TrialSkippedActiveSub  bool
+	Type                  string
+	SubscriptionDays      int
+	TrialDays             int
+	ExtraHwidDelta        int
+	DiscountPercent       int
+	TrialSkippedActiveSub bool
 }
 
 // ActivateErrKind classifies validation failures for differentiated UX.
@@ -26,6 +26,7 @@ const (
 	ActivateErrNotFound
 	ActivateErrPendingDiscount
 	ActivateErrTariffMismatch
+	ActivateErrHwidPinned
 )
 
 // ClassifyActivateError maps validation errors to UI kind (generic = neutral fail + back).
@@ -45,6 +46,8 @@ func ClassifyActivateError(err error) ActivateErrKind {
 		return ActivateErrPendingDiscount
 	case "tariff mismatch":
 		return ActivateErrTariffMismatch
+	case "hwid pinned":
+		return ActivateErrHwidPinned
 	default:
 		return ActivateErrGeneric
 	}

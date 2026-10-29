@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Check, Download, ExternalLink, MonitorSmartphone, Plus } from 'lucide-react'
+import { ArrowLeft, Check, Download, ExternalLink, MonitorSmartphone, Plus, RefreshCw } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { Logo } from '@/components/Logo'
@@ -28,9 +28,13 @@ import './guide/connections-guide.css'
 
 const SCENES: SceneKind[] = ['install', 'add', 'connect']
 
-/** Короткое состояние внутри шага; сбрасывается при любой смене шага. */
-type Flow = { downloaded: boolean; noOpen: boolean }
-const FRESH_FLOW: Flow = { downloaded: false, noOpen: false }
+/**
+ * Короткое состояние внутри шага; сбрасывается при любой смене шага.
+ * pickStore — на телефоне ответили «Нет, скачать», а магазинов несколько:
+ * вместо вопроса показываем кнопки магазинов.
+ */
+type Flow = { downloaded: boolean; noOpen: boolean; pickStore: boolean }
+const FRESH_FLOW: Flow = { downloaded: false, noOpen: false, pickStore: false }
 
 /** Сколько ждём, что после «Добавить подписку» страница уйдёт в приложение. */
 const APP_OPEN_WAIT_MS = 3500
@@ -128,6 +132,12 @@ export default function ConnectionsPage() {
       nextDone[step] = true
       return step >= total - 1 ? { ...p, done: nextDone, finished: true } : { ...p, done: nextDone, current: step + 1 }
     })
+  /** Подписка ушла в приложение — значит, оно и установлено: отмечаем шаги до step включительно. */
+  const completeThrough = (step: number) =>
+    changeProgress((p) => {
+      const nextDone = p.done.map((d, i) => d || i <= step) as GuideProgress['done']
+      return step >= total - 1 ? { ...p, done: nextDone, finished: true } : { ...p, done: nextDone, current: step + 1 }
+    })
   const undo = (step: number) =>
     changeProgress((p) => {
       const nextDone = [...p.done] as GuideProgress['done']
@@ -142,7 +152,8 @@ export default function ConnectionsPage() {
    */
   const toast = useToast()
   const trip = useAppReturn(progressKey, ready0() && !isDesktop, (kind) => {
-    complete(kind === 'install' ? 0 : 1)
+    if (kind === 'install') complete(0)
+    else completeThrough(1)
     // Временный тост, а не плашка в шаге: сообщили и ушли, кнопка — на случай ошибки.
     toast.success(kind === 'install' ? text.noticeInstalled : text.noticeAdded, {
       action: { label: kind === 'install' ? text.notInstalled : text.notAddedShort, onClick: () => revertTrip(kind) },
@@ -155,7 +166,7 @@ export default function ConnectionsPage() {
     // ПК: все шаги перед глазами, а помощь — прямо под ними, поэтому без
     // вопроса «Подписка появилась?» сразу переходим к следующему шагу.
     if (compact) {
-      complete(1)
+      completeThrough(1)
       return
     }
     trip.start('add')
@@ -215,9 +226,22 @@ export default function ConnectionsPage() {
 
   /* ── Куски шага ─────────────────────────────────────────────────── */
 
-  const stepTitle = (i: number) => (i === 0 ? text.installTitle(app?.name || '') : i === 1 ? text.addTitle : text.usageTitle)
-  const stepDescription = (i: number) =>
-    app ? pickText([app.installationStep, app.addSubscriptionStep, app.connectAndUseStep][i]?.description, g.lang) : ''
+  // Телефон, шаг 1: сначала вопрос «У вас есть X?» — у кого приложение уже стоит,
+  // добавляют подписку отсюда же, не проходя установку.
+  const asking = !isDesktop && !flow.downloaded && !flow.pickStore
+  const stepTitle = (i: number) =>
+    i === 0
+      ? asking
+        ? text.haveAppTitle(app?.name || '')
+        : text.installTitle(app?.name || '')
+      : i === 1
+        ? text.addTitle
+        : text.usageTitle
+  const stepDescription = (i: number) => {
+    if (!app) return ''
+    if (i === 0 && asking) return flow.noOpen ? '' : text.haveAppText
+    return pickText([app.installationStep, app.addSubscriptionStep, app.connectAndUseStep][i]?.description, g.lang)
+  }
 
   function scene(kind: SceneKind, freeze: SceneFreeze, className: string) {
     if (!app) return null
@@ -268,7 +292,24 @@ export default function ConnectionsPage() {
           </a>
         </Button>
       ))
-      if (flow.downloaded) {
+      const addHint = g.addHint ? (
+        <p className="text-xs text-amber-700 dark:text-amber-300/90">{text[g.addHint]}</p>
+      ) : null
+
+      // ПК: вместо тихой ссылки «Уже установлено» — вторая кнопка, сразу добавляет подписку.
+      if (compact) {
+        return (
+          <>
+            {installButtons}
+            <Button variant="outline" className={size} onClick={() => addSubscription(true)} disabled={g.addDisabled}>
+              <Plus />
+              {text.alreadyInstalledAdd}
+            </Button>
+          </>
+        )
+      }
+
+      if (flow.downloaded || (flow.pickStore && !buttons.length)) {
         return (
           <>
             {installButtons}
@@ -279,26 +320,89 @@ export default function ConnectionsPage() {
           </>
         )
       }
-      const skip = (
-        <button
-          type="button"
-          onClick={() => complete(0)}
-          className="mx-auto inline-flex items-center gap-1.5 px-1 py-1 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-primary"
-        >
-          {text.alreadyInstalled}
-          <ArrowRight size={13} />
-        </button>
-      )
-      // На ПК ссылка над кнопками: кнопки всех трёх карточек лежат по одному низу.
-      return compact ? (
+
+      if (flow.pickStore) {
+        return (
+          <>
+            {installButtons}
+            <button
+              type="button"
+              onClick={() => setFlow((f) => ({ ...f, pickStore: false }))}
+              className="mx-auto inline-flex items-center gap-1.5 px-1 py-1 text-[12.5px] font-medium text-muted-foreground transition-colors hover:text-primary"
+            >
+              <ArrowLeft size={13} />
+              {text.haveAppBack}
+            </button>
+          </>
+        )
+      }
+
+      // Нажали «Да», а приложение не открылось — скорее всего, его нет: магазин прямо здесь.
+      if (flow.noOpen) {
+        return (
+          <>
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[13px] text-muted-foreground">
+              <b className="font-semibold text-foreground">{text.noOpenLead(app.name)}</b> {text.noOpenInstallTip}
+            </div>
+            {installButtons}
+            <Button variant="outline" className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled}>
+              <RefreshCw />
+              {text.tryAgain}
+            </Button>
+          </>
+        )
+      }
+
+      // Тёмная плашка на светлой теме; на тёмной инверсия дала бы белую плашку ярче
+      // главной кнопки — там спокойная полупрозрачная.
+      // Текст кнопки из app-config — мелкой второй строкой: там бывает и «App Store»,
+      // и «Скачать APK», и «App Store (другой регион)», к «Нет, скачать» их не приклеить.
+      const storeHint = buttons.map((b) => pickText(b.buttonText, g.lang)).filter(Boolean).join(' · ')
+      const noInner = (
         <>
-          {skip}
-          {installButtons}
+          <span className="inline-flex items-center gap-2">
+            <Download />
+            {text.haveAppNo}
+          </span>
+          {storeHint ? (
+            <span className="max-w-full truncate text-[12px] font-normal text-background/65 dark:text-muted-foreground">
+              {storeHint}
+            </span>
+          ) : null}
         </>
-      ) : (
+      )
+      const noClass = cn(
+        size,
+        'h-auto min-h-12 flex-col gap-0 bg-foreground py-1.5 text-background hover:bg-foreground/90',
+        'dark:bg-white/10 dark:text-foreground dark:hover:bg-white/15',
+      )
+      const single = buttons.length === 1 ? buttons[0] : null
+      return (
         <>
-          {installButtons}
-          {skip}
+          <Button variant={primary} className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled}>
+            <Plus />
+            {text.haveAppYes}
+          </Button>
+          {addHint}
+          {single ? (
+            <Button asChild variant="secondary" className={noClass}>
+              <a
+                href={single.buttonLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => {
+                  trip.start('install')
+                  setFlow((f) => ({ ...f, downloaded: true }))
+                }}
+              >
+                {noInner}
+              </a>
+            </Button>
+          ) : (
+            <Button variant="secondary" className={noClass} onClick={() => setFlow((f) => ({ ...f, pickStore: true }))}>
+              {noInner}
+            </Button>
+          )}
         </>
       )
     }

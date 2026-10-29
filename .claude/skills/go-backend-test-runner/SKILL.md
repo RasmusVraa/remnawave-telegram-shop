@@ -13,7 +13,7 @@ description: >-
 
 ## Когда применять
 
-- Любая правка Go-кода в `cmd/`, `internal/`, `pkg/`.
+- Любая правка Go-кода в `cmd/`, `internal/`, `utils/`, `tools/`.
 - Перед git push, если в коммитах есть `*.go`.
 - Не нужно для правок фронтенда, БД, конфигов (если только в `internal/config`).
 
@@ -21,19 +21,40 @@ description: >-
 
 ### 1. Запустить тесты
 
+Тот же набор гоняет CI (`.github/workflows/ci.yml`) — локально прогнать до push:
+
 ```bash
-# Все тесты со стандартным таймаутом
-go test ./...
+# vet — в том числе файлы интеграционных тестов
+go vet ./... && go vet -tags=integration ./...
 
-# С таймаутом подольше (для интеграционных тестов, если есть)
-go test -timeout 30s ./...
+# Все unit-тесты с детектором гонок
+go test -race -count=1 ./...
 
-# Конкретный пакет
-go test ./internal/payment
+# Линтеры (конфиг .golangci.yml, golangci-lint v2)
+golangci-lint run
 
-# Конкретный тест
-go test ./internal/payment -run TestYookasaWebhook
+# Конкретный пакет / тест
+go test -race ./internal/payment
+go test ./internal/handler -run TestParseStarsPayload
 ```
+
+### 1a. Интеграционные тесты (PostgreSQL)
+
+Файлы `*_integration_test.go` с `//go:build integration`: денежные пути
+(блокировка покупки, промокоды, пробный, сквозной вебхук ЮKassa → панель → БД),
+синхронизация, merge, сессии, партнёрка. Нужна **одноразовая** база — тесты
+сами накатывают миграции и пишут строки:
+
+```bash
+docker run -d --name it-pg -e POSTGRES_PASSWORD=t -p 127.0.0.1:55432:5432 postgres:17
+CABINET_INTEGRATION_PG='postgres://postgres:t@127.0.0.1:55432/postgres?sslmode=disable' \
+  go test -tags=integration -count=1 -p 1 ./internal/...
+docker rm -f -v it-pg
+```
+
+`-p 1` обязателен: пакеты делят базу, часть тестов считает строки по всей
+таблице. Без `CABINET_INTEGRATION_PG` тесты делают `t.Skip` — это «не
+проверено», а не «прошли».
 
 Смотреть в выводе:
 - Какие тесты упали (FAIL)
@@ -56,7 +77,9 @@ go tool cover -html=coverage.out -o coverage.html
 
 Проверить:
 - Функции без покрытия (coverage: 0.0%) — особенно в `internal/payment`,
-  `internal/subscription`, `internal/admin` (финансово-критичные).
+  `internal/database`, `internal/promo`, кассы `yookasa`/`platega`/`cryptopay`
+  (финансово-критичные). Учитывать покрытие интеграционными тестами:
+  `-tags=integration -coverprofile=…`.
 - Если покрытие ниже 60% в критичных пакетах — можно ли добавить тесты?
 - Строки в обработчиках ошибок, редких условиях — часто они не покрыты.
 
@@ -70,10 +93,13 @@ go test -race ./...
 
 Если есть race — это потенциальный баг на продакшене. Нужно чинить.
 
-**Интеграционные тесты:** Если бэк требует БД, Redis, внешних API, тесты могут
-падать из-за недостатка окружения. Проверить комментарии в тестах:
-- `// +build integration` — запускаются отдельно
-- `t.Skip("no database")` — пропускаются, если БД нет
+**Интеграционные тесты:** без базы они пропускаются (`t.Skip`), см. шаг 1a.
+Внешние сервисы (ЮKassa, панель Remnawave, Bot API) в тестах подменяются
+`httptest`-серверами — образец `internal/payment/yookassa_webhook_e2e_integration_test.go`.
+Реальная сеть в тестах — ошибка.
+
+**Линтер:** исключение — только `//nolint:<linter> // причина` в конце строки.
+`slog.Error("…", err)` без ключа ловит `sloglint` — писать `"error", err`.
 
 **Timeout:** Некоторые тесты могут зависнуть (бесконечный цикл, deadlock).
 Стандартный таймаут `30s` должен ловить такое, но иногда нужен больше.
@@ -94,7 +120,9 @@ go test -race ./...
 
 ### 5. Контрольный список
 
-- [ ] `go test ./...` прошёл без FAIL
+- [ ] `go test -race ./...` прошёл без FAIL
+- [ ] `golangci-lint run` — 0 замечаний
+- [ ] Интеграционные тесты прогнаны на одноразовой базе (или явно «не проверено»)
 - [ ] Нет таймаутов и панник в stderr
 - [ ] Покрытие критичных пакетов >= 60%
 - [ ] `go vet ./...` не нашёл подозрительных мест

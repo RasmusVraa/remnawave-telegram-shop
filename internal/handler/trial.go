@@ -2,12 +2,14 @@ package handler
 
 import (
 	"context"
+	"errors"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"log/slog"
 
 	"remnawave-tg-shop-bot/internal/config"
+	"remnawave-tg-shop-bot/internal/payment"
 	"remnawave-tg-shop-bot/internal/remnawave"
 	"remnawave-tg-shop-bot/utils"
 )
@@ -40,7 +42,7 @@ func (h Handler) TrialCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 	}
 	c, err := h.customerRepository.FindByTelegramId(ctx, update.CallbackQuery.From.ID)
 	if err != nil {
-		slog.Error("Error finding customer", err)
+		slog.Error("Error finding customer", "error", err)
 		return
 	}
 	if c == nil {
@@ -69,7 +71,7 @@ func (h Handler) ActivateTrialCallbackHandler(ctx context.Context, b *bot.Bot, u
 	}
 	c, err := h.customerRepository.FindByTelegramId(ctx, update.CallbackQuery.From.ID)
 	if err != nil {
-		slog.Error("Error finding customer", err)
+		slog.Error("Error finding customer", "error", err)
 		return
 	}
 	if c == nil {
@@ -82,6 +84,9 @@ func (h Handler) ActivateTrialCallbackHandler(ctx context.Context, b *bot.Bot, u
 	callback := update.CallbackQuery.Message.Message
 	ctxWithUsername := context.WithValue(ctx, remnawave.CtxKeyUsername, update.CallbackQuery.From.Username)
 	_, err = h.paymentService.ActivateTrial(ctxWithUsername, update.CallbackQuery.From.ID)
+	if errors.Is(err, payment.ErrTrialAlreadyUsed) {
+		return // повторное нажатие: пробный уже выдан этим или параллельным запросом
+	}
 	if err != nil {
 		slog.Error("Error activating trial", "error", err)
 		return

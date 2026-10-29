@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Sparkles } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { cn } from '@/lib/utils'
 import { FORTUNE_SECTOR_ICONS } from '@/features/fortune/fortuneSectorIcons'
 import { sectorIconClass } from '@/features/fortune/fortunePrizeVisuals'
@@ -24,6 +25,12 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
   const [entered, setEntered] = useState(false)
   const [displayValue, setDisplayValue] = useState(0)
   const modalControls = useAnimation()
+  // Смахнуть шторку — то же, что тап по фону: приз забирается.
+  const drag = useSheetDragDismiss<HTMLDivElement, HTMLButtonElement>({
+    open,
+    onDismiss: onClaim,
+    desktopQuery: '(min-width: 768px)',
+  })
 
   useEffect(() => {
     if (!open) {
@@ -79,23 +86,33 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
       aria-labelledby="fortune-prize-title"
     >
       <button
+        ref={drag.backdropRef}
         type="button"
         className="absolute inset-0 bg-neutral-950/65 backdrop-blur-sm transition-opacity dark:bg-black/70"
         aria-label={t('common.close')}
         onClick={onClaim}
       />
       <motion.div
+        ref={drag.sheetRef}
         animate={modalControls}
         initial={false}
         className={cn(
           'relative z-[1] w-full border border-border bg-card shadow-2xl transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
-          'max-h-[min(88dvh,560px)] overflow-y-auto rounded-t-3xl p-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] md:max-h-[90vh] md:w-full md:max-w-md md:rounded-2xl md:p-8 md:pb-8',
+          'max-h-[min(88dvh,560px)] overflow-y-auto rounded-t-3xl p-6 pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] md:max-h-[90vh] md:w-full md:max-w-md md:rounded-2xl md:p-8 md:pb-8',
           entered
             ? 'translate-y-0 opacity-100 md:translate-y-0 md:scale-100'
             : 'translate-y-full opacity-95 md:translate-y-2 md:scale-[0.97] md:opacity-0',
         )}
       >
-        <h2 id="fortune-prize-title" className="text-center text-xl font-semibold tracking-tight">
+        {/* Ручка шторки: за неё и за заголовок окно тянут вниз, чтобы закрыть. */}
+        <div className="-mx-6 -mt-6 mb-1 flex cursor-grab touch-none justify-center pb-2 pt-3 md:hidden" {...drag.handlers}>
+          <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+        </div>
+        <h2
+          id="fortune-prize-title"
+          className="touch-none text-center text-xl font-semibold tracking-tight md:touch-auto"
+          {...drag.handlers}
+        >
           {t('fortune.prizeModalTitle')}
         </h2>
         <div className="mt-4 flex justify-center" aria-hidden>

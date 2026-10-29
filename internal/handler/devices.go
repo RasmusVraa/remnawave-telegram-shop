@@ -21,7 +21,7 @@ func (h Handler) DevicesCallbackHandler(ctx context.Context, b *bot.Bot, update 
 
 	customer, err := h.customerRepository.FindByTelegramId(ctx, callback.From.ID)
 	if err != nil {
-		slog.Error("Error finding customer", err)
+		slog.Error("Error finding customer", "error", err)
 		return
 	}
 
@@ -33,7 +33,7 @@ func (h Handler) DevicesCallbackHandler(ctx context.Context, b *bot.Bot, update 
 	// Получаем информацию о пользователе и лимите устройств
 	userID, deviceLimit, err := h.syncService.GetRemnawaveClient().GetUserInfo(ctx, callback.From.ID)
 	if err != nil {
-		slog.Error("Error getting user info", err)
+		slog.Error("Error getting user info", "error", err)
 
 		// Проверяем, является ли ошибка "user not found"
 		msg := callback.Message.Message
@@ -66,7 +66,7 @@ func (h Handler) DevicesCallbackHandler(ctx context.Context, b *bot.Bot, update 
 	// Получаем список устройств пользователя по id
 	devices, err := h.syncService.GetRemnawaveClient().GetUserDevices(ctx, userID)
 	if err != nil {
-		slog.Error("Error getting user devices", err)
+		slog.Error("Error getting user devices", "error", err)
 		_, err = editCallbackOriginToHTMLText(ctx, b, callback.Message.Message, h.translation.GetText(langCode, "devices_error"), models.ParseModeHTML, models.InlineKeyboardMarkup{
 			InlineKeyboard: [][]models.InlineKeyboardButton{
 				{
@@ -157,7 +157,7 @@ func (h Handler) DeleteDeviceCallbackHandler(ctx context.Context, b *bot.Bot, up
 
 	customer, err := h.customerRepository.FindByTelegramId(ctx, callback.From.ID)
 	if err != nil {
-		slog.Error("Error finding customer", err)
+		slog.Error("Error finding customer", "error", err)
 		return
 	}
 
@@ -169,14 +169,14 @@ func (h Handler) DeleteDeviceCallbackHandler(ctx context.Context, b *bot.Bot, up
 	// Получаем UUID пользователя
 	userID, _, err := h.syncService.GetRemnawaveClient().GetUserInfo(ctx, callback.From.ID)
 	if err != nil {
-		slog.Error("Error getting user info", err)
+		slog.Error("Error getting user info", "error", err)
 		_, err = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callback.ID,
 			Text:            h.translation.GetText(langCode, "device_delete_error"),
 			ShowAlert:       true,
 		})
 		if err != nil {
-			slog.Error("Error answering callback query", err)
+			slog.Error("Error answering callback query", "error", err)
 		}
 		return
 	}
@@ -184,14 +184,14 @@ func (h Handler) DeleteDeviceCallbackHandler(ctx context.Context, b *bot.Bot, up
 	// Удаляем устройство
 	err = h.syncService.GetRemnawaveClient().DeleteUserDevice(ctx, userID, hwid)
 	if err != nil {
-		slog.Error("Error deleting device", err)
+		slog.Error("Error deleting device", "error", err)
 		_, err = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 			CallbackQueryID: callback.ID,
 			Text:            h.translation.GetText(langCode, "device_delete_error"),
 			ShowAlert:       true,
 		})
 		if err != nil {
-			slog.Error("Error answering callback query", err)
+			slog.Error("Error answering callback query", "error", err)
 		}
 		return
 	}
@@ -203,7 +203,7 @@ func (h Handler) DeleteDeviceCallbackHandler(ctx context.Context, b *bot.Bot, up
 		ShowAlert:       false,
 	})
 	if err != nil {
-		slog.Error("Error answering callback query", err)
+		slog.Error("Error answering callback query", "error", err)
 	}
 
 	// Обновляем список устройств

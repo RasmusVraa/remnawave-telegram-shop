@@ -127,8 +127,8 @@ git rebase --continue  # или git merge --continue если был merge
 ```bash
 git log --oneline -10  # убедиться, что история выглядит правильно
 git status  # всё ли committed?
-npm run type-check  # если фронтенд
-go test ./...  # если бэкенд
+cd web/cabinet && npm run typecheck && cd -  # если фронтенд
+go test -race ./... && golangci-lint run  # если бэкенд (полный набор — skill go-backend-test-runner)
 ```
 
 ### 6. Если что-то пошло не так

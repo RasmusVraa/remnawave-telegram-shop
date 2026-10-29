@@ -37,12 +37,6 @@ func skipTelegramCustomerDM(c *database.Customer) bool {
 	return c.IsWebOnly || utils.IsSyntheticTelegramID(c.TelegramID)
 }
 
-// sanitizeEmailLocalForPanel делегирует общей реализации: тем же правилом
-// пользуется админка при показе и поиске web-клиентов по логину.
-func sanitizeEmailLocalForPanel(email string) string {
-	return utils.PanelLoginLocalFromEmail(email)
-}
-
 func emailLocalPartForDescription(email string) string {
 	email = strings.TrimSpace(strings.ToLower(email))
 	at := strings.LastIndex(email, "@")
@@ -163,6 +157,17 @@ func NewPaymentService(
 }
 
 func (s PaymentService) ProcessPurchaseById(ctx context.Context, purchaseId int64) error {
+	// Вебхук, его повторы и поллер приходят с одной покупкой одновременно; без
+	// блокировки каждый увидел бы pending и продлил подписку заново. Если покупку
+	// уже обрабатывают, отдаём database.ErrPurchaseLocked: касса повторит вебхук,
+	// поллер — следующий проход, а к тому времени статус будет paid.
+	unlock, err := s.purchaseRepository.LockForProcessing(ctx, purchaseId)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+
+	// Статус читаем уже под блокировкой: предыдущий держатель мог успеть записать paid.
 	purchase, err := s.purchaseRepository.FindById(ctx, purchaseId)
 	if err != nil {
 		return err
@@ -330,6 +335,21 @@ func (s PaymentService) ProcessPurchaseById(ctx context.Context, purchaseId int6
 	return s.resetTrafficAfterSubscriptionPayment(ctx, user)
 }
 
+// panelUserForCustomer находит пользователя панели клиента так же, как кабинет и
+// админка. Поиск только по telegram_id не находит web-only клиентов кабинета —
+// в панели у них нет telegram_id, и вся обработка после оплаты (лимит устройств,
+// докупка HWID, сброс трафика) падала с ErrUserNotFound уже после продления.
+func (s PaymentService) panelUserForCustomer(ctx context.Context, customer *database.Customer) (*remnawave.User, error) {
+	rwCtx := s.withRemnawavePanelUsername(ctx, customer)
+	return s.remnawaveClient.FindUserForAdminCustomer(rwCtx, customer.ID, customer.TelegramID, customer.SubscriptionLink, customer.IsWebOnly)
+}
+
+// setDeviceLimit меняет лимит устройств с тем же поиском пользователя, что и panelUserForCustomer.
+func (s PaymentService) setDeviceLimit(ctx context.Context, customer *database.Customer, limit int) (*remnawave.User, error) {
+	rwCtx := s.withRemnawavePanelUsername(ctx, customer)
+	return s.remnawaveClient.UpdateUserDeviceLimitByCustomer(rwCtx, customer.ID, customer.TelegramID, limit)
+}
+
 func (s PaymentService) resetTrafficAfterSubscriptionPayment(ctx context.Context, user *remnawave.User) error {
 	if user == nil || user.ID <= 0 {
 		return nil
@@ -351,7 +371,7 @@ func (s PaymentService) processDevicePurchase(ctx context.Context, purchase *dat
 	purchase.PaidAt = &paidNow
 	expireBefore := customer.ExpireAt
 
-	userInfo, err := s.remnawaveClient.GetUserTrafficInfo(ctx, customer.TelegramID)
+	userInfo, err := s.panelUserForCustomer(ctx, customer)
 	if err != nil {
 		return err
 	}
@@ -364,7 +384,7 @@ func (s PaymentService) processDevicePurchase(ctx context.Context, purchase *dat
 		if newLimit < 1 {
 			newLimit = 1
 		}
-		if _, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, newLimit); err != nil {
+		if _, err := s.setDeviceLimit(ctx, customer, newLimit); err != nil {
 			return err
 		}
 		if err := s.customerRepository.UpdateFields(ctx, customer.ID, map[string]interface{}{
@@ -383,7 +403,7 @@ func (s PaymentService) processDevicePurchase(ctx context.Context, purchase *dat
 		newLimit = maxLimit
 	}
 
-	updatedUser, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, newLimit)
+	updatedUser, err := s.setDeviceLimit(ctx, customer, newLimit)
 	if err != nil {
 		return err
 	}
@@ -426,7 +446,9 @@ func (s PaymentService) processDevicePurchase(ctx context.Context, purchase *dat
 			},
 		})
 		if err != nil {
-			return err
+			// Покупка уже оплачена и выдана: недоставленное сообщение (например,
+			// бот заблокирован) не должно отменять промокод, опыт и уведомления.
+			slog.Warn("payment DM not delivered", "error", err, "purchase_id", utils.MaskHalfInt64(purchase.ID))
 		}
 	}
 	s.clearPromoDiscountIfUsed(ctx, purchase, customer)
@@ -449,7 +471,7 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 		return nil
 	}
 
-	userInfo, err := s.remnawaveClient.GetUserTrafficInfo(ctx, customer.TelegramID)
+	userInfo, err := s.panelUserForCustomer(ctx, customer)
 	if err != nil {
 		return err
 	}
@@ -479,7 +501,7 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 		if maxL := config.HwidMaxDevices(); maxL > 0 && limit > maxL {
 			limit = maxL
 		}
-		if _, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, limit); err != nil {
+		if _, err := s.setDeviceLimit(ctx, customer, limit); err != nil {
 			return err
 		}
 		return s.customerRepository.UpdateFields(ctx, customer.ID, map[string]interface{}{
@@ -497,7 +519,7 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 		if maxL := config.HwidMaxDevices(); maxL > 0 && newLimit > maxL {
 			newLimit = maxL
 		}
-		if _, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, newLimit); err != nil {
+		if _, err := s.setDeviceLimit(ctx, customer, newLimit); err != nil {
 			return err
 		}
 		return s.customerRepository.UpdateFields(ctx, customer.ID, map[string]interface{}{
@@ -507,7 +529,7 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 	}
 
 	if carriedExtra == 0 && newExtra == 0 && paidBaseLimit > 0 && currentLimit > 0 && currentLimit < paidBaseLimit {
-		if _, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, paidBaseLimit); err != nil {
+		if _, err := s.setDeviceLimit(ctx, customer, paidBaseLimit); err != nil {
 			return err
 		}
 		currentLimit = paidBaseLimit
@@ -533,7 +555,7 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 	}
 
 	if carriedExtra > 0 || newExtra > 0 {
-		if _, err := s.remnawaveClient.UpdateUserDeviceLimit(ctx, customer.TelegramID, newLimit); err != nil {
+		if _, err := s.setDeviceLimit(ctx, customer, newLimit); err != nil {
 			return err
 		}
 	}
@@ -678,12 +700,17 @@ func (s PaymentService) finalizePurchase(ctx context.Context, purchase *database
 			},
 		})
 		if err != nil {
-			return err
+			// Покупка уже помечена оплаченной (MarkAsPaid выше), повтор вебхука её
+			// не обработает. Раньше недоставленное сообщение — чаще всего бот
+			// заблокирован — обрывало всё ниже: реферальный бонус, партнёрскую
+			// комиссию, промокод, опыт лояльности и уведомление админу.
+			slog.Warn("payment DM not delivered", "error", err, "purchase_id", utils.MaskHalfInt64(purchase.ID))
 		}
 	}
 
 	if err := s.applyReferralBonus(ctx, purchase, customer); err != nil {
-		return err
+		// По той же причине ошибка бонуса не должна отменять партнёрку и остальное.
+		slog.Error("referral bonus after payment", "error", err, "purchase_id", utils.MaskHalfInt64(purchase.ID))
 	}
 	s.applyPartnerCommission(ctx, purchase, customer)
 	s.clearPromoDiscountIfUsed(ctx, purchase, customer)
@@ -1150,12 +1177,20 @@ func (s PaymentService) CreatePurchase(ctx context.Context, amount float64, mont
 	}
 }
 
+// ErrHwidLimitPinned — лимит устройств закреплён админом: доп. устройства в
+// счёт не берём, оплата ничего бы не изменила. Интерфейсы кнопку докупки таким
+// клиентам не показывают; это последняя линия на случай подделанного запроса.
+var ErrHwidLimitPinned = errors.New("hwid limit is pinned by admin")
+
 func (s PaymentService) CreatePurchaseWithExtra(ctx context.Context, amount float64, months int, extraHwid int, customer *database.Customer, invoiceType database.InvoiceType, meta *PromoMeta, tariffID *int64, extras *TariffPurchaseExtras) (url string, purchaseId int64, err error) {
 	if extraHwid < 0 {
 		return "", 0, fmt.Errorf("invalid extra hwid: %d", extraHwid)
 	}
 	if !config.HwidExtraDevicesEnabled() && extraHwid > 0 {
 		return "", 0, fmt.Errorf("extra hwid purchases are disabled")
+	}
+	if extraHwid > 0 && customer != nil && customer.HwidLimitOverride != nil {
+		return "", 0, ErrHwidLimitPinned
 	}
 	switch invoiceType {
 	case database.InvoiceTypeCrypto:
@@ -1182,6 +1217,9 @@ func (s PaymentService) CreateHwidPurchase(ctx context.Context, amount float64, 
 	}
 	if !config.HwidExtraDevicesEnabled() {
 		return "", 0, fmt.Errorf("extra hwid purchases are disabled")
+	}
+	if customer != nil && customer.HwidLimitOverride != nil {
+		return "", 0, ErrHwidLimitPinned
 	}
 	switch invoiceType {
 	case database.InvoiceTypeCrypto:
@@ -1490,8 +1528,9 @@ func (s PaymentService) createTelegramInvoice(ctx context.Context, amount float6
 	}
 	purchaseId, err = s.purchaseRepository.Create(ctx, pur)
 	if err != nil {
+		// Раньше здесь возвращался nil: вызывающий получал пустую ссылку без ошибки.
 		slog.Error("Error creating purchase", "error", err)
-		return "", 0, nil
+		return "", 0, err
 	}
 
 	username, _ := ctx.Value(remnawave.CtxKeyUsername).(string)
@@ -1507,6 +1546,14 @@ func (s PaymentService) createTelegramInvoice(ctx context.Context, amount float6
 		Description: s.translation.GetText(customer.Language, "invoice_description"),
 		Payload:     fmt.Sprintf("%d&%s", purchaseId, username),
 	})
+	if err != nil {
+		// Без проверки покупка уходила в pending с пустой ссылкой.
+		slog.Error("Error creating telegram invoice link", "error", err, "purchaseId", purchaseId)
+		if _, cerr := s.purchaseRepository.CancelIfOpen(ctx, purchaseId); cerr != nil {
+			slog.Error("Error canceling purchase after invoice link failure", "error", cerr, "purchaseId", purchaseId)
+		}
+		return "", 0, err
+	}
 
 	updates := map[string]interface{}{
 		"status":             database.PurchaseStatusPending,
@@ -1522,6 +1569,9 @@ func (s PaymentService) createTelegramInvoice(ctx context.Context, amount float6
 	return invoiceUrl, purchaseId, nil
 }
 
+// ErrTrialAlreadyUsed — пробный период уже выдан (или выдаётся параллельным запросом).
+var ErrTrialAlreadyUsed = errors.New("trial already used")
+
 func (s PaymentService) ActivateTrial(ctx context.Context, telegramId int64) (string, error) {
 	if config.TrialDays() == 0 {
 		return "", nil
@@ -1533,6 +1583,27 @@ func (s PaymentService) ActivateTrial(ctx context.Context, telegramId int64) (st
 	}
 	if customer == nil {
 		return "", fmt.Errorf("customer %d not found", telegramId)
+	}
+	// Проверка «пробный ещё не выдан» — под блокировкой по клиенту и по
+	// перечитанной строке: раньше её делали вызывающие без блокировки, и
+	// несколько быстрых нажатий складывали пробные дни.
+	unlock, err := s.customerRepository.LockTrial(ctx, customer.ID)
+	if err != nil {
+		if errors.Is(err, database.ErrTrialLocked) {
+			return "", ErrTrialAlreadyUsed
+		}
+		return "", err
+	}
+	defer unlock()
+	customer, err = s.customerRepository.FindById(ctx, customer.ID)
+	if err != nil {
+		return "", err
+	}
+	if customer == nil {
+		return "", fmt.Errorf("customer %d not found", telegramId)
+	}
+	if customer.SubscriptionLink != nil && strings.TrimSpace(*customer.SubscriptionLink) != "" {
+		return "", ErrTrialAlreadyUsed
 	}
 	rwCtx := s.withRemnawavePanelUsername(ctx, customer)
 	rwCtx = s.ctxWithTelegramUsernameIfMissing(rwCtx, customer)
@@ -1569,13 +1640,13 @@ func (s PaymentService) CancelYookassaPayment(purchaseId int64) error {
 		return fmt.Errorf("purchase with crypto invoice id %s not found", utils.MaskHalfInt64(purchaseId))
 	}
 
-	purchaseFieldsToUpdate := map[string]interface{}{
-		"status": database.PurchaseStatusCancel,
-	}
-
-	err = s.purchaseRepository.UpdateFields(ctx, purchaseId, purchaseFieldsToUpdate)
+	cancelled, err := s.purchaseRepository.CancelIfOpen(ctx, purchaseId)
 	if err != nil {
 		return err
+	}
+	if !cancelled {
+		slog.Info("yookassa: skip cancel, purchase is already finalized", "purchase_id", purchaseId)
+		return nil
 	}
 
 	purchase.Status = database.PurchaseStatusCancel
@@ -1595,30 +1666,14 @@ func (s PaymentService) CancelPlategaPayment(purchaseId int64) error {
 // CancelHeleketPayment закрывает счёт Heleket. Отдельный метод, а не прямая
 // запись статуса из пакета heleket: отмену нужно показать и пользователю, и в
 // группе платежей — этим занимается cancelPurchaseAndNotify.
-//
-// В отличие от остальных касс здесь нужна проверка текущего статуса: вебхук и
-// поллинг Heleket работают параллельно, и поллер может прийти с отменой по уже
-// оплаченной покупке — тогда подписка осталась бы выданной, а покупка ушла бы
-// в cancel вместе с выручкой из статистики.
 func (s PaymentService) CancelHeleketPayment(purchaseId int64) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	purchase, err := s.purchaseRepository.FindById(ctx, purchaseId)
-	if err != nil {
-		return err
-	}
-	if purchase == nil {
-		return fmt.Errorf("purchase with id %s not found", utils.MaskHalfInt64(purchaseId))
-	}
-	if purchase.Status != database.PurchaseStatusNew && purchase.Status != database.PurchaseStatusPending {
-		slog.Info("heleket: skip cancel, purchase is already finalized",
-			"purchase_id", purchaseId, "status", purchase.Status)
-		return nil
-	}
 	return s.cancelPurchaseAndNotify(purchaseId)
 }
 
 // cancelPurchaseAndNotify переводит покупку в cancel и рассылает уведомления.
+// Отменяется только new/pending: вебхук и поллинг работают параллельно, и
+// поллер может прийти с отменой по уже оплаченной покупке — тогда подписка
+// осталась бы выданной, а покупка ушла бы в cancel вместе с выручкой из статистики.
 func (s PaymentService) cancelPurchaseAndNotify(purchaseId int64) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -1629,10 +1684,13 @@ func (s PaymentService) cancelPurchaseAndNotify(purchaseId int64) error {
 	if purchase == nil {
 		return fmt.Errorf("purchase with id %s not found", utils.MaskHalfInt64(purchaseId))
 	}
-	if err := s.purchaseRepository.UpdateFields(ctx, purchaseId, map[string]interface{}{
-		"status": database.PurchaseStatusCancel,
-	}); err != nil {
+	cancelled, err := s.purchaseRepository.CancelIfOpen(ctx, purchaseId)
+	if err != nil {
 		return err
+	}
+	if !cancelled {
+		slog.Info("skip cancel, purchase is already finalized", "purchase_id", purchaseId)
+		return nil
 	}
 	purchase.Status = database.PurchaseStatusCancel
 	cust, ferr := s.customerRepository.FindById(ctx, purchase.CustomerID)

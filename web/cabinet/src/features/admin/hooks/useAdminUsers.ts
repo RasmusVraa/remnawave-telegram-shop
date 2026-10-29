@@ -212,6 +212,14 @@ export function useAdminUserExtraHwid(id: number | null) {
   })
 }
 
+export function useAdminUserSetHwidPin(id: number | null) {
+  const invalidate = useInvalidatePanel(id)
+  return useMutation({
+    mutationFn: (limit: number | null) => api.adminUserSetHwidPin(id!, limit),
+    onSuccess: invalidate,
+  })
+}
+
 export function useAdminUserDeleteDevice(id: number | null) {
   const invalidate = useInvalidatePanel(id)
   return useMutation({

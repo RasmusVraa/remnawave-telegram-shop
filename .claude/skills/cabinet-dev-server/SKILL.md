@@ -42,7 +42,7 @@ VITE_PORT=5174 npm run dev
 npm run build
 
 # Проверка типов
-npm run type-check
+npm run typecheck
 ```
 
 Вывод должен быть вроде:
@@ -91,7 +91,7 @@ Vite поддерживает HMR (Hot Module Replacement):
 - [ ] Компоненты рендеринги без console.error
 - [ ] Стили загружены правильно
 - [ ] HMR работает (правка файла обновляет браузер)
-- [ ] TypeScript-ошибок нет (`npm run type-check`)
+- [ ] TypeScript-ошибок нет (`npm run typecheck`)
 
 ### 7. Типичный workflow
 
@@ -103,7 +103,7 @@ npm run dev
 # (осуществляется в IDE, hot-reload срабатывает автоматически)
 
 # 3. Проверить типы перед коммитом
-npm run type-check
+npm run typecheck
 
 # 4. Собрать продакшн-бундл
 npm run build

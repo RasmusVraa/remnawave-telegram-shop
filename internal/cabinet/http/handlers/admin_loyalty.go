@@ -11,6 +11,7 @@ import (
 
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/loyalty"
+	"remnawave-tg-shop-bot/utils"
 )
 
 var recalcRunning int32
@@ -236,7 +237,7 @@ func (h *AdminLoyaltyHandler) TriggerRecalc(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	go func() {
+	utils.Go("loyalty recalc", func() {
 		defer atomic.StoreInt32(&recalcRunning, 0)
 
 		ctx := context.Background()
@@ -253,7 +254,7 @@ func (h *AdminLoyaltyHandler) TriggerRecalc(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		slog.Info("admin loyalty recalc completed", "customers", len(sums))
-	}()
+	})
 
 	writeJSON(w, http.StatusOK, map[string]string{"status": "started"})
 }

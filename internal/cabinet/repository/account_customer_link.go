@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"remnawave-tg-shop-bot/internal/pgerr"
 )
 
 // LinkStatus — enum cabinet_account_customer_link.link_status.
 const (
-	LinkStatusLinked        = "linked"
-	LinkStatusPendingMerge  = "pending_merge"
-	LinkStatusRejected      = "rejected"
+	LinkStatusLinked       = "linked"
+	LinkStatusPendingMerge = "pending_merge"
+	LinkStatusRejected     = "rejected"
 )
 
 // AccountCustomerLink — связь аккаунта кабинета с customer.
@@ -91,18 +92,8 @@ func (r *AccountCustomerLinkRepo) Create(ctx context.Context, accountID, custome
 }
 
 // isAccountFKViolation — нарушение FK именно по account_id (23503).
-// Проверка по тексту, как isUniqueViolation в merge_audit.go: pgconn у нас
-// indirect-зависимость, и городить типизированную распаковку ради одного места
-// не хочется.
 func isAccountFKViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	if !strings.Contains(msg, "23503") && !strings.Contains(msg, "foreign key constraint") {
-		return false
-	}
-	return strings.Contains(msg, "cabinet_account_customer_link_account_id_fkey")
+	return pgerr.IsForeignKeyViolation(err, "cabinet_account_customer_link_account_id_fkey")
 }
 
 // FindByAccountID — основной lookup. ErrNotFound, если связи ещё нет (аккаунт

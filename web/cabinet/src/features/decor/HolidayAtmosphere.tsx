@@ -1,10 +1,26 @@
+/**
+ * Праздничные сцены — «ночь» на всё полотно: небо, земля с персонажами,
+ * частицы и кромка под шапкой. Рисуются для halloween и new_year, а также
+ * для их копий halloween_2 и new_year_2 из upstream.
+ *
+ * Сцены рисованы только тёмными: при halloween_2 и new_year_2 светлая тема
+ * кабинета выключается (ThemePolicyProvider, isDarkOnlyDecorTheme).
+ */
 import { useLayoutEffect, useState, type CSSProperties } from 'react'
 
 import { Bat, HalloweenFrieze, NewYearFrieze, PumpkinMoon, SpiderCorner, Witch } from './holidayArt'
+import { normalizeDecorTheme, type DecorThemeId } from './decorThemes'
 import { useCabinetDecorTheme } from './useCabinetDecorTheme'
 import './holiday.css'
 
 export type HolidayId = 'halloween' | 'new_year'
+
+/** Какую сцену рисовать для декор-темы; null — тема не праздничная. */
+export function holidayForTheme(theme: DecorThemeId): HolidayId | null {
+  if (theme === 'halloween' || theme === 'halloween_2') return 'halloween'
+  if (theme === 'new_year' || theme === 'new_year_2') return 'new_year'
+  return null
+}
 
 /** Фиксированный рой: задержки отрицательные, поэтому мыши уже разлетелись, а не стартуют пачкой. */
 const BATS: Array<{
@@ -60,15 +76,18 @@ const FLAKES: Array<[number, number, number, number]> = [
   [76, 12, 21, 3],
 ]
 
-/** Тема из кабинета, а в dev ещё и из ?decor= для просмотра лендинга и статуса. */
+/**
+ * Праздничная сцена текущей декор-темы (с учётом авто-смены по календарю),
+ * а в dev ещё и из ?decor= для просмотра лендинга и статуса.
+ */
 export function useHolidayTheme(): HolidayId | null {
   const theme = useCabinetDecorTheme()
-  const [forced, setForced] = useState<HolidayId | null>(null)
+  const [forced, setForced] = useState<DecorThemeId | null>(null)
 
   useLayoutEffect(() => {
     if (!import.meta.env.DEV) return
-    const raw = new URLSearchParams(window.location.search).get('decor')
-    if (raw !== 'halloween' && raw !== 'new_year') return
+    const raw = normalizeDecorTheme(new URLSearchParams(window.location.search).get('decor'))
+    if (holidayForTheme(raw) == null) return
     const root = document.documentElement
     const previous = root.dataset.cabinetDecor
     root.dataset.cabinetDecor = raw
@@ -79,8 +98,7 @@ export function useHolidayTheme(): HolidayId | null {
     }
   }, [])
 
-  const id = forced ?? theme
-  return id === 'halloween' || id === 'new_year' ? id : null
+  return holidayForTheme(forced ?? theme)
 }
 
 /** Снег и искры поверх стекла лендинга. Клики не перехватывает. */
@@ -206,8 +224,9 @@ function Bunting() {
   return (
     <svg className="holiday-bunting" viewBox="0 0 1200 28" preserveAspectRatio="none" aria-hidden>
       <path d="M0 2 Q600 16 1200 2" fill="none" stroke="#3a2418" strokeWidth="1.4" />
-      {colors.concat(colors, colors).map((fill, i) => (
-        <path key={i} d={`M${18 + i * 52} 6 L${36 + i * 52} 24 L${54 + i * 52} 6 Z`} fill={fill} />
+      {/* 23 флажка по 52 единицы — на всю ширину viewBox, а не на две трети. */}
+      {Array.from({ length: 23 }, (_, i) => (
+        <path key={i} d={`M${18 + i * 52} 6 L${36 + i * 52} 24 L${54 + i * 52} 6 Z`} fill={colors[i % colors.length]} />
       ))}
     </svg>
   )

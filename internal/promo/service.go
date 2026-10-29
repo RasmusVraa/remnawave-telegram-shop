@@ -17,10 +17,10 @@ import (
 
 // Service applies promo codes and manages pending discounts.
 type Service struct {
-	PromoRepo      *database.PromoRepository
-	CustomerRepo   *database.CustomerRepository
-	PurchaseRepo   *database.PurchaseRepository
-	Remnawave      *remnawave.Client
+	PromoRepo    *database.PromoRepository
+	CustomerRepo *database.CustomerRepository
+	PurchaseRepo *database.PurchaseRepository
+	Remnawave    *remnawave.Client
 }
 
 func NewService(promo *database.PromoRepository, customers *database.CustomerRepository, purchases *database.PurchaseRepository, rw *remnawave.Client) *Service {
@@ -111,7 +111,7 @@ func (s *Service) Activate(ctx context.Context, telegramID int64, username strin
 			t := time.Now().UTC().Add(time.Duration(*p.DiscountTTLHours) * time.Hour)
 			exp = &t
 		}
-		remaining := 1
+		var remaining int
 		if p.DiscountMaxSubscriptionPaymentsPerCustomer == 0 {
 			remaining = database.PendingDiscountUnlimitedPayments
 		} else {
@@ -135,7 +135,7 @@ func (s *Service) Activate(ctx context.Context, telegramID int64, username strin
 	res, err := s.applyEffect(ctxUser, telegramID, customer, p)
 	if err != nil {
 		s.compensate(ctx, p.ID, customer.ID)
-			slog.Error("promo effect failed, compensated", "error", err, "promo_id", p.ID, "customer_id", utils.MaskHalfInt64(customer.ID))
+		slog.Error("promo effect failed, compensated", "error", err, "promo_id", p.ID, "customer_id", utils.MaskHalfInt64(customer.ID))
 		return nil, err
 	}
 
@@ -162,9 +162,8 @@ func (s *Service) validatePromoRow(ctx context.Context, p *database.PromoCode, c
 	if has {
 		return database.ValidationErrorf("already redeemed")
 	}
-	if p.RequireCustomerInDB {
-		// Customer row already exists if we're here; reserved for future stricter checks.
-	}
+	// RequireCustomerInDB: строка customer к этому моменту уже есть — отдельная
+	// проверка не нужна.
 	if p.FirstPurchaseOnly {
 		n, err := s.PurchaseRepo.CountPaidSubscriptionsByCustomer(ctx, customer.ID)
 		if err != nil {
@@ -198,6 +197,11 @@ func (s *Service) validatePromoRow(ctx context.Context, p *database.PromoCode, c
 		}
 		if customer.ExpireAt == nil || !customer.ExpireAt.After(time.Now()) {
 			return database.ValidationErrorf("extra_hwid needs active sub")
+		}
+		// Лимит закреплён админом: устройства из промокода ничего бы не
+		// добавили, а код сгорел бы. Проверка до записи активации — код цел.
+		if customer.HwidLimitOverride != nil {
+			return database.ValidationErrorf("hwid pinned")
 		}
 	case database.PromoTypeDiscount:
 		if p.DiscountPercent == nil || *p.DiscountPercent < 1 || *p.DiscountPercent > 100 {
@@ -374,10 +378,34 @@ func (s *Service) getActivePendingDiscount(ctx context.Context, customerID int64
 }
 
 // PendingDiscountForPayment returns percent 0-100 if a discount applies; clears expired pending discounts.
+//
+// Скидка гасится только при оплате, поэтому каждый неоплаченный счёт со
+// скидкой резервирует одно использование. Раньше скидку «на одну оплату»
+// можно было получить на любом числе заранее созданных счетов и оплатить их все.
 func (s *Service) PendingDiscountForPayment(ctx context.Context, customerID int64) (percent int, promoCodeID int64, err error) {
 	d, err := s.getActivePendingDiscount(ctx, customerID)
 	if err != nil || d == nil {
 		return 0, 0, err
+	}
+	if d.SubscriptionPaymentsRemaining != database.PendingDiscountUnlimitedPayments {
+		open, err := s.PromoRepo.CountOpenPurchasesWithPromo(ctx, customerID, d.PromoCodeID)
+		if err != nil {
+			return 0, 0, err
+		}
+		if open >= d.SubscriptionPaymentsRemaining {
+			// Брошенные счета Stars не истекают — освобождаем их и считаем заново.
+			if n, cerr := s.PromoRepo.CancelOpenTelegramPurchasesWithPromo(ctx, customerID, d.PromoCodeID); cerr != nil {
+				slog.Error("cancel stale stars invoices with promo", "error", cerr)
+			} else if n > 0 {
+				open, err = s.PromoRepo.CountOpenPurchasesWithPromo(ctx, customerID, d.PromoCodeID)
+				if err != nil {
+					return 0, 0, err
+				}
+			}
+		}
+		if open >= d.SubscriptionPaymentsRemaining {
+			return 0, 0, nil
+		}
 	}
 	return d.Percent, d.PromoCodeID, nil
 }

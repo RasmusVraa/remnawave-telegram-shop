@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -24,6 +25,9 @@ const (
 	TariffCheckoutDowngrade
 )
 
+// ErrTariffUnavailable — тариф не существует или снят с продажи.
+var ErrTariffUnavailable = errors.New("tariff is not available for purchase")
+
 // TariffPurchaseExtras задаёт поля строки purchase для режима tariffs (nil = обычная подписка).
 type TariffPurchaseExtras struct {
 	Kind             database.PurchaseKind
@@ -40,6 +44,18 @@ func ResolveTariffPurchase(
 	invoiceStars bool,
 ) (kind TariffCheckoutKind, amount int, purchaseKind database.PurchaseKind, isEarlyDowngrade bool, err error) {
 	purchaseKind = database.PurchaseKindSubscription
+	// Снятый с продажи тариф купить нельзя: раньше выбор шёл по id из кнопки
+	// или запроса без проверки is_active. Продлить свой текущий — можно, иначе
+	// подписчики снятого тарифа остались бы без продления.
+	if customer.CurrentTariffID == nil || *customer.CurrentTariffID != newTariffID {
+		t, err := tr.GetByID(ctx, newTariffID)
+		if err != nil {
+			return 0, 0, purchaseKind, false, err
+		}
+		if t == nil || !t.IsActive {
+			return 0, 0, purchaseKind, false, fmt.Errorf("%w: tariff %d", ErrTariffUnavailable, newTariffID)
+		}
+	}
 	tpNew, err := tr.GetPrice(ctx, newTariffID, months)
 	if err != nil {
 		return 0, 0, purchaseKind, false, err

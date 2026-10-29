@@ -9,6 +9,7 @@ export const DECOR_THEME_IDS = [
   'neon',
   'ocean',
   'new_year',
+  'new_year_2',
   'slate',
   'carbon',
   // teal–violet bridge + purple
@@ -24,6 +25,7 @@ export const DECOR_THEME_IDS = [
   'sunset',
   'orange',
   'halloween',
+  'halloween_2',
   // yellow / gold
   'yellow',
   'summer',
@@ -59,6 +61,8 @@ export const DECOR_THEMES: Record<DecorThemeId, DecorThemeDef> = {
   neon: { id: 'neon', effect: null },
   ocean: { id: 'ocean', effect: 'bubbles' },
   new_year: { id: 'new_year', effect: null },
+  // Сцена со своим снегом — HolidayAtmosphere, слой частиц не нужен.
+  new_year_2: { id: 'new_year_2', effect: null },
   slate: { id: 'slate', effect: null },
   carbon: { id: 'carbon', effect: null },
   aurora: { id: 'aurora', effect: 'aurora' },
@@ -71,6 +75,7 @@ export const DECOR_THEMES: Record<DecorThemeId, DecorThemeDef> = {
   sunset: { id: 'sunset', effect: 'embers' },
   orange: { id: 'orange', effect: null },
   halloween: { id: 'halloween', effect: null },
+  halloween_2: { id: 'halloween_2', effect: null },
   yellow: { id: 'yellow', effect: null },
   summer: { id: 'summer', effect: 'sunrays' },
   black_friday: { id: 'black_friday', effect: 'sparks' },
@@ -81,6 +86,13 @@ export function normalizeDecorTheme(value: string | undefined | null): DecorThem
   const v = value.trim().toLowerCase()
   if (v in DECOR_THEMES) return v as DecorThemeId
   return 'off'
+}
+
+/** Темы, у которых нет светлого варианта: пока они включены, кабинет только тёмный. */
+const DARK_ONLY_DECOR_THEMES: ReadonlySet<DecorThemeId> = new Set(['halloween_2', 'new_year_2'])
+
+export function isDarkOnlyDecorTheme(theme: DecorThemeId): boolean {
+  return DARK_ONLY_DECOR_THEMES.has(theme)
 }
 
 export function decorEffectForTheme(theme: DecorThemeId): DecorEffectKind {

@@ -1,6 +1,6 @@
 /*
- * Свои сцены хеллоуина и Нового года.
- * Вешаются и на кабинет, и на лендинг, и на публичный статус.
+ * Праздничные сцены: halloween / halloween_2 и new_year / new_year_2 (HolidayAtmosphere.tsx).
+ * Вешаются и на кабинет, и на лендинг, и на публичный статус. Светлого варианта у сцен нет.
  */
 
 .holiday-sky {
@@ -240,7 +240,8 @@
   animation: holiday-bulb 2.4s ease-in-out infinite;
 }
 
-html[data-cabinet-decor="halloween"] .cabinet-status-page .cabinet-elevated-card {
+html[data-cabinet-decor="halloween"] .cabinet-status-page .cabinet-elevated-card,
+html[data-cabinet-decor="halloween_2"] .cabinet-status-page .cabinet-elevated-card {
   border-color: hsl(28 75% 46% / 0.4);
   background-image: linear-gradient(180deg, hsl(270 32% 13% / 0.94), hsl(18 36% 10% / 0.94));
   box-shadow:
@@ -248,7 +249,8 @@ html[data-cabinet-decor="halloween"] .cabinet-status-page .cabinet-elevated-card
     0 14px 32px hsl(270 40% 4% / 0.35);
 }
 
-html[data-cabinet-decor="new_year"] .cabinet-status-page .cabinet-elevated-card {
+html[data-cabinet-decor="new_year"] .cabinet-status-page .cabinet-elevated-card,
+html[data-cabinet-decor="new_year_2"] .cabinet-status-page .cabinet-elevated-card {
   border-color: hsl(198 70% 62% / 0.35);
   background-image: linear-gradient(180deg, hsl(214 40% 14% / 0.94), hsl(210 36% 11% / 0.94));
   box-shadow:
@@ -257,13 +259,17 @@ html[data-cabinet-decor="new_year"] .cabinet-status-page .cabinet-elevated-card 
 }
 
 /* Полоса под карточками, чтобы ряд персонажей не прятался под контентом. */
-html[data-cabinet-decor="halloween"] .cabinet-shell > .relative.z-10,
-html[data-cabinet-decor="new_year"] .cabinet-shell > .relative.z-10 {
+html[data-cabinet-decor="halloween"] .cabinet-shell-content,
+html[data-cabinet-decor="halloween_2"] .cabinet-shell-content,
+html[data-cabinet-decor="new_year"] .cabinet-shell-content,
+html[data-cabinet-decor="new_year_2"] .cabinet-shell-content {
   padding-bottom: 13rem;
 }
 
 html[data-cabinet-decor="halloween"] .cabinet-app-header,
-html[data-cabinet-decor="new_year"] .cabinet-app-header {
+html[data-cabinet-decor="halloween_2"] .cabinet-app-header,
+html[data-cabinet-decor="new_year"] .cabinet-app-header,
+html[data-cabinet-decor="new_year_2"] .cabinet-app-header {
   overflow: visible;
 }
 
@@ -369,8 +375,10 @@ html[data-cabinet-decor="new_year"] .cabinet-app-header {
     max-height: 120px;
   }
 
-  html[data-cabinet-decor="halloween"] .cabinet-shell > .relative.z-10,
-  html[data-cabinet-decor="new_year"] .cabinet-shell > .relative.z-10 {
+  html[data-cabinet-decor="halloween"] .cabinet-shell-content,
+  html[data-cabinet-decor="halloween_2"] .cabinet-shell-content,
+  html[data-cabinet-decor="new_year"] .cabinet-shell-content,
+  html[data-cabinet-decor="new_year_2"] .cabinet-shell-content {
     padding-bottom: calc(8.5rem + var(--cabinet-bottom-nav-h, 0px));
   }
 }

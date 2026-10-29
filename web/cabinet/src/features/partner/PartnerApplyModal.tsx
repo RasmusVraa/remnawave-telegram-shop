@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { api, ApiError, type PartnerApplication } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -66,6 +67,13 @@ export function PartnerApplyModal({
     },
   })
 
+  const drag = useSheetDragDismiss<HTMLDivElement, HTMLButtonElement>({
+    open,
+    onDismiss: onClose,
+    desktopQuery: '(min-width: 768px)',
+    disabled: apply.isPending,
+  })
+
   // Въезд снизу отыгрывается кадром позже: без этого браузер применит конечное
   // состояние сразу и перехода видно не будет.
   useEffect(() => {
@@ -120,6 +128,7 @@ export function PartnerApplyModal({
       aria-labelledby="partner-apply-title"
     >
       <button
+        ref={drag.backdropRef}
         type="button"
         className="absolute inset-0 bg-neutral-950/65 backdrop-blur-sm dark:bg-black/70"
         aria-label={t('common.close')}
@@ -127,16 +136,21 @@ export function PartnerApplyModal({
       />
 
       <div
+        ref={drag.sheetRef}
         className={cn(
           'relative z-[1] w-full border border-border bg-card shadow-2xl transition-[transform,opacity] duration-300 ease-out motion-reduce:transition-none',
-          'max-h-[min(90dvh,680px)] overflow-y-auto rounded-t-3xl p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))]',
+          'max-h-[min(90dvh,680px)] overflow-y-auto rounded-t-3xl p-5 pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))]',
           'md:max-h-[90vh] md:w-full md:max-w-lg md:rounded-2xl md:p-7',
           entered
             ? 'translate-y-0 opacity-100 md:scale-100'
             : 'translate-y-full opacity-95 md:translate-y-2 md:scale-[0.97] md:opacity-0',
         )}
       >
-        <div className="flex items-start justify-between gap-3">
+        {/* Ручка шторки: за неё и за заголовок окно тянут вниз, чтобы закрыть. */}
+        <div className="-mx-5 -mt-5 mb-1 flex cursor-grab touch-none justify-center pb-2 pt-3 md:hidden" {...drag.handlers}>
+          <span className="h-1 w-10 rounded-full bg-muted-foreground/30" aria-hidden />
+        </div>
+        <div className="flex touch-none items-start justify-between gap-3 md:touch-auto" {...drag.handlers}>
           <h2 id="partner-apply-title" className="text-lg font-semibold tracking-tight">
             {application ? t('partnerPage.form.titleAgain') : t('partnerPage.form.title')}
           </h2>

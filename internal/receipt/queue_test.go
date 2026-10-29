@@ -29,6 +29,8 @@ func (f *fakeSender) CreateIncome(_ context.Context, _ float64, _ string, operat
 
 type fakeStore struct {
 	row *database.MoynalogReceipt
+	// taken — строку уже захватил кто-то другой.
+	taken bool
 
 	sentReceiptID string
 	markedSent    bool
@@ -47,6 +49,10 @@ func (s *fakeStore) Enqueue(_ context.Context, purchaseID int64, amount float64,
 		OperationTime: operationTime, Status: database.MoynalogReceiptPending,
 	}
 	return s.row, nil
+}
+
+func (s *fakeStore) Claim(_ context.Context, _ int64, _ time.Time) (bool, error) {
+	return !s.taken, nil
 }
 
 func (s *fakeStore) MarkSent(_ context.Context, _ int64, receiptID string) error {
@@ -246,5 +252,27 @@ func TestDisabledServiceIsSafe(t *testing.T) {
 	svc.waitInflight()
 	if err := svc.ProcessDue(context.Background()); err != nil {
 		t.Fatalf("ProcessDue на nil-сервисе вернул ошибку: %v", err)
+	}
+}
+
+// Чек, который уже отправляет другая попытка, второй раз в ФНС не уходит.
+func TestTrySendSkipsReceiptClaimedElsewhere(t *testing.T) {
+	sender := &fakeSender{}
+	store := &fakeStore{
+		taken: true,
+		row: &database.MoynalogReceipt{
+			ID: 1, PurchaseID: 1192, Amount: 147, Status: database.MoynalogReceiptPending,
+			OperationTime: time.Now(),
+		},
+	}
+	svc := newTestService(store, sender, 720*time.Hour)
+	if err := svc.ProcessDue(context.Background()); err != nil {
+		t.Fatalf("ProcessDue: %v", err)
+	}
+	if sender.calls != 0 {
+		t.Fatalf("CreateIncome called %d times for a claimed receipt, want 0", sender.calls)
+	}
+	if store.markedSent || store.attemptFailed {
+		t.Fatal("claimed receipt must not be touched")
 	}
 }

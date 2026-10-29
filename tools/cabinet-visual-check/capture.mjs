@@ -95,7 +95,7 @@ function loadPlaywright() {
   return import('playwright').catch(() => {
     console.error(
       'Не найден playwright. Поставьте его и браузер:\n' +
-        '  npm i -D playwright && npx playwright install chromium',
+        '  cd tools/cabinet-visual-check && npm ci && npx playwright install chromium',
     )
     process.exit(3)
   })

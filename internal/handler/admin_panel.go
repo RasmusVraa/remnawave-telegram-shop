@@ -90,9 +90,9 @@ func (h Handler) AdminSyncShortcutHandler(ctx context.Context, b *bot.Bot, updat
 	if update.CallbackQuery == nil || update.CallbackQuery.From.ID != config.GetAdminTelegramId() {
 		return
 	}
-	h.syncService.Sync()
 	_, _ = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: update.CallbackQuery.ID,
-		Text:            h.translation.GetText(update.CallbackQuery.From.LanguageCode, "admin_sync_done"),
+		Text:            h.syncReport(ctx, update.CallbackQuery.From.LanguageCode),
+		ShowAlert:       true,
 	})
 }

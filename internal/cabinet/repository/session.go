@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Session — модель cabinet_session.
@@ -50,7 +50,7 @@ const sessionSelectCols = "id, account_id, refresh_token_hash, refresh_token_fam
 
 func scanSession(row pgx.Row) (*Session, error) {
 	var s Session
-	var pgIP pgtype.Inet
+	var pgIP *netip.Prefix // INET; NULL — nil
 	err := row.Scan(
 		&s.ID,
 		&s.AccountID,
@@ -69,13 +69,9 @@ func scanSession(row pgx.Row) (*Session, error) {
 		}
 		return nil, fmt.Errorf("scan session: %w", err)
 	}
-	if pgIP.Status == pgtype.Present {
-		raw := pgIP.IPNet.IP
-		if len(raw) > 0 {
-			ip := make(net.IP, len(raw))
-			copy(ip, raw)
-			s.IP = &ip
-		}
+	if pgIP != nil && pgIP.Addr().IsValid() {
+		ip := net.IP(pgIP.Addr().AsSlice())
+		s.IP = &ip
 	}
 	return &s, nil
 }

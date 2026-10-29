@@ -1,0 +1,68 @@
+{
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "cryptopay": false,
+      "telegram": true,
+      "platega_sbp": true,
+      "heleket": true
+    },
+    "site_links": {
+      "privacy_policy": "https://example.com/privacy",
+      "terms_of_service": "https://example.com/terms"
+    }
+  },
+  "/me/subscription": {
+    "expire_at": "2026-12-21T12:00:00Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 3,
+    "traffic_used_gb": 0,
+    "traffic_limit_gb": 200,
+    "tariff": {
+      "id": 1,
+      "slug": "base",
+      "name": "Базовый",
+      "traffic_gb": 200,
+      "device_limit": 1
+    },
+    "hwid_extra": {
+      "enabled": true,
+      "ui_visible": true,
+      "current_limit": 2,
+      "base_limit": 1,
+      "max_limit": 10,
+      "extra_active": 1,
+      "can_increase": true,
+      "can_decrease": true,
+      "price_rub_month": 75,
+      "stars_price_month": 40,
+      "days_left": 53
+    }
+  },
+  "/me/devices": {
+    "enabled": true,
+    "device_limit": 2,
+    "connected": 1,
+    "devices": [
+      {
+        "hwid": "hwid-ios-1",
+        "platform": "ios",
+        "os_version": "18.1",
+        "device_model": "iPhone 15",
+        "created_at": "2026-08-14T10:12:00Z"
+      }
+    ]
+  },
+  "/payments/hwid/preview": {
+    "current_limit": 2,
+    "target_limit": 3,
+    "delta": 1,
+    "days_left": 53,
+    "amount_rub": 117,
+    "base_amount_rub": 133,
+    "currency": "RUB",
+    "loyalty_discount_pct": 2,
+    "promo_discount_pct": 10,
+    "total_discount_pct": 12
+  }
+}

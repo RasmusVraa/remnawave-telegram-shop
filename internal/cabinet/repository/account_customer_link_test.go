@@ -2,12 +2,11 @@ package repository
 
 import (
 	"errors"
+	"fmt"
 	"testing"
-)
 
-// Текст ошибки — как её отдаёт pgx/v4 при нарушении FK по account_id.
-const fkAccountErrText = `ERROR: insert or update on table "cabinet_account_customer_link" ` +
-	`violates foreign key constraint "cabinet_account_customer_link_account_id_fkey" (SQLSTATE 23503)`
+	"github.com/jackc/pgx/v5/pgconn"
+)
 
 func TestIsAccountFKViolation(t *testing.T) {
 	cases := []struct {
@@ -16,18 +15,17 @@ func TestIsAccountFKViolation(t *testing.T) {
 		want bool
 	}{
 		{"nil", nil, false},
-		{"account fk", errors.New(fkAccountErrText), true},
+		{"account fk", fmt.Errorf("create link: %w", &pgconn.PgError{
+			Code: "23503", ConstraintName: "cabinet_account_customer_link_account_id_fkey"}), true},
 		{
 			// FK по customer_id — это другой сбой, аккаунт тут ни при чём.
 			name: "customer fk",
-			err: errors.New(`ERROR: insert or update on table "cabinet_account_customer_link" ` +
-				`violates foreign key constraint "cabinet_account_customer_link_customer_id_fkey" (SQLSTATE 23503)`),
+			err:  &pgconn.PgError{Code: "23503", ConstraintName: "cabinet_account_customer_link_customer_id_fkey"},
 			want: false,
 		},
 		{
 			name: "unique violation",
-			err: errors.New(`ERROR: duplicate key value violates unique constraint ` +
-				`"cabinet_account_customer_link_account_id_key" (SQLSTATE 23505)`),
+			err:  &pgconn.PgError{Code: "23505", ConstraintName: "cabinet_account_customer_link_account_id_key"},
 			want: false,
 		},
 		{"unrelated", errors.New("connection reset by peer"), false},

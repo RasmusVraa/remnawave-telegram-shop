@@ -1,5 +1,5 @@
 import type { DecorThemeId } from './decorThemes'
-import { HolidayTrim } from './HolidayAtmosphere'
+import { holidayForTheme, HolidayTrim } from './HolidayAtmosphere'
 import { useCabinetDecorTheme } from './useCabinetDecorTheme'
 
 function NeonHeaderAccent() {
@@ -15,7 +15,8 @@ export function CabinetDecorHeader({ theme: themeProp }: { theme?: DecorThemeId 
   const fromHook = useCabinetDecorTheme()
   const theme = themeProp ?? fromHook
 
-  if (theme === 'halloween' || theme === 'new_year') return <HolidayTrim theme={theme} />
+  const holiday = holidayForTheme(theme)
+  if (holiday) return <HolidayTrim theme={holiday} />
   if (theme === 'neon') return <NeonHeaderAccent />
   return null
 }

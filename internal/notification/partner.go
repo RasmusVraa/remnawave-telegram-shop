@@ -175,7 +175,7 @@ func (n *PartnerNotifier) notifyPartner(ctx context.Context, customerID int64, k
 	if !config.PartnerNotifyEnabled() || customerID <= 0 {
 		return
 	}
-	go func() {
+	utils.Go("partner notify", func() {
 		// Контекст запроса умирает вместе с HTTP-ответом, а отправка живёт
 		// дольше него. WithoutCancel сохраняет значения (трассировку), но
 		// отвязывает отмену.
@@ -202,15 +202,15 @@ func (n *PartnerNotifier) notifyPartner(ctx context.Context, customerID int64, k
 			return
 		}
 		n.send(ctx, customer.TelegramID, 0, text, n.partnerMarkup(lang), "partner")
-	}()
+	})
 }
 
 func (n *PartnerNotifier) deliver(ctx context.Context, chatID int64, threadID int, text string, markup models.ReplyMarkup, audience string) {
-	go func() {
+	utils.Go("partner notify deliver", func() {
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
 		defer cancel()
 		n.send(ctx, chatID, threadID, text, markup, audience)
-	}()
+	})
 }
 
 func (n *PartnerNotifier) send(ctx context.Context, chatID int64, threadID int, text string, markup models.ReplyMarkup, audience string) {

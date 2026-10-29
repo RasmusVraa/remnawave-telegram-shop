@@ -11,6 +11,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -41,6 +42,9 @@ type cabinet struct {
 	publicURL      *url.URL
 	publicURLRaw   string
 	allowedOrigins []string
+	// trustedProxies — прокси сверх loopback и частных сетей, которым верим
+	// в X-Forwarded-For (CABINET_TRUSTED_PROXIES).
+	trustedProxies []netip.Prefix
 	cookieDomain   string
 
 	jwtSecret         []byte
@@ -121,6 +125,10 @@ func PublicURL() string { return conf.publicURLRaw }
 
 // AllowedOrigins — whitelist для CORS.
 func AllowedOrigins() []string { return conf.allowedOrigins }
+
+// TrustedProxies — диапазоны из CABINET_TRUSTED_PROXIES (без loopback/частных сетей,
+// им middleware.ClientIP верит всегда).
+func TrustedProxies() []netip.Prefix { return conf.trustedProxies }
 
 // CookieDomain — домен refresh-cookie. Если был пуст в env, подставляется host из CABINET_PUBLIC_URL.
 func CookieDomain() string { return conf.cookieDomain }
@@ -342,6 +350,8 @@ func InitConfig() {
 		}
 	}
 
+	conf.trustedProxies = mustParseTrustedProxies(os.Getenv("CABINET_TRUSTED_PROXIES"))
+
 	// Cookie domain. Если пусто — берём host из публичного URL.
 	conf.cookieDomain = strings.TrimSpace(os.Getenv("CABINET_COOKIE_DOMAIN"))
 	if conf.cookieDomain == "" {
@@ -547,7 +557,7 @@ func resolveBrandLogoFile(raw string) string {
 	}
 	try := func(abs string) string {
 		abs = filepath.Clean(abs)
-		st, err := os.Stat(abs)
+		st, err := os.Stat(abs) //nolint:gosec // G703: путь к логотипу задаёт администратор в env
 		if err != nil || st.IsDir() {
 			return ""
 		}
@@ -610,4 +620,28 @@ func envBool(key string, def bool) bool {
 		return def
 	}
 	return v == "true" || v == "1" || v == "yes" || v == "on"
+}
+
+// mustParseTrustedProxies разбирает список CIDR или адресов через запятую.
+// Опечатка здесь — либо обход лимитов, либо общий лимит на всех клиентов,
+// поэтому кривое значение останавливает старт, а не игнорируется молча.
+func mustParseTrustedProxies(raw string) []netip.Prefix {
+	var out []netip.Prefix
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(item); err == nil {
+			out = append(out, p.Masked())
+			continue
+		}
+		ip, err := netip.ParseAddr(item)
+		if err != nil {
+			panic(fmt.Sprintf("CABINET_TRUSTED_PROXIES: %q is neither a CIDR nor an IP address", item))
+		}
+		ip = ip.Unmap()
+		out = append(out, netip.PrefixFrom(ip, ip.BitLen()))
+	}
+	return out
 }

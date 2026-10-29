@@ -1,0 +1,122 @@
+{
+  "/auth/bootstrap": {
+    "support_chat_enabled": true,
+    "site_links": {}
+  },
+  "/support/summary": {
+    "has_open_ticket": true,
+    "ticket_status": "open",
+    "unread_count": 0
+  },
+  "/support/conversation": {
+    "has_open_ticket": true,
+    "ticket_status": "open",
+    "unread_count": 0,
+    "support_typing": true,
+    "messages": [
+      {
+        "id": 1,
+        "direction": "in",
+        "text": "Не подключается VPN на телефоне",
+        "delivery_status": "sent",
+        "created_at": "2026-10-24T09:00:00Z"
+      },
+      {
+        "id": 2,
+        "direction": "out",
+        "text": "Откройте приложение и нажмите «Обновить подписку».",
+        "created_at": "2026-10-24T09:00:30Z"
+      },
+      {
+        "id": 3,
+        "direction": "in",
+        "text": "Нажал, всё равно не работает",
+        "delivery_status": "sent",
+        "created_at": "2026-10-24T09:02:00Z"
+      }
+    ]
+  },
+  "/content/faq": {
+    "support": {
+      "title": "Поддержка",
+      "description": "Если у вас возникли вопросы или проблемы с подключением, наша поддержка поможет их решить.",
+      "primary_button": "Написать в поддержку",
+      "extra_links": []
+    },
+    "info": {
+      "title": "Информация",
+      "tabs": [
+        {
+          "id": "faq",
+          "label": "FAQ"
+        },
+        {
+          "id": "documents",
+          "label": "Документы"
+        },
+        {
+          "id": "status",
+          "label": "Статус"
+        }
+      ],
+      "documents": [
+        {
+          "label": "Публичная оферта",
+          "link_key": "public_offer"
+        },
+        {
+          "label": "Политика конфиденциальности",
+          "link_key": "privacy_policy"
+        },
+        {
+          "label": "Пользовательское соглашение",
+          "link_key": "terms_of_service"
+        }
+      ],
+      "useful_links": [
+        {
+          "label": "Новости",
+          "link_key": "channel"
+        },
+        {
+          "label": "Отзывы",
+          "link_key": "feedback"
+        }
+      ],
+      "status": {
+        "title": "Статус сервисов",
+        "description": "Проверяйте актуальное состояние платформы и доступность узлов в реальном времени.",
+        "button": "Открыть статус"
+      }
+    },
+    "faq": [
+      {
+        "id": "connect-vpn",
+        "question": "Как подключить VPN?",
+        "answer_md": "Откройте **видеоинструкцию** и выполните шаги настройки.\n\n1. Установите приложение.\n2. Откройте раздел подключения.\n3. Импортируйте подписку и проверьте соединение.",
+        "link_key": "video_guide"
+      },
+      {
+        "id": "pay-subscription",
+        "question": "Как оплатить подписку?",
+        "answer_md": "Перейдите в `Тарифы` и выберите период. Доступные способы оплаты отображаются автоматически по настройкам сервера.\n\nПосле оплаты активация обычно занимает несколько секунд."
+      },
+      {
+        "id": "select-server",
+        "question": "Как выбрать сервер?",
+        "answer_md": "Рекомендации по выбору локации доступны в отдельной инструкции.",
+        "link_key": "server_selection"
+      },
+      {
+        "id": "subscription-not-active",
+        "question": "Пополнил баланс, а подписка не работает",
+        "answer_md": "Откройте страницу статуса платежа и убедитесь, что оплата подтверждена.\n\nЕсли статус не обновляется — напишите в поддержку и укажите время оплаты."
+      },
+      {
+        "id": "remove-device",
+        "question": "Как удалить устройство из подписки?",
+        "answer_md": "Зайдите в раздел `Подключения` и удалите лишнее устройство.\n\nЕсли лимит не освобождается — обратитесь в поддержку."
+      }
+    ]
+  }
+}

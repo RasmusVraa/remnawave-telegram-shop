@@ -254,7 +254,7 @@ func (h *CabinetActivityHandler) GetReferrals(w http.ResponseWriter, r *http.Req
 		resp.ReferralScaleByMonths = config.ReferralScaleByMonths()
 	}
 
-	if u := telegramBotStartURL(config.BotURL(), tg); u != "" {
+	if u := utils.ReferralStartURL(config.BotURL(), tg); u != "" {
 		resp.BotStartLink = u
 	}
 	if h.publicURL != "" {
@@ -263,25 +263,6 @@ func (h *CabinetActivityHandler) GetReferrals(w http.ResponseWriter, r *http.Req
 
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, resp)
-}
-
-func telegramBotStartURL(botURL string, referrerTelegramID int64) string {
-	botURL = strings.TrimSpace(botURL)
-	if botURL == "" || referrerTelegramID == 0 {
-		return ""
-	}
-	// Ожидаем https://t.me/MyBot или @MyBot
-	u := strings.TrimRight(botURL, "/")
-	if strings.HasPrefix(u, "https://t.me/") {
-		return u + "?start=ref_" + strconv.FormatInt(referrerTelegramID, 10)
-	}
-	if strings.HasPrefix(u, "http://t.me/") {
-		return u + "?start=ref_" + strconv.FormatInt(referrerTelegramID, 10)
-	}
-	if strings.HasPrefix(u, "@") {
-		return "https://t.me/" + strings.TrimPrefix(u, "@") + "?start=ref_" + strconv.FormatInt(referrerTelegramID, 10)
-	}
-	return ""
 }
 
 type purchaseRowDTO struct {

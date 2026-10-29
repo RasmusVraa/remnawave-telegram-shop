@@ -16,11 +16,14 @@ import type {
   AdminBroadcastMediaDTO,
   AdminBroadcastPreviewDTO,
   AdminBroadcastSendDTO,
+  AdminBroadcastHistoryDTO,
+  AdminBroadcastHistoryItemDTO,
   AdminCustomerDTO,
   AdminFortuneStatsDTO,
   AdminLoyaltyStatsDTO,
   AdminLoyaltyTierDTO,
   AdminOkDTO,
+  AdminSyncStatusDTO,
   AdminPaymentsDTO,
   AdminPaymentsListDTO,
   AdminPaymentDetailDTO,
@@ -173,9 +176,11 @@ export interface AuthBootstrapResponse {
     | 'slate'
     | 'carbon'
     | 'new_year'
+    | 'new_year_2'
     | 'summer'
     | 'neon'
     | 'halloween'
+    | 'halloween_2'
     | 'valentine'
     | 'spring'
     | 'black_friday'
@@ -430,6 +435,8 @@ export interface SubscriptionHwidExtraInfo {
   price_rub_month: number
   stars_price_month: number
   days_left: number
+  /** Лимит закреплён админом: докупки и уменьшения нет. */
+  pinned?: boolean
 }
 
 export interface SubscriptionResponse {
@@ -451,6 +458,18 @@ export interface SubscriptionResponse {
   loyalty_xp: number
   loyalty_tier: string | null
   hwid_extra?: SubscriptionHwidExtraInfo | null
+  /** Когда клиент последний раз сбрасывал ссылку подписки. */
+  link_reset_at?: string | null
+  /** С какого момента сброс снова доступен — только пока идёт пауза. */
+  link_reset_available_at?: string | null
+}
+
+/** POST /me/subscription/reset-link */
+export interface ResetSubscriptionLinkResponse {
+  ok: boolean
+  subscription_link: string
+  /** false — ссылка новая, но список устройств панель не очистила. */
+  devices_cleared: boolean
 }
 
 /** GET /payments/hwid/preview */
@@ -793,6 +812,8 @@ export interface SupportSummaryResponse {
 }
 
 export interface SupportConversationResponse extends SupportSummaryResponse {
+  /** ИИ саппорт-бота готовит ответ — показываем «печатает…». */
+  support_typing?: boolean
   messages: SupportMessageDTO[]
 }
 
@@ -1070,8 +1091,12 @@ export const api = {
       ...(referralCode ? { referral_code: referralCode } : {}),
     }),
 
-  confirmEmail: (token: string) =>
-    request<AuthTokenResponse>('POST', '/auth/email/verify/confirm', { token }),
+  /**
+   * Код из шести цифр бэкенд проверяет только против кода одного аккаунта:
+   * по email, а без него — по сессии залогиненного пользователя.
+   */
+  confirmEmail: (token: string, email?: string) =>
+    request<AuthTokenResponse>('POST', '/auth/email/verify/confirm', email ? { token, email } : { token }),
 
   resendVerifyEmail: () =>
     request<void>('POST', '/me/email/verify/resend'),
@@ -1260,6 +1285,13 @@ export const api = {
 
   deleteDevice: (hwid: string) =>
     request<{ ok: boolean }>('POST', '/me/devices/delete', { hwid }),
+
+  /**
+   * Новая ссылка подписки: старая и все конфиги по ней перестают работать,
+   * устройства отвязываются. 429 {error:'cooldown', available_at} — пауза.
+   */
+  resetSubscriptionLink: () =>
+    request<ResetSubscriptionLinkResponse>('POST', '/me/subscription/reset-link'),
 
   /** Пустое name сбрасывает название к исходному из Remnawave. */
   renameDevice: (hwid: string, name: string) =>
@@ -1462,6 +1494,9 @@ export const api = {
     request<AdminOkDTO>('DELETE', `/admin/users/${id}/devices/${encodeURIComponent(hwid)}`),
   adminUserExtraHwid: (id: number, delta: number) =>
     request<AdminOkDTO>('POST', `/admin/users/${id}/extra-hwid`, { delta }),
+  /** limit = null снимает закрепление и возвращает расчётный лимит. */
+  adminUserSetHwidPin: (id: number, limit: number | null) =>
+    request<AdminCustomerDTO>('PUT', `/admin/users/${id}/hwid-pin`, { limit }),
 
   adminSquads: () => request<{ items: { uuid: string; name: string }[] }>('GET', '/admin/squads'),
 
@@ -1625,7 +1660,8 @@ export const api = {
   adminBroadcastTariffs: () =>
     request<{ tariffs: { id: number; name: string; slug: string }[] }>('GET', '/admin/broadcast/tariffs'),
   adminBroadcastPreview: (body: {
-    audience: string
+    /** Выбранные сегменты; сервер считает людей без повторов. */
+    audiences: string[]
     tariff_id?: number | null
     text?: string
   }) => request<AdminBroadcastPreviewDTO>('POST', '/admin/broadcast/preview', body),
@@ -1651,7 +1687,8 @@ export const api = {
     return res.json() as Promise<AdminBroadcastMediaDTO>
   },
   adminBroadcastSend: (body: {
-    audience: string
+    /** Выбранные сегменты; человек из нескольких получит сообщение один раз. */
+    audiences: string[]
     tariff_id?: number | null
     text: string
     buttons?: {
@@ -1659,13 +1696,24 @@ export const api = {
       connect?: boolean
       promo?: boolean
       main_menu?: boolean
+      /** «Пригласить друга» с личной реферальной ссылкой получателя. */
+      share_referral?: boolean
       links?: string[]
     }
     media?: {
       file_id: string
       kind: string
+      /** Имя файла — только для истории рассылок. */
+      name?: string
     } | null
   }) => request<AdminBroadcastSendDTO>('POST', '/admin/broadcast/send', body),
+  adminBroadcastHistory: (params: { limit: number; offset: number }) =>
+    request<AdminBroadcastHistoryDTO>(
+      'GET',
+      `/admin/broadcast/history?limit=${params.limit}&offset=${params.offset}`,
+    ),
+  adminBroadcastHistoryItem: (id: number) =>
+    request<AdminBroadcastHistoryItemDTO>('GET', `/admin/broadcast/history/${id}`),
 
   adminInfraNodes: () => request<AdminInfraNodesDTO>('GET', '/admin/infra/nodes'),
   adminInfraCreateNode: (body: { provider_uuid: string; node_uuid: string; next_billing_at?: string }) =>
@@ -1735,7 +1783,8 @@ export const api = {
   adminBotSettingsPatch: (body: { settings: Record<string, string> }) =>
     request<AdminBotSettingsPatchDTO>('PATCH', '/admin/settings', body),
 
-  adminSync: () => request<AdminOkDTO>('POST', '/admin/sync'),
+  adminSync: () => request<AdminSyncStatusDTO>('POST', '/admin/sync'),
+  adminSyncStatus: () => request<AdminSyncStatusDTO>('GET', '/admin/sync'),
 
   // Link / Merge
   linkTelegramStart: () =>

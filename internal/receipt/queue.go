@@ -27,6 +27,10 @@ import (
 // Не уложились — чек останется pending и уйдёт через воркер.
 const submitSendTimeout = 2 * time.Minute
 
+// claimLease — на сколько чек захватывается на одну попытку. Больше
+// submitSendTimeout: попытка успевает закончиться, пока захват действует.
+const claimLease = submitSendTimeout + time.Minute
+
 // incomeSender — часть API «Мой налог», нужная очереди (для подмены в тестах).
 type incomeSender interface {
 	CreateIncome(ctx context.Context, amount float64, description string, operationTime time.Time) (string, error)
@@ -36,6 +40,7 @@ type incomeSender interface {
 // проверять тестами без живой базы. Реализуется database.MoynalogReceiptRepository.
 type receiptStore interface {
 	Enqueue(ctx context.Context, purchaseID int64, amount float64, description string, operationTime time.Time) (*database.MoynalogReceipt, error)
+	Claim(ctx context.Context, id int64, leaseUntil time.Time) (bool, error)
 	MarkSent(ctx context.Context, id int64, receiptID string) error
 	MarkAttemptFailed(ctx context.Context, id int64, sendErr string, nextAttemptAt time.Time) error
 	MarkFailed(ctx context.Context, id int64, sendErr string) error
@@ -157,12 +162,12 @@ func (s *Service) Submit(ctx context.Context, purchase *database.Purchase, descr
 	// без его отмены. Свой таймаут — чтобы горутина не жила вечно.
 	queued := *row
 	s.inflight.Add(1)
-	go func() {
+	utils.Go("moynalog receipt send", func() {
 		defer s.inflight.Done()
 		bgCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), submitSendTimeout)
 		defer cancel()
 		s.trySend(bgCtx, queued)
-	}()
+	})
 }
 
 // ProcessDue — тик воркера: отправляет чеки, которым пора на повтор.
@@ -187,13 +192,27 @@ func (s *Service) ProcessDue(ctx context.Context) error {
 			return ctx.Err()
 		default:
 		}
-		s.trySend(ctx, rows[i])
+		// Попытка не дольше захвата строки — иначе её мог бы взять следующий тик.
+		sendCtx, cancel := context.WithTimeout(ctx, submitSendTimeout)
+		s.trySend(sendCtx, rows[i])
+		cancel()
 	}
 	return nil
 }
 
 // trySend — одна попытка отправки с обновлением состояния строки.
 func (s *Service) trySend(ctx context.Context, r database.MoynalogReceipt) {
+	claimed, err := s.repo.Claim(ctx, r.ID, time.Now().Add(claimLease))
+	if err != nil {
+		slog.Error("moynalog queue: claim receipt", "error", err, "receipt_row_id", r.ID)
+		return
+	}
+	if !claimed {
+		// Чек уже отправляет фоновая отправка после оплаты или прошлый тик.
+		slog.Debug("moynalog queue: receipt is being sent elsewhere, skipping", "receipt_row_id", r.ID)
+		return
+	}
+
 	receiptID, err := s.client.CreateIncome(ctx, r.Amount, r.Description, r.OperationTime)
 	if err == nil {
 		if markErr := s.repo.MarkSent(ctx, r.ID, receiptID); markErr != nil {

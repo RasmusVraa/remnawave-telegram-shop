@@ -41,7 +41,9 @@ func (c *Client) WebHookHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second*60)
 		defer cancel()
-		body, err := io.ReadAll(r.Body)
+		// Уведомление Tribute — несколько килобайт. Без лимита любой мог
+		// прислать гигабайтное тело и держать его в памяти целиком.
+		body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 64<<10))
 		if err != nil {
 			slog.Error("webhook: read body error", "error", err)
 			http.Error(w, "invalid body", http.StatusBadRequest)

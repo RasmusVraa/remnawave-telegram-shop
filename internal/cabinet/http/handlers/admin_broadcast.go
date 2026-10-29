@@ -3,6 +3,8 @@ package handlers
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"mime"
@@ -10,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -17,6 +20,7 @@ import (
 	"remnawave-tg-shop-bot/internal/broadcast"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
+	"remnawave-tg-shop-bot/utils"
 )
 
 // Потолок загрузки. 50 MiB — предел Bot API на отправку файла ботом; меньше
@@ -48,6 +52,7 @@ func releaseBroadcastSend() {
 type AdminBroadcastHandler struct {
 	customers *database.CustomerRepository
 	tariffs   *database.TariffRepository
+	history   *database.BroadcastRepository
 	sender    *broadcast.Sender
 	bot       *bot.Bot
 }
@@ -55,12 +60,14 @@ type AdminBroadcastHandler struct {
 func NewAdminBroadcast(
 	customers *database.CustomerRepository,
 	tariffs *database.TariffRepository,
+	history *database.BroadcastRepository,
 	sender *broadcast.Sender,
 	tgBot *bot.Bot,
 ) *AdminBroadcastHandler {
 	return &AdminBroadcastHandler{
 		customers: customers,
 		tariffs:   tariffs,
+		history:   history,
 		sender:    sender,
 		bot:       tgBot,
 	}
@@ -81,15 +88,6 @@ var broadcastAudienceValues = []string{
 	database.BroadcastAudienceInactiveAll,
 	database.BroadcastAudienceInactivePaid,
 	database.BroadcastAudienceInactiveTrial,
-}
-
-func isValidBroadcastAudience(audience string) bool {
-	for _, aud := range broadcastAudienceValues {
-		if aud == audience {
-			return true
-		}
-	}
-	return false
 }
 
 // Audiences returns available broadcast segments with recipient counts.
@@ -118,25 +116,33 @@ func (h *AdminBroadcastHandler) Audiences(w http.ResponseWriter, r *http.Request
 }
 
 type broadcastButtonsReq struct {
-	Buy      bool     `json:"buy"`
-	Connect  bool     `json:"connect"`
-	Promo    bool     `json:"promo"`
-	MainMenu bool     `json:"main_menu"`
-	Links    []string `json:"links,omitempty"`
+	Buy      bool `json:"buy"`
+	Connect  bool `json:"connect"`
+	Promo    bool `json:"promo"`
+	MainMenu bool `json:"main_menu"`
+	// ShareReferral — «Пригласить друга» с личной реферальной ссылкой получателя.
+	ShareReferral bool     `json:"share_referral"`
+	Links         []string `json:"links,omitempty"`
 }
 
 type broadcastMediaReq struct {
 	FileID string `json:"file_id"`
 	// photo | video | document — что вернул upload-media.
 	Kind string `json:"kind"`
+	// Name — имя файла у админа, только для истории рассылок.
+	Name string `json:"name,omitempty"`
 }
 
 type broadcastSendReq struct {
-	Audience string               `json:"audience"`
-	TariffID *int64               `json:"tariff_id,omitempty"`
-	Text     string               `json:"text"`
-	Buttons  *broadcastButtonsReq `json:"buttons,omitempty"`
-	Media    *broadcastMediaReq   `json:"media,omitempty"`
+	// Audiences — выбранные сегменты; человек из нескольких получит сообщение
+	// один раз. Audience — прежнее поле для одного сегмента: его шлёт кабинет
+	// старой сборки, пока у админа не обновилась вкладка.
+	Audiences []string             `json:"audiences,omitempty"`
+	Audience  string               `json:"audience,omitempty"`
+	TariffID  *int64               `json:"tariff_id,omitempty"`
+	Text      string               `json:"text"`
+	Buttons   *broadcastButtonsReq `json:"buttons,omitempty"`
+	Media     *broadcastMediaReq   `json:"media,omitempty"`
 }
 
 func (req *broadcastSendReq) normalize() {
@@ -171,6 +177,28 @@ func (req *broadcastSendReq) invalidLinkKeys() []string {
 	return bad
 }
 
+// resolveAudiences — сегменты запроса в нормальном виде. При ошибке сам
+// отвечает клиенту 400 и возвращает ok = false.
+func (req *broadcastSendReq) resolveAudiences(w http.ResponseWriter) (audiences []string, ok bool) {
+	list := req.Audiences
+	if len(list) == 0 && req.Audience != "" {
+		list = []string{req.Audience}
+	}
+	audiences, err := database.NormalizeBroadcastAudiences(list)
+	switch {
+	case errors.Is(err, database.ErrBroadcastTestCombined):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return nil, false
+	case err != nil:
+		http.Error(w, "invalid audience", http.StatusBadRequest)
+		return nil, false
+	case len(audiences) == 0:
+		http.Error(w, "audience required", http.StatusBadRequest)
+		return nil, false
+	}
+	return audiences, true
+}
+
 func (req *broadcastSendReq) hasContent() bool {
 	return req.Text != "" || req.Media != nil
 }
@@ -180,11 +208,12 @@ func (req *broadcastSendReq) recipientButtons() broadcast.RecipientButtons {
 		return broadcast.RecipientButtons{}
 	}
 	return broadcast.RecipientButtons{
-		Buy:      req.Buttons.Buy,
-		Connect:  req.Buttons.Connect,
-		Promo:    req.Buttons.Promo,
-		MainMenu: req.Buttons.MainMenu,
-		Links:    broadcast.NormalizeCabinetLinkKeys(req.Buttons.Links),
+		Buy:           req.Buttons.Buy,
+		Connect:       req.Buttons.Connect,
+		Promo:         req.Buttons.Promo,
+		MainMenu:      req.Buttons.MainMenu,
+		ShareReferral: req.Buttons.ShareReferral,
+		Links:         broadcast.NormalizeCabinetLinkKeys(req.Buttons.Links),
 	}
 }
 
@@ -218,16 +247,12 @@ func (h *AdminBroadcastHandler) Preview(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	req.normalize()
-	if req.Audience == "" {
-		http.Error(w, "audience required", http.StatusBadRequest)
-		return
-	}
-	if !isValidBroadcastAudience(req.Audience) {
-		http.Error(w, "invalid audience", http.StatusBadRequest)
+	audiences, ok := req.resolveAudiences(w)
+	if !ok {
 		return
 	}
 
-	recipients, err := h.customers.GetBroadcastRecipients(r.Context(), req.Audience, req.TariffID)
+	recipients, err := h.customers.GetBroadcastRecipientsForAudiences(r.Context(), audiences, req.TariffID)
 	if err != nil {
 		slog.Error("admin broadcast: preview", "error", err)
 		http.Error(w, "failed to count recipients", http.StatusInternalServerError)
@@ -235,7 +260,7 @@ func (h *AdminBroadcastHandler) Preview(w http.ResponseWriter, r *http.Request) 
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"audience":        req.Audience,
+		"audiences":       audiences,
 		"recipient_count": len(recipients),
 	})
 }
@@ -288,7 +313,7 @@ func (h *AdminBroadcastHandler) UploadMedia(w http.ResponseWriter, r *http.Reque
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, broadcastMediaMaxBytes+1024)
-	if err := r.ParseMultipartForm(broadcastMediaMaxBytes); err != nil {
+	if err := r.ParseMultipartForm(broadcastMediaMaxBytes); err != nil { //nolint:gosec // G120: тело ограничено MaxBytesReader строкой выше
 		http.Error(w, "invalid multipart form", http.StatusBadRequest)
 		return
 	}
@@ -417,12 +442,8 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	req.normalize()
-	if req.Audience == "" {
-		http.Error(w, "audience required", http.StatusBadRequest)
-		return
-	}
-	if !isValidBroadcastAudience(req.Audience) {
-		http.Error(w, "invalid audience", http.StatusBadRequest)
+	audiences, ok := req.resolveAudiences(w)
+	if !ok {
 		return
 	}
 	if !req.hasContent() {
@@ -434,14 +455,14 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	recipients, err := h.customers.GetBroadcastRecipients(r.Context(), req.Audience, req.TariffID)
+	recipients, err := h.customers.GetBroadcastRecipientsForAudiences(r.Context(), audiences, req.TariffID)
 	if err != nil {
 		slog.Error("admin broadcast: send", "error", err)
 		http.Error(w, "failed to get recipients", http.StatusInternalServerError)
 		return
 	}
 	if len(recipients) == 0 {
-		if req.Audience == database.BroadcastAudienceTestBroadcast {
+		if audiences[0] == database.BroadcastAudienceTestBroadcast {
 			// Тестовая рассылка идёт админу — пустой список значит только одно.
 			http.Error(w, "test broadcast requires ADMIN_TELEGRAM_ID", http.StatusBadRequest)
 			return
@@ -455,10 +476,43 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 	}
 
 	adminID := config.GetAdminTelegramId()
-	payload := req
 	recipientCount := len(recipients)
+	msg := broadcast.Message{
+		Text: req.Text,
+		/*
+		 * Редактор web-админки вставляет теги Telegram HTML (<b>, <i>,
+		 * <a href>), и без ParseMode они уходили получателю как обычный
+		 * текст: человек видел «<b>Заголовок</b>» вместо жирного.
+		 *
+		 * Entities здесь не передаём: Bot API принимает либо разметку,
+		 * либо готовые entities, и второе — способ рассылки из
+		 * Telegram-админки, где они копируются из сообщения админа.
+		 */
+		ParseMode: models.ParseModeHTML,
+		Media:     req.recipientMedia(),
+		Buttons:   req.recipientButtons(),
+	}
+	opts := broadcast.SendOptions{Source: database.BroadcastSourceCabinet}
+	if req.Media != nil {
+		opts.MediaName = strings.TrimSpace(req.Media.Name)
+	}
 
-	go func() {
+	/*
+	 * Запись истории заводим здесь, а не в фоне: её id уходит в ответ, и по
+	 * нему страница рассылки показывает ход и итог. Не завелась — рассылка
+	 * всё равно уходит, просто без карточки итога в кабинете.
+	 */
+	if h.history != nil {
+		rec := broadcast.HistoryRecord(opts.Source, audiences, req.TariffID, msg, opts.MediaName)
+		rec.Total = recipientCount
+		id, err := h.history.Create(r.Context(), rec)
+		if err != nil {
+			slog.Warn("admin broadcast: history create", "error", err)
+		}
+		opts.BroadcastID = id
+	}
+
+	utils.Go("cabinet broadcast", func() {
 		defer releaseBroadcastSend()
 		ctx := context.Background()
 		if adminID != 0 {
@@ -467,25 +521,11 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 				Text:   "⏳ Рассылка из web-админки запущена. Ожидайте итоговое сообщение…",
 			})
 		}
-		h.sender.Send(ctx, h.bot, adminID, payload.Audience, payload.TariffID, broadcast.Message{
-			Text: payload.Text,
-			/*
-			 * Редактор web-админки вставляет теги Telegram HTML (<b>, <i>,
-			 * <a href>), и без ParseMode они уходили получателю как обычный
-			 * текст: человек видел «<b>Заголовок</b>» вместо жирного.
-			 *
-			 * Entities здесь не передаём: Bot API принимает либо разметку,
-			 * либо готовые entities, и второе — способ рассылки из
-			 * Telegram-админки, где они копируются из сообщения админа.
-			 */
-			ParseMode: models.ParseModeHTML,
-			Media:     payload.recipientMedia(),
-			Buttons:   payload.recipientButtons(),
-		})
-	}()
+		h.sender.Send(ctx, h.bot, adminID, audiences, req.TariffID, msg, opts)
+	})
 
 	slog.Info("admin broadcast: send started",
-		"audience", req.Audience,
+		"audiences", audiences,
 		"recipients", recipientCount,
 		"text_len", len(req.Text),
 		"has_media", req.Media != nil,
@@ -494,7 +534,122 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"status":          "started",
 		"recipient_count": recipientCount,
+		// 0 — история не записалась; кабинет тогда просто не покажет ход.
+		"broadcast_id": opts.BroadcastID,
 	})
+}
+
+// broadcastHistoryResp — рассылка в истории, как её видит кабинет.
+type broadcastHistoryResp struct {
+	ID        int64    `json:"id"`
+	Source    string   `json:"source"`
+	Audiences []string `json:"audiences"`
+	TariffID  *int64   `json:"tariff_id"`
+	Text      string   `json:"text"`
+	// parse_mode пустой — текст без разметки (рассылка из Telegram-админки).
+	ParseMode   string          `json:"parse_mode"`
+	MediaKind   string          `json:"media_kind"`
+	MediaFileID string          `json:"media_file_id"`
+	MediaName   string          `json:"media_name"`
+	Buttons     json.RawMessage `json:"buttons"`
+	Status      string          `json:"status"`
+	Total       int             `json:"total"`
+	Sent        int             `json:"sent"`
+	Blocked     int             `json:"blocked"`
+	Failed      int             `json:"failed"`
+	Error       string          `json:"error"`
+	StartedAt   time.Time       `json:"started_at"`
+	FinishedAt  *time.Time      `json:"finished_at"`
+}
+
+func toBroadcastHistoryResp(rec database.BroadcastRecord) broadcastHistoryResp {
+	buttons := rec.Buttons
+	if len(buttons) == 0 {
+		buttons = json.RawMessage(`{}`)
+	}
+	audiences := rec.Audiences
+	if audiences == nil {
+		audiences = []string{}
+	}
+	return broadcastHistoryResp{
+		ID:          rec.ID,
+		Source:      rec.Source,
+		Audiences:   audiences,
+		TariffID:    rec.TariffID,
+		Text:        rec.Text,
+		ParseMode:   rec.ParseMode,
+		MediaKind:   rec.MediaKind,
+		MediaFileID: rec.MediaFileID,
+		MediaName:   rec.MediaName,
+		Buttons:     buttons,
+		Status:      rec.Status,
+		Total:       rec.Total,
+		Sent:        rec.Sent,
+		Blocked:     rec.Blocked,
+		Failed:      rec.Failed,
+		Error:       rec.Error,
+		StartedAt:   rec.StartedAt,
+		FinishedAt:  rec.FinishedAt,
+	}
+}
+
+const (
+	broadcastHistoryDefaultLimit = 20
+	broadcastHistoryMaxLimit     = 50
+)
+
+// History — страница истории рассылок, свежие сверху.
+func (h *AdminBroadcastHandler) History(w http.ResponseWriter, r *http.Request) {
+	if h.history == nil {
+		http.Error(w, "broadcast history unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	q := r.URL.Query()
+	limit := broadcastHistoryDefaultLimit
+	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 {
+		limit = min(v, broadcastHistoryMaxLimit)
+	}
+	offset := 0
+	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v > 0 {
+		offset = v
+	}
+
+	records, total, err := h.history.List(r.Context(), limit, offset)
+	if err != nil {
+		slog.Error("admin broadcast: history list", "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	items := make([]broadcastHistoryResp, 0, len(records))
+	for _, rec := range records {
+		items = append(items, toBroadcastHistoryResp(rec))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
+}
+
+// HistoryItem — одна рассылка: по ней страница следит за ходом отправки.
+func (h *AdminBroadcastHandler) HistoryItem(w http.ResponseWriter, r *http.Request) {
+	if h.history == nil {
+		http.Error(w, "broadcast history unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	raw := strings.TrimPrefix(r.URL.Path, "/cabinet/api/admin/broadcast/history/")
+	id, err := strconv.ParseInt(strings.Trim(raw, "/"), 10, 64)
+	if err != nil || id <= 0 {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	rec, err := h.history.Get(r.Context(), id)
+	if err != nil {
+		slog.Error("admin broadcast: history item", "id", id, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if rec == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	writeJSON(w, http.StatusOK, toBroadcastHistoryResp(*rec))
 }
 
 // CountByAudience is a helper endpoint to count for specific audience via query param.

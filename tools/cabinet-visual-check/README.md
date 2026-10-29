@@ -25,6 +25,13 @@ node tools/cabinet-visual-check/capture.mjs \
 
 Снимки лягут в `--out` с именами `<тема>-<ширина>-<шаг>.png`.
 
+## Скриншоты к релизу
+
+`release-shots.mjs` — те же снимки, но с жёлтой рамкой и подписью на изменённом
+месте; складываются в `release-screenshots/`, откуда `tools/release` отправляет
+их альбомом к посту. Сценарии внутри — под конкретный релиз, порядок — в скилле
+релиза (`.claude/skills/release-github-telegram/SKILL.md`).
+
 ## Ключи
 
 | Ключ | По умолчанию | Что делает |
@@ -72,10 +79,12 @@ Recharts переизмеряет ширину, когда Playwright растя
 
 ## Требования
 
-Playwright с браузером:
+Playwright с браузером. Он прописан в `package.json` этого каталога, а не в
+кабинете: в сборку фронтенда и в Docker-образ он не попадает. Один раз после
+клона:
 
 ```bash
-npm i -D playwright && npx playwright install chromium
+cd tools/cabinet-visual-check && npm ci && npx playwright install chromium
 ```
 
 В Git Bash на Windows аргумент вида `/cabinet/...` MSYS разворачивает в путь

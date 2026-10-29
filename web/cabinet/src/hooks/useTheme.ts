@@ -2,20 +2,25 @@ import { useEffect, useState } from 'react'
 
 type Theme = 'dark' | 'light'
 
-function getInitialTheme(): Theme {
-  const saved = localStorage.getItem('cab_theme') as Theme | null
-  if (saved) return saved
-  return 'dark'
+function readSavedTheme(): Theme {
+  return localStorage.getItem('cab_theme') === 'light' ? 'light' : 'dark'
 }
 
-function applyTheme(theme: Theme) {
+const getInitialTheme = readSavedTheme
+
+/** Только классы на <html>, без сохранения выбора (принудительная тёмная у праздничных тем). */
+function setThemeClass(theme: Theme) {
   const root = document.documentElement
   root.classList.toggle('dark', theme === 'dark')
   root.classList.toggle('light', theme === 'light')
+}
+
+function applyTheme(theme: Theme) {
+  setThemeClass(theme)
   localStorage.setItem('cab_theme', theme)
 }
 
-export { applyTheme }
+export { applyTheme, readSavedTheme, setThemeClass }
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>(getInitialTheme)

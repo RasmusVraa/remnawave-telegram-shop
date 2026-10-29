@@ -5,10 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
@@ -22,15 +23,25 @@ var (
 	ErrSupportBridge     = errors.New("support bridge failed")
 )
 
+// supportTypingTTL — сколько держим «печатает…» после события typing от саппорт-бота.
+// Бот шлёт его каждые ~5 с, пока ИИ ждёт паузы клиента и думает; запас покрывает
+// задержки сети. Если бот замолк (ответ отменили, тикет ушёл людям), статус гаснет сам.
+const supportTypingTTL = 12 * time.Second
+
 type Support struct {
-	repo      *repository.SupportRepo
-	accounts  *repository.AccountRepo
+	repo       *repository.SupportRepo
+	accounts   *repository.AccountRepo
 	identities *repository.IdentityRepo
-	links     *repository.AccountCustomerLinkRepo
-	customers *database.CustomerRepository
-	bootstrap *bootstrap.CustomerBootstrap
-	sub       *Subscription
-	bot       *supportbot.Client
+	links      *repository.AccountCustomerLinkRepo
+	customers  *database.CustomerRepository
+	bootstrap  *bootstrap.CustomerBootstrap
+	sub        *Subscription
+	bot        *supportbot.Client
+
+	// «Печатает…» по тикетам кабинета: id тикета → до какого момента показывать.
+	// Живёт в памяти процесса — статус короткий, после рестарта бот пришлёт его снова.
+	typingMu    sync.Mutex
+	typingUntil map[int64]time.Time
 }
 
 func NewSupport(
@@ -52,6 +63,8 @@ func NewSupport(
 		bootstrap:  boot,
 		sub:        sub,
 		bot:        bot,
+
+		typingUntil: make(map[int64]time.Time),
 	}
 }
 
@@ -68,6 +81,7 @@ type SupportConversation struct {
 	HasOpenTicket bool                `json:"has_open_ticket"`
 	TicketStatus  string              `json:"ticket_status,omitempty"`
 	UnreadCount   int                 `json:"unread_count"`
+	SupportTyping bool                `json:"support_typing"`
 	Messages      []SupportMessageDTO `json:"messages"`
 }
 
@@ -133,7 +147,36 @@ func (s *Support) Conversation(ctx context.Context, accountID int64) (*SupportCo
 	for _, m := range msgs {
 		out.Messages = append(out.Messages, messageDTO(m))
 	}
+	// «Печатает…» имеет смысл, только пока последнее слово за клиентом: запоздавшее
+	// событие typing не должно висеть под уже пришедшим ответом.
+	if n := len(msgs); n > 0 && msgs[n-1].Direction == repository.SupportMsgIn {
+		out.SupportTyping = s.isTyping(ticket.ID, time.Now())
+	}
 	return out, nil
+}
+
+func (s *Support) setTyping(ticketID int64, now time.Time) {
+	s.typingMu.Lock()
+	defer s.typingMu.Unlock()
+	for id, until := range s.typingUntil {
+		if !until.After(now) {
+			delete(s.typingUntil, id)
+		}
+	}
+	s.typingUntil[ticketID] = now.Add(supportTypingTTL)
+}
+
+func (s *Support) clearTyping(ticketID int64) {
+	s.typingMu.Lock()
+	defer s.typingMu.Unlock()
+	delete(s.typingUntil, ticketID)
+}
+
+func (s *Support) isTyping(ticketID int64, now time.Time) bool {
+	s.typingMu.Lock()
+	defer s.typingMu.Unlock()
+	until, ok := s.typingUntil[ticketID]
+	return ok && until.After(now)
 }
 
 func messageDTO(m repository.SupportMessage) SupportMessageDTO {
@@ -305,6 +348,8 @@ func (s *Support) HandleWebhook(ctx context.Context, p SupportWebhookPayload) er
 		return s.webhookMessage(ctx, p)
 	case "closed":
 		return s.webhookClosed(ctx, p)
+	case "typing":
+		return s.webhookTyping(ctx, p)
 	default:
 		return ErrSupportInvalidMsg
 	}
@@ -349,6 +394,7 @@ func (s *Support) webhookMessage(ctx context.Context, p SupportWebhookPayload) e
 		if !inserted {
 			return nil
 		}
+		s.clearTyping(ticket.ID)
 		if ticket.SupportBotTicketID == nil && p.SupportBotTicketID > 0 {
 			return s.repo.UpdateSupportBotTicketIDTx(ctx, tx, ticket.ID, p.SupportBotTicketID)
 		}
@@ -371,7 +417,23 @@ func (s *Support) webhookClosed(ctx context.Context, p SupportWebhookPayload) er
 		if ticket.Status != repository.SupportTicketOpen {
 			return nil
 		}
+		s.clearTyping(ticket.ID)
 		return s.repo.CloseTicketTx(ctx, tx, ticket.ID, time.Now().UTC())
+	})
+}
+
+// webhookTyping — ИИ саппорт-бота готовит ответ по тикету: кабинет покажет «печатает…».
+func (s *Support) webhookTyping(ctx context.Context, p SupportWebhookPayload) error {
+	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+		ticket, err := s.resolveWebhookTicket(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+		if ticket.Status != repository.SupportTicketOpen {
+			return nil
+		}
+		s.setTyping(ticket.ID, time.Now())
+		return nil
 	})
 }
 

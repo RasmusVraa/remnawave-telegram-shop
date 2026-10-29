@@ -62,15 +62,17 @@ func NewAdminUsers(
 // --- DTOs -------------------------------------------------------------------
 
 type adminCustomerDTO struct {
-	ID                       int64   `json:"id"`
-	TelegramID               int64   `json:"telegram_id,string"`
-	TelegramUsername         *string `json:"telegram_username"`
-	Language                 string  `json:"language"`
-	ExpireAt                 *string `json:"expire_at"`
-	CreatedAt                string  `json:"created_at"`
-	SubscriptionLink         *string `json:"subscription_link"`
-	ExtraHwid                int     `json:"extra_hwid"`
-	ExtraHwidExpiresAt       *string `json:"extra_hwid_expires_at"`
+	ID                 int64   `json:"id"`
+	TelegramID         int64   `json:"telegram_id,string"`
+	TelegramUsername   *string `json:"telegram_username"`
+	Language           string  `json:"language"`
+	ExpireAt           *string `json:"expire_at"`
+	CreatedAt          string  `json:"created_at"`
+	SubscriptionLink   *string `json:"subscription_link"`
+	ExtraHwid          int     `json:"extra_hwid"`
+	ExtraHwidExpiresAt *string `json:"extra_hwid_expires_at"`
+	// HwidLimitOverride — закреплённый админом лимит устройств; null — не закреплён.
+	HwidLimitOverride        *int    `json:"hwid_limit_override"`
 	CurrentTariffID          *int64  `json:"current_tariff_id"`
 	SubscriptionPeriodStart  *string `json:"subscription_period_start"`
 	SubscriptionPeriodMonths *int    `json:"subscription_period_months"`
@@ -176,6 +178,10 @@ func mapCustomerToDTO(c *database.Customer) adminCustomerDTO {
 	if c.CurrentTariffID != nil {
 		id := *c.CurrentTariffID
 		dto.CurrentTariffID = &id
+	}
+	if c.HwidLimitOverride != nil {
+		v := *c.HwidLimitOverride
+		dto.HwidLimitOverride = &v
 	}
 	if c.SubscriptionPeriodStart != nil {
 		s := c.SubscriptionPeriodStart.Format(time.RFC3339)
@@ -1104,6 +1110,8 @@ func (h *AdminUsersHandler) HandleByID(w http.ResponseWriter, r *http.Request) {
 		h.SetExpire(w, r)
 	case strings.HasSuffix(path, "/hwid-limit"):
 		h.SetHwidLimit(w, r)
+	case strings.HasSuffix(path, "/hwid-pin"):
+		h.SetHwidPin(w, r)
 	case strings.HasSuffix(path, "/payments"):
 		h.Payments(w, r)
 	case strings.HasSuffix(path, "/referrals"):

@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"github.com/jackc/pgx/v4/pgxpool"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"remnawave-tg-shop-bot/internal/pgerr"
 )
 
 // Merge audit actor/result — enum значения cabinet_merge_audit.
@@ -16,9 +18,9 @@ const (
 	MergeActorSystem = "system"
 	MergeActorAdmin  = "admin"
 
-	MergeResultLinked  = "linked"
-	MergeResultMerged  = "merged"
-	MergeResultDryRun  = "dry_run"
+	MergeResultLinked   = "linked"
+	MergeResultMerged   = "merged"
+	MergeResultDryRun   = "dry_run"
 	MergeResultRejected = "rejected"
 )
 
@@ -115,7 +117,7 @@ func (r *MergeAuditRepo) Create(ctx context.Context, tx pgx.Tx, in MergeAuditCre
 	m, err := scanMergeAudit(row)
 	if err != nil {
 		// pgx wraps unique violation — проверяем текст ошибки.
-		if isUniqueViolation(err) {
+		if pgerr.IsUniqueViolation(err) {
 			return nil, ErrMergeAuditConflict
 		}
 		return nil, err
@@ -129,28 +131,4 @@ func (r *MergeAuditRepo) FindByIdempotencyKey(ctx context.Context, accountID int
 	const q = `SELECT ` + mergeAuditSelectCols +
 		` FROM cabinet_merge_audit WHERE account_id = $1 AND idempotency_key = $2`
 	return scanMergeAudit(r.pool.QueryRow(ctx, q, accountID, key))
-}
-
-// isUniqueViolation — простая проверка кода ошибки PostgreSQL 23505 (unique_violation).
-func isUniqueViolation(err error) bool {
-	if err == nil {
-		return false
-	}
-	return fmt.Sprintf("%v", err) == "" ||
-		contains(err.Error(), "23505") ||
-		contains(err.Error(), "unique_violation") ||
-		contains(err.Error(), "duplicate key")
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (s == sub || len(s) > 0 && indexStr(s, sub) >= 0)
-}
-
-func indexStr(s, sub string) int {
-	for i := 0; i <= len(s)-len(sub); i++ {
-		if s[i:i+len(sub)] == sub {
-			return i
-		}
-	}
-	return -1
 }

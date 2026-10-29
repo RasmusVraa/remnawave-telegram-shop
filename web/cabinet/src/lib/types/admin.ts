@@ -338,6 +338,8 @@ export interface AdminCustomerDTO {
   subscription_link?: string | null
   extra_hwid: number
   extra_hwid_expires_at?: string | null
+  /** Закреплённый админом лимит устройств; null — считается как обычно. */
+  hwid_limit_override?: number | null
   current_tariff_id?: number | null
   subscription_period_start?: string | null
   subscription_period_months?: number | null
@@ -559,12 +561,70 @@ export interface AdminBroadcastMediaDTO {
 export interface AdminBroadcastSendDTO {
   status: string
   recipient_count: number
+  /** Запись в истории; 0 — не записалась, и ход отправки не показать. */
+  broadcast_id?: number
+}
+
+/**
+ * running — идёт; done — разослана; aborted — Telegram не разобрал разметку
+ * и отправка остановлена; failed — до отправки не дошло; interrupted — бот
+ * перезапустился посреди отправки.
+ */
+export type AdminBroadcastStatus = 'running' | 'done' | 'aborted' | 'failed' | 'interrupted'
+
+export interface AdminBroadcastHistoryItemDTO {
+  id: number
+  /** cabinet | telegram — откуда запущена. */
+  source: string
+  audiences: string[]
+  tariff_id: number | null
+  text: string
+  /** HTML — разметка редактора кабинета; пусто — простой текст из Telegram-админки. */
+  parse_mode: string
+  /** Пусто — без вложения. */
+  media_kind: '' | AdminBroadcastMediaKind
+  media_file_id: string
+  media_name: string
+  buttons: {
+    buy?: boolean
+    connect?: boolean
+    promo?: boolean
+    main_menu?: boolean
+    share_referral?: boolean
+    links?: string[] | null
+  }
+  status: AdminBroadcastStatus
+  total: number
+  sent: number
+  /** Закрыли бота или удалили аккаунт. */
+  blocked: number
+  /** Прочие отказы Telegram. */
+  failed: number
+  error: string
+  started_at: string
+  finished_at: string | null
+}
+
+export interface AdminBroadcastHistoryDTO {
+  items: AdminBroadcastHistoryItemDTO[]
+  total: number
 }
 
 export interface AdminBroadcastAudienceDTO {
   audience: string
   label: string
   count: number
+}
+
+/** Итог синхронизации с панелью, запущенной из кабинета. */
+export interface AdminSyncStatusDTO {
+  state: 'idle' | 'running' | 'ok' | 'delete_blocked' | 'busy' | 'failed'
+  created: number
+  updated: number
+  deleted: number
+  kept: number
+  started_at?: string
+  finished_at?: string
 }
 
 export interface AdminOkDTO {
@@ -609,6 +669,8 @@ export interface AdminUserPanelDTO {
   traffic_presets_gb: number[]
   strategies: string[]
   tariffs?: AdminTariffBriefDTO[]
+  /** Лимит без закрепления: тариф + действующие докупленные слоты. */
+  hwid_unpinned_limit?: number
 }
 
 export interface AdminDeviceDTO {

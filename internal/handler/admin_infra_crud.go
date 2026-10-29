@@ -854,7 +854,7 @@ func (h Handler) infraHistoryScreen(lang string, body *remnawave.InfraBillingHis
 }
 
 // AdminInfraBillingTextHandler — ответы текстом в мастерах инфра-биллинга.
-func (h Handler) AdminInfraBillingTextHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+func (h Handler) AdminInfraBillingTextHandler(_ context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil || update.Message.From == nil {
 		return
 	}
@@ -868,7 +868,7 @@ func (h Handler) AdminInfraBillingTextHandler(ctx context.Context, b *bot.Bot, u
 	}
 	lang := update.Message.From.LanguageCode
 	text := strings.TrimSpace(update.Message.Text)
-	ctx = context.Background()
+	ctx := context.Background()
 
 	switch st.Kind {
 	case infraWizNodeNextDate:

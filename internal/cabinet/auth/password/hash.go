@@ -15,6 +15,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
@@ -41,6 +42,25 @@ func DefaultParams() Params {
 	}
 }
 
+// slots ограничивает число одновременных вычислений Argon2id. Каждое берёт
+// Memory (64 MiB по умолчанию): сотня параллельных попыток входа съедала бы
+// несколько гигабайт, и процесс — вместе с ботом и приёмом оплат — убивал OOM.
+// С ограничением лишние запросы ждут очереди: вход под атакой медленнее,
+// но магазин жив. Ожидающий запрос памяти почти не держит.
+var slots = make(chan struct{}, slotCount(runtime.GOMAXPROCS(0)))
+
+// slotCount — половина ядер (у Argon2id parallelism=2), но от 2 до 4:
+// на 4 слотах пик памяти — 256 MiB.
+func slotCount(procs int) int {
+	return min(max(procs/2, 2), 4)
+}
+
+func idKey(plain, salt []byte, p Params, keyLen uint32) []byte {
+	slots <- struct{}{}
+	defer func() { <-slots }()
+	return argon2.IDKey(plain, salt, p.Iterations, p.Memory, p.Parallelism, keyLen)
+}
+
 // ErrInvalidHashFormat возвращается при попытке сравнить пароль с неразборчивым хешем.
 var ErrInvalidHashFormat = errors.New("password: invalid hash format")
 
@@ -59,7 +79,7 @@ func HashPassword(plain string, p Params) (string, error) {
 		return "", fmt.Errorf("password: read salt: %w", err)
 	}
 
-	hash := argon2.IDKey([]byte(plain), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLen)
+	hash := idKey([]byte(plain), salt, p, p.KeyLen)
 
 	b64Salt := base64.RawStdEncoding.EncodeToString(salt)
 	b64Hash := base64.RawStdEncoding.EncodeToString(hash)
@@ -79,7 +99,7 @@ func ComparePasswordAndHash(plain, encoded string, defaults Params) (ok bool, ne
 		return false, false, err
 	}
 
-	other := argon2.IDKey([]byte(plain), salt, p.Iterations, p.Memory, p.Parallelism, uint32(len(key)))
+	other := idKey([]byte(plain), salt, p, uint32(len(key)))
 	if subtle.ConstantTimeCompare(key, other) != 1 {
 		return false, false, nil
 	}
@@ -136,5 +156,5 @@ func DummyCompare(defaults Params) {
 	// Фиксированные, но безвредные byte-slices — главное, чтобы argon2.IDKey
 	// реально провернул все iterations * memory и съел сопоставимое время.
 	salt := []byte("dummy-account-enum")
-	_ = argon2.IDKey([]byte("dummy-password"), salt, defaults.Iterations, defaults.Memory, defaults.Parallelism, defaults.KeyLen)
+	_ = idKey([]byte("dummy-password"), salt, defaults, defaults.KeyLen)
 }
