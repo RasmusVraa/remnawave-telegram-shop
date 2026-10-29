@@ -54,26 +54,6 @@ export function DecorTreeIcon({ className, strokeWidth = 1.75 }: NavIconProps) {
   )
 }
 
-/** Ёлка для new_year вместо «дома». */
-export function DecorTreeIcon({ className, strokeWidth = 1.75 }: NavIconProps) {
-  return (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={strokeWidth}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M12 2.5l1 2h-2z" fill="currentColor" />
-      <path d="M12 5L8 10h2.5L7 15h3L6 20h12l-4-5h3l-3.5-5H16z" />
-      <path d="M12 20v2" />
-    </svg>
-  )
-}
-
 export function resolveDecorNavIcon(
   theme: DecorThemeId,
   to: string,
