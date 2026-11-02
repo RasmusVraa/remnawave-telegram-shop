@@ -1,7 +1,10 @@
+import { useState } from 'react'
+import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { AlertTriangle, CheckCircle2, Copy, History, X, XCircle } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCircle2, Copy, History, Trash2, X, XCircle } from 'lucide-react'
 
+import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { AdminBroadcastHistoryItemDTO } from '@/lib/types/admin'
 
@@ -59,6 +62,24 @@ function formatDuration(item: Item, t: TFunction): string | null {
 
 function audienceText(item: Item, audienceLabels: Record<string, string>) {
   return item.audiences.map((a) => audienceLabels[a] ?? a).join(', ')
+}
+
+/** Рассылка ушла только в кабинет: счётчики Telegram у неё нулевые и ничего не говорят. */
+function cabinetOnly(item: Item): boolean {
+  return Boolean(item.channels && !item.channels.includes('telegram'))
+}
+
+/** Цифры ленты кабинета: «получили N · прочитали M». */
+function CabinetLine({ item, className }: { item: Item; className?: string }) {
+  const { t, i18n } = useTranslation()
+  if (!item.cabinet) return null
+  const n = (v: number) => v.toLocaleString(i18n.language)
+  return (
+    <p className={cn('flex items-center gap-1.5 text-xs text-muted-foreground', className)}>
+      <Bell className="size-3.5 shrink-0" />
+      {t('admin.broadcast.history.cabinet.line', { recipients: n(item.cabinet.recipients), read: n(item.cabinet.read) })}
+    </p>
+  )
 }
 
 function isTest(item: Item) {
@@ -222,7 +243,14 @@ export function BroadcastResultCard({
         </button>
       </div>
 
-      {item.status === 'failed' ? (
+      {cabinetOnly(item) && item.cabinet ? (
+        <p className="flex flex-wrap items-baseline gap-x-2">
+          <span className="font-heading text-2xl font-extrabold tabular-nums">{n(item.cabinet.recipients)}</span>
+          <span className="text-sm text-muted-foreground">
+            {t('admin.broadcast.history.cabinet.receivedRead', { read: n(item.cabinet.read) })}
+          </span>
+        </p>
+      ) : item.status === 'failed' ? (
         <p className="text-sm text-muted-foreground">{t('admin.broadcast.history.failedHint')}</p>
       ) : (
         <>
@@ -237,6 +265,7 @@ export function BroadcastResultCard({
           </p>
           <DeliveryBar item={item} />
           <DeliveryLegend item={item} />
+          <CabinetLine item={item} />
           {item.status === 'aborted' && (
             <p className="text-xs text-destructive">{t('admin.broadcast.history.abortedHint')}</p>
           )}
@@ -331,12 +360,16 @@ export function BroadcastHistoryList({
                 </span>
                 <span className="truncate text-sm font-semibold">{itemTitle(item, t)}</span>
                 <span className="truncate text-xs text-muted-foreground">{audienceText(item, audienceLabels)}</span>
-                <span className="flex items-center gap-2 text-xs">
-                  <b className="font-semibold tabular-nums">
-                    {n(item.sent)} / {n(item.total)}
-                  </b>
-                  <DeliveryBar item={item} className="h-1.5 flex-1" />
-                </span>
+                {cabinetOnly(item) ? (
+                  <CabinetLine item={item} />
+                ) : (
+                  <span className="flex items-center gap-2 text-xs">
+                    <b className="font-semibold tabular-nums">
+                      {n(item.sent)} / {n(item.total)}
+                    </b>
+                    <DeliveryBar item={item} className="h-1.5 flex-1" />
+                  </span>
+                )}
               </button>
             </li>
           )
@@ -383,9 +416,16 @@ export function BroadcastHistoryList({
                   <span className="line-clamp-2">{audienceText(item, audienceLabels)}</span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 tabular-nums">
-                  <b className="font-semibold">{n(item.sent)}</b>
-                  <span className="text-muted-foreground"> / {n(item.total)}</span>
-                  <DeliveryBar item={item} className="mt-1.5 h-1.5 w-28" />
+                  {cabinetOnly(item) ? (
+                    <CabinetLine item={item} />
+                  ) : (
+                    <>
+                      <b className="font-semibold">{n(item.sent)}</b>
+                      <span className="text-muted-foreground"> / {n(item.total)}</span>
+                      <DeliveryBar item={item} className="mt-1.5 h-1.5 w-28" />
+                      {item.cabinet && <CabinetLine item={item} className="mt-1" />}
+                    </>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   <BroadcastStatusPill item={item} />
@@ -407,6 +447,7 @@ export function BroadcastHistoryDetail({
   onReuse,
   replacesDraft,
   audienceLabels,
+  onItemChange,
 }: {
   item: Item | null
   onClose: () => void
@@ -414,6 +455,8 @@ export function BroadcastHistoryDetail({
   /** В форме уже что-то набрано — «взять за основу» это заменит, о чём стоит сказать заранее. */
   replacesDraft: boolean
   audienceLabels: Record<string, string>
+  /** Админ поменял уведомление в кабинете — запись пришла заново. */
+  onItemChange?: (item: Item) => void
 }) {
   const { t, i18n } = useTranslation()
   if (!item) return null
@@ -479,16 +522,21 @@ export function BroadcastHistoryDetail({
           )}
         </div>
 
-        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="rounded-lg bg-muted/60 px-3 py-2">
-              <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
-              <dd className={cn('font-heading text-lg font-extrabold tabular-nums', s.cls)}>{s.value}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* Только в кабинет — счётчики Telegram нулевые, их цифры в блоке ниже. */}
+        {!cabinetOnly(item) && (
+          <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-lg bg-muted/60 px-3 py-2">
+                <dt className="text-[11px] text-muted-foreground">{s.label}</dt>
+                <dd className={cn('font-heading text-lg font-extrabold tabular-nums', s.cls)}>{s.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
 
-        {item.status !== 'failed' && (
+        {item.cabinet && <CabinetNotificationPanel item={item} onItemChange={onItemChange} />}
+
+        {item.status !== 'failed' && !cabinetOnly(item) && (
           <div className="space-y-2">
             <DeliveryBar item={item} />
             <DeliveryLegend item={item} />
@@ -541,5 +589,91 @@ export function BroadcastHistoryDetail({
         </dl>
       </div>
     </AdminModal>
+  )
+}
+
+/**
+ * Уведомление рассылки в кабинете: сколько прочитали, важность, удаление.
+ * Важность снимается у всех сразу — пропадают закрепление и плашка на главной.
+ * Telegram-сообщения это не трогает: отозвать их у получателей нельзя.
+ */
+function CabinetNotificationPanel({ item, onItemChange }: { item: Item; onItemChange?: (item: Item) => void }) {
+  const { t, i18n } = useTranslation()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const cab = item.cabinet
+  const update = useMutation({
+    mutationFn: (action: 'important' | 'unimportant' | 'delete') =>
+      action === 'delete'
+        ? api.adminBroadcastDeleteCabinet(item.id)
+        : api.adminBroadcastSetCabinetImportant(item.id, action === 'important'),
+    onSuccess: (next) => {
+      setConfirmDelete(false)
+      onItemChange?.(next)
+    },
+  })
+  if (!cab) return null
+  const n = (v: number) => v.toLocaleString(i18n.language)
+  const important = cab.important && !cab.deleted
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border/60 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Bell className="size-4 text-muted-foreground" />
+        <span className="text-sm font-semibold">{t('admin.broadcast.history.cabinet.title')}</span>
+        {important && (
+          <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-300">
+            {t('admin.broadcast.history.cabinet.important')}
+          </span>
+        )}
+        {cab.deleted && (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+            {t('admin.broadcast.history.cabinet.deleted')}
+          </span>
+        )}
+      </div>
+      <p className="text-xs text-muted-foreground">
+        {t('admin.broadcast.history.cabinet.stats', { recipients: n(cab.recipients), read: n(cab.read) })}
+      </p>
+      {important && (
+        <p className="text-xs text-amber-600 dark:text-amber-300">{t('admin.broadcast.history.cabinet.importantHint')}</p>
+      )}
+      {!cab.deleted && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          <button
+            type="button"
+            disabled={update.isPending}
+            onClick={() => update.mutate(cab.important ? 'unimportant' : 'important')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            <AlertTriangle className="size-3.5" />
+            {cab.important ? t('admin.broadcast.history.cabinet.unsetImportant') : t('admin.broadcast.history.cabinet.makeImportant')}
+          </button>
+          {confirmDelete ? (
+            <button
+              type="button"
+              disabled={update.isPending}
+              onClick={() => update.mutate('delete')}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-destructive/90 disabled:opacity-50"
+            >
+              <Trash2 className="size-3.5" />
+              {t('admin.broadcast.history.cabinet.delete')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-destructive/40 px-3 py-1.5 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
+            >
+              <Trash2 className="size-3.5" />
+              {t('admin.broadcast.history.cabinet.delete')}
+            </button>
+          )}
+        </div>
+      )}
+      {confirmDelete && !cab.deleted && (
+        <p className="text-xs text-muted-foreground">{t('admin.broadcast.history.cabinet.deleteConfirm')}</p>
+      )}
+      {update.isError && <p className="text-xs text-destructive">{t('errors.unknown')}</p>}
+    </div>
   )
 }

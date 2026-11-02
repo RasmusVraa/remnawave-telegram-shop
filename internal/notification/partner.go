@@ -12,6 +12,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/handler"
@@ -190,15 +191,23 @@ func (n *PartnerNotifier) notifyPartner(ctx context.Context, customerID int64, k
 		if customer == nil {
 			return
 		}
+		lang := customer.Language
+		text := n.render(lang, key, args...)
+		if text == "" {
+			return
+		}
+		// В кабинет — тем же текстом, и web-only партнёру тоже: это его
+		// единственный канал.
+		cabinetnotify.Notify(ctx, customer.ID, lang, cabinetnotify.Event{
+			Kind:     database.CabinetNotificationPartner,
+			TitleKey: "cabinet_notify_partner_title",
+			BodyHTML: text,
+			Buttons:  []string{"partner"},
+		})
 		// Партнёру из веб-кабинета писать некому: synthetic telegram_id не
 		// соответствует ни одному чату, и Bot API ответит ошибкой на каждое
 		// сообщение. Это штатная ситуация, а не сбой.
 		if customer.IsWebOnly || utils.IsSyntheticTelegramID(customer.TelegramID) || customer.TelegramID <= 0 {
-			return
-		}
-		lang := customer.Language
-		text := n.render(lang, key, args...)
-		if text == "" {
 			return
 		}
 		n.send(ctx, customer.TelegramID, 0, text, n.partnerMarkup(lang), "partner")

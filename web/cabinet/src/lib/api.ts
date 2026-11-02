@@ -16,6 +16,7 @@ import type {
   AdminBroadcastMediaDTO,
   AdminBroadcastPreviewDTO,
   AdminBroadcastSendDTO,
+  AdminBroadcastChannel,
   AdminBroadcastHistoryDTO,
   AdminBroadcastHistoryItemDTO,
   AdminCustomerDTO,
@@ -165,6 +166,8 @@ export interface AuthBootstrapResponse {
     show_features?: boolean
     show_faq?: boolean
   }
+  /** Кнопки на местах 3 и 4 быстрых действий главной (CABINET_HOME_QUICK_ACTIONS), id из features/home/homeQuickActions.ts. */
+  home_quick_actions?: string[]
   /** Декоративная тема кабинета (CABINET_DECOR_THEME) */
   decor_theme?:
     | 'off'
@@ -203,6 +206,10 @@ export interface AuthBootstrapResponse {
     platega_crypto?: boolean
     heleket?: boolean
   }
+  /** Кнопки ЮKassa по способам (YOOKASA_PAYMENT_METHODS); ["all"] — одна кнопка с формой ЮKassa со всеми способами. */
+  yookassa_methods?: string[]
+  /** Способ, выбранный заранее для тех, кто ещё не платил (CABINET_CHECKOUT_DEFAULT_METHOD): «yookassa:sbp», «platega_sbp»…; пусто — не выбран. */
+  checkout_default_method?: string
 }
 
 export interface MeResponse {
@@ -462,6 +469,10 @@ export interface SubscriptionResponse {
   link_reset_at?: string | null
   /** С какого момента сброс снова доступен — только пока идёт пауза. */
   link_reset_available_at?: string | null
+  /** Как панель обнуляет счётчик трафика; только при лимите трафика. */
+  traffic_reset_strategy?: 'DAY' | 'WEEK' | 'MONTH' | 'MONTH_ROLLING' | 'NO_RESET' | string | null
+  /** Следующий сброс счётчика трафика (ISO). */
+  next_traffic_reset_at?: string | null
 }
 
 /** POST /me/subscription/reset-link */
@@ -514,14 +525,45 @@ export interface ConnectInviteResponse {
 /**
  * Ответ GET /public/connect: чем подключаться на устройстве без кабинета.
  *
- * mode=encrypted — админ включил шифрование deep link, и сырая ссылка
- * подписки наружу не отдаётся: только готовые ссылки по приложениям.
+ * mode=encrypted — админ включил шифрование deep link: Happ/INCY получают
+ * готовые зашифрованные ссылки из links, остальные приложения — сырую
+ * subscription_link. encrypted — для каких приложений шифрование включено.
  * mode=plain — шифрование выключено, страница собирает deep link сама.
  */
 export interface ConnectResolveResponse {
   mode: 'plain' | 'encrypted'
   subscription_link?: string
   links?: Record<string, string>
+  encrypted?: string[]
+}
+
+/** Уведомление в ленте под колокольчиком. */
+export interface NotificationDTO {
+  id: number
+  /** broadcast — рассылка; остальное — личные события (payment, expiring…). */
+  kind: string
+  important: boolean
+  /** Пусто у рассылок: их заголовок — в тексте. */
+  title: string
+  /** Telegram HTML. */
+  body: string
+  /** Переходы по разделам кабинета: tariffs, connections… */
+  buttons: { key: string }[]
+  created_at: string
+  read: boolean
+}
+
+export interface NotificationsUnreadDTO {
+  total: number
+  important: number
+  /** Свежее непрочитанное важное — его плашка висит на главной. */
+  latest_important: NotificationDTO | null
+}
+
+export interface NotificationsListDTO {
+  items: NotificationDTO[]
+  total: number
+  unread: NotificationsUnreadDTO
 }
 
 export interface LoyaltyTierDTO {
@@ -1170,6 +1212,20 @@ export const api = {
   connectInvite: () =>
     request<ConnectInviteResponse>('GET', '/me/connect-invite'),
 
+  notifications: (params: { limit: number; offset: number }) =>
+    request<NotificationsListDTO>('GET', `/me/notifications?limit=${params.limit}&offset=${params.offset}`),
+  notificationsUnread: () => request<NotificationsUnreadDTO>('GET', '/me/notifications/unread'),
+  notificationsRead: (body: { ids?: number[]; all?: boolean }) =>
+    request<NotificationsUnreadDTO>('POST', '/me/notifications/read', body),
+  /** Крестик: убрать уведомления из своей ленты. У других получателей они остаются. */
+  notificationsDelete: (ids: number[]) =>
+    request<NotificationsUnreadDTO>('POST', '/me/notifications/delete', { ids }),
+  pushKey: () => request<{ public_key: string }>('GET', '/me/push/key'),
+  pushSubscribe: (sub: PushSubscriptionJSON) =>
+    request<{ subscribed: boolean }>('POST', '/me/push/subscribe', sub),
+  pushUnsubscribe: (endpoint: string) =>
+    request<{ subscribed: boolean }>('POST', '/me/push/unsubscribe', { endpoint }),
+
   /**
    * Резолв приглашения на публичной странице /connect.
    *
@@ -1348,11 +1404,12 @@ export const api = {
       }[]
     }>('GET', '/public/status'),
 
-  // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider.
+  // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider, yookassa_method.
   checkout: (
     input: {
       period: number
       provider: string
+      yookassaMethod?: string
       tariffId?: number | null
       renewExtraHwid?: boolean
       locationId?: number | null
@@ -1363,6 +1420,9 @@ export const api = {
       period: input.period,
       provider: input.provider,
       renew_extra_hwid: Boolean(input.renewExtraHwid),
+    }
+    if (input.yookassaMethod) {
+      body.yookassa_method = input.yookassaMethod
     }
     if (input.tariffId != null && input.tariffId > 0) {
       body.tariff_id = input.tariffId
@@ -1389,10 +1449,16 @@ export const api = {
     return request<HwidExtraPreviewResponse>('GET', `/payments/hwid/preview?${q.toString()}`)
   },
 
-  hwidExtraCheckout: (targetLimit: number, provider: string, idempotencyKey: string) =>
-    request<CheckoutResponse>('POST', '/payments/hwid/checkout', { target_limit: targetLimit, provider }, {
-      'Idempotency-Key': idempotencyKey,
-    }),
+  hwidExtraCheckout: (targetLimit: number, provider: string, idempotencyKey: string, yookassaMethod?: string) =>
+    request<CheckoutResponse>(
+      'POST',
+      '/payments/hwid/checkout',
+      { target_limit: targetLimit, provider, ...(yookassaMethod ? { yookassa_method: yookassaMethod } : {}) },
+      { 'Idempotency-Key': idempotencyKey },
+    ),
+
+  /** Способ прошлой оплаты: «yookassa:sbp», «platega_sbp»…; пусто — оплат не было. */
+  paymentLastMethod: () => request<{ method: string }>('GET', '/payments/last-method'),
 
   hwidExtraApply: (targetLimit: number) =>
     request<{ ok: boolean; device_limit: number }>('POST', '/me/hwid-extra/apply', { target_limit: targetLimit }),
@@ -1706,7 +1772,17 @@ export const api = {
       /** Имя файла — только для истории рассылок. */
       name?: string
     } | null
+    /** Каналы доставки; без поля сервер шлёт только в Telegram. */
+    channels?: AdminBroadcastChannel[]
+    /** Важное в кабинете: закреплено и висит плашкой на главной. */
+    important?: boolean
   }) => request<AdminBroadcastSendDTO>('POST', '/admin/broadcast/send', body),
+  /** Снять или поставить важность уведомлению рассылки в кабинете. */
+  adminBroadcastSetCabinetImportant: (id: number, important: boolean) =>
+    request<AdminBroadcastHistoryItemDTO>('PATCH', `/admin/broadcast/history/${id}/cabinet`, { important }),
+  /** Убрать уведомление рассылки из кабинета у всех. Telegram-сообщения остаются. */
+  adminBroadcastDeleteCabinet: (id: number) =>
+    request<AdminBroadcastHistoryItemDTO>('DELETE', `/admin/broadcast/history/${id}/cabinet`),
   adminBroadcastHistory: (params: { limit: number; offset: number }) =>
     request<AdminBroadcastHistoryDTO>(
       'GET',

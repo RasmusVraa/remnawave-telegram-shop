@@ -91,6 +91,8 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `YOOKASA_ENABLED` | Вкл/выкл |
 | `YOOKASA_SECRET_KEY` / `YOOKASA_SHOP_ID` / `YOOKASA_URL` / `YOOKASA_EMAIL` | Учётные данные API |
 | `YOOKASA_WEBHOOK_URL` | Путь для вебхука (без домена). Пусто — только поллинг. См. [payments.md](./payments.md) |
+| `YOOKASA_PAYMENT_METHODS` | Кнопки ЮKassa по способам, через запятую в порядке показа: `all` (форма со всеми способами), `sbp`, `bank_card`, `sberbank`, `tinkoff_bank`, `yoo_money`. Для всех, кроме `all`, в ЮKassa уходит `payment_method_data`: покупатель сразу попадает на этот способ, но сменить его на форме не сможет. Каждый способ должен быть подключён в кабинете ЮKassa. Пусто — одна кнопка, форма со всеми способами (как раньше). Меняется в админке |
+| `CABINET_CHECKOUT_DEFAULT_METHOD` | Способ, выбранный заранее на странице оплаты кабинета для тех, кто ещё не платил: `yookassa:<способ>` или провайдер (`platega_sbp`, `telegram`, `heleket`…). Кто уже платил, видит свой прошлый способ. Пусто — ничего не выбрано. Меняется в админке |
 | `YOOKASA_PROXY_URL` | Прокси **только** для запросов к API ЮKassa: `http://`, `https://` или `socks5://`, можно с `логин:пароль@`. Пусто — прямое соединение. Нужен, если сеть до `api.yookassa.ru` нестабильна или блокируется. См. [payments.md](./payments.md#прокси-для-юkassa) |
 
 ---
@@ -296,6 +298,28 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 
 ---
 
+## Push в браузер из кабинета
+
+Под колокольчиком кабинета уведомления появляются всегда. Эти переключатели решают, какие из них ещё и дублировать системным уведомлением в браузере тем, кто включил push. Меняются в админке без рестарта: «Настройки бота» → «Уведомления».
+
+| Переменная | По умолчанию | Что шлёт push |
+|------------|--------------|---------------|
+| `CABINET_PUSH_IMPORTANT` | `true` | Важное любого вида: важная рассылка, «подписка заканчивается завтра» |
+| `CABINET_PUSH_SUPPORT` | `true` | Ответ поддержки |
+| `CABINET_PUSH_TORRENT` | `true` | «Сервер временно недоступен» — блокировка за торренты |
+| `CABINET_PUSH_EXPIRING` | `true` | Напоминания о конце подписки |
+| `CABINET_PUSH_TEST_BROADCAST` | `true` | Тестовая рассылка (только админу) |
+| `CABINET_PUSH_BROADCAST` | `false` | Обычные рассылки без отметки «Важное» |
+| `CABINET_PUSH_PAYMENT` | `false` | Оплата прошла |
+| `CABINET_PUSH_DEVICES` | `false` | Стало больше мест для устройств |
+| `CABINET_PUSH_REFERRAL` | `false` | Бонус за друга |
+| `CABINET_PUSH_LOYALTY` | `false` | Новый уровень лояльности |
+| `CABINET_PUSH_PARTNER` | `false` | События партнёрской программы |
+
+Важное проверяется своим переключателем: если `CABINET_PUSH_IMPORTANT=false`, важная рассылка пойдёт по правилу обычной (`CABINET_PUSH_BROADCAST`).
+
+---
+
 ## Web-кабинет
 
 Полный setup: [`cabinet/SETUP-GUIDE-RU.md`](./cabinet/SETUP-GUIDE-RU.md).
@@ -330,6 +354,7 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `CABINET_DECOR_AUTO_ENABLED` | Авто-смена декор-темы по календарю (`false` по умолчанию). В праздничном окне тема окна перекрывает `CABINET_DECOR_THEME`, вне окон возвращается она же |
 | `CABINET_DECOR_SCHEDULE` | Окна авто-смены: JSON `[{"theme":"new_year","from":"12-01","to":"01-31","enabled":true}]`. Пусто — встроенный пресет праздников. Побеждает первое совпавшее окно; `from > to` — окно через 31 декабря. Редактируется в админке |
 | `CABINET_SUBSCRIPTION_SHOW_LOYALTY` | Плашка уровня лояльности на странице «Подписка» (`false` по умолчанию). Флаг влияет только на эту страницу: раздел `/loyalty` и плашка в профиле доступны всегда, программу целиком выключает `LOYALTY_ENABLED`. Меняется в админке без рестарта |
+| `CABINET_HOME_QUICK_ACTIONS` | Кнопки на местах 3 и 4 быстрых действий главной: два разных id через запятую в порядке показа — `promo`, `invite`, `partner`, `fortune`, `support`, `info`, `news`, `feedback`, `sublink` (копирует ссылку подписки). Пусто — `promo,invite`. Места 1 и 2 зависят от подписки и не настраиваются. Выключенный раздел заменяется кнопкой по умолчанию. Меняется в админке без рестарта |
 | `CABINET_TARIFF_PRICE_DISPLAY` | Витрина: `monthly` или `marketing` |
 | `CABINET_TARIFF_SAVINGS_BADGE` | Плашка «−N %» на карточках сроков: `none` (по умолчанию), `corner` (в углу карточки) или `old_price` (зачёркнутая база «цена 1 мес × N»). Меняется в админке без рестарта |
 | `CABINET_DEEPLINK_HAPP_ENCRYPT` | Шифровать Happ deep link (`happ://crypt…/`) |

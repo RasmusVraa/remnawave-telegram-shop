@@ -6,6 +6,7 @@ toolchain go1.27.3
 
 require (
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/go-telegram/bot v1.20.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.18.3

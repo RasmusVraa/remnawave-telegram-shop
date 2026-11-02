@@ -64,3 +64,44 @@ func TestMoynalogGroupIsExposed(t *testing.T) {
 		}
 	}
 }
+
+// Группа «Уведомления» доезжает до админки: переключатель на каждый вид push,
+// с умолчаниями — важное, поддержка, блокировка, конец подписки и тестовая
+// рассылка включены, остальное выключено.
+func TestNotificationsGroupIsExposed(t *testing.T) {
+	want := map[string]string{
+		"CABINET_PUSH_IMPORTANT":      "true",
+		"CABINET_PUSH_SUPPORT":        "true",
+		"CABINET_PUSH_TORRENT":        "true",
+		"CABINET_PUSH_EXPIRING":       "true",
+		"CABINET_PUSH_TEST_BROADCAST": "true",
+		"CABINET_PUSH_BROADCAST":      "false",
+		"CABINET_PUSH_PAYMENT":        "false",
+		"CABINET_PUSH_DEVICES":        "false",
+		"CABINET_PUSH_REFERRAL":       "false",
+		"CABINET_PUSH_LOYALTY":        "false",
+		"CABINET_PUSH_PARTNER":        "false",
+	}
+	got := map[string]string{}
+	for _, g := range buildAdminSettingsResponse().Groups {
+		if g.ID != "notifications" {
+			continue
+		}
+		for _, f := range g.Fields {
+			if f.Type != "bool" || !f.Instant {
+				t.Errorf("%s: type=%s instant=%v, want instant bool", f.Key, f.Type, f.Instant)
+			}
+			got[f.Key] = f.Value
+		}
+	}
+	for key, def := range want {
+		if v, ok := got[key]; !ok {
+			t.Errorf("%s не отдаётся в группе notifications", key)
+		} else if v != def {
+			t.Errorf("%s = %q, want default %q", key, v, def)
+		}
+	}
+	if len(got) != len(want) {
+		t.Errorf("в группе %d полей, want %d: %v", len(got), len(want), got)
+	}
+}

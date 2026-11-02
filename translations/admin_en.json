@@ -538,5 +538,11 @@
   "admin_partner_application_new": "🤝 <b>Partner application</b>\n\n• Customer: %s\n• About: %s\n• Channels: %s\n• Expected: %s",
   "admin_partner_application_auto": "🤝 <b>New partner</b>\n\nThe application was approved automatically — moderation is off.\n\n• Customer: %s\n• About: %s\n• Channels: %s\n• Expected: %s",
   "admin_partner_payout_request": "💸 <b>Payout request</b>\n\n• Partner: %s\n• Amount: %s\n• Method: %s\n• Details: <code>%s</code>",
-  "admin_partner_notify_open_link": "Open the Partners section"
+  "admin_partner_notify_open_link": "Open the Partners section",
+  "broadcast_toggle_cabinet": "🔔 To cabinet",
+  "broadcast_toggle_important": "❗ Important in cabinet",
+  "broadcast_cabinet_line_on": "Cabinet: yes",
+  "broadcast_cabinet_line_important": "Cabinet: yes, important — pinned and shown on the home page",
+  "broadcast_cabinet_line_off": "Cabinet: no",
+  "broadcast_cabinet_line_no_text": "Cabinet: no — the broadcast has no text, and the cabinet doesn't show attachments yet"
 }

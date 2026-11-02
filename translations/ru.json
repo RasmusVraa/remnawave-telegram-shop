@@ -25,6 +25,7 @@
   "partner_payout_paid": "✅ <b>Выплата отправлена</b>\n\nСумма: %s\nЧек: <code>%s</code>",
   "partner_payout_rejected": "💸 <b>Заявка на вывод отклонена</b>\n\n%s вернулись на баланс — заявку можно создать заново.\n\nПричина: %s",
   "partner_notify_open_link": "Открыть кабинет партнёра",
+
   "cabinet_minimal_btn_trial": {
     "text": "🔥 Попробовать бесплатно",
     "style": "red"
@@ -103,6 +104,21 @@
   "month_12": "12 мес - %d₽",
   "crypto_button": "₿ Криптовалютой",
   "card_button": "💳 СБП / Карта 💸",
+  "yookasa_sbp_button": {
+    "text": "⚡ СБП"
+  },
+  "yookasa_bank_card_button": {
+    "text": "💳 Банковская карта"
+  },
+  "yookasa_sberbank_button": {
+    "text": "🟢 SberPay"
+  },
+  "yookasa_tinkoff_bank_button": {
+    "text": "🟡 T-Pay"
+  },
+  "yookasa_yoo_money_button": {
+    "text": "👛 ЮMoney"
+  },
   "pay_button": "💸 Оплатить",
   "subscription_active": "📅 Подписка действует до <b><i>%s</i></b>",
   "traffic_limit": "\n\nЛимит - %s/%s гб",
@@ -804,5 +820,18 @@
   "broadcast_link_loyalty": "⭐ Лояльность",
   "broadcast_link_dashboard": "🏠 Главная кабинета",
   "broadcast_link_connections": "🔗 Подключения",
-  "broadcast_link_fortune": "🎰 Колесо фортуны"
+  "broadcast_link_fortune": "🎰 Колесо фортуны",
+  "cabinet_notify_payment_title": "Оплата прошла",
+  "cabinet_notify_payment_body": "Подписка активна до %s.",
+  "cabinet_notify_expiring_title": "Подписка заканчивается",
+  "cabinet_notify_expiring_body": "Подписка закончится %s. Продлите заранее, чтобы VPN не отключился.",
+  "cabinet_notify_referral_title": "Бонус за друга",
+  "cabinet_notify_referral_body": "Друг оплатил подписку — вам +%d дн.",
+  "cabinet_notify_support_title": "Ответ поддержки",
+  "cabinet_notify_partner_title": "Партнёрская программа",
+  "cabinet_notify_devices_title": "Места для устройств",
+  "cabinet_notify_devices_body": "Мест для устройств стало больше: было %d, стало %d.",
+  "cabinet_notify_loyalty_title": "Новый уровень лояльности",
+  "cabinet_notify_loyalty_body": "Вы на уровне %d — скидка %d%% на продление.",
+  "cabinet_notify_torrent_title": "Сервер временно недоступен"
 }

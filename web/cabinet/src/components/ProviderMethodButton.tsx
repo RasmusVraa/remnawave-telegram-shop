@@ -10,6 +10,7 @@ export function ProviderMethodButton({
   label,
   description,
   trailing,
+  badge,
 }: {
   selected: boolean
   onClick: () => void
@@ -18,6 +19,8 @@ export function ProviderMethodButton({
   description: string
   /** Например ChevronDown у родителя Platega */
   trailing?: ReactNode
+  /** Плашка справа перед галочкой: «в прошлый раз». */
+  badge?: ReactNode
 }) {
   return (
     <button
@@ -39,6 +42,7 @@ export function ProviderMethodButton({
         <p className="text-sm font-medium">{label}</p>
         <p className="text-xs text-muted-foreground">{description}</p>
       </div>
+      {badge}
       {trailing != null ? (
         <div className="flex shrink-0 items-center">{trailing}</div>
       ) : (

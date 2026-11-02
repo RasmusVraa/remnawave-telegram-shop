@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   AlertCircle,
   AlertTriangle,
+  Bell,
   Check,
   Eye,
   Film,
@@ -54,6 +55,8 @@ import {
   BroadcastResultCard,
   broadcastItemHtml,
 } from '../components/BroadcastHistory'
+import { AdminCheckboxField } from '../components/AdminCheckbox'
+import { AdminToggleSwitch } from '../components/AdminToggleSwitch'
 
 interface AudienceItem {
   audience: string
@@ -177,6 +180,10 @@ export default function AdminBroadcastPage() {
   const [resetKey, setResetKey] = useState(0)
   const [watchedId, setWatchedId] = useState<number | null>(null)
   const [detailItem, setDetailItem] = useState<AdminBroadcastHistoryItemDTO | null>(null)
+  // Каналы: по умолчанию оба — в кабинет рассылка доходит и до тех, кто без Telegram.
+  const [toTelegram, setToTelegram] = useState(true)
+  const [toCabinet, setToCabinet] = useState(true)
+  const [important, setImportant] = useState(false)
 
   const history = useBroadcastHistory()
   const { data: watched } = useWatchedBroadcast(watchedId)
@@ -219,7 +226,11 @@ export default function AdminBroadcastPage() {
   const { data: countData, isFetching: countLoading } = useRecipientCount(selectedAudiences, selectedTariff)
 
   const recipientCount = hasAudience ? (countData?.recipient_count ?? null) : 0
+  const cabinetCount = hasAudience ? (countData?.cabinet_count ?? null) : 0
   const hasContent = Boolean(html.trim() || media)
+  const hasChannel = toTelegram || toCabinet
+  // Один кабинет без текста — пустое уведомление: вложения он пока не показывает.
+  const cabinetOnlyWithoutText = toCabinet && !toTelegram && !html.trim()
   const limit = media ? LIMIT_CAPTION : LIMIT_TEXT
   const length = useMemo(() => telegramTextLength(html), [html])
   const overLimit = length > limit
@@ -244,9 +255,12 @@ export default function AdminBroadcastPage() {
         text: html,
         buttons,
         media: media ? { file_id: media.file_id, kind: media.kind, name: media.name } : null,
+        channels: [...(toTelegram ? (['telegram'] as const) : []), ...(toCabinet ? (['cabinet'] as const) : [])],
+        important: toCabinet && important,
       }),
     onSuccess: (res) => {
       setConfirmOpen(false)
+      setImportant(false)
       clearBroadcastDraft()
       setHtml('')
       setEditorSeed('')
@@ -317,7 +331,38 @@ export default function AdminBroadcastPage() {
     setSendSuccess(null)
   }
 
-  const canSend = hasAudience && hasContent && !overLimit && !sendMutation.isPending
+  const canSend =
+    hasAudience && hasContent && hasChannel && !cabinetOnlyWithoutText && !overLimit && !sendMutation.isPending
+  const channelLabels = [
+    toTelegram ? t('admin.broadcast.delivery.telegram') : null,
+    toCabinet
+      ? important
+        ? `${t('admin.broadcast.delivery.cabinet')} · ${t('admin.broadcast.delivery.important')}`
+        : t('admin.broadcast.delivery.cabinet')
+      : null,
+  ].filter(Boolean) as string[]
+  const countLabel = (v: number | null) => (hasAudience && (countLoading || v === null) ? '…' : v)
+  /*
+   * В кабинет рассылка доходит и до тех, кто зарегистрирован по почте без
+   * Telegram: сегмент тот же, но людей в нём больше. Без пояснения «4 против 1»
+   * выглядит так, будто кабинет игнорирует выбранную аудиторию.
+   */
+  const webOnlyCount =
+    recipientCount !== null && cabinetCount !== null && cabinetCount > recipientCount
+      ? cabinetCount - recipientCount
+      : 0
+  const cabinetCountLabel = () => {
+    const v = countLabel(cabinetCount)
+    if (typeof v !== 'number' || !webOnlyCount) return v
+    return (
+      <>
+        {v}
+        <span className="block text-xs font-normal text-muted-foreground">
+          {t('admin.broadcast.recipientsCabinetWebOnly', { count: webOnlyCount })}
+        </span>
+      </>
+    )
+  }
 
   /*
    * Запись с задержкой: на каждое нажатие клавиши переписывать localStorage
@@ -365,9 +410,12 @@ export default function AdminBroadcastPage() {
               {hasAudience ? selectedAudienceLabels.join(', ') : t('admin.broadcast.audienceNone')}
             </span>
           </SummaryRow>
-          <SummaryRow label={t('admin.broadcast.recipients')}>
-            {hasAudience && (countLoading || recipientCount === null) ? '…' : recipientCount}
-          </SummaryRow>
+          {toTelegram && (
+            <SummaryRow label={t('admin.broadcast.recipients')}>{countLabel(recipientCount)}</SummaryRow>
+          )}
+          {toCabinet && (
+            <SummaryRow label={t('admin.broadcast.recipientsCabinet')}>{cabinetCountLabel()}</SummaryRow>
+          )}
           <SummaryRow label={t('admin.broadcast.buttonsTitle')}>
             {selectedButtonLabels.length || t('admin.broadcast.buttons.none')}
           </SummaryRow>
@@ -654,6 +702,51 @@ export default function AdminBroadcastPage() {
               </div>
             </div>
 
+            {/* Доставка */}
+            <div className="overflow-hidden rounded-lg border border-border/50 bg-card">
+              <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3">
+                <span className="grid size-5 shrink-0 place-items-center rounded-md bg-muted font-mono text-[10px] text-muted-foreground">
+                  4
+                </span>
+                <Bell className="size-4 shrink-0 text-muted-foreground" />
+                <span className="text-sm font-semibold">{t('admin.broadcast.delivery.title')}</span>
+              </div>
+              <div className="space-y-3 p-4">
+                <AdminCheckboxField
+                  checked={toTelegram}
+                  onChange={setToTelegram}
+                  label={t('admin.broadcast.delivery.telegram')}
+                  description={t('admin.broadcast.delivery.telegramHint')}
+                />
+                <AdminCheckboxField
+                  checked={toCabinet}
+                  onChange={(v) => {
+                    setToCabinet(v)
+                    if (!v) setImportant(false)
+                  }}
+                  label={t('admin.broadcast.delivery.cabinet')}
+                  description={t('admin.broadcast.delivery.cabinetHint')}
+                />
+                {toCabinet && (
+                  <div className="flex items-start gap-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] p-3">
+                    <AdminToggleSwitch
+                      checked={important}
+                      onChange={setImportant}
+                      aria-label={t('admin.broadcast.delivery.important')}
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{t('admin.broadcast.delivery.important')}</span>
+                      <span className="block text-xs text-muted-foreground">{t('admin.broadcast.delivery.importantHint')}</span>
+                    </span>
+                  </div>
+                )}
+                {!hasChannel && <p className="text-xs text-destructive">{t('admin.broadcast.delivery.noChannel')}</p>}
+                {cabinetOnlyWithoutText && hasContent && (
+                  <p className="text-xs text-destructive">{t('admin.broadcast.delivery.cabinetNeedsText')}</p>
+                )}
+              </div>
+            </div>
+
             {sendMutation.isError && (
               <div className="flex items-start gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" />
@@ -683,7 +776,10 @@ export default function AdminBroadcastPage() {
         <span className="text-xs leading-tight text-muted-foreground">
           {t('admin.broadcast.recipients')}
           <b className="block text-base text-foreground tabular-nums">
-            {countLoading || recipientCount === null ? '…' : recipientCount}
+            {(() => {
+              const v = toTelegram ? recipientCount : cabinetCount
+              return countLoading || v === null ? '…' : v
+            })()}
           </b>
         </span>
         <button
@@ -703,6 +799,10 @@ export default function AdminBroadcastPage() {
         onReuse={reuseBroadcast}
         replacesDraft={hasContent}
         audienceLabels={audienceLabels}
+        onItemChange={(next) => {
+          setDetailItem(next)
+          queryClient.invalidateQueries({ queryKey: HISTORY_KEY })
+        }}
       />
 
       <AdminConfirmModal
@@ -729,9 +829,19 @@ export default function AdminBroadcastPage() {
                   </span>
                 ))}
               </ConfirmRow>
-              <ConfirmRow icon={UsersRound} label={t('admin.broadcast.recipients')}>
-                {recipientCount === null ? '…' : recipientCount}
+              <ConfirmRow icon={Bell} label={t('admin.broadcast.delivery.summary')}>
+                {channelLabels.join(', ')}
               </ConfirmRow>
+              {toTelegram && (
+                <ConfirmRow icon={UsersRound} label={t('admin.broadcast.recipients')}>
+                  {recipientCount === null ? '…' : recipientCount}
+                </ConfirmRow>
+              )}
+              {toCabinet && (
+                <ConfirmRow icon={UsersRound} label={t('admin.broadcast.recipientsCabinet')}>
+                  {cabinetCountLabel()}
+                </ConfirmRow>
+              )}
               <ConfirmRow icon={PanelBottom} label={t('admin.broadcast.buttonsTitle')}>
                 {selectedButtonLabels.length
                   ? selectedButtonLabels.join(', ')
@@ -754,7 +864,10 @@ export default function AdminBroadcastPage() {
             </dl>
             <p className="flex items-start gap-2 rounded-lg border border-amber-500/35 bg-amber-500/10 p-2.5 text-xs leading-relaxed">
               <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-500" />
-              <span>{t('admin.broadcast.confirmWebOnly')}</span>
+              <span>
+                {toCabinet ? t('admin.broadcast.confirmCabinet') : t('admin.broadcast.confirmWebOnly')}
+                {toCabinet && important && <span className="mt-1 block font-semibold">{t('admin.broadcast.confirmImportant')}</span>}
+              </span>
             </p>
           </div>
         }

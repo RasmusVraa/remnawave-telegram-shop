@@ -1136,6 +1136,57 @@
   .dark .admin-dash-link:focus-visible .admin-dash-card-inner {
     box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.07);
   }
+
+  /*
+   * Колокольчик звенит по нажатию (NotificationBell). Колокол качается от
+   * точки подвеса и затухает, язычок идёт в противофазе и бьёт по краям.
+   * Оба вращаются вокруг одной точки в координатах иконки (24×24): язычок
+   * лежит внутри группы колокола и добавляет к его наклону свой.
+   */
+  .bell-ring .bell-body,
+  .bell-ring .bell-clapper {
+    transform-box: view-box;
+    transform-origin: 12px 2.5px;
+  }
+
+  .bell-ring .bell-body {
+    animation: bell-swing 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  }
+
+  .bell-ring .bell-clapper {
+    animation: bell-clapper 0.9s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+  }
+
+  @keyframes bell-swing {
+    0% { transform: rotate(0); }
+    10% { transform: rotate(18deg); }
+    22% { transform: rotate(-15deg); }
+    34% { transform: rotate(11deg); }
+    46% { transform: rotate(-8deg); }
+    58% { transform: rotate(5deg); }
+    70% { transform: rotate(-3deg); }
+    84% { transform: rotate(1deg); }
+    100% { transform: rotate(0); }
+  }
+
+  @keyframes bell-clapper {
+    0% { transform: rotate(0); }
+    6% { transform: rotate(0); }
+    14% { transform: rotate(-14deg); }
+    26% { transform: rotate(14deg); }
+    38% { transform: rotate(-11deg); }
+    50% { transform: rotate(8deg); }
+    62% { transform: rotate(-5deg); }
+    74% { transform: rotate(3deg); }
+    100% { transform: rotate(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bell-ring .bell-body,
+    .bell-ring .bell-clapper {
+      animation: none;
+    }
+  }
 }
 
 @layer utilities {
@@ -5077,4 +5128,17 @@ html:not(.dark) .cabinet-hw-spider {
     width: 130px;
     --hw-moon-max: 1;
   }
+}
+
+/*
+ * Рамка карточки «Трафик» на главной по тону (SPEC §5.1). Отдельным классом:
+ * .dark .cabinet-elevated-card задаёт border-color с !important, утилитой его не перебить.
+ */
+.cabinet-shell .home-card-warn.cabinet-elevated-card,
+.dark .cabinet-shell .home-card-warn.cabinet-elevated-card {
+  border-color: rgb(245 158 11 / 0.5) !important;
+}
+.cabinet-shell .home-card-danger.cabinet-elevated-card,
+.dark .cabinet-shell .home-card-danger.cabinet-elevated-card {
+  border-color: hsl(var(--destructive) / 0.5) !important;
 }

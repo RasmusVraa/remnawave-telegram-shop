@@ -414,6 +414,36 @@ func (pr *PurchaseRepository) FindLatestActiveTributesByCustomerIDs(
 	return &purchases, nil
 }
 
+// LastPaidMethod — каким способом клиент оплатил последнюю покупку: тип счёта
+// и, для ЮKassa, выбранный кнопкой способ (nil — форма со всеми способами).
+// Нет оплат — пустой тип. Tribute не в счёт: в кабинете его нет.
+func (pr *PurchaseRepository) LastPaidMethod(ctx context.Context, customerID int64) (InvoiceType, *string, error) {
+	sql, args, err := sq.Select("invoice_type", "yookasa_payment_method").
+		From("purchase").
+		Where(sq.And{
+			sq.Eq{"customer_id": customerID},
+			sq.Eq{"status": PurchaseStatusPaid},
+			sq.NotEq{"invoice_type": InvoiceTypeTribute},
+		}).
+		OrderBy("paid_at DESC NULLS LAST", "id DESC").
+		Limit(1).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	var invoiceType InvoiceType
+	var method *string
+	if err := pr.pool.QueryRow(ctx, sql, args...).Scan(&invoiceType, &method); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", nil, nil
+		}
+		return "", nil, fmt.Errorf("failed to query last paid method: %w", err)
+	}
+	return invoiceType, method, nil
+}
+
 func (pr *PurchaseRepository) FindSuccessfulPaidPurchaseByCustomer(ctx context.Context, customerID int64) (*Purchase, error) {
 	buildSelect := sq.Select(purchaseColumns...).
 		From("purchase").

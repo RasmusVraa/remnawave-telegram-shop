@@ -114,13 +114,21 @@ func connectInviteURL(token string) string {
 }
 
 type connectResolveResponse struct {
-	// Mode — encrypted (отдаём только зашифрованные deep link) либо plain
-	// (отдаём ссылку подписки, страница собирает deep link сама).
+	// Mode — encrypted (для Happ/INCY только зашифрованные deep link) либо
+	// plain (страница собирает deep link сама для всех приложений).
 	Mode string `json:"mode"`
-	// SubscriptionLink заполняется только в plain-режиме.
+	// SubscriptionLink — сырая ссылка подписки. В encrypted-режиме она нужна
+	// приложениям без шифрования (RabbitHole, v2rayTun…): без неё страница
+	// приглашения прятала их, и на iPhone из российского App Store ставить
+	// было нечего — Happ и INCY оттуда удалены. Приглашение и так равно
+	// подписке, а утёкшую ссылку владелец сбрасывает сам.
 	SubscriptionLink string `json:"subscription_link,omitempty"`
 	// Links — готовые deep link по ключам приложений (happ, incy).
 	Links map[string]string `json:"links,omitempty"`
+	// Encrypted — для каких приложений админ включил шифрование. Приложение
+	// из этого списка без готовой ссылки (шифрование не удалось) страница
+	// скрывает, а не подставляет ему сырую ссылку в обход настройки.
+	Encrypted []string `json:"encrypted,omitempty"`
 }
 
 // Resolve — GET /cabinet/api/public/connect?t=<token>.
@@ -193,8 +201,10 @@ func (h *ConnectInviteHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 	}
 
 	links := make(map[string]string, 2)
+	encrypted := make([]string, 0, 2)
 	var lastErr error
 	if happEnabled {
+		encrypted = append(encrypted, "happ")
 		// Формат ссылки входит в ключ кэша: сменив его в админке, админ должен
 		// увидеть эффект сразу, а не через TTL.
 		happVersion := cabcfg.DeeplinkHappCryptVersion()
@@ -208,6 +218,7 @@ func (h *ConnectInviteHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if incyEnabled {
+		encrypted = append(encrypted, "incy")
 		href, encErr := h.deeplinkCache.get("incy", subLink, func() (string, error) {
 			return deeplink.EncryptINCY(subLink, cabcfg.BrandName())
 		})
@@ -218,17 +229,18 @@ func (h *ConnectInviteHandler) Resolve(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if len(links) == 0 {
-		// Все включённые шифрования отвалились (обычно — недоступен
-		// crypto.happ.su). Сырую ссылку в этом случае не отдаём: админ включил
-		// шифрование осознанно, и обход настройки из-за сетевого сбоя — не то
-		// поведение, которого от нас ждут.
+	if lastErr != nil {
+		// Шифрование не удалось (обычно — недоступен crypto.happ.su). Страница
+		// скроет это приложение, остальные подключатся по сырой ссылке.
 		slog.Error("connect-invite: encrypt failed", "account_id", accountID, "error", lastErr.Error())
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "deeplink_unavailable"})
-		return
 	}
 
-	writeJSON(w, http.StatusOK, connectResolveResponse{Mode: "encrypted", Links: links})
+	writeJSON(w, http.StatusOK, connectResolveResponse{
+		Mode:             "encrypted",
+		SubscriptionLink: subLink,
+		Links:            links,
+		Encrypted:        encrypted,
+	})
 }
 
 // deeplinkCache — TTL-кэш зашифрованных deep link, общий на процесс.

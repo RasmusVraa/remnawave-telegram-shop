@@ -47,6 +47,9 @@ const (
 	CallbackBroadcastToggleVPN   = "bc_t_vpn"
 	CallbackBroadcastToggleBuy   = "bc_t_buy"
 	CallbackBroadcastToggleShare = "bc_t_ref"
+	// Доставка рассылки: в ленту кабинета и важное ли оно там.
+	CallbackBroadcastToggleCabinet   = "bc_t_cab"
+	CallbackBroadcastToggleImportant = "bc_t_imp"
 	CallbackBroadcastButtonsNext = "bc_next"
 
 	CallbackAdminPanel   = "admin_panel"

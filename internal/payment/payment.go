@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"math"
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/cache"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/cryptopay"
@@ -436,6 +437,14 @@ func (s PaymentService) processDevicePurchase(ctx context.Context, purchase *dat
 		}
 	}
 
+	cabinetnotify.Notify(ctx, customer.ID, customer.Language, cabinetnotify.Event{
+		Kind:      database.CabinetNotificationDevices,
+		TitleKey:  "cabinet_notify_devices_title",
+		BodyKey:   "cabinet_notify_devices_body",
+		Args:      []any{currentLimit, newLimit},
+		DedupeKey: fmt.Sprintf("devices:%d", purchase.ID),
+	})
+
 	if !skipTelegramCustomerDM(customer) {
 		successText := fmt.Sprintf(s.translation.GetText(customer.Language, "hwid_change_success_paid"), currentLimit, newLimit, int(math.Ceil(purchase.Amount)))
 		_, err = s.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
@@ -691,6 +700,16 @@ func (s PaymentService) finalizePurchase(ctx context.Context, purchase *database
 		return err
 	}
 
+	// В кабинет — всем, в том числе web-only: им Telegram-сообщение не уходит.
+	cabinetnotify.Notify(ctx, customer.ID, customer.Language, cabinetnotify.Event{
+		Kind:      database.CabinetNotificationPayment,
+		TitleKey:  "cabinet_notify_payment_title",
+		BodyKey:   "cabinet_notify_payment_body",
+		Args:      []any{cabinetnotify.Date(user.ExpireAt)},
+		Buttons:   []string{"connect"},
+		DedupeKey: fmt.Sprintf("payment:%d", purchase.ID),
+	})
+
 	if !skipTelegramCustomerDM(customer) {
 		_, err = s.telegramBot.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: customer.TelegramID,
@@ -772,6 +791,14 @@ func (s PaymentService) maybeNotifyLoyaltyLevelUp(ctx context.Context, customer 
 	}
 	b.WriteString("\n\n")
 	b.WriteString(tm.GetText(lang, "loyalty_level_up_footer"))
+	cabinetnotify.Notify(ctx, customer.ID, lang, cabinetnotify.Event{
+		Kind:      database.CabinetNotificationLoyalty,
+		TitleKey:  "cabinet_notify_loyalty_title",
+		BodyKey:   "cabinet_notify_loyalty_body",
+		Args:      []any{newProg.CurrentTier.SortOrder, newProg.CurrentTier.DiscountPercent},
+		Buttons:   []string{"loyalty"},
+		DedupeKey: fmt.Sprintf("loyalty:%d:%d", customer.ID, newProg.CurrentTier.SortOrder),
+	})
 	if skipTelegramCustomerDM(customer) {
 		return
 	}
@@ -1005,6 +1032,7 @@ func (s PaymentService) sendReferralBonusMessage(ctx context.Context, customer *
 	if days <= 0 {
 		return nil
 	}
+	notifyReferralBonus(ctx, customer, days)
 	if skipTelegramCustomerDM(customer) {
 		return nil
 	}
@@ -1023,6 +1051,7 @@ func (s PaymentService) sendReferralFirstBonusMessage(ctx context.Context, custo
 	if days <= 0 {
 		return nil
 	}
+	notifyReferralBonus(ctx, customer, days)
 	if skipTelegramCustomerDM(customer) {
 		return nil
 	}
@@ -1035,6 +1064,18 @@ func (s PaymentService) sendReferralFirstBonusMessage(ctx context.Context, custo
 		},
 	})
 	return err
+}
+
+// notifyReferralBonus — бонус за друга в ленту кабинета. Без ключа дублей:
+// каждая оплата друга — отдельный бонус.
+func notifyReferralBonus(ctx context.Context, customer *database.Customer, days int) {
+	cabinetnotify.Notify(ctx, customer.ID, customer.Language, cabinetnotify.Event{
+		Kind:     database.CabinetNotificationReferral,
+		TitleKey: "cabinet_notify_referral_title",
+		BodyKey:  "cabinet_notify_referral_body",
+		Args:     []any{days},
+		Buttons:  []string{"referral"},
+	})
 }
 
 func (s PaymentService) createReferralBonusKeyboard(customer *database.Customer) [][]models.InlineKeyboardButton {
@@ -1373,10 +1414,15 @@ func (s PaymentService) createYookasaInvoice(ctx context.Context, amount float64
 		return "", 0, err
 	}
 
+	// Выбор покупателя сверяем с настройкой здесь, а не в боте и кабинете по
+	// отдельности: клиент ЮKassa получает уже итоговый код.
+	method := config.ResolveYookasaPaymentMethod(yookasa.PaymentMethodFromCtx(ctx))
+	ctx = context.WithValue(ctx, yookasa.CtxKeyPaymentMethod, method)
+
 	invDesc := buildRubReceiptDescription(months, extraHwid, extras, database.InvoiceTypeYookasa)
 	invoice, err := s.yookasaClient.CreateInvoice(ctx, int(amount), invDesc, customer.ID, purchaseId)
 	if err != nil {
-		slog.Error("Error creating invoice", "error", err)
+		slog.Error("Error creating invoice", "error", err, "payment_method", method)
 		return "", 0, err
 	}
 
@@ -1384,6 +1430,9 @@ func (s PaymentService) createYookasaInvoice(ctx context.Context, amount float64
 		"yookasa_url": invoice.Confirmation.ConfirmationURL,
 		"yookasa_id":  invoice.ID,
 		"status":      database.PurchaseStatusPending,
+	}
+	if method != "" {
+		updates["yookasa_payment_method"] = method
 	}
 
 	err = s.purchaseRepository.UpdateFields(ctx, purchaseId, updates)

@@ -1,0 +1,124 @@
+{
+  "/me": {
+    "id": 1,
+    "email": "user@example.invalid",
+    "email_verified": true,
+    "language": "ru",
+    "providers": [
+      "password",
+      "telegram"
+    ],
+    "has_telegram_link": true,
+    "has_password": true,
+    "is_admin": true,
+    "customer_id": 1
+  },
+  "/auth/bootstrap": {
+    "site_links": {
+      "channel": "https://t.me/example",
+      "feedback": "https://t.me/example_reviews"
+    },
+    "partner_max_percent": 20,
+    "support_chat_enabled": true
+  },
+  "/me/subscription": {
+    "expire_at": "2027-01-29T04:00:14.230Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 3,
+    "traffic_used_gb": 0.8,
+    "traffic_limit_gb": null,
+    "is_trial": false,
+    "tariff": {
+      "id": 1,
+      "slug": "premium",
+      "name": "Премиум",
+      "traffic_gb": null,
+      "device_limit": 5
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": {
+      "enabled": true,
+      "ui_visible": true,
+      "current_limit": 5,
+      "base_limit": 3,
+      "max_limit": 8,
+      "extra_active": 2,
+      "can_increase": true,
+      "can_decrease": true,
+      "price_rub_month": 75,
+      "stars_price_month": 40,
+      "days_left": 41
+    },
+    "traffic_reset_strategy": null,
+    "next_traffic_reset_at": null
+  },
+  "/me/devices": {
+    "enabled": true,
+    "device_limit": 5,
+    "connected": 4,
+    "devices": [
+      {
+        "hwid": "h1",
+        "platform": "iOS",
+        "os_version": "18.1",
+        "device_model": "iPhone 13"
+      },
+      {
+        "hwid": "h2",
+        "platform": "Android",
+        "os_version": "14",
+        "device_model": "Redmi Note 12"
+      },
+      {
+        "hwid": "h3",
+        "platform": "Windows",
+        "os_version": "11",
+        "device_model": "Ноутбук"
+      },
+      {
+        "hwid": "h4",
+        "platform": "AndroidTV",
+        "os_version": "11",
+        "device_model": "Mi TV"
+      }
+    ]
+  },
+  "/me/traffic-usage": {
+    "enabled": true,
+    "period_start": "2026-10-23",
+    "period_end": "2026-10-31",
+    "categories": [
+      "2026-10-23",
+      "2026-10-24",
+      "2026-10-25",
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31"
+    ],
+    "points": [
+      106980870,
+      69222916,
+      50343939,
+      53490435,
+      50343939,
+      314649619,
+      62929924,
+      56636931,
+      94394886
+    ],
+    "total_bytes": 858993459.2
+  },
+  "/me/trial": {
+    "enabled": true,
+    "can_activate": false,
+    "days": 3
+  },
+  "/me/connect-invite": {
+    "url": "https://example.invalid/c/abc",
+    "expires_at": "2026-11-07T16:00:14.230Z"
+  }
+}

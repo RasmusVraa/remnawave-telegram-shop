@@ -145,6 +145,9 @@ type CreateRequest struct {
 	TariffID *int64
 	// Provider — "yookassa" | "cryptopay".
 	Provider string
+	// YookassaMethod — способ ЮKassa из кнопки (YOOKASA_PAYMENT_METHODS):
+	// "sbp", "bank_card"… Пусто или вне списка — PaymentService выберет сам.
+	YookassaMethod string
 	// IdempotencyKey — содержимое заголовка Idempotency-Key.
 	IdempotencyKey string
 	// RenewExtraHwid — если true, при наличии активных extra_hwid добавляем их продление к счёту (как в Telegram-боте).
@@ -292,7 +295,7 @@ func (s *CheckoutService) Create(ctx context.Context, accountID int64, req Creat
 	}
 
 	returnURL := s.buildReturnURL(checkout.ID)
-	providerCtx := s.withProviderOverrides(ctx, provider, returnURL, acc)
+	providerCtx := s.withProviderOverrides(ctx, provider, req.YookassaMethod, returnURL, acc)
 
 	var paymentURL string
 	var purchaseID int64
@@ -622,6 +625,7 @@ type HwidPreviewResult struct {
 type HwidCreateRequest struct {
 	TargetLimit    int
 	Provider       string
+	YookassaMethod string
 	IdempotencyKey string
 }
 
@@ -810,7 +814,7 @@ func (s *CheckoutService) CreateHwid(ctx context.Context, accountID int64, req H
 	if err != nil {
 		return nil, fmt.Errorf("payments: load account: %w", err)
 	}
-	providerCtx := s.withProviderOverrides(ctx, provider, returnURL, acc)
+	providerCtx := s.withProviderOverrides(ctx, provider, req.YookassaMethod, returnURL, acc)
 
 	paymentURL, purchaseID, err := s.payments.CreateHwidPurchase(providerCtx, float64(amount), delta, customer, invoiceType, meta)
 	if err != nil {
@@ -1028,15 +1032,18 @@ func (s *CheckoutService) buildReturnURL(checkoutID int64) string {
 	return fmt.Sprintf("%s/cabinet/payment/status/%d", s.cfg.PublicURL, checkoutID)
 }
 
-// withProviderOverrides прокидывает return_url / receipt_email в контекст
-// провайдера. Значения подхватываются yookasa.Client / PaymentService.
+// withProviderOverrides прокидывает return_url / receipt_email / способ ЮKassa
+// в контекст провайдера. Значения подхватываются yookasa.Client / PaymentService.
 func (s *CheckoutService) withProviderOverrides(
 	ctx context.Context,
-	provider, returnURL string,
+	provider, yookassaMethod, returnURL string,
 	acc *repository.Account,
 ) context.Context {
 	switch provider {
 	case repository.CheckoutProviderYookassa:
+		if yookassaMethod != "" {
+			ctx = context.WithValue(ctx, yookasa.CtxKeyPaymentMethod, yookassaMethod)
+		}
 		if returnURL != "" {
 			ctx = context.WithValue(ctx, yookasa.CtxKeyReturnURL, returnURL)
 		}

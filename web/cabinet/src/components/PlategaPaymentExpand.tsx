@@ -5,6 +5,7 @@ import { Bitcoin, ChevronDown, CreditCard, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { ProviderMethodButton } from '@/components/ProviderMethodButton'
+import { SbpBrandIcon } from '@/components/BrandIcons'
 
 export const PLATEGA_METHOD_ORDER = [
   'platega_sbp',
@@ -33,7 +34,7 @@ function plategaParentTitle(t: (k: string) => string, methods: PlategaMethodId[]
   return parts.join(' / ')
 }
 
-function plategaMethodLabel(t: (k: string) => string, id: PlategaMethodId): string {
+export function plategaMethodLabel(t: (k: string) => string, id: PlategaMethodId): string {
   switch (id) {
     case 'platega_sbp':
       return t('checkout.plategaSbp')
@@ -48,10 +49,10 @@ function plategaMethodLabel(t: (k: string) => string, id: PlategaMethodId): stri
   }
 }
 
-function plategaMethodIcon(id: PlategaMethodId) {
+export function plategaMethodIcon(id: PlategaMethodId) {
   switch (id) {
     case 'platega_sbp':
-      return <Wallet size={18} className="text-primary" />
+      return <SbpBrandIcon className="h-[18px] w-[18px]" />
     case 'platega_cards':
       return <CreditCard size={18} className="text-primary" />
     case 'platega_acquiring':
@@ -67,7 +68,7 @@ function plategaMethodIcon(id: PlategaMethodId) {
 function plategaMethodIconCompact(id: PlategaMethodId) {
   switch (id) {
     case 'platega_sbp':
-      return <Wallet size={14} className="shrink-0" />
+      return <SbpBrandIcon className="h-3.5 w-3.5 shrink-0" />
     case 'platega_cards':
       return <CreditCard size={14} className="shrink-0" />
     case 'platega_acquiring':

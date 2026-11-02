@@ -14,6 +14,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/handler"
@@ -190,6 +191,7 @@ func (h *Handler) handleTorrentReport(ctx context.Context, raw json.RawMessage) 
 		)
 		return nil
 	}
+	h.notifyCabinet(ctx, customer, data.Node.Name, ar, dedupKey)
 	if customer.IsWebOnly || utils.IsSyntheticTelegramID(customer.TelegramID) {
 		slog.Info("remnawave webhook: skip web-only/synthetic customer",
 			"customer_id", utils.MaskHalfInt64(customer.ID),
@@ -228,6 +230,22 @@ func (h *Handler) notifyCustomer(ctx context.Context, customer *database.Custome
 		"duration_min", mins,
 	)
 	return nil
+}
+
+// notifyCabinet — та же блокировка в ленту кабинета, в том числе web-only
+// клиенту: в Telegram ему не написать, а узнать, почему сервер пропал, надо.
+func (h *Handler) notifyCabinet(ctx context.Context, customer *database.Customer, nodeName string, ar actionReport, dedupKey string) {
+	lang := customer.Language
+	if lang == "" {
+		lang = config.DefaultLanguage()
+	}
+	mins := DurationMinutes(ar.BlockDuration, ar.ProcessedAt, ar.WillUnblockAt)
+	cabinetnotify.Notify(ctx, customer.ID, lang, cabinetnotify.Event{
+		Kind:      database.CabinetNotificationTorrent,
+		TitleKey:  "cabinet_notify_torrent_title",
+		BodyHTML:  FormatMessage(h.tm.GetText(lang, "torrent_blocked"), nodeName, mins, ar.WillUnblockAt),
+		DedupeKey: "torrent:" + dedupKey,
+	})
 }
 
 func (h *Handler) buildKeyboard(lang string) *models.InlineKeyboardMarkup {

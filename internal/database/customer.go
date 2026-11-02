@@ -968,47 +968,15 @@ func (cr *CustomerRepository) GetBroadcastRecipientsForAudiences(ctx context.Con
 		return cr.testBroadcastRecipients(ctx)
 	}
 
-	now := time.Now()
+	filter, err := BroadcastAudienceFilter(normalized, tariffID, time.Now())
+	if err != nil {
+		return nil, err
+	}
 	buildSelect := sq.Select("telegram_id", "language").
 		From("customer").
 		PlaceholderFormat(sq.Dollar)
-
-	activeVPN := sq.And{sq.NotEq{"expire_at": nil}, sq.Gt{"expire_at": now}}
-	inactiveVPN := sq.Or{sq.Eq{"expire_at": nil}, sq.LtOrEq{"expire_at": now}}
-	paidSubscription := sq.Expr(`EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
-	noPaidSubscription := sq.Expr(`NOT EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
-
-	// «Все» поглощает остальные сегменты ещё в NormalizeBroadcastAudiences,
-	// так что здесь он может прийти только один и фильтра не добавляет.
-	if normalized[0] != BroadcastAudienceAll {
-		var segments sq.Or
-		for _, audience := range normalized {
-			switch audience {
-			case BroadcastAudienceActiveAll:
-				segments = append(segments, activeVPN)
-			case BroadcastAudienceInactiveAll:
-				segments = append(segments, inactiveVPN)
-			case BroadcastAudienceActivePaid:
-				ap := sq.And{activeVPN, paidSubscription}
-				if tariffID != nil {
-					ap = sq.And{ap, sq.Eq{"current_tariff_id": *tariffID}}
-				}
-				segments = append(segments, ap)
-			case BroadcastAudienceActiveTrial:
-				segments = append(segments, sq.And{activeVPN, noPaidSubscription})
-			case BroadcastAudienceInactivePaid:
-				ip := sq.And{inactiveVPN, paidSubscription}
-				if tariffID != nil {
-					ip = sq.And{ip, sq.Eq{"current_tariff_id": *tariffID}}
-				}
-				segments = append(segments, ip)
-			case BroadcastAudienceInactiveTrial:
-				segments = append(segments, sq.And{inactiveVPN, noPaidSubscription})
-			default:
-				return nil, fmt.Errorf("unknown broadcast audience: %s", audience)
-			}
-		}
-		buildSelect = buildSelect.Where(segments)
+	if filter != nil {
+		buildSelect = buildSelect.Where(filter)
 	}
 
 	buildSelect = buildSelect.Where(sq.Eq{"is_web_only": false, "broadcast_opt_out": false})
@@ -1045,6 +1013,57 @@ func (cr *CustomerRepository) GetBroadcastRecipientsForAudiences(ctx context.Con
 	}
 
 	return out, nil
+}
+
+// BroadcastAudienceFilter — условие на таблицу customer для уже нормализованных
+// сегментов (см. NormalizeBroadcastAudiences). nil — «Все», без фильтра.
+//
+// Одно условие на оба канала: Telegram-рассылка и уведомления в кабинете
+// обязаны выбирать один и тот же круг людей, иначе «только для Премиум»
+// в кабинете дошло бы и до «Стандарта». Тестовая рассылка сюда не попадает:
+// её получатель — админ, а не сегмент.
+func BroadcastAudienceFilter(normalized []string, tariffID *int64, now time.Time) (sq.Sqlizer, error) {
+	if len(normalized) == 0 {
+		return nil, errors.New("no broadcast audience selected")
+	}
+	activeVPN := sq.And{sq.NotEq{"expire_at": nil}, sq.Gt{"expire_at": now}}
+	inactiveVPN := sq.Or{sq.Eq{"expire_at": nil}, sq.LtOrEq{"expire_at": now}}
+	paidSubscription := sq.Expr(`EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
+	noPaidSubscription := sq.Expr(`NOT EXISTS (SELECT 1 FROM purchase p WHERE p.customer_id = customer.id AND p.status = 'paid' AND p.month > 0)`)
+
+	// «Все» поглощает остальные сегменты ещё в NormalizeBroadcastAudiences,
+	// так что здесь он может прийти только один и фильтра не добавляет.
+	if normalized[0] != BroadcastAudienceAll {
+		var segments sq.Or
+		for _, audience := range normalized {
+			switch audience {
+			case BroadcastAudienceActiveAll:
+				segments = append(segments, activeVPN)
+			case BroadcastAudienceInactiveAll:
+				segments = append(segments, inactiveVPN)
+			case BroadcastAudienceActivePaid:
+				ap := sq.And{activeVPN, paidSubscription}
+				if tariffID != nil {
+					ap = sq.And{ap, sq.Eq{"current_tariff_id": *tariffID}}
+				}
+				segments = append(segments, ap)
+			case BroadcastAudienceActiveTrial:
+				segments = append(segments, sq.And{activeVPN, noPaidSubscription})
+			case BroadcastAudienceInactivePaid:
+				ip := sq.And{inactiveVPN, paidSubscription}
+				if tariffID != nil {
+					ip = sq.And{ip, sq.Eq{"current_tariff_id": *tariffID}}
+				}
+				segments = append(segments, ip)
+			case BroadcastAudienceInactiveTrial:
+				segments = append(segments, sq.And{inactiveVPN, noPaidSubscription})
+			default:
+				return nil, fmt.Errorf("unknown broadcast audience: %s", audience)
+			}
+		}
+		return segments, nil
+	}
+	return nil, nil
 }
 
 // testBroadcastRecipients возвращает единственного получателя тестовой рассылки — админа

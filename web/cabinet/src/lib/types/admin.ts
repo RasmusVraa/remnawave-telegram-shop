@@ -547,8 +547,13 @@ export interface AdminTariffSquadsPreviewDTO {
 
 export interface AdminBroadcastPreviewDTO {
   recipient_count: number
+  /** Сколько получат уведомление в кабинете — включая тех, кто без Telegram. */
+  cabinet_count?: number
   status?: string
 }
+
+/** Канал рассылки. */
+export type AdminBroadcastChannel = 'telegram' | 'cabinet'
 
 /** Чем вложение уйдёт в Telegram. Решает сервер по тому, во что его превратил Bot API. */
 export type AdminBroadcastMediaKind = 'photo' | 'video' | 'document'
@@ -561,6 +566,7 @@ export interface AdminBroadcastMediaDTO {
 export interface AdminBroadcastSendDTO {
   status: string
   recipient_count: number
+  cabinet_count?: number
   /** Запись в истории; 0 — не записалась, и ход отправки не показать. */
   broadcast_id?: number
 }
@@ -603,6 +609,16 @@ export interface AdminBroadcastHistoryItemDTO {
   error: string
   started_at: string
   finished_at: string | null
+  /** Каналы: у рассылок до уведомлений в кабинете — только telegram. */
+  channels?: AdminBroadcastChannel[]
+  /** Уведомление в кабинете; null — туда рассылка не уходила. */
+  cabinet?: {
+    important: boolean
+    /** Админ убрал уведомление у всех. */
+    deleted: boolean
+    recipients: number
+    read: number
+  } | null
 }
 
 export interface AdminBroadcastHistoryDTO {

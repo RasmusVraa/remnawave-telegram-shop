@@ -3,6 +3,7 @@ import {
   Activity,
   BadgeRussianRuble,
   Bell,
+  BellRing,
   CalendarDays,
   CircleDot,
   CreditCard,
@@ -10,6 +11,7 @@ import {
   Gem,
   Gift,
   Handshake,
+  LayoutGrid,
   LayoutList,
   PanelTop,
   Link2,
@@ -56,6 +58,7 @@ export const ADMIN_SETTINGS_GROUP_ORDER = [
   'links',
   'tags',
   'lifecycle',
+  'notifications',
   'fortune',
 ] as const
 
@@ -76,6 +79,7 @@ export const ADMIN_SETTINGS_GROUP_ICONS: Record<AdminSettingsGroupId, LucideIcon
   links: Link2,
   tags: Tag,
   lifecycle: RefreshCw,
+  notifications: BellRing,
   fortune: CircleDot,
   cabinet: Sparkles,
   landing: PanelTop,
@@ -103,6 +107,7 @@ export const ADMIN_SETTINGS_GROUP_ICON_STYLES: Record<AdminSettingsGroupId, Admi
   links: { box: 'bg-indigo-500/10 dark:bg-indigo-500/20', icon: 'text-indigo-500' },
   tags: { box: 'bg-orange-500/10 dark:bg-orange-500/20', icon: 'text-orange-500' },
   lifecycle: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
+  notifications: { box: 'bg-red-500/10 dark:bg-red-500/20', icon: 'text-red-500' },
   fortune: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
   cabinet: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
   landing: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
@@ -135,6 +140,7 @@ export const ADMIN_SETTINGS_CATEGORY_ORDER = [
   'design',
   'marketing',
   'finance',
+  'notifications',
   'operations',
   'access',
 ] as const
@@ -175,6 +181,15 @@ export const ADMIN_SETTINGS_CATEGORIES: AdminSettingsCategoryDef[] = [
     icon: Wallet,
     groups: ['payments', 'payments_notify', 'moynalog'],
     iconStyle: { box: 'bg-emerald-500/10 dark:bg-emerald-500/20', icon: 'text-emerald-500' },
+  },
+  {
+    // Push в браузер из кабинета: какие виды уведомлений дублировать
+    // системным уведомлением. В ленту под колокольчиком попадает всё.
+    id: 'notifications',
+    titleKey: 'admin.settings.categories.notifications',
+    icon: BellRing,
+    groups: ['notifications'],
+    iconStyle: { box: 'bg-red-500/10 dark:bg-red-500/20', icon: 'text-red-500' },
   },
   {
     id: 'operations',
@@ -302,6 +317,26 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       keys: ['REFERRAL_SCALE_BY_MONTHS'],
     },
   ],
+  notifications: [
+    {
+      id: 'urgent',
+      titleKey: 'admin.settings.subsections.notifications.urgent',
+      icon: BellRing,
+      keys: ['CABINET_PUSH_IMPORTANT', 'CABINET_PUSH_SUPPORT', 'CABINET_PUSH_TORRENT', 'CABINET_PUSH_EXPIRING'],
+    },
+    {
+      id: 'broadcasts',
+      titleKey: 'admin.settings.subsections.notifications.broadcasts',
+      icon: Megaphone,
+      keys: ['CABINET_PUSH_TEST_BROADCAST', 'CABINET_PUSH_BROADCAST'],
+    },
+    {
+      id: 'account',
+      titleKey: 'admin.settings.subsections.notifications.account',
+      icon: Wallet,
+      keys: ['CABINET_PUSH_PAYMENT', 'CABINET_PUSH_DEVICES', 'CABINET_PUSH_REFERRAL', 'CABINET_PUSH_LOYALTY', 'CABINET_PUSH_PARTNER'],
+    },
+  ],
   payments_notify: [
     {
       id: 'toggle',
@@ -334,6 +369,18 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
         'PLATEGA_WORLDWIDE_ENABLED',
         'PLATEGA_CRYPTO_ENABLED',
       ],
+    },
+    {
+      id: 'yookassa',
+      titleKey: 'admin.settings.subsections.payments.yookassa',
+      icon: CreditCard,
+      keys: ['YOOKASA_PAYMENT_METHODS'],
+    },
+    {
+      id: 'checkout',
+      titleKey: 'admin.settings.subsections.payments.checkout',
+      icon: Wallet,
+      keys: ['CABINET_CHECKOUT_DEFAULT_METHOD'],
     },
   ],
   moynalog: [
@@ -475,6 +522,12 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       titleKey: 'admin.settings.subsections.cabinet.sections',
       icon: LayoutList,
       keys: ['CABINET_SUBSCRIPTION_SHOW_LOYALTY'],
+    },
+    {
+      id: 'homeActions',
+      titleKey: 'admin.settings.subsections.cabinet.homeActions',
+      icon: LayoutGrid,
+      keys: ['CABINET_HOME_QUICK_ACTIONS'],
     },
     {
       id: 'schedule',

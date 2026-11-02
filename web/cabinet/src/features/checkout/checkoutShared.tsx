@@ -1,15 +1,9 @@
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useTranslation } from 'react-i18next'
-import { Bitcoin, CreditCard, Star } from 'lucide-react'
 
-import { HeleketBrandIcon } from '@/components/BrandIcons'
 import { LegalContinueDisclaimer } from '@/components/LegalContinueDisclaimer'
-import { PlategaPaymentExpand, type PlategaMethodId } from '@/components/PlategaPaymentExpand'
-import { ProviderMethodButton } from '@/components/ProviderMethodButton'
 import { RevealItem } from '@/components/PageReveal'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { cn } from '@/lib/utils'
 
@@ -69,80 +63,6 @@ export function SummaryRow({
       <span className="text-muted-foreground">{label}</span>
       <span className="font-medium text-right">{value}</span>
     </div>
-  )
-}
-
-export function ProviderPickerCard({
-  providerEnabled,
-  provider,
-  selectedProvider,
-  onSelect,
-}: {
-  providerEnabled: Record<Provider, boolean>
-  /** Выбор как есть — Platega разворачивается по нему, даже если способ выключен. */
-  provider: Provider | null
-  /** Выбор с учётом включённых способов — по нему подсвечиваются кнопки. */
-  selectedProvider: Provider | null
-  onSelect: (p: Provider) => void
-}) {
-  const { t } = useTranslation()
-  const availableProviders = PROVIDER_ORDER.filter((p) => providerEnabled[p])
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-medium text-muted-foreground">
-          {t('checkout.chooseProvider')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        {availableProviders.includes('yookassa') && (
-          <ProviderMethodButton
-            selected={selectedProvider === 'yookassa'}
-            onClick={() => onSelect('yookassa')}
-            icon={<CreditCard size={18} className="text-primary" />}
-            label={t('checkout.card')}
-            description="YooKassa"
-          />
-        )}
-        {availableProviders.includes('cryptopay') && (
-          <ProviderMethodButton
-            selected={selectedProvider === 'cryptopay'}
-            onClick={() => onSelect('cryptopay')}
-            icon={<Bitcoin size={18} className="text-orange-500" />}
-            label={t('checkout.crypto')}
-            description="CryptoPay"
-          />
-        )}
-        <PlategaPaymentExpand
-          enabled={providerEnabled}
-          selected={provider}
-          onSelect={(id: PlategaMethodId) => onSelect(id)}
-          variant="checkout"
-        />
-        {availableProviders.includes('telegram') && (
-          <ProviderMethodButton
-            selected={selectedProvider === 'telegram'}
-            onClick={() => onSelect('telegram')}
-            icon={<Star size={18} className="text-amber-500" />}
-            label={t('checkout.telegramStars')}
-            description="Telegram Stars"
-          />
-        )}
-        {availableProviders.includes('heleket') && (
-          <ProviderMethodButton
-            selected={selectedProvider === 'heleket'}
-            onClick={() => onSelect('heleket')}
-            icon={<HeleketBrandIcon className="h-[18px] w-[18px]" />}
-            label={t('checkout.otherCrypto')}
-            description="Heleket"
-          />
-        )}
-        {availableProviders.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
-        )}
-      </CardContent>
-    </Card>
   )
 }
 

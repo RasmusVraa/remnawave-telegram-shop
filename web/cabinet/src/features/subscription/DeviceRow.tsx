@@ -11,7 +11,7 @@ import { api, type DeviceInfo } from '@/lib/api'
 const DEVICE_NAME_MAX_LEN = 64
 
 const iconButton =
-  'shrink-0 rounded-lg p-2 text-muted-foreground transition-colors disabled:pointer-events-none disabled:opacity-50'
+  'inline-flex size-8 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors disabled:pointer-events-none disabled:opacity-50 sm:size-9'
 
 /**
  * Строка устройства в «Мои устройства». Карандаш превращает название в поле
@@ -73,11 +73,11 @@ export function DeviceRow({
   }
 
   return (
-    <li className="cabinet-row flex items-center justify-between gap-3 rounded-xl px-3 py-2">
-      <div className="flex min-w-0 flex-1 items-center gap-3">
+    <li className="flex items-center justify-between gap-3 border-t border-border/[0.55] px-1 py-2.5 sm:gap-3.5">
+      <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-3.5">
         {/* Иконка по платформе: ноутбук для macOS/Windows, телефон для мобильных. */}
-        <span className="cabinet-icon-box inline-flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <DevicePlatformIcon platform={device.platform ?? device.device_model} className="size-4" />
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.12] text-primary">
+          <DevicePlatformIcon platform={device.platform ?? device.device_model} className="size-5" />
         </span>
         {editing ? (
           <input
@@ -102,8 +102,8 @@ export function DeviceRow({
           />
         ) : (
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium">{title}</p>
-            <p className="truncate text-xs text-muted-foreground">{subtitle}</p>
+            <p className="truncate text-[15px] font-semibold">{title}</p>
+            <p className="mt-0.5 truncate text-[13px] text-muted-foreground">{subtitle}</p>
           </div>
         )}
       </div>
@@ -119,7 +119,7 @@ export function DeviceRow({
               title={t('subscriptionPage.renameDeviceSave')}
               className={`${iconButton} hover:bg-emerald-500/10 hover:text-emerald-500`}
             >
-              <Check size={15} />
+              <Check size={17} />
             </button>
             <button
               type="button"
@@ -129,7 +129,7 @@ export function DeviceRow({
               title={t('subscriptionPage.renameDeviceCancel')}
               className={`${iconButton} hover:bg-muted hover:text-foreground`}
             >
-              <X size={15} />
+              <X size={17} />
             </button>
           </>
         ) : (
@@ -141,7 +141,7 @@ export function DeviceRow({
               title={t('subscriptionPage.renameDevice')}
               className={`${iconButton} hover:bg-primary/10 hover:text-primary`}
             >
-              <Pencil size={15} />
+              <Pencil size={17} />
             </button>
             <button
               type="button"
@@ -151,7 +151,7 @@ export function DeviceRow({
               title={t('subscriptionPage.deleteDevice')}
               className={`${iconButton} hover:bg-destructive/10 hover:text-destructive`}
             >
-              <Trash2 size={15} />
+              <Trash2 size={17} />
             </button>
           </>
         )}

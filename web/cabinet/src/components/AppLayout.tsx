@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next'
 import {
   Activity,
   Home,
-  Sparkles,
   Zap,
   MessageCircle,
   User,
@@ -13,17 +12,20 @@ import {
   TicketPercent,
   Users,
   Handshake,
-  Gift,
   LogOut,
   ShieldCheck,
+  FileText,
+  Newspaper,
+  Star,
+  ChevronRight,
+  type LucideIcon,
 } from 'lucide-react'
 
 import { ConfirmModal } from './ConfirmModal'
 import { Logo } from './Logo'
-import { ThemeToggle } from './ThemeToggle'
-import { LangToggle } from './LangToggle'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
+import { FortuneWheelIcon } from '@/features/fortune/FortuneWheelIcon'
 import { hapticImpactLight } from '@/lib/telegram-web-app'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useAuthStore } from '@/store/auth'
@@ -32,6 +34,7 @@ import { CabinetDecorHeader } from '@/features/decor/CabinetDecorHeader'
 import { DecorNavIcon } from '@/features/decor/decorNavIcons'
 import { useCabinetDecorTheme } from '@/features/decor/useCabinetDecorTheme'
 import { CabinetOnboarding } from '@/features/onboarding/CabinetOnboarding'
+import { NotificationBell } from '@/features/notifications/NotificationBell'
 import { useSupportSummary } from '@/features/support/useSupportChat'
 
 interface AppLayoutProps {
@@ -46,40 +49,18 @@ type NavItem = {
   activePrefixes?: string[]
 }
 
+/*
+ * «Подписка» слилась с главной (SPEC редизайна главной), поэтому гид
+ * подключения /connections подсвечивает «Главную».
+ */
 const baseNavItems: NavItem[] = [
-  { to: '/dashboard', icon: Home, labelKey: 'nav.dashboard' },
-  { to: '/subscription', icon: Sparkles, labelKey: 'nav.subscription', activePrefixes: ['/connections'] },
+  { to: '/dashboard', icon: Home, labelKey: 'nav.dashboard', activePrefixes: ['/connections'] },
   { to: '/tariffs', icon: Zap, labelKey: 'nav.tariffs' },
   { to: '/support', icon: MessageCircle, labelKey: 'nav.support' },
   { to: '/profile', icon: User, labelKey: 'nav.profile', activePrefixes: ['/accounts', '/link'] },
 ]
 
-const mobileBottomNavItems: NavItem[] = [
-  { to: '/dashboard', icon: Home, labelKey: 'nav.dashboard' },
-  { to: '/subscription', icon: Sparkles, labelKey: 'nav.subscription', activePrefixes: ['/connections'] },
-  { to: '/tariffs', icon: Zap, labelKey: 'nav.tariffs' },
-  { to: '/support', icon: MessageCircle, labelKey: 'nav.support' },
-  { to: '/profile', icon: User, labelKey: 'nav.profile', activePrefixes: ['/accounts', '/link'] },
-]
-
-const overflowNavMainItems: { to: string; icon: typeof Home; labelKey: string }[] = [
-  { to: '/dashboard', icon: Home, labelKey: 'nav.dashboard' },
-  { to: '/subscription', icon: Sparkles, labelKey: 'nav.subscription' },
-  { to: '/tariffs', icon: Zap, labelKey: 'nav.tariffs' },
-  { to: '/support', icon: MessageCircle, labelKey: 'nav.support' },
-  { to: '/status', icon: Activity, labelKey: 'nav.servers' },
-  { to: '/promocodes', icon: TicketPercent, labelKey: 'nav.promocodes' },
-  { to: '/referral', icon: Users, labelKey: 'nav.referral' },
-  { to: '/partner', icon: Handshake, labelKey: 'nav.partner' },
-  { to: '/fortune', icon: Gift, labelKey: 'nav.fortune' },
-]
-
-const overflowNavProfileItem: { to: string; icon: typeof User; labelKey: string; activePrefixes: string[] } = {
-  to: '/profile',
-  icon: User,
-  labelKey: 'nav.profile',
-  activePrefixes: ['/accounts', '/link'],
-}
+const mobileBottomNavItems: NavItem[] = baseNavItems
 
 function navItemActive(pathname: string, item: NavItem): boolean {
   if (pathname === item.to) return true
@@ -93,13 +74,45 @@ function overflowActive(pathname: string, to: string): boolean {
   return pathname === to || pathname.startsWith(`${to}/`)
 }
 
-function profileNavActive(pathname: string): boolean {
-  if (pathname === overflowNavProfileItem.to) return true
-  return overflowNavProfileItem.activePrefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`))
-}
-
 /** Активный пункт в выпадающем меню и нижней мобильной навигации (как у текста ссылки). */
 const navAccentActiveClass = 'text-primary'
+
+/**
+ * Пункт меню ☰. Внутренний (to) или внешний (href — новости и отзывы ведут
+ * в Telegram), со своим «хвостом» справа: подсказка или бейдж.
+ */
+type MenuItem = {
+  key: string
+  icon: LucideIcon
+  label: string
+  to?: string
+  href?: string
+  extra?: ReactNode
+  decorTo?: string
+}
+
+function MenuEntry({
+  item,
+  className,
+  children,
+}: {
+  item: MenuItem
+  className: string
+  children: ReactNode
+}) {
+  if (item.href) {
+    return (
+      <a href={item.href} target="_blank" rel="noopener noreferrer" role="menuitem" className={className}>
+        {children}
+      </a>
+    )
+  }
+  return (
+    <Link to={item.to ?? '/'} role="menuitem" className={className}>
+      {children}
+    </Link>
+  )
+}
 
 function NavIconWithDot({ showDot, children }: { showDot: boolean; children: ReactNode }) {
   return (
@@ -115,16 +128,63 @@ export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation()
   const decorTheme = useCabinetDecorTheme()
   const { data: bootstrap } = useAuthBootstrap()
-  const overflowMainNav = useMemo(() => {
-    // Выключенные разделы убираются из меню: пункт, ведущий на «недоступно», —
-    // это обещание, которого продукт не выполняет.
-    const hidden = new Set<string>()
-    if (bootstrap?.fortune_nav_visible === false) hidden.add('/fortune')
-    if (bootstrap?.partner_nav_visible === false) hidden.add('/partner')
-    if (hidden.size === 0) return overflowNavMainItems
-    return overflowNavMainItems.filter((item) => !hidden.has(item.to))
-  }, [bootstrap?.fortune_nav_visible, bootstrap?.partner_nav_visible])
+  // Публичные страницы (переход по deep link) тоже в этой шапке: без сессии
+  // колокольчик спрашивал бы счётчик и получал 401.
+  const hasSession = Boolean(useAuthStore((st) => st.accessToken))
   const user = useAuthStore((s) => s.user)
+  const partnerMaxPercent = bootstrap?.partner_max_percent ?? 0
+  const newsUrl = bootstrap?.site_links?.channel?.trim()
+  const feedbackUrl = bootstrap?.site_links?.feedback?.trim()
+  /*
+   * Меню ☰ по разделам. Пункты нижней навигации и шапки (Главная, Тарифы,
+   * Поддержка, Профиль) сюда не входят — это были дубли; из дублей шапки ПК
+   * осталась только «Админ-панель» внизу, перед «Выйти».
+   * Выключенные разделы убираются: пункт, ведущий на «недоступно», — это
+   * обещание, которого продукт не выполняет.
+   */
+  const menuGroups = useMemo(() => {
+    const bonuses: MenuItem[] = [
+      { key: 'promo', icon: TicketPercent, label: t('nav.promocodes'), to: '/promocodes', decorTo: '/promocodes' },
+      {
+        key: 'referral',
+        icon: Users,
+        label: t('nav.referral'),
+        to: '/referral',
+        decorTo: '/referral',
+        extra: <span className="ml-auto shrink-0 text-xs text-muted-foreground">{t('home.menuReferralHint')}</span>,
+      },
+    ]
+    if (bootstrap?.partner_nav_visible !== false) {
+      bonuses.push({
+        key: 'partner',
+        icon: Handshake,
+        label: t('nav.partner'),
+        to: '/partner',
+        decorTo: '/partner',
+        // Ставка прямо в меню: партнёрка — единственный пункт, который что-то
+        // обещает, и обещание должно быть видно до перехода.
+        extra:
+          partnerMaxPercent > 0 ? (
+            <span className="ml-auto shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
+              {t('nav.partnerBadge', { percent: `${partnerMaxPercent}%` })}
+            </span>
+          ) : undefined,
+      })
+    }
+    if (bootstrap?.fortune_nav_visible !== false) {
+      bonuses.push({ key: 'fortune', icon: FortuneWheelIcon, label: t('nav.fortune'), to: '/fortune', decorTo: '/fortune' })
+    }
+    const about: MenuItem[] = [
+      { key: 'info', icon: FileText, label: t('nav.info'), to: '/support#cabinet-info' },
+      { key: 'servers', icon: Activity, label: t('nav.servers'), to: '/status', decorTo: '/status' },
+    ]
+    if (newsUrl) about.push({ key: 'news', icon: Newspaper, label: t('dashboard.newsCardTitle'), href: newsUrl })
+    if (feedbackUrl) about.push({ key: 'feedback', icon: Star, label: t('dashboard.feedbackCardTitle'), href: feedbackUrl })
+    return [
+      { key: 'bonuses', title: t('home.menuBonuses'), items: bonuses },
+      { key: 'about', title: t('home.menuAbout'), items: about },
+    ]
+  }, [t, bootstrap?.partner_nav_visible, bootstrap?.fortune_nav_visible, partnerMaxPercent, newsUrl, feedbackUrl])
   const navItems = useMemo(() => {
     if (user?.is_admin) {
       return [
@@ -136,10 +196,41 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [user?.is_admin])
   const logout = useAuthStore((s) => s.logout)
   const supportChatEnabled = Boolean(bootstrap?.support_chat_enabled)
-  const partnerMaxPercent = bootstrap?.partner_max_percent ?? 0
   const { data: supportSummary } = useSupportSummary(supportChatEnabled, 60_000)
   const supportUnread = supportSummary?.unread_count ?? 0
   const [menuOpen, setMenuOpen] = useState(false)
+  /*
+   * Анимация меню: menuMounted держит разметку, пока идёт уход, menuVisible
+   * переключает классы перехода (тот же приём, что у шторок). Снимаем по
+   * таймеру, а не по transitionend — при «уменьшить движение» события нет.
+   */
+  const [menuMounted, setMenuMounted] = useState(false)
+  const [menuVisible, setMenuVisible] = useState(false)
+  // Прокрутка мобильного меню включается после выезда: во время анимации
+  // пункты на миг выходят за край контейнера, и мелькала полоса прокрутки.
+  const [menuSettled, setMenuSettled] = useState(false)
+  useEffect(() => {
+    if (menuOpen) {
+      setMenuMounted(true)
+      let inner = 0
+      let settle = 0
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => {
+          setMenuVisible(true)
+          settle = window.setTimeout(() => setMenuSettled(true), 220)
+        })
+      })
+      return () => {
+        cancelAnimationFrame(outer)
+        cancelAnimationFrame(inner)
+        window.clearTimeout(settle)
+      }
+    }
+    setMenuSettled(false)
+    setMenuVisible(false)
+    const id = window.setTimeout(() => setMenuMounted(false), 220)
+    return () => window.clearTimeout(id)
+  }, [menuOpen])
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const mobileNavRef = useRef<HTMLElement>(null)
@@ -293,8 +384,10 @@ export function AppLayout({ children }: AppLayoutProps) {
           </nav>
 
           <div className="flex items-center gap-0.5 sm:gap-1 ml-auto shrink-0">
-            <LangToggle className="h-10 px-4" />
-            <ThemeToggle className="size-10 [&_svg]:size-[18px]" />
+            {/* Колокольчик — всем вошедшим, с подпиской или без. */}
+            {hasSession && <NotificationBell />}
+            {/* Язык и тема — только в профиле («Настройки»): тёмная тема стоит по
+                умолчанию, язык берётся из браузера, менять их часто незачем. */}
             <div className="relative" ref={menuRef}>
               <Button
                 variant="ghost"
@@ -304,7 +397,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 aria-haspopup="true"
                 aria-label={t('nav.moreMenu')}
                 title={t('nav.moreMenu')}
-                className="size-10"
+                className={cn('size-10', menuOpen && 'bg-secondary')}
                 onClick={() => {
                   hapticImpactLight()
                   setMenuOpen((o) => !o)
@@ -312,110 +405,71 @@ export function AppLayout({ children }: AppLayoutProps) {
               >
                 {menuOpen ? <X className="size-[18px]" strokeWidth={1.75} /> : <Menu className="size-[18px]" strokeWidth={1.75} />}
               </Button>
-              {menuOpen && (
+              {menuMounted && (
+                /* ПК: плоский список без карточек внутри карточки (SPEC §9). */
                 <div
                   role="menu"
-                  className="hidden sm:block absolute right-0 top-full mt-1.5 min-w-[14rem] rounded-lg border border-border bg-card py-1 shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] z-[500] ring-1 ring-border/60"
+                  className={cn(
+                    'absolute right-0 top-full z-[500] mt-1.5 hidden w-[300px] origin-top-right rounded-[18px] border border-border bg-card p-2 shadow-[0_24px_60px_rgba(0,0,0,0.55)] transition-[opacity,transform] duration-200 ease-out sm:block',
+                    menuVisible ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none -translate-y-1 scale-[0.97] opacity-0',
+                  )}
                 >
-                  {overflowMainNav.map(({ to, icon: Icon, labelKey }) => {
-                    const label = t(labelKey)
-                    const active = overflowActive(location.pathname, to)
-                    const isTariffs = to === '/tariffs'
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        role="menuitem"
-                        className={cn(
-                          'flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-muted dark:text-slate-300',
-                          active && cn('bg-secondary', navAccentActiveClass),
-                        )}
-                      >
-                        <DecorNavIcon
-                          theme={decorTheme}
-                          to={to}
-                          defaultIcon={Icon}
-                          className={cn(
-                            'size-4 shrink-0',
-                            !active && 'text-muted-foreground',
-                            isTariffs && !active && 'tariffs-shine-icon',
-                            active && navAccentActiveClass,
-                          )}
-                          strokeWidth={1.75}
-                        />
-                        {label}
-                        {/* Ставка прямо в меню: партнёрка — единственный пункт,
-                            который что-то обещает, и обещание должно быть
-                            видно до перехода. Значение приходит из настроек,
-                            поэтому не разъедется со страницей. */}
-                        {to === '/partner' && partnerMaxPercent > 0 ? (
-                          <span className="ml-auto shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                            {t('nav.partnerBadge', { percent: `${partnerMaxPercent}%` })}
-                          </span>
-                        ) : null}
-                      </Link>
-                    )
-                  })}
-                  <div className="my-1 border-t border-border/70" />
-                  {(() => {
-                    const { to, icon: Icon, labelKey } = overflowNavProfileItem
-                    const label = t(labelKey)
-                    const active = profileNavActive(location.pathname)
-                    return (
-                      <Link
-                        key={to}
-                        to={to}
-                        role="menuitem"
-                        className={cn(
-                          'flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-muted dark:text-slate-300',
-                          active && cn('bg-secondary', navAccentActiveClass),
-                        )}
-                      >
-                        <DecorNavIcon
-                          theme={decorTheme}
-                          to={to}
-                          defaultIcon={Icon}
-                          className={cn(
-                            'size-4 shrink-0',
-                            !active && 'text-muted-foreground',
-                            active && navAccentActiveClass,
-                          )}
-                          strokeWidth={1.75}
-                        />
-                        {label}
-                      </Link>
-                    )
-                  })()}
+                  {menuGroups.map((g, gi) => (
+                    <div key={g.key}>
+                      {gi > 0 && <div className="mx-1 my-1.5 h-px bg-border" />}
+                      <p className="px-3 pb-1 pt-2.5 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+                        {g.title}
+                      </p>
+                      {g.items.map((item) => {
+                        const active = item.to ? overflowActive(location.pathname, item.to.split('#')[0]) : false
+                        return (
+                          <MenuEntry
+                            key={item.key}
+                            item={item}
+                            className={cn(
+                              'flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-[14.5px] text-foreground/90 transition-colors hover:bg-secondary hover:text-foreground',
+                              active && 'bg-secondary text-primary',
+                            )}
+                          >
+                            {item.decorTo ? (
+                              <DecorNavIcon
+                                theme={decorTheme}
+                                to={item.decorTo}
+                                defaultIcon={item.icon}
+                                className={cn('size-[18px] shrink-0', active ? 'text-primary' : 'text-muted-foreground')}
+                                strokeWidth={1.75}
+                              />
+                            ) : (
+                              <item.icon className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                            )}
+                            <span className="truncate">{item.label}</span>
+                            {item.extra}
+                          </MenuEntry>
+                        )
+                      })}
+                    </div>
+                  ))}
+                  <div className="mx-1 my-1.5 h-px bg-border" />
                   {user?.is_admin ? (
-                    <>
-                      <div className="my-1 border-t border-border/70" />
-                      <Link
-                        to="/admin"
-                        role="menuitem"
-                        className={cn(
-                          'flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-muted dark:text-slate-300',
-                          overflowActive(location.pathname, '/admin') && cn('bg-secondary', navAccentActiveClass),
-                        )}
-                      >
-                        <ShieldCheck
-                          className={cn(
-                            'size-4 shrink-0',
-                            !overflowActive(location.pathname, '/admin') && 'text-muted-foreground',
-                            overflowActive(location.pathname, '/admin') && navAccentActiveClass,
-                          )}
-                          strokeWidth={1.75}
-                        />
-                        {t('admin.dashboard.title')}
-                      </Link>
-                    </>
+                    <Link
+                      to="/admin"
+                      role="menuitem"
+                      className={cn(
+                        'flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-[14.5px] text-foreground/90 transition-colors hover:bg-secondary hover:text-foreground',
+                        overflowActive(location.pathname, '/admin') && 'bg-secondary text-primary',
+                      )}
+                    >
+                      <ShieldCheck className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                      {t('admin.dashboard.title')}
+                    </Link>
                   ) : null}
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-destructive/10"
+                    className="flex h-10 w-full items-center gap-3 rounded-[10px] px-3 text-left text-[14.5px] text-destructive transition-colors hover:bg-destructive/10"
                     onClick={requestLogoutConfirm}
                   >
-                    <LogOut className="size-4 shrink-0" strokeWidth={1.75} />
+                    <LogOut className="size-[18px] shrink-0" strokeWidth={1.75} />
                     {t('nav.logout')}
                   </button>
                 </div>
@@ -426,108 +480,76 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       </header>
 
-      {menuOpen && (
-        <div className="fixed inset-x-0 bottom-0 top-[calc(56px+var(--cabinet-tg-safe-top))] z-40 flex min-h-0 flex-col bg-background sm:hidden">
-          <div className="flex min-h-0 flex-1 flex-col overflow-hidden border-t border-border bg-background">
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background pt-2 pb-[calc(5.75rem+max(env(safe-area-inset-bottom,0px),var(--cabinet-tg-safe-bottom)))]">
-              {overflowMainNav.map(({ to, icon: Icon, labelKey }) => {
-                const label = t(labelKey)
-                const active = overflowActive(location.pathname, to)
-                const isTariffs = to === '/tariffs'
-                return (
-                  <Link
-                    key={`mobile-${to}`}
-                    to={to}
-                    role="menuitem"
-                    className={cn(
-                      'flex items-center gap-3 pl-8 pr-4 py-3 text-base text-slate-700 hover:bg-muted dark:text-slate-300',
-                      active && cn('bg-secondary', navAccentActiveClass),
-                    )}
-                  >
-                    <DecorNavIcon
-                      theme={decorTheme}
-                      to={to}
-                      defaultIcon={Icon}
+      {menuMounted && (
+        /* Телефон: экран меню — группы списками, как в профиле (SPEC §9). */
+        <div
+          className={cn(
+            'fixed inset-x-0 bottom-0 top-[calc(56px+var(--cabinet-tg-safe-top))] z-40 flex min-h-0 flex-col bg-background transition-opacity duration-200 ease-out sm:hidden',
+            menuVisible ? 'opacity-100' : 'pointer-events-none opacity-0',
+          )}
+        >
+          <div className={cn('min-h-0 flex-1 overscroll-contain bg-background', menuSettled ? 'overflow-y-auto' : 'overflow-hidden')}>
+          <div
+            className={cn(
+              'pb-[calc(6.5rem+max(env(safe-area-inset-bottom,0px),var(--cabinet-tg-safe-bottom)))] transition-transform duration-200 ease-out',
+              menuVisible ? 'translate-y-0' : '-translate-y-2',
+            )}
+          >
+            {menuGroups.map((g) => (
+              <div key={g.key}>
+                <p className="px-5 pb-2 pt-[22px] text-xs font-bold uppercase tracking-[0.08em] text-muted-foreground">{g.title}</p>
+                <div className="mx-4 overflow-hidden rounded-[18px] border border-border bg-card/55">
+                  {g.items.map((item, i) => (
+                    <MenuEntry
+                      key={item.key}
+                      item={item}
                       className={cn(
-                        'size-5 shrink-0',
-                        !active && 'text-muted-foreground',
-                        isTariffs && !active && 'tariffs-shine-icon',
-                        active && navAccentActiveClass,
+                        'flex h-12 items-center gap-3 px-3.5 text-[15px] text-foreground/90 transition-colors active:bg-secondary',
+                        i > 0 && 'border-t border-border',
                       )}
-                      strokeWidth={1.75}
-                    />
-                    {label}
-                    {to === '/partner' && partnerMaxPercent > 0 ? (
-                      <span className="ml-auto shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold text-primary">
-                        {t('nav.partnerBadge', { percent: `${partnerMaxPercent}%` })}
-                      </span>
-                    ) : null}
-                  </Link>
-                )
-              })}
-              <div className="my-1 mx-4 border-t border-border/70" />
-              {(() => {
-                const { to, icon: Icon, labelKey } = overflowNavProfileItem
-                const label = t(labelKey)
-                const active = profileNavActive(location.pathname)
-                return (
-                  <Link
-                    key={`mobile-${to}`}
-                    to={to}
-                    role="menuitem"
-                    className={cn(
-                      'flex items-center gap-3 pl-8 pr-4 py-3 text-base text-slate-700 hover:bg-muted dark:text-slate-300',
-                      active && cn('bg-secondary', navAccentActiveClass),
-                    )}
-                  >
-                    <DecorNavIcon
-                      theme={decorTheme}
-                      to={to}
-                      defaultIcon={Icon}
-                      className={cn(
-                        'size-5 shrink-0',
-                        !active && 'text-muted-foreground',
-                        active && navAccentActiveClass,
+                    >
+                      {item.decorTo ? (
+                        <DecorNavIcon
+                          theme={decorTheme}
+                          to={item.decorTo}
+                          defaultIcon={item.icon}
+                          className="size-[18px] shrink-0 text-muted-foreground"
+                          strokeWidth={1.75}
+                        />
+                      ) : (
+                        <item.icon className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.75} />
                       )}
-                      strokeWidth={1.75}
-                    />
-                    {label}
-                  </Link>
-                )
-              })()}
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                      {item.extra ? <span className="flex shrink-0 [&>span]:ml-0">{item.extra}</span> : null}
+                      <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                    </MenuEntry>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div className="mx-4 mt-[22px] overflow-hidden rounded-[18px] border border-border bg-card/55">
               {user?.is_admin ? (
-                <>
-                  <div className="my-1 mx-4 border-t border-border/70" />
-                  <Link
-                    to="/admin"
-                    role="menuitem"
-                    className={cn(
-                      'flex items-center gap-3 pl-8 pr-4 py-3 text-base text-slate-700 hover:bg-muted dark:text-slate-300',
-                      overflowActive(location.pathname, '/admin') && cn('bg-secondary', navAccentActiveClass),
-                    )}
-                  >
-                    <ShieldCheck
-                      className={cn(
-                        'size-5 shrink-0',
-                        !overflowActive(location.pathname, '/admin') && 'text-muted-foreground',
-                        overflowActive(location.pathname, '/admin') && navAccentActiveClass,
-                      )}
-                      strokeWidth={1.75}
-                    />
-                    {t('admin.dashboard.title')}
-                  </Link>
-                </>
+                <Link
+                  to="/admin"
+                  role="menuitem"
+                  className="flex h-12 items-center gap-3 border-b border-border px-3.5 text-[15px] text-foreground/90 active:bg-secondary"
+                >
+                  <ShieldCheck className="size-[18px] shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                  <span className="min-w-0 flex-1 truncate">{t('admin.dashboard.title')}</span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </Link>
               ) : null}
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-3 pl-8 pr-4 py-3 text-base text-destructive hover:bg-destructive/10"
+                className="flex h-12 w-full items-center gap-3 px-3.5 text-left text-[15px] text-destructive active:bg-destructive/10"
                 onClick={requestLogoutConfirm}
               >
-                <LogOut className="size-5 shrink-0" strokeWidth={1.75} />
+                <LogOut className="size-[18px] shrink-0" strokeWidth={1.75} />
                 {t('nav.logout')}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}

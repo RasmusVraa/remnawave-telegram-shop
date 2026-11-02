@@ -191,7 +191,7 @@ function SuccessState({ data }: { data: PaymentStatusResponse }) {
       )}
 
       <Button asChild className="w-full">
-        <Link to="/subscription">{t('paymentStatus.toSubscription')}</Link>
+        <Link to="/dashboard">{t('paymentStatus.toSubscription')}</Link>
       </Button>
     </>
   )
@@ -217,7 +217,7 @@ function FailedState({ expired }: { expired: boolean }) {
           <Link to="/tariffs">{t('paymentStatus.retry')}</Link>
         </Button>
         <Button asChild variant="ghost">
-          <Link to="/subscription">{t('paymentStatus.toSubscription')}</Link>
+          <Link to="/dashboard">{t('paymentStatus.toSubscription')}</Link>
         </Button>
       </div>
     </>

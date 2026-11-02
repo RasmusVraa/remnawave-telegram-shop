@@ -1,5 +1,5 @@
 {
-  "greeting": "🎁 7 days of VPN for FREE!\nConnect right now!\n\n🌐 Servers:<blockquote>🇱🇻 Latvia  🇩🇪 Germany\n🇸🇪 Sweden  🇷🇺 Russia</blockquote>\n\n🚀 Fast speed unlimited traffic\n💪 No ads\n♾️ Bypassing WS\n\n🌐 Cabinet: cabinet.me0ws.ru\n\n<b><a href=\"tg://resolve?domain=Meows_support_bot\">🆘 Help and TG proxy</a></b>",
+  "greeting": "🎁 7 days of VPN for FREE!\nConnect right now!\n\n🌐 Servers:<blockquote>🇱🇻 Latvia  🇩🇪 Germany\n🇸🇪 Sweden  🇷🇺 Russia</blockquote>\n\n🚀 Fast speed unlimited traffic\n💪 No ads\n♾️ Bypassing WS\n\n🌐 Cabinet: cabinet.me0ws.store\n\n<b><a href=\"tg://resolve?domain=Meows_support_bot\">🆘 Help and TG proxy</a></b>",
   "cabinet_minimal_user_line": "👤 <b>%s</b>",
   "cabinet_minimal_status_active": "📱 Subscription: 💎 Active",
   "cabinet_minimal_status_expired": "📱 Subscription: 🔴 Expired",
@@ -7,7 +7,7 @@
   "cabinet_minimal_date_line": "📅 %s",
   "cabinet_minimal_date_placeholder": "—",
   "cabinet_minimal_expiring": "⚠️ expires in %d days",
-  "cabinet_minimal_footer": "🌐 Cabinet - cabinet.me0ws.ru\n📰 News channel - @VPN_meows_news",
+  "cabinet_minimal_footer": "🌐 Cabinet - cabinet.me0ws.store\n📰 News channel - @VPN_meows_news",
   "cabinet_minimal_btn_trial": {
     "text": "Try free",
     "emoji_id": "5424972470023104089",
@@ -89,6 +89,21 @@
   "month_12": "12 mo – %d ₽",
   "crypto_button": "₿ Crypto",
   "card_button": "💳 Card",
+  "yookasa_sbp_button": {
+    "text": "⚡ SBP"
+  },
+  "yookasa_bank_card_button": {
+    "text": "💳 Bank card"
+  },
+  "yookasa_sberbank_button": {
+    "text": "🟢 SberPay"
+  },
+  "yookasa_tinkoff_bank_button": {
+    "text": "🟡 T-Pay"
+  },
+  "yookasa_yoo_money_button": {
+    "text": "👛 YooMoney"
+  },
   "platega_sbp_button": {
     "text": "💳 SBP"
   },
@@ -423,5 +438,18 @@
   "broadcast_link_loyalty": "⭐ Loyalty",
   "broadcast_link_dashboard": "🏠 Cabinet home",
   "broadcast_link_connections": "🔗 Connections",
-  "broadcast_link_fortune": "🎰 Wheel of fortune"
+  "broadcast_link_fortune": "🎰 Wheel of fortune",
+  "cabinet_notify_payment_title": "Payment received",
+  "cabinet_notify_payment_body": "Your subscription is active until %s.",
+  "cabinet_notify_expiring_title": "Subscription ending soon",
+  "cabinet_notify_expiring_body": "Your subscription ends on %s. Renew in advance so your VPN keeps working.",
+  "cabinet_notify_referral_title": "Referral bonus",
+  "cabinet_notify_referral_body": "Your friend paid for a subscription — you get +%d days.",
+  "cabinet_notify_support_title": "Support replied",
+  "cabinet_notify_partner_title": "Partner program",
+  "cabinet_notify_devices_title": "Device slots",
+  "cabinet_notify_devices_body": "You have more device slots now: %d → %d.",
+  "cabinet_notify_loyalty_title": "New loyalty level",
+  "cabinet_notify_loyalty_body": "You reached level %d — %d%% off renewals.",
+  "cabinet_notify_torrent_title": "Server temporarily unavailable"
 }

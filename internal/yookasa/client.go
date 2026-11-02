@@ -44,7 +44,20 @@ const (
 	// Idempotence-Key. Без override клиент продолжает генерировать uuid,
 	// чтобы не ломать существующие вызовы из бота.
 	CtxKeyIdempotenceKey ctxKey = "yookasa.idempotence_key"
+	// CtxKeyPaymentMethod — способ ЮKassa, выбранный покупателем (id из
+	// config.YookasaPaymentMethodIDs). PaymentService сверяет его с настройкой
+	// YOOKASA_PAYMENT_METHODS и кладёт обратно уже итоговый код: клиент
+	// передаёт его в payment_method_data как есть, пусто — не передаёт.
+	CtxKeyPaymentMethod ctxKey = "yookasa.payment_method"
 )
+
+// PaymentMethodFromCtx — способ ЮKassa из контекста, либо пустая строка.
+func PaymentMethodFromCtx(ctx context.Context) string {
+	if v, ok := ctx.Value(CtxKeyPaymentMethod).(string); ok {
+		return v
+	}
+	return ""
+}
 
 // returnURLFromCtx возвращает переопределение из контекста, либо пустую строку.
 func returnURLFromCtx(ctx context.Context) string {
@@ -170,6 +183,9 @@ func (c *Client) CreateInvoice(ctx context.Context, amount int, description stri
 		receipt,
 		metaData,
 	)
+	if method := PaymentMethodFromCtx(ctx); method != "" && method != config.YookasaPaymentMethodAll {
+		paymentRequest.PaymentMethodData = &PaymentMethodData{Type: method}
+	}
 
 	idempotencyKey := idempotenceKeyFromCtx(ctx)
 	if idempotencyKey == "" {

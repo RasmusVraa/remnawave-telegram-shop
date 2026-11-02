@@ -1,0 +1,19 @@
+{
+  "/me": {
+    "id": 7,
+    "email": "",
+    "email_verified": true,
+    "language": "ru",
+    "providers": ["telegram"],
+    "has_telegram_link": true,
+    "telegram_id": 100200300,
+    "username": "catuser",
+    "display_name": "Кот Тестовый",
+    "identity_provider": "telegram",
+    "has_password": false,
+    "google_oauth_enabled": false,
+    "is_admin": false,
+    "customer_id": 7,
+    "registered_at": "2026-11-01T10:00:00Z"
+  }
+}

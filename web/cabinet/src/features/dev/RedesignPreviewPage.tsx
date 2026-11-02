@@ -56,7 +56,7 @@ const MOCK = {
   loyaltyDiscountPct: 7,
   loyaltyProgressPct: 62,
   loyaltyNextLevel: 4,
-  subscriptionLink: 'https://sub.me0ws.ru/s/9f3ac1e0b74d2a58',
+  subscriptionLink: 'https://sub.me0ws.store/s/9f3ac1e0b74d2a58',
 }
 
 const MOCK_DEVICES = [

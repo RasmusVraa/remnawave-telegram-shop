@@ -8,11 +8,11 @@
 // Запуск из корня репозитория, после `cd web/cabinet && npm run build`:
 //
 //   node tools/cabinet-visual-check/release-shots.mjs internal/cabinet/web/dist \
-//     tools/cabinet-visual-check/fixtures/release-connect-holiday.json release-screenshots
+//     tools/cabinet-visual-check/fixtures/release-5-26.json release-screenshots
 //
 // Под новый релиз меняются только сценарии в конце файла: какую страницу
-// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.23.0 (ночные
-// декор-темы и первый шаг гида подключения).
+// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.26.0
+// (уведомления в кабинете, push в браузер, окно приглашения с QR).
 // mark(locator, 'Подпись', side): side — top | bottom | left | inside | inside-low.
 // Каждый снимок после съёмки посмотреть глазами: подпись не должна закрывать
 // текст интерфейса, рамка — резать соседние строки.
@@ -121,42 +121,80 @@ async function caption(page, label, top = 128) {
     document.body.appendChild(tag)
   }, [label, top])
 }
+// Прокрутить так, чтобы блок оказался под шапкой, и обвести его.
+async function scrollToBlock(page, locator, offset = 120) {
+  await locator.first().evaluate((el, off) => {
+    const y = el.getBoundingClientRect().top + window.scrollY - off
+    window.scrollTo(0, y)
+  }, offset)
+  await page.waitForTimeout(500)
+}
 const shot = (page, name) => page.screenshot({ path: path.join(outDir, name) })
 
+// Сцена со своими данными поверх общей фикстуры.
+const withSub = (patch) => ({ ...base, '/me/subscription': { ...base['/me/subscription'], ...patch } })
+
 {
-  // Земля со снеговиком прижата к низу окна — нужен высокий кадр, чтобы она не заслоняла карточки.
-  const { ctx, page, errors } = await open(1440, 1200, withDecor('new_year_2'), '/subscription')
-  // Между гирляндой и карточкой, по центру — заголовок страницы слева не задевает.
-  await caption(page, 'Новая тема «Новый год 2»', 96)
-  await shot(page, '01-new-year-2.png')
+  // Лента на ПК: окно из колокольчика.
+  const { ctx, page, errors } = await open(1440, 900, base, '/dashboard#notifications')
+  await mark(page.locator('[role=dialog]'), 'Уведомления в кабинете', 'left')
+  await shot(page, '01-notifications-desktop.png')
   console.log('1', errors)
   await ctx.close()
 }
 {
-  const { ctx, page, errors } = await open(1440, 900, withDecor('halloween_2'), '/landing')
-  await caption(page, 'Новая тема «Хэллоуин 2» — и на лендинге', 140)
-  await shot(page, '02-halloween-2-landing.png')
+  // Важное — красной плашкой на главной, счётчик на колокольчике красный.
+  const { ctx, page, errors } = await open(390, 844, base, '/dashboard')
+  await mark(page.locator('button').filter({ hasText: 'сменился адрес' }), 'Важное висит на главной', 'bottom')
+  await mark(page.locator('header button[aria-expanded]').first(), '', 'top')
+  await shot(page, '02-important-phone.png')
   console.log('2', errors)
   await ctx.close()
 }
 {
-  const { ctx, page, errors } = await open(390, 844, withDecor('off'), '/connections')
-  const yes = page.getByRole('button', { name: 'Да, добавить подписку' })
-  await yes.scrollIntoViewIfNeeded()
-  await page.waitForTimeout(400)
-  // Над кнопками — описание шага, под ними — помощь: подпись уходит на пустой низ картинки.
-  await mark(yes.locator('xpath=..'), '', 'top')
-  const ill = await page.locator('.cg-step-enter > :first-child').first().boundingBox()
-  await caption(page, 'Приложение уже есть — один тап', ill ? ill.y + ill.height - 46 : 360)
-  await shot(page, '03-connect-phone.png')
+  // Лента на телефоне — шторка снизу.
+  const { ctx, page, errors } = await open(390, 844, base, '/dashboard#notifications')
+  await caption(page, 'Лента на телефоне', 44)
+  await shot(page, '03-notifications-phone.png')
   console.log('3', errors)
   await ctx.close()
 }
 {
-  const { ctx, page, errors } = await open(1440, 900, withDecor('off'), '/connections')
-  await mark(page.getByRole('button', { name: 'Уже есть — добавить' }), 'Сразу добавить подписку', 'bottom')
-  await shot(page, '04-connect-desktop.png')
+  // Админ решает, что слать push в браузер.
+  const { ctx, page, errors } = await open(1440, 1000, base, '/admin/settings')
+  await page.getByRole('tab', { name: 'Уведомления' }).or(page.getByRole('button', { name: 'Уведомления', exact: true })).first().click()
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: 'Push в браузер' }).first().click()
+  // Курсор уводим: иначе шапка группы останется подсвеченной наведением.
+  await page.mouse.move(2, 600)
+  await page.waitForTimeout(700)
+  await mark(page.getByRole('tab', { name: 'Уведомления' }).or(page.getByRole('button', { name: 'Уведомления', exact: true })), 'Новый раздел: что слать push', 'top')
+  await mark(page.getByText('Это не включение уведомлений').locator('xpath=..'), '', 'top')
+  await shot(page, '04-push-settings.png')
   console.log('4', errors)
+  await ctx.close()
+}
+{
+  // Рассылка — и в кабинет, в том числе тем, кто без Telegram.
+  const { ctx, page, errors } = await open(1440, 1000, base, '/admin/broadcast')
+  const delivery = page.locator('div.rounded-lg').filter({ has: page.getByText('Куда отправить', { exact: true }) }).last()
+  // «Кабинет» включён по умолчанию — переключатель «Важное» уже виден.
+  await page.mouse.move(2, 600)
+  await page.waitForTimeout(400)
+  await scrollToBlock(page, delivery, 140)
+  await mark(delivery, 'Рассылка и в кабинет', 'inside')
+  await shot(page, '05-broadcast-cabinet.png')
+  console.log('5', errors)
+  await ctx.close()
+}
+{
+  // Окно приглашения: QR открывают обычной камерой.
+  const { ctx, page, errors } = await open(390, 844, base, '/dashboard')
+  await page.getByRole('button', { name: /Добавить доп/ }).first().click()
+  await page.waitForTimeout(900)
+  await caption(page, 'QR — обычной камерой телефона', 44)
+  await shot(page, '06-invite-qr-phone.png')
+  console.log('6', errors)
   await ctx.close()
 }
 await b.close()

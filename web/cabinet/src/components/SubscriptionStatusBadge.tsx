@@ -6,19 +6,31 @@ import { daysTone } from '@/lib/subscriptionTone'
 /**
  * Статус подписки по общей шкале: зелёный → янтарный → красный.
  *
- * Один на главную и страницу подписки: раньше у страницы подписки был свой
- * бейдж, который до последнего дня оставался зелёным «Активна», хотя главная
- * уже показывала «Заканчивается».
+ * Пробный период из шкалы исключён — он короткий и по общим порогам был бы
+ * «Заканчивается» с первого дня. Исчерпанный трафик называется прямо:
+ * панель помечает такого пользователя неактивным, и раньше здесь стояло
+ * «Истекла», хотя срок подписки ещё не вышел.
  */
-export function SubscriptionStatusBadge({ days, isActive }: { days: number | null; isActive: boolean }) {
+export function SubscriptionStatusBadge({
+  days,
+  isActive,
+  isTrial,
+  trafficExhausted,
+}: {
+  days: number | null
+  isActive: boolean
+  isTrial?: boolean
+  trafficExhausted?: boolean
+}) {
   const { t } = useTranslation()
-  const tone = isActive ? daysTone(days) : 'danger'
+  const tone = isActive ? (isTrial ? 'calm' : daysTone(days)) : 'danger'
+  const base = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[13px] font-bold'
 
   if (!isActive) {
     return (
-      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-destructive/45 bg-destructive/10 px-2.5 py-1 text-xs font-medium text-destructive">
-        <span className="size-1.5 rounded-full bg-destructive" />
-        {t('subscriptionPage.statusExpired')}
+      <span className={cn(base, 'border-destructive/45 bg-destructive/10 text-destructive')}>
+        <span className="size-[7px] rounded-full bg-destructive" />
+        {trafficExhausted ? t('home.statusTrafficExhausted') : t('subscriptionPage.statusExpired')}
       </span>
     )
   }
@@ -28,21 +40,26 @@ export function SubscriptionStatusBadge({ days, isActive }: { days: number | nul
     return (
       <span
         className={cn(
-          'inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium',
+          base,
           danger
             ? 'border-destructive/45 bg-destructive/10 text-destructive'
             : 'border-amber-400/50 bg-amber-500/10 text-amber-700 dark:text-amber-300',
         )}
       >
-        <span className={cn('size-1.5 rounded-full', danger ? 'bg-destructive' : 'bg-amber-500')} />
+        <span className={cn('size-[7px] rounded-full', danger ? 'bg-destructive' : 'bg-amber-500')} />
         {t('subscriptionPage.statusEnding')}
       </span>
     )
   }
 
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:border-emerald-400/30 dark:bg-emerald-500/15 dark:text-emerald-200">
-      <span className="size-1.5 rounded-full bg-emerald-500" />
+    <span
+      className={cn(
+        base,
+        'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-400/40 dark:bg-emerald-500/15 dark:text-emerald-300',
+      )}
+    >
+      <span className="size-[7px] rounded-full bg-emerald-500" />
       {t('subscriptionPage.statusActive')}
     </span>
   )

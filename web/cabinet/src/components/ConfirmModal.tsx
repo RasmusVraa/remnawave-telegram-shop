@@ -127,13 +127,15 @@ export function ConfirmModal({
         >
           <div
             className={cn(
-              'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+              'flex shrink-0 items-center justify-center',
+              // В строку с заголовком — бейдж поменьше, по высоте строки.
+              inlineTitle ? 'h-8 w-8 rounded-lg' : 'h-10 w-10 rounded-xl',
               danger
                 ? 'bg-destructive/15 text-destructive'
                 : 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
             )}
           >
-            <Icon className="h-5 w-5" aria-hidden />
+            <Icon className={inlineTitle ? 'h-4 w-4' : 'h-5 w-5'} aria-hidden />
           </div>
           <div className="min-w-0 flex-1 space-y-1.5">
             <h2 className="text-base font-semibold leading-snug text-foreground">{title}</h2>

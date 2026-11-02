@@ -47,6 +47,22 @@ export function HeleketBrandIcon({ className }: BrandIconProps) {
   )
 }
 
+/** Знак Системы быстрых платежей (СБП). */
+export function SbpBrandIcon({ className }: BrandIconProps) {
+  return (
+    <svg viewBox="0 0 41.2 52.6" className={className} aria-hidden>
+      <path fill="#5B57A2" d="M0 12.86l6.15 10.99v6.7L.01 41.52 0 12.86z" />
+      <path fill="#D90751" d="M23.6 19.85l5.76-3.53 11.79-.01-17.55 10.75v-7.21z" />
+      <path fill="#FAB718" d="M23.57 12.8l.03 14.55-6.16-3.79V0l6.13 12.8z" />
+      <path fill="#ED6F26" d="M41.15 16.31l-11.79.01-5.79-3.52L17.44 0l23.71 16.31z" />
+      <path fill="#63B22F" d="M23.6 41.58v-7.06l-6.16-3.71.01 21.77 6.15-11z" />
+      <path fill="#1487C9" d="M29.35 38.08L6.15 23.85 0 12.86l41.12 25.2-11.77.02z" />
+      <path fill="#017F36" d="M17.45 52.58l6.15-11 5.75-3.5 11.77-.02-23.67 14.52z" />
+      <path fill="#984995" d="M.01 41.52l17.48-10.71-5.88-3.6-5.46 3.34-6.14 10.97z" />
+    </svg>
+  )
+}
+
 export function VKBrandIcon({ className }: BrandIconProps) {
   return (
     <svg viewBox="0 0 24 24" className={className} aria-hidden>

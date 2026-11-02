@@ -55,9 +55,15 @@ function subscriptionPayloadForScheme(scheme: string, subscriptionLink: string, 
  * а схема у него одна.
  */
 function encryptedLinkForApp(app: Pick<AppGuide, 'urlScheme'>, links: Record<string, string>): string {
+  const key = encryptKeyForApp(app)
+  return key ? links[key] || '' : ''
+}
+
+/** Ключ шифрования приложения (happ, incy) или '' — шифрования у него нет. */
+function encryptKeyForApp(app: Pick<AppGuide, 'urlScheme'>): 'happ' | 'incy' | '' {
   const scheme = (app.urlScheme || '').trim().toLowerCase()
-  if (scheme.startsWith('happ://')) return links.happ || ''
-  if (scheme.startsWith('incy://')) return links.incy || ''
+  if (scheme.startsWith('happ://')) return 'happ'
+  if (scheme.startsWith('incy://')) return 'incy'
   return ''
 }
 
@@ -137,16 +143,24 @@ export function useConnectionGuide() {
     inviteMode ? invite?.subscription_link || '' : subscription?.subscription_link || ''
   ).trim()
 
-  // В защищённом режиме приглашения сырой ссылки подписки у страницы нет, а
-  // значит нечего подставлять во все остальные клиенты — оставляем только те
-  // приложения, для которых бэкенд прислал готовый зашифрованный deep link.
+  // В защищённом режиме приглашения приложение с включённым шифрованием
+  // показываем, только если бэкенд прислал для него готовую ссылку: сырую ему
+  // не подставляем, это обход настройки админа. Остальные (RabbitHole и др.)
+  // работают по сырой ссылке — так же, как на странице владельца.
   const appsFor = useCallback(
     (platform: PlatformKey): AppGuide[] => {
       const all = config?.platforms?.[platform] || []
       if (invite?.mode !== 'encrypted') return all
-      return all.filter((app) => Boolean(encryptedLinkForApp(app, encryptedLinks)))
+      const encryptedApps = invite.encrypted || []
+      const hasRawLink = Boolean(invite.subscription_link?.trim())
+      return all.filter((app) => {
+        if (encryptedLinkForApp(app, encryptedLinks)) return true
+        const key = encryptKeyForApp(app)
+        if (key && encryptedApps.includes(key)) return false
+        return hasRawLink
+      })
     },
-    [config, invite?.mode, encryptedLinks],
+    [config, invite, encryptedLinks],
   )
 
   const availablePlatforms = useMemo(

@@ -173,7 +173,7 @@
       "description": {
        "en": "If the subscription is not added, you can watch the video instruction using the button below.\n\nIf nothing happens after clicking the button, add the subscription manually:\n\n1. Click the Get Link button in the top right corner of this page\n2. Copy the link\n3. In Happ, go to the Profiles section\n4. Paste the link in the text field\n5. Click the Import button",
        "fa": "اگر اشتراک اضافه نشده است، می‌توانید ویدیو راهنما را با استفاده از دکمه زیر تماشا کنید. اگر پس از کلیک روی دکمه اتفاقی نیفتاد، اشتراک را به صورت دستی اضافه کنید. در گوشه بالا سمت راست این صفحه روی دکمه دریافت لینک کلیک کنید، لینک را کپی کنید. در Happ به بخش پروفایل‌ها بروید و لینک را در فیلد متنی وارد کنید، سپس روی دکمه وارد کردن کلیک کنید.",
-       "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.ru/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
+       "ru": "Если подписка не добавилась, вы можете посмотреть видео инструкцию по кнопке ниже.\n\nЕсли после нажатия на кнопку ничего не произошло, добавьте подписку вручную:\n\n1. Перейдите на стр [«Подписка»](https://cabinet.me0ws.store/cabinet/subscription)\n2. Нажмите кнопку скопировать рядом с «Ссылка подписки»\n3. В Happ перейдите в раздел Профили\n4. Вставьте ссылку в текстовое поле\n5. Нажмите на кнопку Импорт"
       }
      },
      "connectAndUseStep": {

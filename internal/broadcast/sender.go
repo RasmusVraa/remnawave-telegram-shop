@@ -33,10 +33,19 @@ type Sender struct {
 	// history — журнал рассылок; nil отключает запись (тесты, старые вызовы).
 	history *database.BroadcastRepository
 	tm      *translation.Manager
+	// cabinet — лента уведомлений кабинета; nil — канал недоступен.
+	cabinet CabinetPublisher
 }
 
 func NewSender(customers *database.CustomerRepository, history *database.BroadcastRepository, tm *translation.Manager) *Sender {
 	return &Sender{customers: customers, history: history, tm: tm}
+}
+
+// SetCabinetPublisher подключает канал «кабинет».
+func (s *Sender) SetCabinetPublisher(p CabinetPublisher) {
+	if s != nil {
+		s.cabinet = p
+	}
 }
 
 // SendOptions — как рассылку записать в историю.
@@ -48,6 +57,25 @@ type SendOptions struct {
 	BroadcastID int64
 	// MediaName — имя прикреплённого файла, только для истории.
 	MediaName string
+	// Cabinet — положить рассылку и в ленту кабинета.
+	Cabinet bool
+	// SkipTelegram — не слать в Telegram (только кабинет). Нулевое значение —
+	// Telegram, как у всех рассылок до появления кабинета.
+	SkipTelegram bool
+	// Important — уведомление в кабинете важное: закреплено и висит на главной.
+	Important bool
+}
+
+// Channels — каналы рассылки для истории.
+func (o SendOptions) Channels() []string {
+	var out []string
+	if !o.SkipTelegram {
+		out = append(out, database.BroadcastChannelTelegram)
+	}
+	if o.Cabinet {
+		out = append(out, database.BroadcastChannelCabinet)
+	}
+	return out
 }
 
 // HistoryRecord — запись истории для сообщения, которое собираются разослать.
@@ -108,40 +136,90 @@ func (s *Sender) Send(
 	opts SendOptions,
 ) SendResult {
 	result := SendResult{}
-	if s == nil || s.customers == nil || b == nil {
+	if s == nil || s.customers == nil || (b == nil && !opts.SkipTelegram) {
 		return result
+	}
+	notifyAdmin := func(text string) {
+		if adminID != 0 && b != nil {
+			_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: adminID, Text: text})
+		}
 	}
 
 	history := historyLog{repo: s.history, id: opts.BroadcastID}
 	if history.repo != nil && history.id == 0 {
-		id, err := history.repo.Create(ctx, HistoryRecord(opts.Source, audiences, tariffID, msg, opts.MediaName))
+		rec := HistoryRecord(opts.Source, audiences, tariffID, msg, opts.MediaName)
+		rec.Channels = opts.Channels()
+		id, err := history.repo.Create(ctx, rec)
 		if err != nil {
 			slog.Warn("broadcast: history create", "error", err)
 		}
 		history.id = id
 	}
 
+	/*
+	 * Кабинет — раньше Telegram: в ленту уведомление ложится одним запросом за
+	 * доли секунды, а Telegram-отправка идёт пачками минуты. При аварии людям
+	 * важнее увидеть сообщение сразу, чем дождаться, пока бот всех обойдёт.
+	 */
+	cabinetCount := 0
+	cabinetFailed := false
+	if opts.Cabinet && s.cabinet != nil {
+		n, err := s.cabinet.PublishBroadcast(ctx, CabinetRequest{
+			BroadcastID:     history.id,
+			Audiences:       audiences,
+			TariffID:        tariffID,
+			Message:         msg,
+			Important:       opts.Important,
+			AdminTelegramID: adminID,
+		})
+		if err != nil {
+			slog.Error("broadcast: cabinet publish", "error", err, "audiences", audiences)
+			cabinetFailed = true
+		}
+		cabinetCount = n
+		result.CabinetRecipients = n
+	}
+	cabinetLine := func() string {
+		if !opts.Cabinet {
+			return ""
+		}
+		if cabinetFailed {
+			return "\n• В кабинет: ошибка, см. логи"
+		}
+		return fmt.Sprintf("\n• В кабинете: %d", cabinetCount)
+	}
+
+	if opts.SkipTelegram {
+		status, errText := database.BroadcastStatusDone, ""
+		if cabinetFailed || cabinetCount == 0 {
+			status, errText = database.BroadcastStatusFailed, "no cabinet recipients"
+			if cabinetFailed {
+				errText = "cabinet publish failed"
+			}
+		}
+		history.finish(ctx, status, database.BroadcastCounters{}, errText)
+		notifyAdmin("✅ Рассылка только в кабинет завершена." + cabinetLine())
+		return result
+	}
+
 	recipients, err := s.customers.GetBroadcastRecipientsForAudiences(ctx, audiences, tariffID)
 	if err != nil {
 		slog.Error("broadcast: get recipients", "error", err, "audiences", audiences)
 		history.finish(ctx, database.BroadcastStatusFailed, database.BroadcastCounters{}, err.Error())
-		if adminID != 0 {
-			_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: adminID,
-				Text:   fmt.Sprintf("❌ Ошибка при получении списка пользователей: %v", err),
-			})
-		}
+		notifyAdmin(fmt.Sprintf("❌ Ошибка при получении списка пользователей: %v", err) + cabinetLine())
 		return result
 	}
 
 	if len(recipients) == 0 {
-		history.finish(ctx, database.BroadcastStatusFailed, database.BroadcastCounters{}, "no recipients")
-		if adminID != 0 {
-			_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID: adminID,
-				Text:   "❌ Нет пользователей для рассылки",
-			})
+		// Аудитория может состоять из одних web-only клиентов: в Telegram им
+		// слать некуда, но в кабинет рассылка дошла — это не провал.
+		if cabinetCount > 0 {
+			history.finish(ctx, database.BroadcastStatusDone, database.BroadcastCounters{}, "")
+			notifyAdmin("✅ В Telegram получателей нет, рассылка ушла только в кабинет." + cabinetLine())
+			return result
 		}
+		history.finish(ctx, database.BroadcastStatusFailed, database.BroadcastCounters{}, "no recipients")
+		notifyAdmin("❌ Нет пользователей для рассылки")
 		return result
 	}
 
@@ -216,10 +294,11 @@ func (s *Sender) Send(
 	}
 
 	result = SendResult{
-		TotalUsers:   eligibleUsers,
-		SentCount:    sentCount,
-		FailedCount:  failedCount,
-		BlockedCount: blockedCount,
+		TotalUsers:        eligibleUsers,
+		SentCount:         sentCount,
+		FailedCount:       failedCount,
+		BlockedCount:      blockedCount,
+		CabinetRecipients: cabinetCount,
 	}
 
 	if aborted != nil {
@@ -228,13 +307,11 @@ func (s *Sender) Send(
 		history.finish(ctx, database.BroadcastStatusDone, counters(), "")
 	}
 
-	if adminID != 0 {
-		text := fmt.Sprintf(adminResultMessageFmt, eligibleUsers, sentCount, failedCount, blockedCount)
-		if aborted != nil {
-			text = fmt.Sprintf(adminAbortedMessageFmt, aborted)
-		}
-		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: adminID, Text: text})
+	text := fmt.Sprintf(adminResultMessageFmt, eligibleUsers, sentCount, failedCount, blockedCount)
+	if aborted != nil {
+		text = fmt.Sprintf(adminAbortedMessageFmt, aborted)
 	}
+	notifyAdmin(text + cabinetLine())
 
 	slog.Info("broadcast completed",
 		"totalUsers", totalUsers,

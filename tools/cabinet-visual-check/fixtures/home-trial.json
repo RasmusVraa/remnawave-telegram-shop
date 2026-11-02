@@ -1,0 +1,65 @@
+{
+  "/me": {
+    "id": 1,
+    "email": "user@example.invalid",
+    "email_verified": true,
+    "language": "ru",
+    "providers": [
+      "password",
+      "telegram"
+    ],
+    "has_telegram_link": true,
+    "has_password": true,
+    "is_admin": true,
+    "customer_id": 1
+  },
+  "/auth/bootstrap": {
+    "site_links": {
+      "channel": "https://t.me/example",
+      "feedback": "https://t.me/example_reviews"
+    },
+    "partner_max_percent": 20,
+    "support_chat_enabled": true
+  },
+  "/me/subscription": {
+    "expire_at": "2026-11-04T04:00:14.230Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 3,
+    "traffic_used_gb": 0,
+    "traffic_limit_gb": null,
+    "is_trial": true,
+    "tariff": {
+      "id": 1,
+      "slug": "premium",
+      "name": "",
+      "traffic_gb": null,
+      "device_limit": 1
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": null,
+    "traffic_reset_strategy": null,
+    "next_traffic_reset_at": null
+  },
+  "/me/devices": {
+    "enabled": true,
+    "device_limit": 1,
+    "connected": 0,
+    "devices": []
+  },
+  "/me/traffic-usage": {
+    "enabled": true,
+    "categories": [],
+    "points": [],
+    "total_bytes": 0
+  },
+  "/me/trial": {
+    "enabled": true,
+    "can_activate": false,
+    "days": 3
+  },
+  "/me/connect-invite": {
+    "url": "https://example.invalid/c/abc",
+    "expires_at": "2026-11-07T16:00:14.230Z"
+  }
+}

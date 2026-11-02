@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Check, ChevronRight, ChevronDown, Copy, MonitorSmartphone, Plus, Upload, X } from 'lucide-react'
+import { Camera, Check, ChevronRight, ChevronDown, Copy, MonitorSmartphone, Plus, SlidersHorizontal, Upload, X } from 'lucide-react'
 
 import { QrCode } from '@/components/QrCode'
 import { Card, CardContent } from '@/components/ui/card'
@@ -27,7 +27,9 @@ import { SubscriptionLinkResetLink } from '@/features/subscription/SubscriptionL
  *
  * Сырая ссылка никуда не делась: она под раскрывашкой «Настроить вручную»,
  * для случая, когда установка по гайду не сработала и подписку вставляют в
- * приложение руками.
+ * приложение руками. Там же QR самой подписки: те, кто знает про сканер в
+ * VPN-приложении, наводили его на QR приглашения и получали ошибку — QR
+ * приглашения ведёт на страницу с инструкцией, а не на подписку.
  */
 export function ConnectExtraDeviceCard({
   onOpen,
@@ -237,13 +239,19 @@ export function ConnectInviteModal({
         ) : (
           <>
             {/* Шаг 1 — устройство рядом: камера открывает страницу с инструкцией.
+                Плашка над кодом говорит, чем его сканировать: сканер VPN-приложения
+                ждёт подписку и на ссылку-приглашение отвечает ошибкой.
                 Своей рамки у картинки нет: спецификация QR требует светлого
                 поля в четыре модуля, и оно уже нарисовано внутри SVG. */}
             <div className="flex flex-col items-center rounded-xl bg-muted/30 px-3 py-4">
+              <span className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                <Camera size={14} />
+                {t('connectInvite.qrBadge')}
+              </span>
               <div className="overflow-hidden rounded-lg bg-white">
                 <QrCode value={inviteUrl} size={196} title={t('connectInvite.qrAlt')} />
               </div>
-              <p className="mt-3 text-center text-xs text-muted-foreground">
+              <p className="mt-3 text-center text-sm text-foreground/85">
                 {t('connectInvite.qrHint')}
               </p>
             </div>
@@ -278,34 +286,34 @@ export function ConnectInviteModal({
               {inviteCopyState === 'failed' && (
                 <p className="text-center text-xs text-destructive">{t('common.copyFailed')}</p>
               )}
-              <p className="text-center text-[11px] leading-4 text-muted-foreground">
-                {t('connectInvite.shareHint')}
-              </p>
+              {data?.expires_at && (
+                <p className="text-center text-[11px] text-muted-foreground">
+                  {t('connectInvite.expiresAt', { date: formatDate(data.expires_at, lang) })}
+                </p>
+              )}
             </div>
-
-            {data?.expires_at && (
-              <p className="mt-3 text-center text-[11px] text-muted-foreground">
-                {t('connectInvite.expiresAt', { date: formatDate(data.expires_at, lang) })}
-              </p>
-            )}
           </>
         )}
 
         {/* Сырая ссылка подписки — для ручной вставки в приложение, когда гайд
             не помог. Свёрнута: рядовому пользователю она ничего не говорит. */}
         {subscriptionLink && (
-          <div className="mt-4 border-t border-border pt-1">
-            {/* Строка во всю высоту пальца (44px), а не по высоте мелкого
-                текста: это последний элемент листа, и по узкой полоске у
-                нижнего края промахивались. */}
+          <div className="mt-4">
+            {/* Кнопка с рамкой, а не серая строка: серую не замечали и шли в
+                поддержку за ссылкой, которая лежала здесь. Высота не меньше
+                пальца (44px) — это последний элемент листа. */}
             <button
               type="button"
               onClick={() => setManualOpen((v) => !v)}
               aria-expanded={manualOpen}
-              className="flex min-h-11 w-full items-center justify-between gap-2 text-left text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="flex min-h-11 w-full items-center gap-2.5 rounded-xl border border-border bg-muted/30 px-3 text-left text-sm font-medium text-foreground transition-colors hover:bg-muted/60"
             >
-              {t('connectInvite.manualToggle')}
-              <ChevronDown size={16} className={cn('transition-transform', manualOpen && 'rotate-180')} />
+              <SlidersHorizontal size={16} className="shrink-0 text-primary" />
+              <span className="flex-1">{t('connectInvite.manualToggle')}</span>
+              <ChevronDown
+                size={16}
+                className={cn('shrink-0 text-muted-foreground transition-transform', manualOpen && 'rotate-180')}
+              />
             </button>
             {/* Раскрытие через grid-template-rows 0fr↔1fr — тот же приём, что у
                 подпанелей докупки устройств: высоту не приходится измерять, и
@@ -317,9 +325,15 @@ export function ConnectInviteModal({
               )}
             >
               <div className="min-h-0 min-w-0">
-                <div className="mt-2.5 min-w-0">
-                  <p className="mb-2 text-[11px] leading-4 text-muted-foreground">
-                    {t('connectInvite.manualHint')}
+                <div className="mt-3 min-w-0 px-0.5">
+                  <div className="flex items-center gap-3">
+                    <div className="shrink-0 overflow-hidden rounded-md bg-white">
+                      <QrCode value={subscriptionLink} size={96} title={t('connectInvite.manualQrAlt')} />
+                    </div>
+                    <p className="text-xs leading-4 text-foreground/85">{t('connectInvite.manualQrHint')}</p>
+                  </div>
+                  <p className="mb-2 mt-3 text-xs leading-4 text-muted-foreground">
+                    {t('connectInvite.manualCopyHint')}
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="min-w-0 flex-1 select-all truncate rounded-lg bg-muted/70 px-3 py-2 font-mono text-xs text-muted-foreground">

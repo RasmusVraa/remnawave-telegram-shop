@@ -17,6 +17,12 @@ const (
 	BroadcastSourceTelegram = "telegram"
 )
 
+// Каналы доставки рассылки.
+const (
+	BroadcastChannelTelegram = "telegram"
+	BroadcastChannelCabinet  = "cabinet"
+)
+
 // Чем кончилась рассылка.
 const (
 	BroadcastStatusRunning = "running"
@@ -45,7 +51,10 @@ type BroadcastRecord struct {
 	// Buttons — кнопки под сообщением в том виде, в каком их отдаёт API
 	// кабинета. JSON, а не структура: тип кнопок живёт в пакете broadcast,
 	// который сам зависит от database.
-	Buttons    json.RawMessage
+	Buttons json.RawMessage
+	// Channels — telegram и/или cabinet. Пусто при записи — только Telegram,
+	// как у рассылок до появления уведомлений в кабинете.
+	Channels   []string
 	Status     string
 	Total      int
 	Sent       int
@@ -74,7 +83,7 @@ func NewBroadcastRepository(pool *pgxpool.Pool) *BroadcastRepository {
 }
 
 const broadcastColumns = `id, source, audiences, tariff_id, text, parse_mode, media_kind, media_file_id,
-	media_name, buttons, status, total, sent, blocked, failed, error, started_at, finished_at`
+	media_name, buttons, channels, status, total, sent, blocked, failed, error, started_at, finished_at`
 
 // Create заводит запись со статусом running и возвращает её id.
 func (r *BroadcastRepository) Create(ctx context.Context, rec BroadcastRecord) (int64, error) {
@@ -86,14 +95,18 @@ func (r *BroadcastRepository) Create(ctx context.Context, rec BroadcastRecord) (
 	if audiences == nil {
 		audiences = []string{}
 	}
+	channels := rec.Channels
+	if len(channels) == 0 {
+		channels = []string{BroadcastChannelTelegram}
+	}
 	var id int64
 	err := r.pool.QueryRow(ctx, `
 		INSERT INTO broadcast (source, audiences, tariff_id, text, parse_mode, media_kind, media_file_id,
-			media_name, buttons, status, total)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+			media_name, buttons, channels, status, total)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING id`,
 		rec.Source, audiences, rec.TariffID, rec.Text, rec.ParseMode, rec.MediaKind, rec.MediaFileID,
-		rec.MediaName, []byte(buttons), BroadcastStatusRunning, rec.Total,
+		rec.MediaName, []byte(buttons), channels, BroadcastStatusRunning, rec.Total,
 	).Scan(&id)
 	if err != nil {
 		return 0, fmt.Errorf("create broadcast: %w", err)
@@ -184,7 +197,7 @@ func scanBroadcast(row pgx.Row) (BroadcastRecord, error) {
 	var rec BroadcastRecord
 	var buttons []byte
 	err := row.Scan(&rec.ID, &rec.Source, &rec.Audiences, &rec.TariffID, &rec.Text, &rec.ParseMode,
-		&rec.MediaKind, &rec.MediaFileID, &rec.MediaName, &buttons, &rec.Status, &rec.Total, &rec.Sent,
+		&rec.MediaKind, &rec.MediaFileID, &rec.MediaName, &buttons, &rec.Channels, &rec.Status, &rec.Total, &rec.Sent,
 		&rec.Blocked, &rec.Failed, &rec.Error, &rec.StartedAt, &rec.FinishedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

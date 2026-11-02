@@ -55,6 +55,13 @@ type AdminBroadcastHandler struct {
 	history   *database.BroadcastRepository
 	sender    *broadcast.Sender
 	bot       *bot.Bot
+	// notifications — уведомления в кабинете; nil — канал «кабинет» недоступен.
+	notifications *database.CabinetNotificationRepository
+}
+
+// SetNotifications подключает канал «кабинет» к рассылкам из web-админки.
+func (h *AdminBroadcastHandler) SetNotifications(repo *database.CabinetNotificationRepository) {
+	h.notifications = repo
 }
 
 func NewAdminBroadcast(
@@ -143,6 +150,29 @@ type broadcastSendReq struct {
 	Text      string               `json:"text"`
 	Buttons   *broadcastButtonsReq `json:"buttons,omitempty"`
 	Media     *broadcastMediaReq   `json:"media,omitempty"`
+	// Channels — telegram и/или cabinet. Не прислан — только Telegram: так
+	// шлёт кабинет старой сборки, у которого выбора каналов ещё нет.
+	Channels []string `json:"channels,omitempty"`
+	// Important — уведомление в кабинете важное: закреплено и висит на главной.
+	Important bool `json:"important,omitempty"`
+}
+
+// channels — выбранные каналы. ok = false — прислан незнакомый канал.
+func (req *broadcastSendReq) channels() (telegram, cabinet, ok bool) {
+	if len(req.Channels) == 0 {
+		return true, false, true
+	}
+	for _, c := range req.Channels {
+		switch strings.TrimSpace(c) {
+		case database.BroadcastChannelTelegram:
+			telegram = true
+		case database.BroadcastChannelCabinet:
+			cabinet = true
+		default:
+			return false, false, false
+		}
+	}
+	return telegram, cabinet, true
 }
 
 func (req *broadcastSendReq) normalize() {
@@ -258,11 +288,20 @@ func (h *AdminBroadcastHandler) Preview(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "failed to count recipients", http.StatusInternalServerError)
 		return
 	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"audiences":       audiences,
 		"recipient_count": len(recipients),
-	})
+	}
+	// В кабинет рассылка доходит и до web-only клиентов, поэтому число своё.
+	if h.notifications != nil {
+		n, err := h.notifications.CountAudience(r.Context(), audiences, req.TariffID, config.GetAdminTelegramId())
+		if err != nil {
+			slog.Warn("admin broadcast: cabinet preview", "error", err)
+		} else {
+			resp["cabinet_count"] = n
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // Tariffs returns tariff list for audience filtering (tariffs mode).
@@ -432,16 +471,26 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	if h.bot == nil || h.sender == nil {
-		http.Error(w, "broadcast unavailable", http.StatusServiceUnavailable)
-		return
-	}
-
 	var req broadcastSendReq
 	if !decodeJSON(w, r, &req) {
 		return
 	}
 	req.normalize()
+	toTelegram, toCabinet, chOK := req.channels()
+	switch {
+	case !chOK:
+		http.Error(w, "unknown channel", http.StatusBadRequest)
+		return
+	case !toTelegram && !toCabinet:
+		http.Error(w, "channel required", http.StatusBadRequest)
+		return
+	case h.sender == nil || (toTelegram && h.bot == nil):
+		http.Error(w, "broadcast unavailable", http.StatusServiceUnavailable)
+		return
+	case toCabinet && h.notifications == nil:
+		http.Error(w, "cabinet notifications unavailable", http.StatusServiceUnavailable)
+		return
+	}
 	audiences, ok := req.resolveAudiences(w)
 	if !ok {
 		return
@@ -450,18 +499,38 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "text or media required", http.StatusBadRequest)
 		return
 	}
+	// Картинки и видео кабинет пока не показывает: в ленту уходит только
+	// текст. Рассылка из одного вложения без подписи там была бы пустой.
+	if toCabinet && !toTelegram && req.Text == "" {
+		http.Error(w, "cabinet notification requires text", http.StatusBadRequest)
+		return
+	}
 	if bad := req.invalidLinkKeys(); len(bad) > 0 {
 		http.Error(w, "unknown cabinet link buttons: "+strings.Join(bad, ", "), http.StatusBadRequest)
 		return
 	}
 
-	recipients, err := h.customers.GetBroadcastRecipientsForAudiences(r.Context(), audiences, req.TariffID)
-	if err != nil {
-		slog.Error("admin broadcast: send", "error", err)
-		http.Error(w, "failed to get recipients", http.StatusInternalServerError)
-		return
+	var recipients []database.BroadcastRecipient
+	if toTelegram {
+		list, err := h.customers.GetBroadcastRecipientsForAudiences(r.Context(), audiences, req.TariffID)
+		if err != nil {
+			slog.Error("admin broadcast: send", "error", err)
+			http.Error(w, "failed to get recipients", http.StatusInternalServerError)
+			return
+		}
+		recipients = list
 	}
-	if len(recipients) == 0 {
+	cabinetCount := 0
+	if toCabinet {
+		n, err := h.notifications.CountAudience(r.Context(), audiences, req.TariffID, config.GetAdminTelegramId())
+		if err != nil {
+			slog.Error("admin broadcast: cabinet count", "error", err)
+			http.Error(w, "failed to get recipients", http.StatusInternalServerError)
+			return
+		}
+		cabinetCount = n
+	}
+	if len(recipients) == 0 && cabinetCount == 0 {
 		if audiences[0] == database.BroadcastAudienceTestBroadcast {
 			// Тестовая рассылка идёт админу — пустой список значит только одно.
 			http.Error(w, "test broadcast requires ADMIN_TELEGRAM_ID", http.StatusBadRequest)
@@ -492,7 +561,12 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 		Media:     req.recipientMedia(),
 		Buttons:   req.recipientButtons(),
 	}
-	opts := broadcast.SendOptions{Source: database.BroadcastSourceCabinet}
+	opts := broadcast.SendOptions{
+		Source:       database.BroadcastSourceCabinet,
+		Cabinet:      toCabinet && req.Text != "",
+		SkipTelegram: !toTelegram,
+		Important:    req.Important,
+	}
 	if req.Media != nil {
 		opts.MediaName = strings.TrimSpace(req.Media.Name)
 	}
@@ -504,6 +578,7 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 	 */
 	if h.history != nil {
 		rec := broadcast.HistoryRecord(opts.Source, audiences, req.TariffID, msg, opts.MediaName)
+		rec.Channels = opts.Channels()
 		rec.Total = recipientCount
 		id, err := h.history.Create(r.Context(), rec)
 		if err != nil {
@@ -515,7 +590,7 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 	utils.Go("cabinet broadcast", func() {
 		defer releaseBroadcastSend()
 		ctx := context.Background()
-		if adminID != 0 {
+		if adminID != 0 && h.bot != nil {
 			_, _ = h.bot.SendMessage(ctx, &bot.SendMessageParams{
 				ChatID: adminID,
 				Text:   "⏳ Рассылка из web-админки запущена. Ожидайте итоговое сообщение…",
@@ -534,6 +609,7 @@ func (h *AdminBroadcastHandler) Send(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusAccepted, map[string]any{
 		"status":          "started",
 		"recipient_count": recipientCount,
+		"cabinet_count":   cabinetCount,
 		// 0 — история не записалась; кабинет тогда просто не покажет ход.
 		"broadcast_id": opts.BroadcastID,
 	})
@@ -560,6 +636,40 @@ type broadcastHistoryResp struct {
 	Error       string          `json:"error"`
 	StartedAt   time.Time       `json:"started_at"`
 	FinishedAt  *time.Time      `json:"finished_at"`
+	Channels    []string        `json:"channels"`
+	// Cabinet — уведомление в кабинете; nil — рассылка туда не уходила.
+	Cabinet *broadcastCabinetResp `json:"cabinet"`
+}
+
+// broadcastCabinetResp — уведомление рассылки в кабинете глазами админа.
+type broadcastCabinetResp struct {
+	Important  bool `json:"important"`
+	Deleted    bool `json:"deleted"`
+	Recipients int  `json:"recipients"`
+	Read       int  `json:"read"`
+}
+
+// withCabinet дополняет записи истории статистикой уведомлений в кабинете.
+func (h *AdminBroadcastHandler) withCabinet(r *http.Request, items []broadcastHistoryResp) {
+	if h.notifications == nil || len(items) == 0 {
+		return
+	}
+	ids := make([]int64, 0, len(items))
+	for _, it := range items {
+		ids = append(ids, it.ID)
+	}
+	stats, err := h.notifications.BroadcastStats(r.Context(), ids)
+	if err != nil {
+		slog.Warn("admin broadcast: cabinet stats", "error", err)
+		return
+	}
+	for i := range items {
+		if st, ok := stats[items[i].ID]; ok {
+			items[i].Cabinet = &broadcastCabinetResp{
+				Important: st.Important, Deleted: st.Deleted, Recipients: st.Recipients, Read: st.Read,
+			}
+		}
+	}
 }
 
 func toBroadcastHistoryResp(rec database.BroadcastRecord) broadcastHistoryResp {
@@ -570,6 +680,10 @@ func toBroadcastHistoryResp(rec database.BroadcastRecord) broadcastHistoryResp {
 	audiences := rec.Audiences
 	if audiences == nil {
 		audiences = []string{}
+	}
+	channels := rec.Channels
+	if len(channels) == 0 {
+		channels = []string{database.BroadcastChannelTelegram}
 	}
 	return broadcastHistoryResp{
 		ID:          rec.ID,
@@ -590,6 +704,7 @@ func toBroadcastHistoryResp(rec database.BroadcastRecord) broadcastHistoryResp {
 		Error:       rec.Error,
 		StartedAt:   rec.StartedAt,
 		FinishedAt:  rec.FinishedAt,
+		Channels:    channels,
 	}
 }
 
@@ -624,6 +739,7 @@ func (h *AdminBroadcastHandler) History(w http.ResponseWriter, r *http.Request) 
 	for _, rec := range records {
 		items = append(items, toBroadcastHistoryResp(rec))
 	}
+	h.withCabinet(r, items)
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total})
 }
 
@@ -649,7 +765,77 @@ func (h *AdminBroadcastHandler) HistoryItem(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	writeJSON(w, http.StatusOK, toBroadcastHistoryResp(*rec))
+	items := []broadcastHistoryResp{toBroadcastHistoryResp(*rec)}
+	h.withCabinet(r, items)
+	writeJSON(w, http.StatusOK, items[0])
+}
+
+// Cabinet — PATCH/DELETE /admin/broadcast/history/{id}/cabinet: снять или
+// поставить важность уведомлению рассылки в кабинете, убрать его у всех.
+// Telegram-сообщения это не трогает: отозвать их у получателей нельзя.
+func (h *AdminBroadcastHandler) Cabinet(w http.ResponseWriter, r *http.Request) {
+	if h.notifications == nil {
+		http.Error(w, "cabinet notifications unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	id, ok := broadcastIDFromCabinetPath(r.URL.Path)
+	if !ok {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var found bool
+	var err error
+	switch r.Method {
+	case http.MethodPatch:
+		var req struct {
+			Important *bool `json:"important"`
+		}
+		if !decodeJSON(w, r, &req) {
+			return
+		}
+		if req.Important == nil {
+			http.Error(w, "important required", http.StatusBadRequest)
+			return
+		}
+		found, err = h.notifications.SetImportantByBroadcast(r.Context(), id, *req.Important)
+	case http.MethodDelete:
+		found, err = h.notifications.DeleteByBroadcast(r.Context(), id)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if err != nil {
+		slog.Error("admin broadcast: cabinet update", "id", id, "error", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if !found {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	slog.Info("admin broadcast: cabinet notification updated", "broadcast_id", id, "method", r.Method)
+	rec, err := h.history.Get(r.Context(), id)
+	if err != nil || rec == nil {
+		writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
+	items := []broadcastHistoryResp{toBroadcastHistoryResp(*rec)}
+	h.withCabinet(r, items)
+	writeJSON(w, http.StatusOK, items[0])
+}
+
+// broadcastIDFromCabinetPath — id рассылки из /admin/broadcast/history/{id}/cabinet.
+func broadcastIDFromCabinetPath(path string) (int64, bool) {
+	raw := strings.TrimPrefix(path, "/cabinet/api/admin/broadcast/history/")
+	raw = strings.Trim(raw, "/")
+	if !strings.HasSuffix(raw, "/cabinet") {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(strings.TrimSuffix(raw, "/cabinet"), 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
 }
 
 // CountByAudience is a helper endpoint to count for specific audience via query param.

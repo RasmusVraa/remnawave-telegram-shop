@@ -5,6 +5,8 @@ package database
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -133,7 +135,20 @@ func TestBroadcastHistoryDown(t *testing.T) {
 		t.Fatalf("down with rows: err = %v, want refusal", err)
 	}
 	err = execDownInTx(t, pool, "000056_broadcast_history.down.sql", func(tx pgx.Tx) {
-		if _, err := tx.Exec(context.Background(), `DELETE FROM broadcast`); err != nil {
+		ctx := context.Background()
+		// Тестовая база уже на последней миграции, а откат идёт по порядку:
+		// сначала 59 — у уведомлений кабинета внешний ключ на broadcast.
+		if _, err := tx.Exec(ctx, `DELETE FROM cabinet_notification`); err != nil {
+			t.Fatalf("clear notifications: %v", err)
+		}
+		later, err := os.ReadFile(filepath.Join(partnerMigrationsDir(t), "000059_cabinet_notifications.down.sql"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, string(later)); err != nil {
+			t.Fatalf("down 59: %v", err)
+		}
+		if _, err := tx.Exec(ctx, `DELETE FROM broadcast`); err != nil {
 			t.Fatalf("clear: %v", err)
 		}
 	})

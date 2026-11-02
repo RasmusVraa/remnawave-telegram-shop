@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/handler"
 	"remnawave-tg-shop-bot/internal/payment"
@@ -149,6 +150,21 @@ func (s *SubscriptionService) getDaysUntilExpiration(now time.Time, expireAt tim
 }
 
 func (s *SubscriptionService) sendNotification(ctx context.Context, customer database.Customer) error {
+	// Кабинет — до проверки Telegram: web-only клиент напоминание в боте не
+	// получит, а в кабинете увидит. Крон идёт каждый день, ключ дублей —
+	// дата окончания и сколько дней осталось: одно напоминание на день.
+	days := s.getDaysUntilExpiration(time.Now(), *customer.ExpireAt)
+	cabinetnotify.Notify(ctx, customer.ID, customer.Language, cabinetnotify.Event{
+		Kind: database.CabinetNotificationExpiring,
+		// Последний день — важное: плашка на главной, пока не прочитано.
+		Important: days <= 1,
+		TitleKey:  "cabinet_notify_expiring_title",
+		BodyKey:   "cabinet_notify_expiring_body",
+		Args:      []any{cabinetnotify.Date(*customer.ExpireAt)},
+		Buttons:   []string{"buy"},
+		DedupeKey: fmt.Sprintf("expiring:%d:%s:%d", customer.ID, customer.ExpireAt.UTC().Format("2006-01-02"), days),
+	})
+
 	if customer.IsWebOnly || utils.IsSyntheticTelegramID(customer.TelegramID) {
 		return nil
 	}

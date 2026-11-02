@@ -66,4 +66,6 @@ type SendResult struct {
 	FailedCount int
 	// BlockedCount — часть FailedCount: получатель закрыл бота или удалил аккаунт.
 	BlockedCount int
+	// CabinetRecipients — скольким уведомление легло в ленту кабинета.
+	CabinetRecipients int
 }

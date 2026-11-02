@@ -79,7 +79,7 @@ type SubscriptionTariff struct {
 	DeviceLimit int     `json:"device_limit"`
 }
 
-// SubscriptionHwidExtra — блок «доп. устройства» для SPA /cabinet/subscription (как HWID_EXTRA в боте).
+// SubscriptionHwidExtra — блок «доп. устройства» для SPA (главная кабинета) (как HWID_EXTRA в боте).
 type SubscriptionHwidExtra struct {
 	Enabled         bool `json:"enabled"`
 	UiVisible       bool `json:"ui_visible"`
@@ -122,6 +122,47 @@ type SubscriptionResponse struct {
 	// LinkResetAvailableAt — с какого момента сброс снова доступен; только
 	// пока пауза после прошлого сброса не вышла.
 	LinkResetAvailableAt *time.Time `json:"link_reset_available_at,omitempty"`
+	// TrafficResetStrategy — как панель обнуляет счётчик трафика (DAY, WEEK,
+	// MONTH, MONTH_ROLLING, NO_RESET). Только при лимите трафика: у безлимита
+	// сбрасывать нечего, и подпись в кабинете ничего бы не значила.
+	TrafficResetStrategy *string `json:"traffic_reset_strategy,omitempty"`
+	// NextTrafficResetAt — когда счётчик обнулится в следующий раз; nil, если
+	// стратегия без сброса или посчитать не из чего.
+	NextTrafficResetAt *time.Time `json:"next_traffic_reset_at,omitempty"`
+}
+
+// nextTrafficReset считает ближайший сброс счётчика трафика по стратегии панели.
+//
+// Remnawave обнуляет счётчики по расписанию в UTC: DAY — каждую полночь, WEEK —
+// в полночь понедельника, MONTH — 1-го числа. MONTH_ROLLING отсчитывает месяц
+// от прошлого сброса, поэтому без lastReset его не посчитать.
+func nextTrafficReset(strategy string, lastReset *time.Time, now time.Time) *time.Time {
+	now = now.UTC()
+	midnight := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	var next time.Time
+	switch strategy {
+	case "DAY":
+		next = midnight.AddDate(0, 0, 1)
+	case "WEEK":
+		days := (int(time.Monday) - int(now.Weekday()) + 7) % 7
+		if days == 0 {
+			days = 7
+		}
+		next = midnight.AddDate(0, 0, days)
+	case "MONTH":
+		next = time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, time.UTC)
+	case "MONTH_ROLLING":
+		if lastReset == nil || lastReset.IsZero() {
+			return nil
+		}
+		next = lastReset.UTC().AddDate(0, 1, 0)
+		for !next.After(now) {
+			next = next.AddDate(0, 1, 0)
+		}
+	default:
+		return nil
+	}
+	return &next
 }
 
 // SubscriptionLinkResetCooldown — пауза между сбросами ссылки. Повторный сброс
@@ -239,6 +280,10 @@ func (s *Subscription) Get(ctx context.Context, accountID int64) (*SubscriptionR
 		resp.TrafficUsedGB = &used
 		if v := trafficGBFromBytes(rwUser.TrafficLimitBytes); v != nil {
 			resp.TrafficLimitGB = v
+			if strategy := strings.ToUpper(strings.TrimSpace(rwUser.TrafficLimitStrategy)); strategy != "" {
+				resp.TrafficResetStrategy = &strategy
+				resp.NextTrafficResetAt = nextTrafficReset(strategy, rwUser.LastTrafficResetAt, time.Now())
+			}
 		}
 	}
 

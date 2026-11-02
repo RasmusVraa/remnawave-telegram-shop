@@ -538,5 +538,11 @@
   "admin_partner_application_new": "🤝 <b>Заявка в партнёры</b>\n\n• Клиент: %s\n• О себе: %s\n• Площадки: %s\n• Ожидает: %s",
   "admin_partner_application_auto": "🤝 <b>Новый партнёр</b>\n\nЗаявка принята автоматически — модерация выключена.\n\n• Клиент: %s\n• О себе: %s\n• Площадки: %s\n• Ожидает: %s",
   "admin_partner_payout_request": "💸 <b>Запрос на вывод</b>\n\n• Партнёр: %s\n• Сумма: %s\n• Способ: %s\n• Реквизиты: <code>%s</code>",
-  "admin_partner_notify_open_link": "Открыть раздел «Партнёры»"
+  "admin_partner_notify_open_link": "Открыть раздел «Партнёры»",
+  "broadcast_toggle_cabinet": "🔔 В кабинет",
+  "broadcast_toggle_important": "❗ Важное в кабинете",
+  "broadcast_cabinet_line_on": "Кабинет: да",
+  "broadcast_cabinet_line_important": "Кабинет: да, важное — закреплено и висит на главной",
+  "broadcast_cabinet_line_off": "Кабинет: нет",
+  "broadcast_cabinet_line_no_text": "Кабинет: нет — у рассылки нет текста, а вложения кабинет пока не показывает"
 }

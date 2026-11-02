@@ -28,6 +28,8 @@ type checkoutReq struct {
 	Period   int    `json:"period"`
 	TariffID *int64 `json:"tariff_id,omitempty"`
 	Provider string `json:"provider"`
+	// YookassaMethod — способ ЮKassa для provider=yookassa ("sbp", "bank_card"…).
+	YookassaMethod string `json:"yookassa_method,omitempty"`
 	// RenewExtraHwid — продлевать активные доп. HWID вместе с подпиской.
 	RenewExtraHwid bool `json:"renew_extra_hwid"`
 	// LocationID — выбранная площадка, если у тарифа заданы локации.
@@ -55,6 +57,7 @@ func (h *PaymentsHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		Period:         req.Period,
 		TariffID:       req.TariffID,
 		Provider:       strings.ToLower(strings.TrimSpace(req.Provider)),
+		YookassaMethod: strings.ToLower(strings.TrimSpace(req.YookassaMethod)),
 		IdempotencyKey: idemKey,
 		RenewExtraHwid: req.RenewExtraHwid,
 		LocationID:     req.LocationID,
@@ -122,9 +125,28 @@ func (h *PaymentsHandler) Preview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+// LastMethod — GET /cabinet/api/payments/last-method.
+//
+// Способ, которым клиент оплатил последнюю покупку: страница оплаты
+// подставляет его заранее. Пустая строка — оплат не было.
+func (h *PaymentsHandler) LastMethod(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	method, err := h.svc.LastMethod(r.Context(), claims.AccountID)
+	if err != nil {
+		writePaymentsErr(w, err, "last_method")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"method": method})
+}
+
 type hwidCheckoutReq struct {
-	TargetLimit int    `json:"target_limit"`
-	Provider    string `json:"provider"`
+	TargetLimit    int    `json:"target_limit"`
+	Provider       string `json:"provider"`
+	YookassaMethod string `json:"yookassa_method,omitempty"`
 }
 
 // HwidPreview — GET /cabinet/api/payments/hwid/preview?target_limit=&provider=.
@@ -168,6 +190,7 @@ func (h *PaymentsHandler) HwidCheckout(w http.ResponseWriter, r *http.Request) {
 	result, err := h.svc.CreateHwid(r.Context(), claims.AccountID, payments.HwidCreateRequest{
 		TargetLimit:    req.TargetLimit,
 		Provider:       req.Provider,
+		YookassaMethod: strings.ToLower(strings.TrimSpace(req.YookassaMethod)),
 		IdempotencyKey: idemKey,
 	})
 	if err != nil {

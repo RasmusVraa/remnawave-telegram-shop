@@ -1,0 +1,648 @@
+{
+  "/admin/bootstrap": {
+    "sales_mode": "tariffs",
+    "loyalty_enabled": true,
+    "partner_enabled": true,
+    "fortune_enabled": true,
+    "version": "dev-visual",
+    "commit": "visual"
+  },
+  "/admin/users/1560": {
+    "id": 1560,
+    "telegram_id": "443907358",
+    "telegram_username": "Lesya_74",
+    "language": "ru",
+    "expire_at": "2026-10-04T11:15:00Z",
+    "created_at": "2026-09-04T09:17:00Z",
+    "subscription_link": "https://example.invalid/sub/abcdef123456",
+    "extra_hwid": 0,
+    "extra_hwid_expires_at": null,
+    "current_tariff_id": 1,
+    "subscription_period_start": "2026-09-04T09:34:00Z",
+    "subscription_period_months": 1,
+    "loyalty_xp": 150,
+    "loyalty_level": 1,
+    "loyalty_discount_percent": 0,
+    "is_web_only": false,
+    "status": "active",
+    "rw_status": "ACTIVE",
+    "avatar_url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA5NiA5NiI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+PHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjNGRhM2Q4Ii8+PHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjN2M2OGVlIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9Ijk2IiBoZWlnaHQ9Ijk2IiBmaWxsPSJ1cmwoI2cpIi8+PGNpcmNsZSBjeD0iNDgiIGN5PSIzOCIgcj0iMTYiIGZpbGw9IiNmZmYiIG9wYWNpdHk9Ii45Ii8+PHBhdGggZD0iTTIwIDk2YzAtMTYgMTMtMjYgMjgtMjZzMjggMTAgMjggMjZaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIuOSIvPjwvc3ZnPg=="
+  },
+  "/admin/users/1560/panel": {
+    "customer": {
+      "id": 1560,
+      "telegram_id": "443907358",
+      "telegram_username": "Lesya_74",
+      "language": "ru",
+      "expire_at": "2026-10-04T11:15:00Z",
+      "created_at": "2026-09-04T09:17:00Z",
+      "extra_hwid": 0,
+      "current_tariff_id": 1,
+      "loyalty_xp": 150,
+      "is_web_only": false,
+      "status": "active"
+    },
+    "has_rw_user": true,
+    "rw": {
+      "uuid": "1f0f5a6c-4f7a-4a3e-9a6e-1f0b5c2d7a11",
+      "username": "1560_lesya",
+      "status": "ACTIVE",
+      "subscription_url": "https://example.invalid/sub/abcdef123456",
+      "expire_at": "2026-10-04T11:15:00Z",
+      "traffic_used_bytes": 644245094,
+      "traffic_limit_bytes": 214748364800,
+      "traffic_limit_strategy": "MONTH",
+      "hwid_device_limit": 2,
+      "description": "Lesya_74",
+      "tag": "TG_TAG",
+      "last_traffic_reset_at": "2026-09-01T00:00:00Z",
+      "online_at": "2026-09-04T10:52:00Z",
+      "active_squads": [
+        {
+          "uuid": "sq-default",
+          "name": "Default-Squad"
+        }
+      ]
+    },
+    "available_squads": [
+      {
+        "uuid": "sq-default",
+        "name": "Default-Squad"
+      },
+      {
+        "uuid": "sq-premium",
+        "name": "Premium"
+      },
+      {
+        "uuid": "sq-trial",
+        "name": "Trial"
+      },
+      {
+        "uuid": "sq-bridge",
+        "name": "Bridge-Squad"
+      },
+      {
+        "uuid": "sq-rastyan",
+        "name": "Rastyan"
+      }
+    ],
+    "traffic_presets_gb": [
+      5,
+      10,
+      50,
+      100,
+      200,
+      500
+    ],
+    "strategies": [
+      "DAY",
+      "WEEK",
+      "MONTH",
+      "MONTH_ROLLING",
+      "NO_RESET"
+    ],
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "basic",
+        "name": "Базовый"
+      },
+      {
+        "id": 2,
+        "slug": "premium",
+        "name": "Премиум"
+      },
+      {
+        "id": 3,
+        "slug": "trial",
+        "name": "Пробный"
+      }
+    ]
+  },
+  "/admin/users/1560/devices": {
+    "items": [
+      {
+        "hwid": "D3532A88-F1B1-3893-E69A-B4D9C5B82B28",
+        "platform": "iOS",
+        "os_version": "18.2",
+        "device_model": "iPhone 16 Pro Max",
+        "created_at": "2026-09-04T09:40:00Z"
+      },
+      {
+        "hwid": "cffe2y99491c88e3",
+        "platform": "iOS",
+        "os_version": "18.1",
+        "device_model": "iPhone 16 Pro Max",
+        "created_at": "2026-09-04T10:05:00Z"
+      }
+    ]
+  },
+  "/admin/users/1560/payments": {
+    "items": [
+      {
+        "id": 9014,
+        "amount": 150,
+        "currency": "RUB",
+        "invoice_type": "YOOKASSA",
+        "month": 1,
+        "paid_at": "2026-09-04T09:34:00Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "rub_sum": 150,
+    "rub_count": 1,
+    "stars_sum": 0,
+    "stars_count": 0,
+    "stars_rub_equiv": 0,
+    "rub_per_star": 1.6
+  },
+  "/admin/users/1560/referrals": {
+    "referees": [],
+    "stats": {
+      "total": 0,
+      "paid": 0,
+      "active": 0,
+      "conversion": 0,
+      "earned_total": 0
+    },
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/tariffs": [
+    {
+      "id": 1,
+      "slug": "basic",
+      "name": "Базовый"
+    },
+    {
+      "id": 2,
+      "slug": "premium",
+      "name": "Премиум"
+    },
+    {
+      "id": 3,
+      "slug": "trial",
+      "name": "Пробный"
+    }
+  ],
+  "/admin/loyalty/tiers": [
+    {
+      "id": 1,
+      "name": "Старт",
+      "xp_min": 0,
+      "discount_percent": 0,
+      "sort_order": 1
+    },
+    {
+      "id": 2,
+      "name": "Серебро",
+      "xp_min": 500,
+      "discount_percent": 5,
+      "sort_order": 2
+    }
+  ],
+  "/tariffs": {
+    "sales_mode": "tariffs",
+    "currency": "RUB",
+    "price_display": "monthly",
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "base",
+        "name": "Стандарт",
+        "description": "2 устройства\nЛимит до 200 ГБ/мес",
+        "device_limit": 1,
+        "traffic_limit_bytes": 214748364800,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 150
+          },
+          {
+            "months": 3,
+            "amount_rub": 400
+          },
+          {
+            "months": 6,
+            "amount_rub": 750
+          },
+          {
+            "months": 12,
+            "amount_rub": 1320
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "slug": "default-plus",
+        "name": "дефолт+++",
+        "description": "64654",
+        "device_limit": 4,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 200
+          },
+          {
+            "months": 6,
+            "amount_rub": 1000
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "slug": "premium",
+        "name": "🔥Премиум",
+        "description": "Обход Белых списков🔥\nБезлимитный трафик для 3 устройств",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 400
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "slug": "extended",
+        "name": "❤️Расширенный",
+        "description": "низкие цены\n- все четко\n- порвет по скорости\n- офигенный тариф",
+        "device_limit": 5,
+        "traffic_limit_bytes": 107374182400,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 1000
+          }
+        ]
+      }
+    ],
+    "savings_badge": "corner"
+  },
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "cryptopay": false,
+      "telegram": true,
+      "platega_sbp": true,
+      "heleket": true
+    },
+    "site_links": {
+      "channel": "https://t.me/example",
+      "feedback": "https://t.me/example_reviews"
+    },
+    "partner_max_percent": 20,
+    "support_chat_enabled": true,
+    "yookassa_methods": [
+      "sbp",
+      "bank_card",
+      "sberbank"
+    ],
+    "checkout_default_method": "yookassa:sbp",
+    "home_quick_actions": [
+      "fortune",
+      "support"
+    ],
+    "fortune_enabled": true
+  },
+  "/payments/preview": {
+    "amount": 374,
+    "amount_rub": 374,
+    "currency": "RUB",
+    "scenario": "renew",
+    "extra_hwid_active": 1,
+    "extra_hwid_included": true,
+    "extra_hwid_amount_rub": 75
+  },
+  "/subscription": {},
+  "/me/subscription": {
+    "expire_at": "2026-11-19T04:00:14.230Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 3,
+    "traffic_used_gb": 32,
+    "traffic_limit_gb": 100,
+    "is_trial": false,
+    "tariff": {
+      "id": 1,
+      "slug": "premium",
+      "name": "Стандарт",
+      "traffic_gb": 100,
+      "device_limit": 5
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": {
+      "enabled": true,
+      "ui_visible": true,
+      "current_limit": 5,
+      "base_limit": 3,
+      "max_limit": 8,
+      "extra_active": 2,
+      "can_increase": true,
+      "can_decrease": true,
+      "price_rub_month": 75,
+      "stars_price_month": 40,
+      "days_left": 41
+    },
+    "traffic_reset_strategy": "MONTH",
+    "next_traffic_reset_at": "2026-11-18T16:00:14.230Z"
+  },
+  "/me/devices": {
+    "enabled": true,
+    "device_limit": 5,
+    "connected": 3,
+    "devices": [
+      {
+        "hwid": "h1",
+        "platform": "iOS",
+        "os_version": "18.1",
+        "device_model": "iPhone 13"
+      },
+      {
+        "hwid": "h2",
+        "platform": "Android",
+        "os_version": "14",
+        "device_model": "Redmi Note 12"
+      },
+      {
+        "hwid": "h3",
+        "platform": "Windows",
+        "os_version": "11",
+        "device_model": "Ноутбук"
+      }
+    ]
+  },
+  "/payments/hwid/preview": {
+    "current_limit": 2,
+    "target_limit": 3,
+    "delta": 1,
+    "days_left": 53,
+    "amount_rub": 117,
+    "base_amount_rub": 133,
+    "currency": "RUB",
+    "loyalty_discount_pct": 2,
+    "promo_discount_pct": 10,
+    "total_discount_pct": 12
+  },
+  "/me": {
+    "id": 1,
+    "email": "user@example.invalid",
+    "email_verified": true,
+    "language": "ru",
+    "providers": [
+      "password",
+      "telegram"
+    ],
+    "has_telegram_link": true,
+    "has_password": true,
+    "is_admin": true,
+    "customer_id": 1
+  },
+  "/me/traffic-usage": {
+    "enabled": true,
+    "period_start": "2026-10-23",
+    "period_end": "2026-10-31",
+    "categories": [
+      "2026-10-23",
+      "2026-10-24",
+      "2026-10-25",
+      "2026-10-26",
+      "2026-10-27",
+      "2026-10-28",
+      "2026-10-29",
+      "2026-10-30",
+      "2026-10-31"
+    ],
+    "points": [
+      4279234815,
+      2768916645,
+      2013757560,
+      2139617408,
+      2013757560,
+      12585984750,
+      2517196950,
+      2265477255,
+      3775795425
+    ],
+    "total_bytes": 34359738368
+  },
+  "/me/trial": {
+    "enabled": true,
+    "can_activate": false,
+    "days": 3
+  },
+  "/me/connect-invite": {
+    "url": "https://example.invalid/c/abc",
+    "expires_at": "2026-11-07T16:00:14.230Z"
+  },
+  "/payments/last-method": {
+    "method": ""
+  },
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "cabinet",
+        "fields": [
+          {
+            "key": "CABINET_LIGHT_THEME_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DECOR_THEME",
+            "type": "enum",
+            "value": "carbon",
+            "source": "db",
+            "instant": true,
+            "enum_values": [
+              "off",
+              "green",
+              "spring",
+              "cyber",
+              "neon",
+              "ocean",
+              "new_year",
+              "new_year_2",
+              "slate",
+              "carbon",
+              "aurora",
+              "nebula",
+              "violet",
+              "lavender",
+              "pink",
+              "valentine",
+              "wine",
+              "sunset",
+              "orange",
+              "halloween",
+              "halloween_2",
+              "yellow",
+              "summer",
+              "black_friday"
+            ]
+          },
+          {
+            "key": "CABINET_DECOR_AUTO_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DECOR_SCHEDULE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": false
+          },
+          {
+            "key": "CABINET_SUBSCRIPTION_SHOW_LOYALTY",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_HOME_QUICK_ACTIONS",
+            "type": "text",
+            "value": "fortune,support",
+            "source": "db",
+            "instant": false
+          }
+        ]
+      },
+      {
+        "id": "cabinet_connect",
+        "fields": [
+          {
+            "key": "CABINET_DEEPLINK_HAPP_ENCRYPT",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DEEPLINK_HAPP_CRYPT_VERSION",
+            "type": "enum",
+            "value": "crypt5",
+            "source": "default",
+            "instant": true,
+            "enum_values": [
+              "crypt5",
+              "crypt4"
+            ]
+          },
+          {
+            "key": "CABINET_DEEPLINK_INCY_ENCRYPT",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_TELEGRAM_SHOW_CHANNEL_BUTTON",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_TELEGRAM_SHOW_FEEDBACK_BUTTON",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "id": "payments",
+        "fields": [
+          {
+            "key": "YOOKASA_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CRYPTO_PAY_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "HELEKET_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "TELEGRAM_STARS_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_SBP_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_CARDS_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_ACQUIRING_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_WORLDWIDE_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_CRYPTO_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "YOOKASA_PAYMENT_METHODS",
+            "type": "text",
+            "value": "sbp,bank_card,sberbank",
+            "source": "db",
+            "instant": false
+          },
+          {
+            "key": "CABINET_CHECKOUT_DEFAULT_METHOD",
+            "type": "text",
+            "value": "yookassa:sbp",
+            "source": "db",
+            "instant": false
+          }
+        ]
+      }
+    ]
+  }
+}

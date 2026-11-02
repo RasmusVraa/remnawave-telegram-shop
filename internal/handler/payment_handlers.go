@@ -306,9 +306,9 @@ func (h Handler) SellCallbackHandler(ctx context.Context, b *bot.Bot, update *mo
 	}
 
 	if config.IsYookasaEnabled() {
-		keyboard = append(keyboard, []models.InlineKeyboardButton{
-			h.translation.WithButton(langCode, "card_button", models.InlineKeyboardButton{CallbackData: paymentCallbackQuery(tidStr, month, string(database.InvoiceTypeYookasa), amount, extraCount)}),
-		})
+		keyboard = append(keyboard, h.yookasaPaymentRows(langCode, func(suffix string) string {
+			return paymentCallbackQuery(tidStr, month, string(database.InvoiceTypeYookasa), amount, extraCount) + suffix
+		})...)
 	}
 
 	keyboard = h.appendPlategaPaymentRows(keyboard, langCode, tidStr, month, amount, extraCount)
@@ -540,6 +540,7 @@ func (h Handler) PaymentCallbackHandler(_ context.Context, b *bot.Bot, update *m
 	meta := h.checkoutPromoMeta(ctx, customer, invoiceType, &price)
 
 	ctxWithUsername := context.WithValue(ctx, remnawave.CtxKeyUsername, update.CallbackQuery.From.Username)
+	ctxWithUsername = withYookasaMethodFromCallback(ctxWithUsername, callbackQuery)
 	var paymentURL string
 	var purchaseId int64
 	if extra > 0 {

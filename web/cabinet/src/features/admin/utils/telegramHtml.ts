@@ -175,15 +175,29 @@ export function renderTelegramHtml(html: string): string {
   out = out.replace(/&lt;blockquote&gt;/gi, '<blockquote>')
   out = out.replace(/&lt;\/blockquote&gt;/gi, '</blockquote>')
 
-  out = out.replace(/&lt;a href=&quot;([^&]*)&quot;&gt;/gi, (match, href: string) => {
-    const safe = safeHref(href)
-    return safe ? `<a href="${escapeHtml(safe)}" rel="noreferrer">` : match
+  out = out.replace(/&lt;a href=&quot;((?:(?!&quot;).)*)&quot;&gt;/gi, (match, href: string) => {
+    // Адрес экранирован дважды: разметкой Telegram (&amp; в ссылке) и нами выше.
+    const safe = safeHref(unescapeHtml(unescapeHtml(href)))
+    return safe ? `<a href="${escapeHtml(safe)}" target="_blank" rel="noreferrer">` : match
   })
   out = out.replace(/&lt;\/a&gt;/gi, '</a>')
+
+  // Сущности исходной разметки (&lt; &amp; …) экранирование выше превратило в
+  // &amp;lt; — на экране вышло бы «&lt;» буквами. Возвращаем их последним
+  // шагом, когда теги уже разобраны: так текст «&lt;b&gt;» останется текстом.
+  out = out.replace(/&amp;(amp|lt|gt|quot|#\d+|#x[0-9a-f]+);/gi, '&$1;')
 
   // Переводы строк в предпросмотре рисуем сами: white-space их сохранит, но
   // внутри blockquote нужен именно <br>, иначе строка склеивается с текстом.
   return out.replace(/\n/g, '<br>')
+}
+
+function unescapeHtml(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, '&')
 }
 
 /** Длина текста без разметки — по ней считается лимит Telegram. */

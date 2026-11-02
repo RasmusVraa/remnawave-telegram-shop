@@ -50,7 +50,7 @@ func (h Handler) buildCabinetMinimalismCoreRows(langCode string, customer *datab
 		}))
 	}
 	if !noSub {
-		if sub := cabinetWebAppURL("/cabinet/subscription"); sub != "" {
+		if sub := cabinetWebAppURL("/cabinet/dashboard"); sub != "" {
 			add(h.translation.WithButton(langCode, "cabinet_minimal_btn_subscription", models.InlineKeyboardButton{
 				WebApp: &models.WebAppInfo{URL: sub},
 			}))

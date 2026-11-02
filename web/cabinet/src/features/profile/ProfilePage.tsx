@@ -18,6 +18,7 @@ import { ProfileLoyaltySection } from '@/features/loyalty/LoyaltyProgramPage'
 import { PaymentsHistoryCard } from '@/features/payments/PaymentsHistoryPage'
 import { ReferralCopyRow } from '@/features/referral/ReferralCopyRow'
 import { ProfileIdentityHeader, useProfileIdentity } from '@/features/profile/ProfileIdentity'
+import { ProfileSettingsCard } from '@/features/profile/ProfileSettingsCard'
 
 type ProfileTab = 'general' | 'bonuses' | 'history'
 
@@ -203,6 +204,8 @@ export default function ProfilePage() {
                 )}
               </CardContent>
             </Card>
+
+            <ProfileSettingsCard />
 
             {pulseLinkedAccounts ? (
               <Link to="/accounts" className="connect-device-cta group block">

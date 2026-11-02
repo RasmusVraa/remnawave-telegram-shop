@@ -17,14 +17,9 @@ import { newIdempotencyKey } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 import { formatDayMonth } from '@/features/subscription/DeviceSlots'
-import {
-  CheckoutPayButton,
-  PROVIDER_ORDER,
-  ProviderPickerCard,
-  SummaryRow,
-  useProviderEnabled,
-  type Provider,
-} from '@/features/checkout/checkoutShared'
+import { CheckoutPayButton, PROVIDER_ORDER, SummaryRow, type Provider } from '@/features/checkout/checkoutShared'
+import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
+import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
 /**
  * Оформление докупки мест для устройств. Та же страница, что при оплате
@@ -38,7 +33,6 @@ export default function DeviceSlotsCheckoutPage() {
   const [searchParams] = useSearchParams()
   const target = parseInt(searchParams.get('target') ?? '', 10)
 
-  const [provider, setProvider] = useState<Provider | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,9 +51,9 @@ export default function DeviceSlotsCheckoutPage() {
       target <= hwid.max_limit,
   )
 
-  const providerEnabled = useProviderEnabled()
+  const checkoutMethod = useCheckoutMethod()
+  const { providerEnabled, provider: selectedProvider } = checkoutMethod
   const availableProviders = PROVIDER_ORDER.filter((p) => providerEnabled[p])
-  const selectedProvider = provider && providerEnabled[provider] ? provider : null
   const previewProvider: Provider = selectedProvider ?? availableProviders[0] ?? 'yookassa'
 
   const { data: preview, isError: previewError } = useQuery({
@@ -78,7 +72,7 @@ export default function DeviceSlotsCheckoutPage() {
     // До первого await: иначе Safari заблокирует вкладку оплаты.
     const payWindow = reservePaymentWindow()
     try {
-      const res = await api.hwidExtraCheckout(target, selectedProvider, newIdempotencyKey())
+      const res = await api.hwidExtraCheckout(target, selectedProvider, newIdempotencyKey(), checkoutMethod.yookassaMethod)
       if (payWindow.go(res.payment_url)) {
         navigate(`/payment/status/${res.checkout_id}`)
       }
@@ -120,7 +114,7 @@ export default function DeviceSlotsCheckoutPage() {
                 <div className="space-y-3">
                   <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
                   <Button asChild variant="outline" size="sm">
-                    <Link to="/subscription">{t('subscriptionPage.title')}</Link>
+                    <Link to="/dashboard#devices">{t('home.myDevices')}</Link>
                   </Button>
                 </div>
               ) : (
@@ -170,11 +164,14 @@ export default function DeviceSlotsCheckoutPage() {
 
         {valid && (
           <RevealItem>
-            <ProviderPickerCard
+            <PaymentMethodPicker
+              methods={checkoutMethod.methods}
+              method={checkoutMethod.method}
+              initialId={checkoutMethod.initial.id}
+              initialSource={checkoutMethod.initial.source}
+              loading={checkoutMethod.loading}
               providerEnabled={providerEnabled}
-              provider={provider}
-              selectedProvider={selectedProvider}
-              onSelect={setProvider}
+              onSelect={checkoutMethod.setMethod}
             />
           </RevealItem>
         )}

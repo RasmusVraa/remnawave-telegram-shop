@@ -64,6 +64,13 @@
             "value": "false",
             "source": "default",
             "instant": true
+          },
+          {
+            "key": "CABINET_HOME_QUICK_ACTIONS",
+            "type": "text",
+            "value": "promo,invite",
+            "source": "default",
+            "instant": false
           }
         ]
       },

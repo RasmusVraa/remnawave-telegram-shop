@@ -126,6 +126,61 @@
       "title": "Servers",
       "lead": "Reachability of the locations added by hand."
     },
+    "home": {
+      "statDays_one": "day",
+      "statDays_other": "days",
+      "statDevices_one": "device",
+      "statDevices_other": "devices",
+      "statTraffic": "traffic",
+      "trafficUsedOfLimit": "{{used}}/{{limit}} GB",
+      "devicesAllTaken": "all places taken",
+      "devicesAllTakenShort": "full",
+      "statusTrafficExhausted": "Traffic used up",
+      "expiredSince": "ended {{date}}",
+      "alertWarn": "Renew in advance so your VPN keeps working",
+      "alertCrit_one": "Your VPN will stop on all devices in {{count}} day",
+      "alertCrit_other": "Your VPN will stop on all devices in {{count}} days",
+      "alertExpired": "Your VPN is off. Renew your subscription to turn it back on",
+      "alertTrafficWarn": "{{left}} GB of {{limit}} left — traffic will run out soon",
+      "changeTariff": "Change plan",
+      "qaAddExtra": "Add another device",
+      "qaRenew": "Renew subscription",
+      "qaBuy": "Buy subscription",
+      "qaPromo": "Enter promo code",
+      "qaInvite": "Invite a friend",
+      "qaConnect": "Connect device",
+      "qaSupport": "Contact support",
+      "qaPartner": "Partners",
+      "qaFortune": "Fortune wheel",
+      "qaInfo": "Info",
+      "qaNews": "News",
+      "qaFeedback": "Reviews",
+      "qaSubLink": "Subscription link",
+      "qaSubLinkCopied": "Subscription link copied",
+      "qaSubLinkNone": "Get a subscription first",
+      "myDevices": "My devices",
+      "manageDevices": "Manage devices",
+      "addDevice": "Add device",
+      "connectedOf": "{{used}} of {{limit}} connected",
+      "connectedN": "{{used}} connected",
+      "resetsOn": "resets {{date}}",
+      "unlimitedTariff": "Unlimited plan",
+      "slotsLabel": "Device places",
+      "noDevicesTitle": "No devices yet",
+      "noDevicesHint": "Tap “Connect device” — it takes a couple of minutes",
+      "usageCardTitle": "Traffic usage",
+      "trafficLeft": "{{left}} GB left",
+      "trafficEnded": "Traffic used up",
+      "avgPerDay": "Daily average",
+      "maxDay": "Peak day",
+      "menuBonuses": "Bonuses",
+      "menuAbout": "About",
+      "menuReferralHint": "days for friends",
+      "settingsTitle": "Settings",
+      "settingsLanguage": "Language",
+      "mb": "MB",
+      "settingsTheme": "Theme"
+    },
     "dashboard": {
       "partnerCardTitle": "Partners",
       "partnerCardHint": "A percentage of payments from clients you bring",
@@ -284,19 +339,55 @@
     "connectInvite": {
       "cardTitle": "Connect another device",
       "cardSubtitle": "A second phone, computer or TV",
-      "modalTitle": "Connect another device",
+      "modalTitle": "Instructions for another device",
       "qrAlt": "Connection link QR code",
-      "qrHint": "Point the other phone's camera here — it opens the setup instructions",
+      "qrBadge": "Use the regular phone camera",
+      "qrHint": "It opens a page with instructions",
       "share": "Send invitation",
       "shareText": "VPN access 🔐\nOpen this link on the device that needs the VPN and follow the instructions on the page:",
       "copyInvite": "Copy invitation",
       "inviteCopied": "Copied — send it in a messenger",
-      "shareHint": "A link with instructions: the recipient opens it on their device and connects on their own",
       "expiresAt": "The link works until {{date}}",
       "noSubscription": "Get a subscription first — there is nothing to connect yet.",
       "manualToggle": "Set up manually",
-      "manualHint": "Subscription link to paste into a VPN app by hand — if the guided setup did not work. It is not meant to be opened in a browser, only an app understands it.",
+      "manualQrAlt": "Subscription link QR code",
+      "manualQrHint": "Subscription QR for VPN apps (Happ, Incy and others)",
+      "manualCopyHint": "Or copy the link and paste it into the app:",
       "addDeviceSlot": "Add a device"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "bellUnread_one": "Notifications: {{count}} unread",
+      "bellUnread_other": "Notifications: {{count}} unread",
+      "readAll": "Mark all as read",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "empty": "Service news, support replies and subscription reminders will show up here.",
+      "more": "Show more",
+      "unread": "Unread",
+      "importantBadge": "Important",
+      "pushTitle": "Notifications on this device",
+      "pushHint": "Get important updates even when the cabinet is closed.",
+      "pushEnable": "Turn on",
+      "pushDenied": "Notifications are blocked in your browser settings — allow them for this site to get important updates.",
+      "pushIosInstall": "On iPhone, notifications work once you add the cabinet to your Home Screen: Share → Add to Home Screen.",
+      "pushFailed": "Couldn't turn them on. Try again.",
+      "remove": "Delete notification",
+      "pushPromptBlocked": "Your browser didn't show the prompt. Allow notifications for this site — the icon left of the address bar — and press “Turn on” again.",
+      "kinds": {
+        "important": "Important",
+        "broadcast": "News",
+        "payment": "Payment",
+        "expiring": "Subscription",
+        "referral": "Referrals",
+        "support": "Support",
+        "partner": "Partners",
+        "devices": "Devices",
+        "loyalty": "Loyalty",
+        "torrent": "Restriction"
+      },
+      "showMore": "Show more",
+      "showLess": "Show less"
     },
     "linkReset": {
       "inviteEntry": "Link ended up with the wrong people? Reset it",
@@ -978,6 +1069,16 @@
       "plategaAcquiring": "Card",
       "plategaWorldwide": "Card",
       "plategaCrypto": "Crypto",
+      "yookassaMethod": {
+        "sbp": "SBP",
+        "bank_card": "Card",
+        "sberbank": "SberPay",
+        "tinkoff_bank": "T-Pay",
+        "yoo_money": "YooMoney"
+      },
+      "changeMethod": "Change",
+      "recommendedBadge": "Recommended",
+      "otherMethods": "Other methods",
       "total": "Total",
       "rub": "₽",
       "stars": "Stars",
@@ -2227,7 +2328,7 @@
       },
       "broadcast": {
         "title": "Broadcast",
-        "subtitle": "Mass messaging via Telegram",
+        "subtitle": "Mass messaging to Telegram and the cabinet",
         "audienceTitle": "Audience",
         "audienceNone": "none selected",
         "draftSaved": "Draft saved",
@@ -2286,7 +2387,21 @@
           "mediaPlaceholderNoName": "{{kind}} — history keeps the Telegram file itself, without a preview.",
           "plainTextNote": "Sent from the Telegram admin: formatting is stored separately there, so this text has none.",
           "reuse": "Use as a starting point",
-          "reuseReplaces": "This replaces your current draft."
+          "reuseReplaces": "This replaces your current draft.",
+          "cabinet": {
+            "title": "Cabinet notification",
+            "stats": "Received {{recipients}} · read {{read}}",
+            "important": "Important",
+            "deleted": "Removed from cabinet",
+            "makeImportant": "Mark important",
+            "unsetImportant": "Unmark important",
+            "delete": "Remove from cabinet",
+            "deleteConfirm": "The notification disappears from every recipient's feed. Telegram messages stay.",
+            "importantHint": "Currently pinned and shown on the home page for those who haven't read it.",
+            "badge": "Cabinet",
+            "line": "Cabinet: received {{recipients}} · read {{read}}",
+            "receivedRead": "received in the cabinet · read {{read}}"
+          }
         },
         "previewMediaFromDraft": "“{{name}}” from the draft will be sent with the broadcast. Attach the file again to see a preview.",
         "audienceAndMore": "{{first}} and {{count}} more",
@@ -2388,7 +2503,24 @@
         "confirmWebOnly": "People without Telegram will not get it — they only have an email login in the cabinet.",
         "attachment": "Attachment",
         "attachmentNone": "none, text only",
-        "previewEmpty": "Your broadcast text will appear here"
+        "previewEmpty": "Your broadcast text will appear here",
+        "delivery": {
+          "title": "Where to send",
+          "telegram": "Telegram",
+          "telegramHint": "A bot message to everyone who has the bot open.",
+          "cabinet": "Cabinet",
+          "cabinetHint": "Under the bell — including people without Telegram. Text and buttons only: the cabinet doesn't show attachments yet.",
+          "important": "Important",
+          "importantHint": "Pinned in the feed, shown on the home page until read, and sent as a browser push if enabled in the Notifications settings. Only one broadcast is important: the previous one becomes regular. You can unpin it later in the history.",
+          "noChannel": "Pick at least one channel.",
+          "cabinetNeedsText": "Cabinet-only broadcasts need text: attachments aren't shown there yet.",
+          "summary": "Channels"
+        },
+        "recipientsCabinet": "In cabinet",
+        "confirmCabinet": "People without Telegram will see the message in the cabinet under the bell.",
+        "confirmImportant": "Important: pinned and shown on the home page for every recipient.",
+        "recipientsCabinetWebOnly_one": "{{count}} of them without Telegram",
+        "recipientsCabinetWebOnly_other": "{{count}} of them without Telegram"
       },
       "statusPage": {
         "title": "Status",
@@ -2486,7 +2618,8 @@
           "marketing": "Marketing",
           "finance": "Finance",
           "operations": "Operations",
-          "access": "Access"
+          "access": "Access",
+          "notifications": "Notifications"
         },
         "subsections": {
           "trial": {
@@ -2507,7 +2640,9 @@
           },
           "payments": {
             "providers": "Payment methods",
-            "platega": "Platega"
+            "platega": "Platega",
+            "yookassa": "YooKassa buttons",
+            "checkout": "Preselected in the cabinet"
           },
           "moynalog": {
             "toggle": "Receipt sending",
@@ -2529,7 +2664,8 @@
           "cabinet": {
             "decor": "Appearance",
             "schedule": "Holiday auto-switch",
-            "sections": "Subscription page sections"
+            "sections": "Subscription page sections",
+            "homeActions": "Home page buttons"
           },
           "landing": {
             "copy": "First screen copy",
@@ -2541,6 +2677,11 @@
           },
           "tariffs": {
             "showcase": "Tariff showcase"
+          },
+          "notifications": {
+            "urgent": "Important and urgent",
+            "broadcasts": "Broadcasts",
+            "account": "Account events"
           }
         },
         "groups": {
@@ -2562,7 +2703,26 @@
           "landing": "Landing page",
           "status": "Status page",
           "cabinet_connect": "Connection and Telegram",
-          "tariffs": "Price display"
+          "tariffs": "Price display",
+          "notifications": "Browser push"
+        },
+        "groupIntros": {
+          "notifications": "This doesn't turn cabinet notifications on or off: they always appear under the bell for everyone. These toggles decide what is also sent as a system notification to the browser or phone of those who tapped \"Turn on\" in the notification feed. People who didn't subscribe get nothing."
+        },
+        "yookassaMethods": {
+          "intro": "Each checked method is a separate button in the bot and cabinet, in this order. The buyer lands on the chosen YooKassa method right away but can't switch to another one on the form.",
+          "all": "YooKassa form with all methods",
+          "allHint": "Same as without the setting: one “Card / Bank transfer” button",
+          "connectWarning": "Each method has to be enabled in your YooKassa account, or the payment won't be created.",
+          "noAllWarning": "No form with all methods: methods missing from the list aren't available via YooKassa.",
+          "moveUp": "Up",
+          "moveDown": "Down",
+          "reset": "Reset to default"
+        },
+        "checkoutDefault": {
+          "intro": "Returning buyers see the method they paid with last time. This one is preselected for first-time buyers: it's shown large with a “Recommended” badge, the rest as tiles below.",
+          "none": "Don't preselect — plain list",
+          "unavailable": "This method is turned off — buyers will see the plain list with nothing selected."
         },
         "decorSchedule": {
           "from": "From",
@@ -2581,6 +2741,17 @@
           "noneActive": "No window is active today — the theme selected above is shown",
           "autoOff": "Auto-switch is off: the schedule is saved but not applied",
           "priorityHint": "Windows repeat every year. When two windows overlap the upper one wins — reorder them with the arrows. A window may cross December 31 (e.g. December 1 → January 31)"
+        },
+        "homeQuickActions": {
+          "intro": "Four buttons below “Connect device”. The first two follow the subscription state and cannot be changed. Slots 3 and 4 are yours: pick what goes there and swap them.",
+          "lockedHint": "Depends on subscription",
+          "lockedExtra": "Add another device",
+          "lockedRenew": "Renew subscription",
+          "slot": "Slot {{n}}",
+          "swap": "Swap",
+          "reset": "Reset to default",
+          "unavailable": "This section is turned off — customers will see “{{fallback}}” here",
+          "expiredNote": "When the subscription has expired, the first two buttons are hidden: slots 3 and 4 remain, plus “Contact support”."
         },
         "fortune": {
           "basic": "Rules & limits",
@@ -2693,6 +2864,14 @@
           "HELEKET_ENABLED": {
             "label": "Other crypto",
             "hint": "Crypto payments via Heleket. Credentials live in .env"
+          },
+          "YOOKASA_PAYMENT_METHODS": {
+            "label": "YooKassa methods",
+            "hint": ""
+          },
+          "CABINET_CHECKOUT_DEFAULT_METHOD": {
+            "label": "Default method",
+            "hint": ""
           },
           "MOYNALOG_ENABLED": {
             "label": "Send income to Moy Nalog",
@@ -2938,6 +3117,10 @@
             "label": "Loyalty card on subscription page",
             "hint": "Turn on to show the level card on the Subscription page; it is hidden by default. The Loyalty section and the profile card are always available — use \"Loyalty program\" to disable the program itself"
           },
+          "CABINET_HOME_QUICK_ACTIONS": {
+            "label": "Home quick actions",
+            "hint": ""
+          },
           "CABINET_DEEPLINK_HAPP_ENCRYPT": {
             "label": "Encrypt Happ deep link",
             "hint": "When connecting Happ, return an encrypted link (happ://crypt…) so the subscription can't be viewed/edited in the app. The subscription URL is sent to the third-party service crypto.happ.su"
@@ -3149,6 +3332,50 @@
           "FORTUNE_REWARD_DAYS_180": {
             "label": "Days for +180 prize",
             "hint": ""
+          },
+          "CABINET_PUSH_IMPORTANT": {
+            "label": "Important",
+            "hint": "The important broadcast and \"subscription ends tomorrow\"."
+          },
+          "CABINET_PUSH_SUPPORT": {
+            "label": "Support reply",
+            "hint": "A reply reaches the person even when the tab is closed."
+          },
+          "CABINET_PUSH_TORRENT": {
+            "label": "Server temporarily unavailable",
+            "hint": "Torrent block: without a push the person won't know why the VPN stopped."
+          },
+          "CABINET_PUSH_EXPIRING": {
+            "label": "Subscription ending",
+            "hint": "Reminders that the subscription ends soon. The last day is important and follows the \"Important\" toggle."
+          },
+          "CABINET_PUSH_TEST_BROADCAST": {
+            "label": "Test broadcast",
+            "hint": "Sent only to you, to see what the push looks like."
+          },
+          "CABINET_PUSH_BROADCAST": {
+            "label": "Regular broadcasts",
+            "hint": "News without the \"Important\" mark. Use with care: people turn off sites that push often, and Chrome revokes the permission itself — then even important ones won't arrive."
+          },
+          "CABINET_PUSH_PAYMENT": {
+            "label": "Payment received",
+            "hint": "The person is usually on the site at that moment."
+          },
+          "CABINET_PUSH_DEVICES": {
+            "label": "Device slots",
+            "hint": "More slots after a purchase."
+          },
+          "CABINET_PUSH_REFERRAL": {
+            "label": "Referral bonus",
+            "hint": "A friend paid — days added."
+          },
+          "CABINET_PUSH_LOYALTY": {
+            "label": "Loyalty level",
+            "hint": "New level and renewal discount."
+          },
+          "CABINET_PUSH_PARTNER": {
+            "label": "Partner program",
+            "hint": "Application, payouts and other partner events."
           }
         }
       },

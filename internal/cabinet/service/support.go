@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"html"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
 	"remnawave-tg-shop-bot/internal/cabinet/supportbot"
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/database"
 )
 
@@ -366,7 +368,8 @@ func (s *Support) webhookMessage(ctx context.Context, p SupportWebhookPayload) e
 		sbMsgID = &p.SupportBotMessageID
 	}
 
-	return s.repo.WithTx(ctx, func(tx pgx.Tx) error {
+	var notifyAccountID, notifyMsgID int64
+	err = s.repo.WithTx(ctx, func(tx pgx.Tx) error {
 		// Advisory lock по account_id — защита от race condition при параллельных webhook'ах
 		if p.AccountID > 0 {
 			if err := s.repo.LockAccount(ctx, tx, p.AccountID); err != nil {
@@ -380,7 +383,7 @@ func (s *Support) webhookMessage(ctx context.Context, p SupportWebhookPayload) e
 		if ticket.Status != repository.SupportTicketOpen {
 			return nil
 		}
-		_, inserted, err := s.repo.InsertMessageIfNotExistsTx(ctx, tx, &repository.SupportMessage{
+		savedMsg, inserted, err := s.repo.InsertMessageIfNotExistsTx(ctx, tx, &repository.SupportMessage{
 			TicketID:            ticket.ID,
 			Direction:           repository.SupportMsgOut,
 			Text:                text,
@@ -394,11 +397,49 @@ func (s *Support) webhookMessage(ctx context.Context, p SupportWebhookPayload) e
 		if !inserted {
 			return nil
 		}
+		notifyAccountID = ticket.AccountID
+		if savedMsg != nil {
+			notifyMsgID = savedMsg.ID
+		}
 		s.clearTyping(ticket.ID)
 		if ticket.SupportBotTicketID == nil && p.SupportBotTicketID > 0 {
 			return s.repo.UpdateSupportBotTicketIDTx(ctx, tx, ticket.ID, p.SupportBotTicketID)
 		}
 		return nil
+	})
+	if err != nil {
+		return err
+	}
+	if notifyAccountID > 0 {
+		s.notifyCabinetReply(ctx, notifyAccountID, notifyMsgID, text)
+	}
+	return nil
+}
+
+// notifyCabinetReply — ответ оператора в ленту кабинета и push: чат поддержки
+// открыт не всегда, а ответ ждут.
+func (s *Support) notifyCabinetReply(ctx context.Context, accountID, msgID int64, text string) {
+	if s.links == nil || s.customers == nil {
+		return
+	}
+	link, err := s.links.FindByAccountID(ctx, accountID)
+	if err != nil || link == nil {
+		return
+	}
+	lang := ""
+	if c, err := s.customers.FindById(ctx, link.CustomerID); err == nil && c != nil {
+		lang = c.Language
+	}
+	preview := []rune(strings.TrimSpace(text))
+	if len(preview) > 300 {
+		preview = append(preview[:299], '…')
+	}
+	cabinetnotify.Notify(ctx, link.CustomerID, lang, cabinetnotify.Event{
+		Kind:      database.CabinetNotificationSupport,
+		TitleKey:  "cabinet_notify_support_title",
+		BodyHTML:  html.EscapeString(string(preview)),
+		Buttons:   []string{"support"},
+		DedupeKey: fmt.Sprintf("support:%d", msgID),
 	})
 }
 

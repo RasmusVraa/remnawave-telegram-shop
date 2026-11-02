@@ -324,6 +324,7 @@ func (h Handler) AddDevicePaymentCallbackHandler(ctx context.Context, b *bot.Bot
 	amt := amount
 	meta := h.checkoutPromoMeta(ctx, customer, invoiceType, &amt)
 	ctxWithUsername := context.WithValue(ctx, remnawave.CtxKeyUsername, update.CallbackQuery.From.Username)
+	ctxWithUsername = withYookasaMethodFromCallback(ctxWithUsername, params)
 	paymentURL, purchaseId, err := h.paymentService.CreateHwidPurchase(ctxWithUsername, float64(amt), delta, customer, invoiceType, meta)
 	if err != nil {
 		slog.Error("Error creating hwid payment", "error", err)
@@ -422,9 +423,9 @@ func (h Handler) showDevicePaymentMethods(ctx context.Context, b *bot.Bot, callb
 	}
 
 	if config.IsYookasaEnabled() {
-		keyboard = append(keyboard, []models.InlineKeyboardButton{
-			h.translation.WithButton(langCode, "card_button", models.InlineKeyboardButton{CallbackData: fmt.Sprintf("%s?target=%d&invoiceType=%s", CallbackAddDevicePayment, target, database.InvoiceTypeYookasa)}),
-		})
+		keyboard = append(keyboard, h.yookasaPaymentRows(langCode, func(suffix string) string {
+			return fmt.Sprintf("%s?target=%d&invoiceType=%s", CallbackAddDevicePayment, target, database.InvoiceTypeYookasa) + suffix
+		})...)
 	}
 
 	keyboard = h.appendPlategaAddDevicePaymentRows(keyboard, langCode, target)

@@ -16,6 +16,7 @@ import (
 	cabinethttp "remnawave-tg-shop-bot/internal/cabinet/http"
 	cabrepo "remnawave-tg-shop-bot/internal/cabinet/repository"
 	cabstartup "remnawave-tg-shop-bot/internal/cabinet/startup"
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/cache"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/cryptopay"
@@ -127,6 +128,10 @@ func main() {
 
 	// Создание репозиториев для работы с данными в БД
 	customerRepository := database.NewCustomerRepository(pool)                  // Работа с пользователями
+	// Уведомления в кабинете: лента под колокольчиком и push. Общий сервис
+	// заводится до всех, кто пишет людям, — оплаты, кронов, рассылок.
+	cabinetNotify := cabinetnotify.New(pool, tm)
+	cabinetnotify.SetDefault(cabinetNotify)
 	purchaseRepository := database.NewPurchaseRepository(pool)                  // Работа с покупками
 	tariffRepository := database.NewTariffRepository(pool)                      // Тарифы (SALES_MODE=tariffs)
 	referralRepository := database.NewReferralRepository(pool)                  // Работа с реферальной системой
@@ -303,6 +308,7 @@ func main() {
 		slog.Warn("broadcast history: broadcasts interrupted by restart", "count", n)
 	}
 	broadcastSender := broadcast.NewSender(customerRepository, broadcastRepository, tm)
+	broadcastSender.SetCabinetPublisher(cabinetNotify)
 	h := handler.NewHandler(syncService, paymentService, tm, customerRepository, purchaseRepository, tariffRepository, cryptoPayClient, yookasaClient, referralRepository, partnerRepository, cache, promoRepository, promoService, remnawaveClient, statsRepository, infraBillingRepository, loyaltyTierRepository, broadcastSender)
 
 	// Получение информации о боте (username и т.д.)
@@ -422,6 +428,8 @@ func main() {
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleVPN, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleBuy, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleShare, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleCabinet, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
+	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastToggleImportant, bot.MatchTypeExact, h.BroadcastButtonToggleHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 	b.RegisterHandler(bot.HandlerTypeCallbackQueryData, handler.CallbackBroadcastButtonsNext, bot.MatchTypeExact, h.BroadcastButtonsNextHandler, isAdminMiddleware, h.AnswerCallbackQueryMiddleware)
 
 	// Админ-панель и промокоды

@@ -76,6 +76,10 @@ var remnaTagPattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 
 // RuntimeSettingsRegistry — Phase 1 whitelist (~50 ключей).
 func RuntimeSettingsRegistry() []SettingField {
+	return append(baseRuntimeSettings(), cabinetPushRegistry()...)
+}
+
+func baseRuntimeSettings() []SettingField {
 	return []SettingField{
 		// --- loyalty ---
 		{
@@ -172,6 +176,16 @@ func RuntimeSettingsRegistry() []SettingField {
 			Apply: applyPaymentToggle(HeleketHasCredentials, heleketCredentialsHint,
 				func(v bool) { conf.isHeleketEnabled = v }),
 			Current: func() string { return boolStr(conf.isHeleketEnabled) },
+		},
+		{
+			Key: "YOOKASA_PAYMENT_METHODS", Group: "payments", Type: SettingText,
+			Apply:   applyYookasaPaymentMethods(),
+			Current: yookasaPaymentMethodsCurrent(),
+		},
+		{
+			Key: "CABINET_CHECKOUT_DEFAULT_METHOD", Group: "payments", Type: SettingText,
+			Apply:   applyCheckoutDefaultMethod(),
+			Current: checkoutDefaultMethodCurrent(),
 		},
 
 		// --- moynalog ---
@@ -529,6 +543,11 @@ func RuntimeSettingsRegistry() []SettingField {
 			Key: "CABINET_SUBSCRIPTION_SHOW_LOYALTY", Group: "cabinet", Type: SettingBool, Instant: true,
 			Apply:   applyFortuneBool("CABINET_SUBSCRIPTION_SHOW_LOYALTY"),
 			Current: cabinetBoolCurrent("CABINET_SUBSCRIPTION_SHOW_LOYALTY", false),
+		},
+		{
+			Key: "CABINET_HOME_QUICK_ACTIONS", Group: "cabinet", Type: SettingText,
+			Apply:   applyCabinetHomeQuickActions(),
+			Current: cabinetHomeQuickActionsCurrent(),
 		},
 
 		// --- landing (тексты и секции публичной витрины; пустой текст = перевод) ---

@@ -42,6 +42,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/supportbot"
 	"remnawave-tg-shop-bot/internal/cabinet/tgprofile"
 	"remnawave-tg-shop-bot/internal/cabinet/web"
+	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/notification"
@@ -389,6 +390,11 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	adminLoyaltyHandler := handlers.NewAdminLoyalty(loyaltyRepo, customerRepo, purchaseRepo)
 	adminPartnersHandler := handlers.NewAdminPartners(partnerRepo, customerRepo, config.BotURL(), partnerNotifier)
 	adminBroadcastHandler := handlers.NewAdminBroadcast(customerRepo, tariffRepo, database.NewBroadcastRepository(pool), broadcastSender, tgBot)
+	notifySvc := cabinetnotify.Default()
+	if notifySvc != nil {
+		adminBroadcastHandler.SetNotifications(notifySvc.Repo())
+	}
+	notificationsHandler := handlers.NewNotifications(linkRepo, notifySvc)
 	adminInfraHandler := handlers.NewAdminInfra(rw, infraBillingRepo)
 	adminSettingsHandler := handlers.NewAdminSettings(runtimeSettingsRepo)
 	adminSquadsHandler := handlers.NewAdminSquads(rw)
@@ -401,6 +407,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
 		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim)
+	registerNotificationRoutes(api, notificationsHandler, jwtIssuer)
 
 	statusTargets := statusprobe.NewKVTargets(runtimeSettingsRepo)
 	statusRunner := statusprobe.NewRunner(statusprobe.NewKVHistory(runtimeSettingsRepo))
@@ -1270,6 +1277,16 @@ func registerAPIRoutes(
 				),
 			}),
 		)
+		// GET /payments/last-method — способ прошлой оплаты для страницы оплаты.
+		api.Handle("/cabinet/api/payments/last-method",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(pay.LastMethod),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RateLimit(paymentsAcctLim, accountKey("payments")),
+				),
+			}),
+		)
 		api.Handle("/cabinet/api/payments/hwid/preview",
 			methodRouter(map[string]http.Handler{
 				http.MethodGet: middleware.Chain(
@@ -1632,6 +1649,8 @@ func registerAPIRoutes(
 	)
 	// Отдельный ключ лимита: страница опрашивает идущую рассылку раз в пару
 	// секунд, и общий с историей лимит съедался бы этим опросом.
+	// PATCH/DELETE …/history/{id}/cabinet — важность и удаление уведомления
+	// рассылки в кабинете.
 	api.Handle("/cabinet/api/admin/broadcast/history/",
 		methodRouter(map[string]http.Handler{
 			http.MethodGet: middleware.Chain(
@@ -1639,6 +1658,20 @@ func registerAPIRoutes(
 				middleware.RequireAuth(jwtIssuer),
 				middleware.RequireAdmin(adminChecker),
 				middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_history_item")),
+			),
+			http.MethodPatch: middleware.Chain(
+				http.HandlerFunc(adminBroadcast.Cabinet),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.CSRF(),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_cabinet")),
+			),
+			http.MethodDelete: middleware.Chain(
+				http.HandlerFunc(adminBroadcast.Cabinet),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.CSRF(),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_cabinet")),
 			),
 		}),
 	)
@@ -1800,6 +1833,31 @@ func emailBodyKey(route string) middleware.KeyFunc {
 }
 
 // accountKey берёт account_id из JWT claims (должен быть после RequireAuth!).
+// registerNotificationRoutes — колокольчик: лента, счётчик, отметки и push.
+//
+// Без RequireVerifiedEmail: колокольчик есть у всех зарегистрированных, и
+// важное («перебои, переключитесь на другой сервер») должно дойти и до того,
+// кто ещё не подтвердил почту. Счётчик опрашивается раз в минуту с каждой
+// вкладки, отсюда щедрый лимит.
+func registerNotificationRoutes(api *http.ServeMux, h *handlers.NotificationsHandler, jwtIssuer *jwt.Issuer) {
+	lim := ratelimit.New(ratelimit.Rule{Count: 120, Interval: time.Minute})
+	get := func(fn http.HandlerFunc, key string) http.Handler {
+		return methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(fn, middleware.RequireAuth(jwtIssuer), middleware.RateLimit(lim, accountKey(key))),
+		})
+	}
+	post := func(fn http.HandlerFunc, key string) http.Handler {
+		return onlyPOST(middleware.Chain(fn, middleware.RequireAuth(jwtIssuer), middleware.CSRF(), middleware.RateLimit(lim, accountKey(key))))
+	}
+	api.Handle("/cabinet/api/me/notifications", get(h.List, "notifications_list"))
+	api.Handle("/cabinet/api/me/notifications/unread", get(h.Unread, "notifications_unread"))
+	api.Handle("/cabinet/api/me/notifications/read", post(h.Read, "notifications_read"))
+	api.Handle("/cabinet/api/me/notifications/delete", post(h.Delete, "notifications_delete"))
+	api.Handle("/cabinet/api/me/push/key", get(h.PushKey, "push_key"))
+	api.Handle("/cabinet/api/me/push/subscribe", post(h.PushSubscribe, "push_subscribe"))
+	api.Handle("/cabinet/api/me/push/unsubscribe", post(h.PushUnsubscribe, "push_unsubscribe"))
+}
+
 func accountKey(route string) middleware.KeyFunc {
 	return func(r *http.Request) string {
 		claims := middleware.AuthClaims(r)
