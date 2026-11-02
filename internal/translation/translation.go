@@ -3,12 +3,15 @@ package translation
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 
 	"github.com/go-telegram/bot/models"
+
+	translationfs "remnawave-tg-shop-bot/translations"
 )
 
 type Translation map[string]TranslationValue
@@ -74,6 +77,9 @@ func mergeTranslations(dst Translation, src Translation) {
 	}
 }
 
+// InitTranslations грузит вшитые в бинарник тексты, затем поверх — файлы
+// из translationsDir (том на сервере). Ключи, которых нет на диске,
+// остаются из образа: не нужно вручную подтягивать ru.json после каждого релиза.
 func (tm *Manager) InitTranslations(translationsDir string, defaultLanguage string) error {
 	tm.mu.Lock()
 	defer tm.mu.Unlock()
@@ -82,79 +88,152 @@ func (tm *Manager) InitTranslations(translationsDir string, defaultLanguage stri
 		tm.defaultLanguage = defaultLanguage
 	}
 
-	files, err := os.ReadDir(translationsDir)
-	if err != nil {
-		return fmt.Errorf("failed to read translation directory: %w", err)
+	tm.translations = make(map[string]Translation)
+
+	if err := tm.loadFromFS(translationfs.FS, "."); err != nil {
+		return fmt.Errorf("bundled translations: %w", err)
 	}
 
-	type overlay struct {
-		name string
-		lang string
-	}
-	var overlays []overlay
-
-	for _, file := range files {
-		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
-			continue
-		}
-
-		baseName := strings.TrimSuffix(file.Name(), ".json")
-		if strings.HasPrefix(baseName, "admin_") {
-			lang := strings.TrimPrefix(baseName, "admin_")
-			if lang == "" {
-				return fmt.Errorf("invalid admin overlay file name %q (expected admin_<lang>.json)", file.Name())
+	if translationsDir != "" {
+		if _, err := os.Stat(translationsDir); err == nil {
+			if err := tm.loadFromDir(translationsDir); err != nil {
+				return fmt.Errorf("disk translations %s: %w", translationsDir, err)
 			}
-			overlays = append(overlays, overlay{name: file.Name(), lang: lang})
-			continue
+		} else if !os.IsNotExist(err) {
+			return fmt.Errorf("stat translation directory: %w", err)
 		}
-
-		langCode := baseName
-		filePath := filepath.Join(translationsDir, file.Name())
-
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read translation file %s: %w", file.Name(), err)
-		}
-
-		var translation Translation
-		if err := json.Unmarshal(content, &translation); err != nil {
-			return fmt.Errorf("failed to parse translation file %s: %w", file.Name(), err)
-		}
-
-		if err := validateButtonStyles(translation, file.Name()); err != nil {
-			return err
-		}
-
-		tm.translations[langCode] = translation
-	}
-
-	for _, o := range overlays {
-		filePath := filepath.Join(translationsDir, o.name)
-		content, err := os.ReadFile(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to read translation file %s: %w", o.name, err)
-		}
-
-		var overlayTr Translation
-		if err := json.Unmarshal(content, &overlayTr); err != nil {
-			return fmt.Errorf("failed to parse translation file %s: %w", o.name, err)
-		}
-
-		if err := validateButtonStyles(overlayTr, o.name); err != nil {
-			return err
-		}
-
-		base, ok := tm.translations[o.lang]
-		if !ok {
-			return fmt.Errorf("overlay %s: base language %q has no %s.json — load base file first", o.name, o.lang, o.lang)
-		}
-		mergeTranslations(base, overlayTr)
 	}
 
 	if _, exists := tm.translations[tm.defaultLanguage]; !exists {
 		return fmt.Errorf("default language %s translation not found", tm.defaultLanguage)
 	}
 
+	return nil
+}
+
+type langOverlay struct {
+	name string
+	lang string
+}
+
+func (tm *Manager) loadFromDir(translationsDir string) error {
+	files, err := os.ReadDir(translationsDir)
+	if err != nil {
+		return fmt.Errorf("failed to read translation directory: %w", err)
+	}
+
+	var overlays []langOverlay
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		baseName := strings.TrimSuffix(file.Name(), ".json")
+		if strings.HasPrefix(baseName, "admin_") {
+			lang := strings.TrimPrefix(baseName, "admin_")
+			if lang == "" {
+				return fmt.Errorf("invalid admin overlay file name %q (expected admin_<lang>.json)", file.Name())
+			}
+			overlays = append(overlays, langOverlay{name: file.Name(), lang: lang})
+			continue
+		}
+
+		content, err := os.ReadFile(filepath.Join(translationsDir, file.Name()))
+		if err != nil {
+			return fmt.Errorf("failed to read translation file %s: %w", file.Name(), err)
+		}
+		if err := tm.mergeLangJSON(baseName, content, file.Name()); err != nil {
+			return err
+		}
+	}
+
+	for _, o := range overlays {
+		content, err := os.ReadFile(filepath.Join(translationsDir, o.name))
+		if err != nil {
+			return fmt.Errorf("failed to read translation file %s: %w", o.name, err)
+		}
+		if err := tm.mergeOverlayJSON(o.lang, content, o.name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (tm *Manager) loadFromFS(fsys fs.FS, root string) error {
+	entries, err := fs.ReadDir(fsys, root)
+	if err != nil {
+		return err
+	}
+
+	var overlays []langOverlay
+	for _, file := range entries {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+			continue
+		}
+		baseName := strings.TrimSuffix(file.Name(), ".json")
+		if strings.HasPrefix(baseName, "admin_") {
+			lang := strings.TrimPrefix(baseName, "admin_")
+			if lang == "" {
+				return fmt.Errorf("invalid admin overlay file name %q", file.Name())
+			}
+			overlays = append(overlays, langOverlay{name: file.Name(), lang: lang})
+			continue
+		}
+		content, err := fs.ReadFile(fsys, joinFS(root, file.Name()))
+		if err != nil {
+			return fmt.Errorf("read bundled %s: %w", file.Name(), err)
+		}
+		if err := tm.mergeLangJSON(baseName, content, file.Name()); err != nil {
+			return err
+		}
+	}
+	for _, o := range overlays {
+		content, err := fs.ReadFile(fsys, joinFS(root, o.name))
+		if err != nil {
+			return fmt.Errorf("read bundled %s: %w", o.name, err)
+		}
+		if err := tm.mergeOverlayJSON(o.lang, content, o.name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func joinFS(root, name string) string {
+	if root == "" || root == "." {
+		return name
+	}
+	return root + "/" + name
+}
+
+func (tm *Manager) mergeLangJSON(langCode string, content []byte, fileName string) error {
+	var translation Translation
+	if err := json.Unmarshal(content, &translation); err != nil {
+		return fmt.Errorf("failed to parse translation file %s: %w", fileName, err)
+	}
+	if err := validateButtonStyles(translation, fileName); err != nil {
+		return err
+	}
+	if base, ok := tm.translations[langCode]; ok {
+		mergeTranslations(base, translation)
+		return nil
+	}
+	tm.translations[langCode] = translation
+	return nil
+}
+
+func (tm *Manager) mergeOverlayJSON(lang string, content []byte, fileName string) error {
+	var overlayTr Translation
+	if err := json.Unmarshal(content, &overlayTr); err != nil {
+		return fmt.Errorf("failed to parse translation file %s: %w", fileName, err)
+	}
+	if err := validateButtonStyles(overlayTr, fileName); err != nil {
+		return err
+	}
+	base, ok := tm.translations[lang]
+	if !ok {
+		return fmt.Errorf("overlay %s: base language %q has no %s.json — load base file first", fileName, lang, lang)
+	}
+	mergeTranslations(base, overlayTr)
 	return nil
 }
 
