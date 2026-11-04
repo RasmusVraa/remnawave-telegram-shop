@@ -192,8 +192,8 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
                 </Alert>
               ) : null}
 
-              <Button type="submit" className="w-full" disabled={!canRequest || requestPayout.isPending}>
-                {requestPayout.isPending ? t('partnerPage.payouts.sending') : t('partnerPage.payouts.request')}
+              <Button type="submit" className="w-full" loading={requestPayout.isPending} disabled={!canRequest}>
+                {t('partnerPage.payouts.request')}
               </Button>
               <p className="text-center text-xs text-muted-foreground">{t('partnerPage.payouts.manualNotice')}</p>
             </form>
@@ -251,7 +251,7 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
                 </Alert>
               ) : null}
 
-              <Button type="submit" className="w-full" disabled={saveDetails.isPending}>
+              <Button type="submit" className="w-full" loading={saveDetails.isPending}>
                 {t('partnerPage.payouts.saveDetails')}
               </Button>
             </form>
@@ -309,7 +309,7 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
                 variant="secondary"
                 size="sm"
                 className="mt-3 w-full"
-                disabled={history.isFetchingNextPage}
+                loading={history.isFetchingNextPage}
                 onClick={() => void history.fetchNextPage()}
               >
                 {t('partnerPage.showMore')}

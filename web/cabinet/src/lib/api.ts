@@ -135,6 +135,8 @@ export interface AuthBootstrapResponse {
   pwa_short_name?: string
   /** false при FORTUNE_ENABLED=false — пункт «Колесо фортуны» в меню кабинета скрыт (маршрут /fortune доступен по ссылке). */
   fortune_nav_visible?: boolean
+  /** false, пока в списке статуса нет ни одного сервера: пункт меню, кнопка главной и сама страница скрыты. */
+  status_nav_visible?: boolean
   /** false при PARTNER_PROGRAM_ENABLED=false — пункт «Партнёрам» скрыт. */
   partner_nav_visible?: boolean
   /** Максимальная ставка партнёрки — бейдж «до N%» рядом с пунктом меню. */
@@ -210,6 +212,97 @@ export interface AuthBootstrapResponse {
   yookassa_methods?: string[]
   /** Способ, выбранный заранее для тех, кто ещё не платил (CABINET_CHECKOUT_DEFAULT_METHOD): «yookassa:sbp», «platega_sbp»…; пусто — не выбран. */
   checkout_default_method?: string
+}
+
+/** Строка списка серверов на странице статуса (админка). */
+export interface AdminStatusTargetDTO {
+  id: string
+  name: string
+  country: string
+  address: string
+  enabled: boolean
+  interval_min: number
+  world_probes: number
+  russia_probes: number
+  note?: string
+  kind?: 'regular' | 'bypass'
+  whitelist?: boolean
+  repeat_cities?: boolean
+  node_uuid?: string
+  exit_node_uuid?: string
+  no_external?: boolean
+}
+
+export interface AdminStatusNodeDTO {
+  uuid: string
+  name: string
+  country?: string
+  address: string
+  state: 'up' | 'partial' | 'down'
+}
+
+export interface AdminStatusQuotaDTO {
+  per_hour: number
+  limit: number
+  token_set: boolean
+  latencylab_set: boolean
+  /** Сервис ответил 429: проверки стоят до этого времени (ISO). */
+  globalping_paused_until?: string
+  latencylab_paused_until?: string
+}
+
+export interface PublicStatusHit {
+  city?: string
+  network?: string
+  country?: string
+  lat?: number
+  lon?: number
+  ping_ms?: number
+  ok?: boolean
+  kind?: string
+  answer?: string
+  icmp_ok?: boolean
+  tcp_ok?: boolean
+  icmp_ms?: number
+  tcp_ms?: number
+}
+
+export interface PublicStatusResponse {
+  available: boolean
+  updated_at?: string
+  online: number
+  total: number
+  show_map?: boolean
+  probes_enabled?: boolean
+  /** Операторы с белыми списками проверяются (задан ключ Latency Lab). */
+  bypass_probes?: boolean
+  probe_world?: number
+  probe_russia?: number
+  probe_interval_min?: number
+  title?: string
+  lead?: string
+  nodes: {
+    id?: string
+    name: string
+    country?: string
+    note?: string
+    kind?: 'regular' | 'bypass'
+    whitelist?: boolean
+    /** Строку не меряют внешние зонды: статус только из панели. */
+    no_probe?: boolean
+    state: string
+    probe?: {
+      world_ping_ms?: number
+      world_ok: number
+      world_total: number
+      russia_ok: number
+      russia_total: number
+      history?: Array<number | null>
+      measured_at?: string
+      next_min?: number
+      hits?: PublicStatusHit[]
+    }
+  }[]
 }
 
 export interface MeResponse {
@@ -1356,53 +1449,7 @@ export const api = {
   // Tariffs
   tariffs: () => request<TariffsRawResponse>('GET', '/tariffs').then(normalizeTariffsResponse),
 
-  publicStatus: () =>
-    request<{
-      available: boolean
-      updated_at?: string
-      online: number
-      total: number
-      show_map?: boolean
-      probes_enabled?: boolean
-      probe_world?: number
-      probe_russia?: number
-      probe_interval_min?: number
-      title?: string
-      lead?: string
-      nodes: {
-        id?: string
-        name: string
-        country?: string
-        note?: string
-        whitelist?: boolean
-        state: string
-        probe?: {
-          world_ping_ms?: number
-          world_ok: number
-          world_total: number
-          russia_ok: number
-          russia_total: number
-          history?: Array<number | null>
-          measured_at?: string
-          next_min?: number
-          hits?: {
-            city?: string
-            network?: string
-            country?: string
-            lat?: number
-            lon?: number
-            ping_ms?: number
-            ok?: boolean
-            kind?: string
-            answer?: string
-            icmp_ok?: boolean
-            tcp_ok?: boolean
-            icmp_ms?: number
-            tcp_ms?: number
-          }[]
-        }
-      }[]
-    }>('GET', '/public/status'),
+  publicStatus: () => request<PublicStatusResponse>('GET', '/public/status'),
 
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider, yookassa_method.
   checkout: (
@@ -1816,44 +1863,19 @@ export const api = {
   adminInfraDeleteHistory: (uuid: string) =>
     request<AdminInfraHistoryDTO>('DELETE', `/admin/infra/history/${uuid}`),
   adminInfraSettings: () => request<AdminInfraSettingsDTO>('GET', '/admin/infra/settings'),
-  adminInfraUpdateSettings: (body: { days: number; enabled: boolean }) =>
-    request<AdminOkDTO>('PATCH', '/admin/infra/settings', body),
+  adminStatusTargets: () => request<{ targets: AdminStatusTargetDTO[] }>('GET', '/admin/status/targets'),
 
-  adminStatusTargets: () =>
-    request<{
-      targets: {
-        id: string
-        name: string
-        country: string
-        address: string
-        enabled: boolean
-        interval_min: number
-        world_probes: number
-        russia_probes: number
-        note?: string
-        whitelist?: boolean
-        repeat_cities?: boolean
-      }[]
-    }>('GET', '/admin/status/targets'),
-
-  saveAdminStatusTargets: (
-    targets: {
-      id: string
-      name: string
-      country: string
-      address: string
-      enabled: boolean
-      interval_min: number
-      world_probes: number
-      russia_probes: number
-      note?: string
-      whitelist?: boolean
-      repeat_cities?: boolean
-    }[],
-  ) =>
-    request<{ targets: { id: string }[] }>('PUT', '/admin/status/targets', { targets }),
+  saveAdminStatusTargets: (targets: AdminStatusTargetDTO[]) =>
+    request<{ targets: AdminStatusTargetDTO[] }>('PUT', '/admin/status/targets', { targets }),
 
   adminStatusProbe: () => request<{ ok: boolean }>('POST', '/admin/status/probe'),
+
+  adminStatusNodes: () => request<{ nodes: AdminStatusNodeDTO[] }>('GET', '/admin/status/nodes'),
+
+  adminStatusQuota: () => request<AdminStatusQuotaDTO>('GET', '/admin/status/quota'),
+
+  adminInfraUpdateSettings: (body: { days: number; enabled: boolean }) =>
+    request<AdminOkDTO>('PATCH', '/admin/infra/settings', body),
 
   adminBotSettings: () => request<AdminBotSettingsDTO>('GET', '/admin/settings'),
   adminBotSettingsPatch: (body: { settings: Record<string, string> }) =>

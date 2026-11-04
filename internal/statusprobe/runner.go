@@ -26,6 +26,8 @@ type Target struct {
 	Whitelist    bool
 	RepeatCities bool
 	Disabled     bool
+	// NoExternal — адрес не уходит во внешние зонды, строка не меряется.
+	NoExternal bool
 }
 
 // Runner держит последний замер и журнал. Страница статуса не ждёт зонды:
@@ -52,6 +54,17 @@ func NewRunner(store HistoryStore) *Runner {
 		samples: map[string]Sample{},
 		history: map[string]map[string]DayRecord{},
 	}
+}
+
+// Pauses — до какого времени стоят проверки после ответа 429: обычный пинг и белые списки.
+// Нулевое время или прошедший момент значит «не на паузе».
+func (r *Runner) Pauses() (ping, list time.Time) {
+	if r == nil {
+		return time.Time{}, time.Time{}
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.cooldownUntil, r.listCooldownUntil
 }
 
 // Snapshot возвращает последний удачный замер и окно истории.
@@ -333,7 +346,7 @@ func (r *Runner) pickLocked(targets []Target, force bool) (ping []Target, list [
 	paused := now.Before(r.cooldownUntil)
 	listPaused := now.Before(r.listCooldownUntil)
 	for _, target := range targets {
-		if target.Disabled {
+		if target.Disabled || target.NoExternal {
 			continue
 		}
 		sample, ok := r.samples[target.Key]
@@ -617,6 +630,11 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	sample.WhitelistPingMs = prev.WhitelistPingMs
 	sample.WhitelistAt = prev.WhitelistAt
 	sample.WhitelistDone = prev.WhitelistDone
+	if sample.AllFailed() {
+		sample.FailStreak = prev.FailStreak + 1
+	} else {
+		sample.FailStreak = 0
+	}
 	r.samples[key] = sample
 	RecordDay(r.history, key, sample, time.Now())
 	r.mu.Unlock()

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
-import { Loader2, Send, X } from 'lucide-react'
+import { Send, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
@@ -284,11 +284,12 @@ export function SupportChatModal({ open, enabled, onClose }: SupportChatModalPro
               type="button"
               size="icon"
               className="size-9 shrink-0"
-              disabled={!text.trim() || sendMutation.isPending}
+              loading={sendMutation.isPending}
+              disabled={!text.trim()}
               onClick={() => void handleSend()}
               aria-label={t('supportChat.send')}
             >
-              {sendMutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              <Send className="size-4" />
             </Button>
           </div>
         </div>

@@ -8,17 +8,9 @@ import { PageReveal, RevealItem } from '@/components/PageReveal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CountryFlag } from '@/features/admin/components/CountryFlag'
 import type { StatusMapNode, StatusProbe, StatusProbeHit } from '@/features/landing/components/StatusMap'
+import { StateChip, stateTint } from './StateChip'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
-
-function countryName(code: string | undefined, locale: string): string {
-  if (!code || code.length !== 2) return ''
-  try {
-    return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? ''
-  } catch {
-    return ''
-  }
-}
 
 function historyLevel(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return ''
@@ -133,7 +125,7 @@ export default function CabinetStatusPage() {
             <p className="cabinet-elevated-card px-4 py-8 text-sm text-muted-foreground">{t('landing.status.emptyHint')}</p>
           </RevealItem>
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid items-start gap-3 sm:grid-cols-2">
             {nodes.map((node, index) => {
               const key = node.id || `${node.country}-${node.name}-${index}`
               return (
@@ -141,6 +133,7 @@ export default function CabinetStatusPage() {
                 key={key}
                 node={node}
                 locale={i18n.language}
+                bypassProbes={data?.bypass_probes !== false}
                 open={open === key}
                 onToggle={() => {
                   setOpen((current) => (current === key ? null : key))
@@ -158,16 +151,17 @@ export default function CabinetStatusPage() {
 function LocationCard({
   node,
   locale,
+  bypassProbes,
   open,
   onToggle,
 }: {
+  bypassProbes: boolean
   node: StatusMapNode
   locale: string
   open: boolean
   onToggle: () => void
 }) {
   const { t, i18n } = useTranslation()
-  const region = countryName(node.country, locale)
   const probe = node.probe
   const whitelist = Boolean(node.whitelist)
   const hits = whitelist ? whitelistHits(probe) : russiaHits(probe)
@@ -177,15 +171,19 @@ function LocationCard({
     ? Math.round((measured.reduce((sum, value) => sum + value, 0) / measured.length) * 1000) / 10
     : null
   const note = node.note?.trim()
-  const subtitle = note || (region && region !== node.name ? region : '')
+  // Подпись только та, что задал админ. Название страны сюда не подставляем.
+  const subtitle = note
 
   return (
-      <div className="cabinet-elevated-card overflow-hidden">
+      <div className={cn('cabinet-elevated-card overflow-hidden', stateTint(node))}>
         <button type="button" className="w-full px-4 py-4 text-left" aria-expanded={open} onClick={onToggle}>
           <span className="flex items-center gap-3">
             <CountryFlag code={node.country} className="h-5 w-7 rounded-[3px]" />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-heading text-base font-bold">{node.name}</span>
+              <span className="flex items-center gap-2">
+                <span className="truncate font-heading text-base font-bold">{node.name}</span>
+                <StateChip node={node} />
+              </span>
               {subtitle ? <span className="mt-0.5 block truncate text-sm text-muted-foreground">{subtitle}</span> : null}
             </span>
             <ChevronDown className={cn('size-4 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
@@ -193,10 +191,10 @@ function LocationCard({
 
           <span className="mt-3 grid grid-cols-2 gap-2">
             <Metric label={t('landing.status.colWorld')}>
-              <WorldLine probe={probe} />
+              <WorldLine node={node} />
             </Metric>
             <Metric label={whitelist ? t('landing.status.whitelistProbes') : t('landing.status.colRussia')}>
-              <RussiaLine probe={probe} whitelist={whitelist} />
+              <RussiaLine probe={probe} whitelist={whitelist} skipped={Boolean(node.no_probe) || (whitelist && !bypassProbes)} />
             </Metric>
           </span>
 
@@ -269,8 +267,10 @@ function Metric({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-function WorldLine({ probe }: { probe?: StatusProbe }) {
+function WorldLine({ node }: { node: StatusMapNode }) {
   const { t } = useTranslation()
+  const probe = node.probe
+  if (node.no_probe) return <span className="text-muted-foreground">—</span>
   if (!probe || probe.world_total === 0) return <span className="text-muted-foreground">{t('landing.status.worldPending')}</span>
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -280,13 +280,14 @@ function WorldLine({ probe }: { probe?: StatusProbe }) {
   )
 }
 
-function RussiaLine({ probe, whitelist }: { probe?: StatusProbe; whitelist: boolean }) {
+function RussiaLine({ probe, whitelist, skipped }: { probe?: StatusProbe; whitelist: boolean; skipped: boolean }) {
   const { t } = useTranslation()
   const operators = whitelistHits(probe)
   const total = whitelist ? operators.length : (probe?.russia_total ?? 0)
   const ok = whitelist ? operators.filter((hit) => hit.ok).length : (probe?.russia_ok ?? 0)
   const pings = operators.map((hit) => hit.ping_ms).filter((ms): ms is number => typeof ms === 'number')
   const avg = pings.length ? Math.round(pings.reduce((sum, ms) => sum + ms, 0) / pings.length) : null
+  if (skipped) return <span className="text-muted-foreground">—</span>
   if (!probe || total === 0) return <span className="text-muted-foreground">{t('landing.status.worldPending')}</span>
   return (
     <span>

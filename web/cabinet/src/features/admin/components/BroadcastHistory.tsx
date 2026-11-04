@@ -6,6 +6,7 @@ import { AlertTriangle, Bell, CheckCircle2, Copy, History, Trash2, X, XCircle } 
 
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import type { AdminBroadcastHistoryItemDTO } from '@/lib/types/admin'
 
 import { AdminModal } from './AdminModal'
@@ -332,9 +333,13 @@ export function BroadcastHistoryList({
         type="button"
         onClick={onLoadMore}
         disabled={loadingMore}
-        className="text-sm font-semibold text-primary disabled:opacity-60"
+        className={cn(
+          'inline-flex items-center gap-2 text-sm font-semibold text-primary disabled:opacity-60',
+          loadingMore && '!opacity-100',
+        )}
       >
-        {loadingMore ? t('admin.broadcast.previewLoading') : t('admin.broadcast.history.loadMore')}
+        {loadingMore && <Spinner />}
+        {t('admin.broadcast.history.loadMore')}
       </button>
     </div>
   )
@@ -613,6 +618,8 @@ function CabinetNotificationPanel({ item, onItemChange }: { item: Item; onItemCh
   })
   if (!cab) return null
   const n = (v: number) => v.toLocaleString(i18n.language)
+  const deleteBusy = update.isPending && update.variables === 'delete'
+  const importantBusy = update.isPending && update.variables !== 'delete'
   const important = cab.important && !cab.deleted
 
   return (
@@ -643,9 +650,12 @@ function CabinetNotificationPanel({ item, onItemChange }: { item: Item; onItemCh
             type="button"
             disabled={update.isPending}
             onClick={() => update.mutate(cab.important ? 'unimportant' : 'important')}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-accent disabled:opacity-50"
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-lg border border-border/60 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-accent disabled:opacity-50',
+              importantBusy && '!opacity-100',
+            )}
           >
-            <AlertTriangle className="size-3.5" />
+            {importantBusy ? <Spinner className="h-3.5 w-3.5" /> : <AlertTriangle className="size-3.5" />}
             {cab.important ? t('admin.broadcast.history.cabinet.unsetImportant') : t('admin.broadcast.history.cabinet.makeImportant')}
           </button>
           {confirmDelete ? (
@@ -653,9 +663,12 @@ function CabinetNotificationPanel({ item, onItemChange }: { item: Item; onItemCh
               type="button"
               disabled={update.isPending}
               onClick={() => update.mutate('delete')}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-lg bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-destructive/90 disabled:opacity-50',
+                deleteBusy && '!opacity-100',
+              )}
             >
-              <Trash2 className="size-3.5" />
+              {deleteBusy ? <Spinner className="h-3.5 w-3.5" /> : <Trash2 className="size-3.5" />}
               {t('admin.broadcast.history.cabinet.delete')}
             </button>
           ) : (

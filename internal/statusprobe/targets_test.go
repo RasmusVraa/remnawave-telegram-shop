@@ -17,7 +17,7 @@ func TestNormalizeTargetsAcceptsPublicIP(t *testing.T) {
 	if len(got) != 1 || got[0].Country != "NL" || got[0].Address != "1.1.1.1" || got[0].ID == "" {
 		t.Fatalf("%+v", got)
 	}
-	if got[0].IntervalMin != 20 {
+	if got[0].IntervalMin != 60 {
 		t.Fatalf("interval %d", got[0].IntervalMin)
 	}
 }

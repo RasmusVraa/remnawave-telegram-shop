@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Pencil, Trash2, X } from 'lucide-react'
 
 import { DevicePlatformIcon } from '@/components/DevicePlatformIcon'
+import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { api, type DeviceInfo } from '@/lib/api'
 
@@ -22,10 +23,13 @@ const iconButton =
 export function DeviceRow({
   device,
   deleteDisabled,
+  deleting = false,
   onDelete,
 }: {
   device: DeviceInfo
   deleteDisabled: boolean
+  /** Удаляется именно это устройство: спиннер вместо корзины. */
+  deleting?: boolean
   onDelete: () => void
 }) {
   const { t } = useTranslation()
@@ -117,9 +121,10 @@ export function DeviceRow({
               onClick={save}
               aria-label={t('subscriptionPage.renameDeviceSave')}
               title={t('subscriptionPage.renameDeviceSave')}
-              className={`${iconButton} hover:bg-emerald-500/10 hover:text-emerald-500`}
+              aria-busy={rename.isPending || undefined}
+              className={`${iconButton} hover:bg-emerald-500/10 hover:text-emerald-500 ${rename.isPending ? '!opacity-100' : ''}`}
             >
-              <Check size={17} />
+              {rename.isPending ? <Spinner /> : <Check size={17} />}
             </button>
             <button
               type="button"
@@ -145,13 +150,14 @@ export function DeviceRow({
             </button>
             <button
               type="button"
-              disabled={deleteDisabled}
+              disabled={deleteDisabled || deleting}
               onClick={onDelete}
               aria-label={t('subscriptionPage.deleteDevice')}
               title={t('subscriptionPage.deleteDevice')}
-              className={`${iconButton} hover:bg-destructive/10 hover:text-destructive`}
+              aria-busy={deleting || undefined}
+              className={`${iconButton} hover:bg-destructive/10 hover:text-destructive ${deleting ? '!opacity-100' : ''}`}
             >
-              <Trash2 size={17} />
+              {deleting ? <Spinner /> : <Trash2 size={17} />}
             </button>
           </>
         )}

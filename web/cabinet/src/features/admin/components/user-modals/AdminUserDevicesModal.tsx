@@ -55,6 +55,7 @@ export function AdminUserDevicesModal({
   const [pinned, setPinned] = useState(initialPinned)
   const [draftPin, setDraftPin] = useState(initialPin ?? totalLimit)
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (open) {
@@ -87,6 +88,7 @@ export function AdminUserDevicesModal({
       return
     }
 
+    setSaving(true)
     try {
       if (pinned) {
         await setPin.mutateAsync(draftPin)
@@ -109,10 +111,13 @@ export function AdminUserDevicesModal({
       const msg = formatAdminApiError(e, t)
       setError(msg)
       onError?.(msg)
+    } finally {
+      setSaving(false)
     }
   }
 
-  const isPending = setHwid.isPending || extraHwid.isPending || setPin.isPending
+  // saving держит кнопку и в паузе между цепочкой запросов, когда ни один isPending не взведён.
+  const isPending = saving || setHwid.isPending || extraHwid.isPending || setPin.isPending
 
   return (
     <AdminModal

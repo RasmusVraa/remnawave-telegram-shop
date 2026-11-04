@@ -1,7 +1,9 @@
 import * as React from 'react'
-import { Slot } from '@radix-ui/react-slot'
+import { Slot, Slottable } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
+import { useNavPending } from '@/lib/navPending'
+import { Spinner } from '@/components/ui/spinner'
 
 const buttonVariants = cva(
   // cabinet-btn / cabinet-btn-primary — стабильные хуки для декор-тем:
@@ -42,30 +44,73 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  /**
+   * Запрос в работе: спиннер вместо иконки, повторное нажатие невозможно.
+   * Обязателен для кнопок, которые ждут сервер (обычно `loading={mutation.isPending}`).
+   * Если onClick возвращает Promise, кнопка включает это состояние сама до его завершения.
+   * Переход на другую страницу отслеживается сам (lib/navPending.ts).
+   */
   loading?: boolean
 }
 
+function isPromiseLike(v: unknown): v is PromiseLike<unknown> {
+  return typeof v === 'object' && v !== null && typeof (v as PromiseLike<unknown>).then === 'function'
+}
+
+/**
+ * Спиннер встаёт первым, а ведущая иконка прячется (`.cabinet-btn-spinner + svg` в index.css):
+ * подпись и ширина кнопки при загрузке не меняются.
+ */
+const spinner = <Spinner />
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, children, disabled, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, children, disabled, onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button'
+    const innerRef = React.useRef<HTMLButtonElement | null>(null)
+    const setRefs = React.useCallback(
+      (node: HTMLButtonElement | null) => {
+        innerRef.current = node
+        if (typeof ref === 'function') ref(node)
+        else if (ref) ref.current = node
+      },
+      [ref],
+    )
+    const navPending = useNavPending(innerRef)
+    const [promisePending, setPromisePending] = React.useState(false)
+    const busy = loading || navPending || promisePending
+
+    const handleClick = onClick
+      ? (e: React.MouseEvent<HTMLButtonElement>) => {
+          // Тип onClick обещает void, но стрелка `() => mutateAsync()` вернёт Promise — его и ждём.
+          const result: unknown = onClick(e)
+          if (!isPromiseLike(result)) return
+          setPromisePending(true)
+          Promise.resolve(result).finally(() => setPromisePending(false))
+        }
+      : undefined
+
     return (
       <Comp
         className={cn(
           buttonVariants({ variant, size, className }),
-          /* При loading кнопка остаётся disabled, но не «серой»: виден спиннер как на активной CTA */
-          loading && '!opacity-100',
+          /* При загрузке кнопка остаётся disabled, но не «серой»: виден спиннер как на активной CTA */
+          busy && '!opacity-100',
         )}
-        ref={ref}
-        disabled={disabled || loading}
-        aria-busy={loading || undefined}
+        ref={setRefs}
+        disabled={disabled || busy}
+        aria-busy={busy || undefined}
+        // Спиннер рисует сама кнопка — трекер переходов не трогает её иконку.
+        data-pending-ui=""
+        onClick={handleClick}
         {...props}
       >
-        {loading ? (
+        {/* У Slot дети идут списком, а не фрагментом: иначе он не найдёт Slottable. */}
+        {asChild && busy ? spinner : null}
+        {asChild ? (
+          <Slottable>{children}</Slottable>
+        ) : busy ? (
           <span className="inline-flex w-full min-w-0 items-center justify-center gap-2">
-            <span
-              className="box-border inline-block h-4 w-4 shrink-0 rounded-full border-2 border-solid border-current border-t-transparent animate-spin"
-              aria-hidden
-            />
+            {spinner}
             {children}
           </span>
         ) : (

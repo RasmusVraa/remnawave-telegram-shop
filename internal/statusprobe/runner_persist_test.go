@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -83,9 +84,10 @@ func TestSchedulePingsDueNodeWithoutAPageView(t *testing.T) {
 	prevPing := pingTarget
 	t.Cleanup(func() { pingTarget = prevPing })
 
-	var pinged int
+	// Замер идёт в своей горутине, тест читает счётчик из другой: без atomic -race ругается.
+	var pinged atomic.Int32
 	pingTarget = func(context.Context, *http.Client, string, int, int, bool) (Sample, error) {
-		pinged++
+		pinged.Add(1)
 		return Sample{WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now()}, nil
 	}
 
@@ -97,14 +99,14 @@ func TestSchedulePingsDueNodeWithoutAPageView(t *testing.T) {
 	runner.schedule(context.Background(), func(context.Context) ([]Target, error) {
 		return []Target{{Key: "pl\nPoland", Address: "203.0.113.10", Interval: 30 * time.Minute}}, nil
 	})
-	waitUntil(t, func() bool { return pinged == 1 })
+	waitUntil(t, func() bool { return pinged.Load() == 1 })
 
 	runner.schedule(context.Background(), func(context.Context) ([]Target, error) {
 		return []Target{{Key: "pl\nPoland", Address: "203.0.113.10", Interval: 30 * time.Minute}}, nil
 	})
 	time.Sleep(50 * time.Millisecond)
-	if pinged != 1 {
-		t.Fatalf("fresh sample was pinged again: %d", pinged)
+	if got := pinged.Load(); got != 1 {
+		t.Fatalf("fresh sample was pinged again: %d", got)
 	}
 }
 

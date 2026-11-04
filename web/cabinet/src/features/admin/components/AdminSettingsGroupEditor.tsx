@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, Info, Loader2, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, Info, SlidersHorizontal } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -61,6 +61,11 @@ export interface AdminSettingsGroupEditorProps {
   onInstantEnum: (key: string, value: string) => void
   onSave: (keys: string[]) => void
   saving: boolean
+  /**
+   * Идёт сохранение именно этой секции (спиннер на «Сохранить секцию»).
+   * `saving` шире: он true при любом PATCH настроек, в том числе от переключателя.
+   */
+  sectionSaving?: boolean
   togglingKey: string | null
 }
 
@@ -84,6 +89,7 @@ export function AdminSettingsGroupEditor({
   onInstantEnum,
   onSave,
   saving,
+  sectionSaving,
   togglingKey,
 }: AdminSettingsGroupEditorProps) {
   const { t } = useTranslation()
@@ -198,7 +204,8 @@ export function AdminSettingsGroupEditor({
           label={label}
           hint={hint}
           checked={parseBool(value)}
-          disabled={togglingKey === field.key || saving}
+          disabled={saving}
+          busy={togglingKey === field.key}
           onChange={(checked) => onToggle(field.key, checked)}
         />
       )
@@ -238,7 +245,8 @@ export function AdminSettingsGroupEditor({
             }}
             placeholder={label}
             ariaLabel={label}
-            disabled={togglingKey === field.key || saving}
+            disabled={saving}
+            busy={togglingKey === field.key}
           />
         ) : isTextareaSettingType(field.type) ? (
           <textarea
@@ -362,17 +370,11 @@ export function AdminSettingsGroupEditor({
                   type="button"
                   size="sm"
                   disabled={saving}
+                  loading={sectionSaving ?? (saving && togglingKey === null)}
                   onClick={() => onSave(nonInstantKeys)}
                   className="min-w-[140px]"
                 >
-                  {saving ? (
-                    <>
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                      {t('admin.settings.saving')}
-                    </>
-                  ) : (
-                    t('admin.settings.saveSection')
-                  )}
+                  {t('admin.settings.saveSection')}
                 </Button>
               </div>
             )}

@@ -2,11 +2,14 @@ import { Check } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 interface AdminCheckboxProps {
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
+  /** Значение сохраняется на сервере: чекбокс заблокирован, внутри спиннер. */
+  busy?: boolean
   id?: string
   className?: string
   'aria-label'?: string
@@ -16,6 +19,7 @@ export function AdminCheckbox({
   checked,
   onChange,
   disabled,
+  busy = false,
   id,
   className,
   'aria-label': ariaLabel,
@@ -27,7 +31,8 @@ export function AdminCheckbox({
       role="checkbox"
       aria-checked={checked}
       aria-label={ariaLabel}
-      disabled={disabled}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
       onClick={() => onChange(!checked)}
       className={cn(
         'inline-flex size-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
@@ -35,11 +40,16 @@ export function AdminCheckbox({
         checked
           ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border bg-background hover:border-primary/60',
-        disabled && 'pointer-events-none opacity-50',
+        (disabled || busy) && 'pointer-events-none',
+        disabled && !busy && 'opacity-50',
         className,
       )}
     >
-      {checked && <Check className="size-3.5" strokeWidth={3} />}
+      {busy ? (
+        <Spinner className={cn('h-3 w-3 border-[1.5px]', !checked && 'text-muted-foreground')} />
+      ) : (
+        checked && <Check className="size-3.5" strokeWidth={3} />
+      )}
     </button>
   )
 }
@@ -59,7 +69,8 @@ export function AdminCheckboxField({
     <label
       className={cn(
         'flex cursor-pointer items-start gap-3 rounded-lg transition-colors hover:bg-accent/40',
-        props.disabled && 'cursor-not-allowed opacity-60',
+        props.disabled && !props.busy && 'cursor-not-allowed opacity-60',
+        props.busy && 'cursor-wait',
         className,
       )}
     >

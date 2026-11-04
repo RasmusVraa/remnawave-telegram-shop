@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -409,8 +410,13 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		oauthIPLim, telegramIPLim, linkAcctLim)
 	registerNotificationRoutes(api, notificationsHandler, jwtIssuer)
 
+	// Страница статуса серверов: замер в фоне, список и узлы — в админке.
 	statusTargets := statusprobe.NewKVTargets(runtimeSettingsRepo)
-	statusRunner := statusprobe.NewRunner(statusprobe.NewKVHistory(runtimeSettingsRepo))
+	statusStore := statusprobe.NewPGStore(pool)
+	if err := statusStore.ImportLegacy(ctx, statusprobe.NewKVHistory(runtimeSettingsRepo)); err != nil {
+		slog.Warn("status probe history import", "error", err)
+	}
+	statusRunner := statusprobe.NewRunner(statusStore)
 	statusRunner.Watch(ctx, func(c context.Context) ([]statusprobe.Target, error) {
 		list, err := statusTargets.Load(c)
 		if err != nil {
@@ -419,30 +425,34 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		return statusprobe.TargetsFrom(list), nil
 	})
 	publicStatus := handlers.NewPublicStatus(rw, statusRunner, statusTargets)
+	authHandler.SetStatusVisible(publicStatus.HasServers)
+	publicStatusIPLim := ratelimit.New(ratelimit.Rule{Count: 60, Interval: time.Minute})
+	publicStatusIPLim.RunGC(ctx)
 	api.Handle("/cabinet/api/public/status",
 		methodRouter(map[string]http.Handler{
-			http.MethodGet: http.HandlerFunc(publicStatus.Get),
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(publicStatus.Get),
+				middleware.RateLimit(publicStatusIPLim, ipKey("public-status")),
+			),
 		}),
 	)
-	adminStatusTargets := handlers.NewAdminStatusTargets(statusTargets, statusRunner)
-	api.Handle("/cabinet/api/admin/status/targets",
-		middleware.Chain(
-			http.HandlerFunc(adminStatusTargets.Handle),
-			middleware.RequireAuth(jwtIssuer),
-			middleware.RequireAdmin(adminChecker),
-			middleware.CSRF(),
-			middleware.RateLimit(adminAcctLim, accountKey("admin_status_targets")),
-		),
-	)
-	api.Handle("/cabinet/api/admin/status/probe",
-		middleware.Chain(
-			http.HandlerFunc(adminStatusTargets.Probe),
-			middleware.RequireAuth(jwtIssuer),
-			middleware.RequireAdmin(adminChecker),
-			middleware.CSRF(),
-			middleware.RateLimit(adminAcctLim, accountKey("admin_status_probe")),
-		),
-	)
+	adminStatusTargets := handlers.NewAdminStatusTargets(statusTargets, statusRunner, rw, publicStatus.Invalidate)
+	for route, handler := range map[string]http.HandlerFunc{
+		"/cabinet/api/admin/status/targets": adminStatusTargets.Handle,
+		"/cabinet/api/admin/status/probe":   adminStatusTargets.Probe,
+		"/cabinet/api/admin/status/nodes":   adminStatusTargets.Nodes,
+		"/cabinet/api/admin/status/quota":   adminStatusTargets.Quota,
+	} {
+		api.Handle(route,
+			middleware.Chain(
+				handler,
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.CSRF(),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_"+strings.TrimPrefix(route, "/cabinet/api/admin/"))),
+			),
+		)
+	}
 
 	// 404 JSON на любой неизвестный /cabinet/api/*.
 	api.HandleFunc("/cabinet/api/", func(w http.ResponseWriter, _ *http.Request) {
@@ -483,6 +493,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	mux.Handle("/{$}", spaChain)
 	mux.Handle("/landing", spaChain)
 	mux.Handle("/landing/", spaChain)
+	// Публичный статус серверов: тот же бандл, basename выбирается по пути.
 	mux.Handle("/status", spaChain)
 	mux.Handle("/status/", spaChain)
 

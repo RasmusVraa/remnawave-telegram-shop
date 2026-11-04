@@ -260,7 +260,7 @@ func latencyMs(value *float64) *int {
 }
 
 func latencyLabGet(ctx context.Context, client *http.Client, token, url string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil) //nolint:gosec // G704: адрес — константа сервиса Latency Lab
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +279,7 @@ func latencyLabPost(ctx context.Context, client *http.Client, token, url string,
 func latencyLabDo(client *http.Client, token string, req *http.Request) ([]byte, error) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("User-Agent", "remnawave-telegram-shop/status")
-	res, err := client.Do(req)
+	res, err := client.Do(req) //nolint:gosec // G704: адрес — константа сервиса Latency Lab
 	if err != nil {
 		return nil, err
 	}

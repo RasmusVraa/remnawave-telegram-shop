@@ -53,8 +53,10 @@ export function AdminUserTrafficModal({
   const [customTrafficGB, setCustomTrafficGB] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [confirmReset, setConfirmReset] = useState(false)
+  const [saving, setSaving] = useState(false)
 
-  const isPending = setTraffic.isPending || setStrategy.isPending
+  // saving держит кнопку и в паузе между двумя запросами, когда ни один isPending не взведён.
+  const isPending = saving || setTraffic.isPending || setStrategy.isPending
 
   useEffect(() => {
     if (open) {
@@ -73,6 +75,7 @@ export function AdminUserTrafficModal({
 
   const handleSave = async () => {
     setError(null)
+    setSaving(true)
     try {
       const trafficChanged = draftBytes !== rw.traffic_limit_bytes
       const strategyChanged = draftStrategy !== rw.traffic_limit_strategy
@@ -92,6 +95,8 @@ export function AdminUserTrafficModal({
       const msg = formatAdminApiError(e, t)
       setError(msg)
       onError?.(msg)
+    } finally {
+      setSaving(false)
     }
   }
 

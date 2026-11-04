@@ -329,9 +329,14 @@ export function AdminDeviceLimitEditor({
                             },
                           })
                         }
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-medium text-destructive-foreground disabled:opacity-50"
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-lg bg-destructive px-2.5 py-1.5 text-xs font-medium text-destructive-foreground disabled:opacity-50',
+                          deleteDevice.isPending && deleteDevice.variables === d.hwid && '!opacity-100',
+                        )}
                       >
-                        {deleteDevice.isPending && <Loader2 className="size-3 animate-spin" />}
+                        {deleteDevice.isPending && deleteDevice.variables === d.hwid && (
+                          <Loader2 className="size-3 animate-spin" />
+                        )}
                         {t('admin.users.subscription.unbindDevice')}
                       </button>
                     </div>

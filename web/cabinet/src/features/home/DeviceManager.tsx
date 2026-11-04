@@ -30,6 +30,8 @@ type DeviceManagerApi = {
   openSlots: (target: number) => void
   requestDelete: (hwid: string) => void
   deletePending: boolean
+  /** hwid устройства, которое сейчас удаляется (спиннер в его строке). */
+  deletingHwid: string | null
 }
 
 const Ctx = createContext<DeviceManagerApi | null>(null)
@@ -72,6 +74,7 @@ export function DeviceManagerProvider({ data, children }: { data: HomeData; chil
     },
     requestDelete: (h) => setDeleteConfirmHwid(h),
     deletePending: deleteDevice.isPending,
+    deletingHwid: deleteDevice.isPending ? (deleteDevice.variables ?? null) : null,
   }
 
   return (
@@ -346,7 +349,7 @@ export function devicesSheetSubtitle(data: HomeData, t: (k: string, o?: Record<s
  */
 export function DevicesPanel({ data, variant }: { data: HomeData; variant: 'desktop' | 'sheet' }) {
   const { t } = useTranslation()
-  const { requestDelete, deletePending } = useDeviceManager()
+  const { requestDelete, deletePending, deletingHwid } = useDeviceManager()
   const { devices, devicesQuery, hasLink, stopped, allSlotsTaken } = data
   const list = devices?.devices ?? []
   const sheet = variant === 'sheet'
@@ -393,7 +396,13 @@ export function DevicesPanel({ data, variant }: { data: HomeData; variant: 'desk
       ) : (
         <ul>
           {list.map((d) => (
-            <DeviceRow key={d.hwid} device={d} deleteDisabled={deletePending} onDelete={() => requestDelete(d.hwid)} />
+            <DeviceRow
+              key={d.hwid}
+              device={d}
+              deleteDisabled={deletePending}
+              deleting={deletingHwid === d.hwid}
+              onDelete={() => requestDelete(d.hwid)}
+            />
           ))}
         </ul>
       )}

@@ -301,7 +301,7 @@ export default function ConnectionsPage() {
         return (
           <>
             {installButtons}
-            <Button variant="outline" className={size} onClick={() => addSubscription(true)} disabled={g.addDisabled}>
+            <Button variant="outline" className={size} onClick={() => addSubscription(true)} disabled={g.addDisabled} loading={g.addLoading}>
               <Plus />
               {text.alreadyInstalledAdd}
             </Button>
@@ -345,7 +345,7 @@ export default function ConnectionsPage() {
               <b className="font-semibold text-foreground">{text.noOpenLead(app.name)}</b> {text.noOpenInstallTip}
             </div>
             {installButtons}
-            <Button variant="outline" className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled}>
+            <Button variant="outline" className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled} loading={g.addLoading}>
               <RefreshCw />
               {text.tryAgain}
             </Button>
@@ -379,7 +379,7 @@ export default function ConnectionsPage() {
       const single = buttons.length === 1 ? buttons[0] : null
       return (
         <>
-          <Button variant={primary} className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled}>
+          <Button variant={primary} className={size} onClick={() => addSubscription(false)} disabled={g.addDisabled} loading={g.addLoading}>
             <Plus />
             {text.haveAppYes}
           </Button>
@@ -413,7 +413,7 @@ export default function ConnectionsPage() {
       ) : null
       return (
         <>
-          <Button variant={primary} className={size} onClick={() => addSubscription(compact)} disabled={g.addDisabled}>
+          <Button variant={primary} className={size} onClick={() => addSubscription(compact)} disabled={g.addDisabled} loading={g.addLoading}>
             <Plus />
             {flow.noOpen ? text.tryAgain : text.addSubscription}
           </Button>

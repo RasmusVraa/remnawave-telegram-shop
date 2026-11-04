@@ -2,6 +2,8 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+
 interface Props {
   onCancel: () => void
   onSave: () => void
@@ -34,7 +36,10 @@ export function AdminModalSaveFooter({ onCancel, onSave, isPending, saveDisabled
           type="button"
           onClick={onSave}
           disabled={isPending || saveDisabled}
-          className="inline-flex items-center gap-2 rounded-btn bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+          className={cn(
+            'inline-flex items-center gap-2 rounded-btn bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50',
+            isPending && '!opacity-100',
+          )}
         >
           {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
           {t('admin.save')}

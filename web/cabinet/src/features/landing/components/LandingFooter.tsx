@@ -71,6 +71,11 @@ export function LandingFooter({ brand }: { brand: LandingBrand }) {
                 <a href="/#faq" className="landing-footer-link text-sm">
                   {t('landing.nav.faq')}
                 </a>
+                {!brand.statusUrl && brand.statusVisible && (
+                  <a href="/status" className="landing-footer-link text-sm">
+                    {t('landing.nav.status')}
+                  </a>
+                )}
               </FooterColumn>
 
               {productLinks.length > 0 && (

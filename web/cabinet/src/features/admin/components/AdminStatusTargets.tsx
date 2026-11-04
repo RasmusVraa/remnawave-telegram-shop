@@ -1,10 +1,25 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import {
+  ChevronDown,
+  GripVertical,
+  Download,
+  Loader2,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Server,
+  Trash2,
+} from 'lucide-react'
 
-import { api } from '@/lib/api'
+import { api, type AdminStatusNodeDTO, type AdminStatusTargetDTO } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { AdminFeedback, type AdminFeedbackState } from './AdminFeedback'
+import { AdminModal } from './AdminModal'
+import { AdminToggleSwitch } from './AdminToggleSwitch'
+import { CountryFlag } from './CountryFlag'
+import { CountrySelect } from './CountrySelect'
 import { formatAdminApiError } from '../utils/formatAdminApiError'
 
 export interface StatusTargetDraft {
@@ -17,8 +32,23 @@ export interface StatusTargetDraft {
   world_probes: number
   russia_probes: number
   note: string
+  /** regular — обычная нода, bypass — каскад обхода (проверка операторов с белыми списками). */
+  kind: 'regular' | 'bypass'
   whitelist: boolean
   repeat_cities: boolean
+  node_uuid: string
+  exit_node_uuid: string
+  no_external: boolean
+}
+
+/** Самое свежее время замера по всем серверам, мс. Нет замеров — null. */
+function newestMeasuredAt(nodes: { probe?: { measured_at?: string } }[] | undefined): number | null {
+  let best: number | null = null
+  for (const node of nodes ?? []) {
+    const ts = node.probe?.measured_at ? Date.parse(node.probe.measured_at) : NaN
+    if (!Number.isNaN(ts) && (best == null || ts > best)) best = ts
+  }
+  return best
 }
 
 function newDraftId(): string {
@@ -39,273 +69,816 @@ function emptyTarget(): StatusTargetDraft {
     world_probes: 0,
     russia_probes: 0,
     note: '',
+    kind: 'regular',
     whitelist: false,
     repeat_cities: true,
+    node_uuid: '',
+    exit_node_uuid: '',
+    no_external: false,
   }
 }
 
-const fieldClass =
-  'h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
+function fromDTO(item: Partial<AdminStatusTargetDTO> & { id: string }): StatusTargetDraft {
+  const bypass = item.kind === 'bypass' || (!item.kind && Boolean(item.whitelist))
+  return {
+    ...emptyTarget(),
+    ...item,
+    note: item.note ?? '',
+    kind: bypass ? 'bypass' : 'regular',
+    whitelist: bypass,
+    repeat_cities: item.repeat_cities !== false,
+    node_uuid: item.node_uuid ?? '',
+    exit_node_uuid: item.exit_node_uuid ?? '',
+    no_external: Boolean(item.no_external),
+  }
+}
 
-/** Список стран, которые страница статуса проверяет зондами. */
+function toDTO(row: StatusTargetDraft): AdminStatusTargetDTO {
+  return { ...row, whitelist: row.kind === 'bypass' }
+}
+
+const inputClass =
+  'h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring'
+
+const STATE_DOT: Record<string, string> = {
+  up: 'bg-emerald-500',
+  partial: 'bg-amber-500',
+  down: 'bg-rose-500',
+}
+
+/** Список серверов страницы статуса: строки, окно правки и панель сохранения. */
 export function AdminStatusTargets() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [rows, setRows] = useState<StatusTargetDraft[]>([])
+  const [saved, setSaved] = useState('[]')
   const [ready, setReady] = useState(false)
   const [feedback, setFeedback] = useState<AdminFeedbackState | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const listRef = useRef<HTMLUListElement>(null)
+  const [dragId, setDragId] = useState<string | null>(null)
+  const rowRefs = useRef(new Map<string, HTMLLIElement>())
+  // Где строка стояла в прошлый раз (offsetTop не зависит от transform): по разнице играем анимацию переезда.
+  const prevTops = useRef(new Map<string, number>())
+  const pointerY = useRef(0)
+  // Насколько ниже верхнего края строки пользователь взялся за ручку.
+  const grabOffset = useRef(0)
 
   const query = useQuery({
     queryKey: ['admin-status-targets'],
     queryFn: () => api.adminStatusTargets(),
   })
+  const nodesQuery = useQuery({
+    queryKey: ['admin-status-nodes'],
+    queryFn: () => api.adminStatusNodes(),
+    retry: false,
+    staleTime: 60_000,
+  })
+  const nodes = useMemo(() => nodesQuery.data?.nodes ?? [], [nodesQuery.data])
+  // «Обновлено N мин назад»: берём тот же публичный ответ, что видят пользователи.
+  const publicQuery = useQuery({
+    queryKey: ['public-status'],
+    queryFn: () => api.publicStatus(),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+  const measuredAt = newestMeasuredAt(publicQuery.data?.nodes)
+  const minutesAgo = measuredAt ? Math.max(0, Math.round((Date.now() - measuredAt) / 60000)) : null
 
   useEffect(() => {
     if (!query.data || ready) return
-    setRows(
-      (query.data.targets ?? []).map((item) => ({
-        ...item,
-        note: item.note ?? '',
-        whitelist: Boolean(item.whitelist),
-        repeat_cities: item.repeat_cities !== false,
-      })),
-    )
+    const next = (query.data.targets ?? []).map(fromDTO)
+    setRows(next)
+    setSaved(JSON.stringify(next))
     setReady(true)
   }, [query.data, ready])
 
+  const dirty = ready && JSON.stringify(rows) !== saved
+
   const probe = useMutation({
     mutationFn: () => api.adminStatusProbe(),
-    onSuccess: () => {
-      setFeedback({ type: 'success', message: t('admin.statusPage.forceProbeStarted') })
-    },
-    onError: (err) => {
-      setFeedback({ type: 'error', message: formatAdminApiError(err, t) })
-    },
+    onSuccess: () => setFeedback({ type: 'success', message: t('admin.statusPage.checkStarted') }),
+    onError: (err) => setFeedback({ type: 'error', message: formatAdminApiError(err, t) }),
   })
 
   const save = useMutation({
-    mutationFn: () => api.saveAdminStatusTargets(rows),
+    mutationFn: () => api.saveAdminStatusTargets(rows.map(toDTO)),
     onSuccess: async (data) => {
-      setFeedback({ type: 'success', message: t('admin.statusPage.targetsSaved') })
-      await queryClient.invalidateQueries({ queryKey: ['admin-status-targets'] })
-      if (Array.isArray((data as { targets?: StatusTargetDraft[] }).targets)) {
-        setRows((data as { targets: StatusTargetDraft[] }).targets)
-      }
+      const next = (data.targets ?? []).map(fromDTO)
+      setRows(next)
+      setSaved(JSON.stringify(next))
+      setFeedback({ type: 'success', message: t('admin.statusPage.saved') })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-status-targets'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-status-quota'] }),
+        queryClient.invalidateQueries({ queryKey: ['public-status'] }),
+      ])
     },
-    onError: (err) => {
-      setFeedback({ type: 'error', message: formatAdminApiError(err, t) })
-    },
+    onError: (err) => setFeedback({ type: 'error', message: formatAdminApiError(err, t) }),
   })
 
-  function patch(index: number, next: Partial<StatusTargetDraft>) {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...next } : row)))
+  function patch(id: string, next: Partial<StatusTargetDraft>) {
+    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, ...next } : row)))
   }
 
   function move(index: number, dir: -1 | 1) {
     setRows((prev) => {
-      const next = index + dir
-      if (next < 0 || next >= prev.length) return prev
+      const to = index + dir
+      if (to < 0 || to >= prev.length) return prev
       const copy = [...prev]
       const [row] = copy.splice(index, 1)
-      copy.splice(next, 0, row)
+      copy.splice(to, 0, row)
       return copy
     })
   }
 
+  // Перетаскивание за ручку из шести точек. Строка поднимается (тень, чуть крупнее) и идёт за
+  // курсором, а соседи плавно расступаются: их переезд проигрывается в useLayoutEffect ниже.
+  function placeDragged() {
+    const el = dragId ? rowRefs.current.get(dragId) : undefined
+    const ul = listRef.current
+    if (!el || !ul) return
+    const layoutTop = ul.getBoundingClientRect().top + el.offsetTop
+    const dy = pointerY.current - grabOffset.current - layoutTop
+    el.style.transition = 'none'
+    el.style.transform = `translateY(${dy}px) scale(1.02)`
+  }
+
+  function dragMove(clientY: number) {
+    if (!dragId || !listRef.current) return
+    pointerY.current = clientY
+    placeDragged()
+    const dragged = rowRefs.current.get(dragId)
+    const from = rows.findIndex((row) => row.id === dragId)
+    if (!dragged || from < 0) return
+    const ulTop = listRef.current.getBoundingClientRect().top
+    const draggedCenter = clientY - grabOffset.current + dragged.offsetHeight / 2
+    const to = rows.filter((row) => {
+      if (row.id === dragId) return false
+      const el = rowRefs.current.get(row.id)
+      return el ? ulTop + el.offsetTop + el.offsetHeight / 2 < draggedCenter : false
+    }).length
+    if (to === from) return
+    setRows((prev) => {
+      const i = prev.findIndex((row) => row.id === dragId)
+      if (i < 0) return prev
+      const copy = [...prev]
+      const [row] = copy.splice(i, 1)
+      copy.splice(to, 0, row)
+      return copy
+    })
+  }
+
+  function endDrag() {
+    if (!dragId) return
+    // Строка плавно садится на своё место.
+    const el = rowRefs.current.get(dragId)
+    if (el) {
+      el.style.transition = 'transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms, border-color 200ms'
+      el.style.transform = ''
+    }
+    setDragId(null)
+  }
+
+  // Анимация переезда: после смены порядка каждая строка «отъезжает» от старого места к новому.
+  useLayoutEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    rowRefs.current.forEach((el, id) => {
+      const top = el.offsetTop
+      const prev = prevTops.current.get(id)
+      if (!reduce && prev != null && prev !== top && id !== dragId) {
+        el.style.transition = 'none'
+        el.style.transform = `translateY(${prev - top}px)`
+        void el.getBoundingClientRect()
+        el.style.transition = 'transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1)'
+        el.style.transform = ''
+      }
+      prevTops.current.set(id, top)
+    })
+    placeDragged()
+  }, [rows, dragId])
+
+  // Курсор «схватил» на всём экране, пока тянем.
+  useEffect(() => {
+    if (!dragId) return
+    const prev = document.body.style.cursor
+    document.body.style.cursor = 'grabbing'
+    return () => {
+      document.body.style.cursor = prev
+    }
+  }, [dragId])
+
+  function addRow(base: Partial<StatusTargetDraft>) {
+    const row = { ...emptyTarget(), ...base }
+    setRows((prev) => [...prev, row])
+    setAdding(false)
+    setEditingId(row.id)
+  }
+
+  function remove(id: string) {
+    setRows((prev) => prev.filter((row) => row.id !== id))
+    setEditingId(null)
+  }
+
+  const editing = rows.find((row) => row.id === editingId) ?? null
+
   return (
-    <section className="space-y-3 rounded-xl border border-border/60 bg-card/40 p-4 sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h2 className="text-base font-semibold tracking-tight">{t('admin.statusPage.targetsTitle')}</h2>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{t('admin.statusPage.targetsHint')}</p>
+    <section className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold tracking-tight">{t('admin.statusPage.serversTitle')}</h2>
+          <p className="text-sm text-muted-foreground">{t('admin.statusPage.serversHint')}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {rows.length > 0 && (
+            <span className="mr-1 text-xs text-muted-foreground">
+              {minutesAgo == null
+                ? t('admin.statusPage.neverMeasured')
+                : minutesAgo < 1
+                  ? t('landing.status.updatedJust')
+                  : t('landing.status.updatedMin', { count: minutesAgo })}
+            </span>
+          )}
           <button
             type="button"
-            disabled={probe.isPending}
+            disabled={probe.isPending || rows.length === 0 || dirty}
+            title={dirty ? t('admin.statusPage.saveFirst') : undefined}
             onClick={() => probe.mutate()}
-            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium hover:bg-accent disabled:opacity-60"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium hover:bg-muted disabled:opacity-50"
           >
             {probe.isPending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
-            {t('admin.statusPage.forceProbe')}
+            {t('admin.statusPage.checkNow')}
           </button>
           <button
             type="button"
-            onClick={() => setRows((prev) => [...prev, emptyTarget()])}
-            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border border-border px-3 text-sm font-medium hover:bg-accent"
+            onClick={() => setAdding(true)}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="size-4" />
-            {t('admin.statusPage.addTarget')}
+            {t('admin.statusPage.add')}
           </button>
         </div>
       </div>
 
       <AdminFeedback feedback={feedback} onDismiss={() => setFeedback(null)} autoDismissMs={4000} />
 
-      {query.isLoading ? (
+      <div className="mt-4">
+        {query.isLoading ? (
+          <div className="flex justify-center py-10 text-muted-foreground">
+            <Loader2 className="size-5 animate-spin" />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border/70 px-4 py-10 text-center">
+            <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+              <Server className="size-6" />
+            </div>
+            <div>
+              <p className="font-medium">{t('admin.statusPage.emptyTitle')}</p>
+              <p className="mt-1 max-w-sm text-sm text-muted-foreground">{t('admin.statusPage.emptyText')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <Plus className="size-4" />
+              {t('admin.statusPage.add')}
+            </button>
+          </div>
+        ) : (
+          <ul
+            ref={listRef}
+            className={cn('relative space-y-2', dragId && 'select-none')}
+            onPointerMove={(e) => dragMove(e.clientY)}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+          >
+            {rows.map((row, index) => (
+              <TargetRow
+                key={row.id}
+                row={row}
+                node={nodes.find((n) => n.uuid === row.node_uuid)}
+                dragging={dragId === row.id}
+                liRef={(el) => {
+                  if (el) rowRefs.current.set(row.id, el)
+                  else rowRefs.current.delete(row.id)
+                }}
+                onToggle={(enabled) => patch(row.id, { enabled })}
+                onEdit={() => setEditingId(row.id)}
+                onHandleDown={(e) => {
+                  e.preventDefault()
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                  const el = rowRefs.current.get(row.id)
+                  pointerY.current = e.clientY
+                  grabOffset.current = el ? e.clientY - el.getBoundingClientRect().top : 0
+                  setDragId(row.id)
+                }}
+                onHandleKey={(dir) => move(index, dir)}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {dirty && (
+        <div className="sticky bottom-3 z-20 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/40 bg-card px-4 py-3 shadow-lg">
+          <span className="text-sm font-medium">{t('admin.statusPage.unsaved')}</span>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={save.isPending}
+              onClick={() => setRows(JSON.parse(saved) as StatusTargetDraft[])}
+              className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-sm font-medium hover:bg-muted disabled:opacity-50"
+            >
+              {t('admin.statusPage.discard')}
+            </button>
+            <button
+              type="button"
+              disabled={save.isPending}
+              onClick={() => save.mutate()}
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 active:bg-primary/75 disabled:opacity-60"
+            >
+              {save.isPending && <Loader2 className="size-4 animate-spin" />}
+              {t('admin.statusPage.save')}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <AddServerModal
+        open={adding}
+        onClose={() => setAdding(false)}
+        nodes={nodes}
+        loading={nodesQuery.isLoading}
+        failed={nodesQuery.isError}
+        usedIds={new Set(rows.map((row) => row.node_uuid).filter(Boolean))}
+        onPick={(node) =>
+          addRow({
+            name: node.name,
+            country: (node.country ?? '').toUpperCase(),
+            address: node.address,
+            node_uuid: node.uuid,
+          })
+        }
+        onManual={() => addRow({})}
+      />
+
+      <EditServerModal
+        row={editing}
+        nodes={nodes}
+        onClose={() => setEditingId(null)}
+        onPatch={(next) => editing && patch(editing.id, next)}
+        onRemove={() => editing && remove(editing.id)}
+      />
+    </section>
+  )
+}
+
+function TargetRow({
+  row,
+  node,
+  dragging,
+  liRef,
+  onToggle,
+  onEdit,
+  onHandleDown,
+  onHandleKey,
+}: {
+  row: StatusTargetDraft
+  node?: AdminStatusNodeDTO
+  dragging: boolean
+  liRef: (el: HTMLLIElement | null) => void
+  onToggle: (enabled: boolean) => void
+  onEdit: () => void
+  onHandleDown: (e: React.PointerEvent<HTMLButtonElement>) => void
+  onHandleKey: (dir: -1 | 1) => void
+}) {
+  const { t } = useTranslation()
+  const bypass = row.kind === 'bypass'
+  return (
+    <li
+      ref={liRef}
+      className={cn(
+        'flex items-center gap-3 rounded-xl border border-border/60 bg-background/40 p-3 transition-[opacity,box-shadow,border-color,background-color] duration-200',
+        !row.enabled && 'opacity-60',
+        dragging && 'relative z-20 border-primary/60 bg-card opacity-100 shadow-2xl shadow-black/40',
+      )}
+    >
+      <button
+        type="button"
+        aria-label={t('admin.statusPage.drag')}
+        title={t('admin.statusPage.drag')}
+        onPointerDown={onHandleDown}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+            e.preventDefault()
+            onHandleKey(e.key === 'ArrowUp' ? -1 : 1)
+          }
+        }}
+        className={cn(
+          '-ml-1 flex h-9 w-6 shrink-0 touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          dragging ? 'cursor-grabbing' : 'cursor-grab',
+        )}
+      >
+        <GripVertical className="size-5" />
+      </button>
+      <div className="flex h-7 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+        {row.country ? (
+          <CountryFlag code={row.country} className="h-full w-full object-cover" />
+        ) : (
+          <Server className="size-4 text-muted-foreground" />
+        )}
+      </div>
+      <button type="button" onClick={onEdit} className="min-w-0 flex-1 text-left">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="truncate font-medium">{row.name || t('admin.statusPage.noName')}</span>
+          <span
+            className={cn(
+              'rounded-md px-1.5 py-0.5 text-[11px] font-semibold',
+              bypass ? 'bg-violet-500/15 text-violet-600 dark:text-violet-300' : 'bg-primary/10 text-primary',
+            )}
+          >
+            {bypass ? t('admin.statusPage.kindBypass') : t('admin.statusPage.kindRegular')}
+          </span>
+        </div>
+        <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+          {node ? (
+            <>
+              <span className={cn('size-1.5 shrink-0 rounded-full', STATE_DOT[node.state] ?? 'bg-muted-foreground')} />
+              <span className="shrink-0">{t(`admin.statusPage.panel.${node.state}`)}</span>
+            </>
+          ) : (
+            <span className="shrink-0">{t('admin.statusPage.noPanel')}</span>
+          )}
+          <span className="truncate">· {row.address || t('admin.statusPage.noAddress')}</span>
+        </p>
+      </button>
+      <AdminToggleSwitch checked={row.enabled} onChange={onToggle} aria-label={t('admin.statusPage.showOnPage')} />
+      <button
+        type="button"
+        aria-label={t('admin.statusPage.edit')}
+        onClick={onEdit}
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <Pencil className="size-4" />
+      </button>
+    </li>
+  )
+}
+
+function AddServerModal({
+  open,
+  onClose,
+  nodes,
+  loading,
+  failed,
+  usedIds,
+  onPick,
+  onManual,
+}: {
+  open: boolean
+  onClose: () => void
+  nodes: AdminStatusNodeDTO[]
+  loading: boolean
+  failed: boolean
+  usedIds: Set<string>
+  onPick: (node: AdminStatusNodeDTO) => void
+  onManual: () => void
+}) {
+  const { t } = useTranslation()
+  const free = nodes.filter((node) => !usedIds.has(node.uuid))
+  return (
+    <AdminModal
+      open={open}
+      onClose={onClose}
+      title={t('admin.statusPage.addTitle')}
+      description={t('admin.statusPage.addHint')}
+      size="md"
+      icon={Download}
+      iconAccent="cyan"
+      footer={
+        <button
+          type="button"
+          onClick={onManual}
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-3.5 text-sm font-medium hover:bg-muted"
+        >
+          <Plus className="size-4" />
+          {t('admin.statusPage.addManual')}
+        </button>
+      }
+    >
+      {loading ? (
         <div className="flex justify-center py-8 text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
-      ) : rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">{t('admin.statusPage.targetsEmpty')}</p>
+      ) : failed ? (
+        <p className="py-4 text-sm text-muted-foreground">{t('admin.statusPage.panelError')}</p>
+      ) : free.length === 0 ? (
+        <p className="py-4 text-sm text-muted-foreground">{t('admin.statusPage.panelEmpty')}</p>
       ) : (
-        <ul className="space-y-3">
-          {rows.map((row, index) => (
-            <li key={row.id || `new-${index}`} className="space-y-3 rounded-lg border border-border/50 p-3">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.4fr_5rem_1fr_auto]">
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldName')}
-                  <input
-                    className={`${fieldClass} mt-1`}
-                    value={row.name}
-                    maxLength={80}
-                    onChange={(e) => patch(index, { name: e.target.value })}
-                  />
-                </label>
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldCountry')}
-                  <input
-                    className={`${fieldClass} mt-1 uppercase`}
-                    value={row.country}
-                    maxLength={2}
-                    onChange={(e) => patch(index, { country: e.target.value.toUpperCase() })}
-                  />
-                </label>
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldAddress')}
-                  <input
-                    className={`${fieldClass} mt-1`}
-                    value={row.address}
-                    inputMode="text"
-                    autoComplete="off"
-                    spellCheck={false}
-                    onChange={(e) => patch(index, { address: e.target.value })}
-                  />
-                </label>
-                <div className="flex items-end justify-between gap-2 sm:justify-end">
-                  <label className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={row.enabled}
-                      onChange={(e) => patch(index, { enabled: e.target.checked })}
-                    />
-                    {t('admin.statusPage.fieldEnabled')}
-                  </label>
-                  <label className="inline-flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={row.whitelist}
-                      onChange={(e) => patch(index, { whitelist: e.target.checked })}
-                    />
-                    {t('admin.statusPage.fieldWhitelist')}
-                  </label>
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      aria-label={t('admin.statusPage.moveUp')}
-                      disabled={index === 0}
-                      onClick={() => move(index, -1)}
-                      className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30"
-                    >
-                      <ChevronUp className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t('admin.statusPage.moveDown')}
-                      disabled={index === rows.length - 1}
-                      onClick={() => move(index, 1)}
-                      className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted disabled:opacity-30"
-                    >
-                      <ChevronDown className="size-4" />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={t('admin.statusPage.removeTarget')}
-                      onClick={() => setRows((prev) => prev.filter((_, i) => i !== index))}
-                      className="inline-flex size-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      <Trash2 className="size-4" />
-                    </button>
+        <>
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t('admin.statusPage.fromPanel')}
+          </p>
+          <ul className="space-y-2">
+            {free.map((node) => (
+              <li key={node.uuid}>
+                <button
+                  type="button"
+                  onClick={() => onPick(node)}
+                  className="flex w-full items-center gap-3 rounded-xl border border-border/60 px-3 py-2.5 text-left hover:bg-muted"
+                >
+                  <div className="flex h-7 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-muted">
+                    <CountryFlag code={node.country} className="h-full w-full object-cover" />
                   </div>
-                </div>
-              </div>
-              <label className="block text-xs font-medium text-muted-foreground">
-                {t('admin.statusPage.fieldNote')}
-                <input
-                  className={`${fieldClass} mt-1`}
-                  value={row.note || ''}
-                  maxLength={48}
-                  placeholder={t('admin.statusPage.fieldNotePlaceholder')}
-                  onChange={(e) => patch(index, { note: e.target.value })}
-                />
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldInterval')}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{node.name}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{node.address || '—'}</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span className={cn('size-1.5 rounded-full', STATE_DOT[node.state] ?? 'bg-muted-foreground')} />
+                    {t(`admin.statusPage.panel.${node.state}`)}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </AdminModal>
+  )
+}
+
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="text-sm font-medium">{label}</span>
+      <div className="mt-1.5">{children}</div>
+      {hint && <span className="mt-1 block text-xs text-muted-foreground">{hint}</span>}
+    </label>
+  )
+}
+
+function NodeSelect({
+  value,
+  nodes,
+  emptyLabel,
+  onChange,
+}: {
+  value: string
+  nodes: AdminStatusNodeDTO[]
+  emptyLabel: string
+  onChange: (uuid: string) => void
+}) {
+  return (
+    <select className={inputClass} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{emptyLabel}</option>
+      {value && !nodes.some((node) => node.uuid === value) && <option value={value}>{value}</option>}
+      {nodes.map((node) => (
+        <option key={node.uuid} value={node.uuid}>
+          {node.name}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function EditServerModal({
+  row,
+  nodes,
+  onClose,
+  onPatch,
+  onRemove,
+}: {
+  row: StatusTargetDraft | null
+  nodes: AdminStatusNodeDTO[]
+  onClose: () => void
+  onPatch: (next: Partial<StatusTargetDraft>) => void
+  onRemove: () => void
+}) {
+  const { t } = useTranslation()
+  const [advanced, setAdvanced] = useState(false)
+  useEffect(() => {
+    setAdvanced(false)
+  }, [row?.id])
+
+  if (!row) return <AdminModal open={false} onClose={onClose} title="">{null}</AdminModal>
+
+  const bypass = row.kind === 'bypass'
+  // Адрес так и остался адресом самой ноды из панели: для обхода проверять нужно хост из белого списка.
+  const boundNode = nodes.find((node) => node.uuid === row.node_uuid)
+  const addressIsNode = Boolean(boundNode && boundNode.address.trim() !== '' && boundNode.address.trim() === row.address.trim())
+  const choice = (kind: 'regular' | 'bypass', title: string, text: string) => (
+    <button
+      type="button"
+      onClick={() => onPatch({ kind, whitelist: kind === 'bypass' })}
+      className={cn(
+        'rounded-xl border p-3 text-left transition-colors',
+        row.kind === kind ? 'border-primary bg-primary/10' : 'border-border/60 hover:bg-muted',
+      )}
+    >
+      <span className="block text-sm font-semibold">{title}</span>
+      <span className="mt-1 block text-xs leading-snug text-muted-foreground">{text}</span>
+    </button>
+  )
+
+  return (
+    <AdminModal
+      open
+      onClose={onClose}
+      title={row.name || t('admin.statusPage.newServer')}
+      size="md"
+      icon={Server}
+      iconAccent="cyan"
+      footer={
+        <div className="flex w-full items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="size-4" />
+            {t('admin.statusPage.remove')}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex min-h-10 items-center rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            {t('admin.statusPage.done')}
+          </button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-2">
+          {choice('regular', t('admin.statusPage.typeRegularTitle'), t('admin.statusPage.typeRegularText'))}
+          {choice('bypass', t('admin.statusPage.typeBypassTitle'), t('admin.statusPage.typeBypassText'))}
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label={t('admin.statusPage.fName')} hint={t('admin.statusPage.fNameHint')}>
+            <input
+              className={inputClass}
+              value={row.name}
+              maxLength={80}
+              onChange={(e) => onPatch({ name: e.target.value })}
+            />
+          </Field>
+          <div>
+            <span className="text-sm font-medium">{t('admin.statusPage.fCountry')}</span>
+            <CountrySelect
+              className="mt-1.5"
+              value={row.country}
+              placeholder={t('admin.statusPage.countryPlaceholder')}
+              onChange={(country) => onPatch({ country })}
+            />
+            <span className="mt-1 block text-xs text-muted-foreground">{t('admin.statusPage.fCountryHint')}</span>
+          </div>
+        </div>
+
+        <Field
+          label={bypass ? t('admin.statusPage.fAddressBypass') : t('admin.statusPage.fAddress')}
+          hint={bypass ? t('admin.statusPage.fAddressBypassHint') : t('admin.statusPage.fAddressHint')}
+        >
+          <input
+            className={inputClass}
+            value={row.address}
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(e) => onPatch({ address: e.target.value })}
+          />
+        </Field>
+        {bypass && addressIsNode && (
+          <p className="-mt-2 rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+            {t('admin.statusPage.addressIsNode')}
+          </p>
+        )}
+
+        <div className={cn('grid gap-3', bypass && 'sm:grid-cols-2')}>
+          <Field
+            label={bypass ? t('admin.statusPage.fEntryNode') : t('admin.statusPage.fNode')}
+            hint={bypass ? undefined : t('admin.statusPage.fNodeHint')}
+          >
+            <NodeSelect
+              value={row.node_uuid}
+              nodes={nodes}
+              emptyLabel={t('admin.statusPage.nodeAuto')}
+              onChange={(node_uuid) => onPatch({ node_uuid })}
+            />
+          </Field>
+          {bypass && (
+            <Field label={t('admin.statusPage.fExitNode')} hint={t('admin.statusPage.fExitHint')}>
+              <NodeSelect
+                value={row.exit_node_uuid}
+                nodes={nodes}
+                emptyLabel={t('admin.statusPage.nodeNone')}
+                onChange={(exit_node_uuid) => onPatch({ exit_node_uuid })}
+              />
+            </Field>
+          )}
+        </div>
+
+        <Field label={t('admin.statusPage.fNote')} hint={t('admin.statusPage.fNoteHint')}>
+          <input
+            className={inputClass}
+            value={row.note}
+            maxLength={48}
+            onChange={(e) => onPatch({ note: e.target.value })}
+          />
+        </Field>
+
+        <div className="rounded-xl border border-border/60">
+          <button
+            type="button"
+            aria-expanded={advanced}
+            onClick={() => setAdvanced((v) => !v)}
+            className="flex w-full items-center justify-between px-3 py-2.5 text-sm font-medium"
+          >
+            {t('admin.statusPage.advanced')}
+            <ChevronDown className={cn('size-4 text-muted-foreground transition-transform', advanced && 'rotate-180')} />
+          </button>
+          {advanced && (
+            <div className="space-y-4 border-t border-border/60 p-3">
+              <div className="grid items-end gap-3 sm:grid-cols-3">
+                <Field label={t('admin.statusPage.fInterval')}>
                   <input
-                    className={`${fieldClass} mt-1`}
+                    className={inputClass}
                     type="number"
                     min={5}
                     max={180}
-                    placeholder={t('admin.statusPage.fieldIntervalPlaceholder')}
+                    placeholder={t('admin.statusPage.shared')}
                     value={row.interval_min || ''}
-                    onChange={(e) => patch(index, { interval_min: Number(e.target.value) || 0 })}
+                    onChange={(e) => onPatch({ interval_min: Number(e.target.value) || 0 })}
                   />
-                </label>
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldWorld')}
+                </Field>
+                <Field label={t('admin.statusPage.fWorld')}>
                   <input
-                    className={`${fieldClass} mt-1`}
+                    className={inputClass}
                     type="number"
                     min={0}
                     max={10}
-                    placeholder={t('admin.statusPage.fieldCountPlaceholder')}
+                    placeholder={t('admin.statusPage.shared')}
                     value={row.world_probes || ''}
-                    onChange={(e) => patch(index, { world_probes: Number(e.target.value) || 0 })}
+                    onChange={(e) => onPatch({ world_probes: Number(e.target.value) || 0 })}
                   />
-                </label>
-                <label className="block text-xs font-medium text-muted-foreground">
-                  {t('admin.statusPage.fieldRussia')}
+                </Field>
+                <Field label={t('admin.statusPage.fRussia')}>
                   <input
-                    className={`${fieldClass} mt-1`}
+                    className={inputClass}
                     type="number"
                     min={0}
                     max={30}
-                    placeholder={t('admin.statusPage.fieldCountPlaceholder')}
+                    placeholder={t('admin.statusPage.shared')}
                     value={row.russia_probes || ''}
-                    onChange={(e) => patch(index, { russia_probes: Number(e.target.value) || 0 })}
+                    onChange={(e) => onPatch({ russia_probes: Number(e.target.value) || 0 })}
                   />
-                </label>
+                </Field>
               </div>
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={row.repeat_cities}
-                  onChange={(e) => patch(index, { repeat_cities: e.target.checked })}
-                />
-                <span>
-                  <span className="font-medium">{t('admin.statusPage.fieldRepeatCities')}</span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {t('admin.statusPage.fieldRepeatCitiesHint')}
-                  </span>
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={save.isPending}
-          onClick={() => save.mutate()}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-        >
-          {save.isPending ? <Loader2 className="size-4 animate-spin" /> : t('admin.save')}
-        </button>
+              <ToggleLine
+                label={t('admin.statusPage.fRepeat')}
+                hint={t('admin.statusPage.fRepeatHint')}
+                checked={row.repeat_cities}
+                onChange={(repeat_cities) => onPatch({ repeat_cities })}
+              />
+              <ToggleLine
+                label={t('admin.statusPage.fNoExternal')}
+                hint={t('admin.statusPage.fNoExternalHint')}
+                checked={row.no_external}
+                onChange={(no_external) => onPatch({ no_external })}
+              />
+              {row.no_external && !row.node_uuid && (
+                <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+                  {t('admin.statusPage.fNoExternalNeedsNode')}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
-    </section>
+    </AdminModal>
+  )
+}
+
+function ToggleLine({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string
+  hint: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-sm font-medium">{label}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+      </div>
+      <AdminToggleSwitch checked={checked} onChange={onChange} aria-label={label} />
+    </div>
   )
 }

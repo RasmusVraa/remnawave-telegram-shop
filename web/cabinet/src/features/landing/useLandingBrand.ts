@@ -32,6 +32,8 @@ export interface LandingBrand {
   privacyUrl: string | null
   offerUrl: string | null
   statusUrl: string | null
+  /** false — в списке статуса нет серверов, ссылку на /status не показываем. */
+  statusVisible: boolean
   /** Абсолютный URL кнопки «Личный кабинет»: дашборд, если сессия уже есть. */
   cabinetHref: string
   /** Абсолютный URL витрины тарифов в кабинете. */
@@ -68,6 +70,7 @@ export function useLandingBrand(): LandingBrand {
       privacyUrl: pick(links, 'privacy_policy'),
       offerUrl: pick(links, 'public_offer'),
       statusUrl: pick(links, 'server_status'),
+      statusVisible: data?.status_nav_visible !== false,
       cabinetHref: `${CABINET_BASE}${accessToken ? '/dashboard' : '/login'}`,
       tariffsHref: `${CABINET_BASE}${accessToken ? '/tariffs' : '/login'}`,
       authenticated: Boolean(accessToken),

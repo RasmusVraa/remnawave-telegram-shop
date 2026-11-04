@@ -1,9 +1,12 @@
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 interface AdminToggleSwitchProps {
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
+  /** Значение сохраняется на сервере: переключатель заблокирован, на ползунке спиннер. */
+  busy?: boolean
   id?: string
   'aria-label'?: string
 }
@@ -13,6 +16,7 @@ export function AdminToggleSwitch({
   checked,
   onChange,
   disabled,
+  busy = false,
   id,
   'aria-label': ariaLabel,
 }: AdminToggleSwitchProps) {
@@ -23,21 +27,25 @@ export function AdminToggleSwitch({
       role="switch"
       aria-checked={checked}
       aria-label={ariaLabel}
-      disabled={disabled}
+      aria-busy={busy || undefined}
+      disabled={disabled || busy}
       onClick={() => onChange(!checked)}
       className={cn(
         'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         checked ? 'bg-primary' : 'bg-muted-foreground/30 dark:bg-muted-foreground/40',
-        disabled && 'pointer-events-none opacity-50',
+        (disabled || busy) && 'pointer-events-none',
+        disabled && !busy && 'opacity-50',
       )}
     >
       <span
         className={cn(
-          'pointer-events-none block size-5 rounded-full bg-background shadow-sm ring-0 transition-transform',
+          'pointer-events-none flex size-5 items-center justify-center rounded-full bg-background shadow-sm ring-0 transition-transform',
           checked ? 'translate-x-5' : 'translate-x-0.5',
         )}
-      />
+      >
+        {busy && <Spinner className="h-3 w-3 border-[1.5px] text-muted-foreground" />}
+      </span>
     </button>
   )
 }
@@ -48,10 +56,11 @@ interface AdminToggleRowProps {
   checked: boolean
   onChange: (checked: boolean) => void
   disabled?: boolean
+  busy?: boolean
   badge?: string
 }
 
-export function AdminToggleRow({ label, hint, checked, onChange, disabled, badge }: AdminToggleRowProps) {
+export function AdminToggleRow({ label, hint, checked, onChange, disabled, busy, badge }: AdminToggleRowProps) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-border/50 py-3 last:border-0">
       <div className="min-w-0 flex-1">
@@ -65,7 +74,7 @@ export function AdminToggleRow({ label, hint, checked, onChange, disabled, badge
         </div>
         {hint && <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>}
       </div>
-      <AdminToggleSwitch checked={checked} onChange={onChange} disabled={disabled} aria-label={label} />
+      <AdminToggleSwitch checked={checked} onChange={onChange} disabled={disabled} busy={busy} aria-label={label} />
     </div>
   )
 }

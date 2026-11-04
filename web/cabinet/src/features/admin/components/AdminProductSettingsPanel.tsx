@@ -29,6 +29,7 @@ export function AdminProductSettingsPanel() {
     draft,
     setDraftValue,
     togglingKey,
+    savingGroup,
     isGroupSaving,
     handleToggle,
     handleInstantEnum,
@@ -87,6 +88,7 @@ export function AdminProductSettingsPanel() {
               onInstantEnum={handleInstantEnum}
               onSave={(keys) => handleSaveSection(group.id, keys)}
               saving={isGroupSaving(group.id)}
+              sectionSaving={savingGroup === group.id}
               togglingKey={togglingKey}
             />
           ))}

@@ -378,6 +378,7 @@ export default function FortunePage() {
           type="button"
           size="lg"
           className="w-full sm:w-auto min-w-[200px]"
+          loading={spinMut.isPending}
           disabled={!canPress}
           onClick={() => {
             setSpinError(null)

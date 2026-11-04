@@ -607,7 +607,7 @@ func baseRuntimeSettings() []SettingField {
 			Current: cabinetBoolCurrent("LANDING_SHOW_FAQ", true),
 		},
 
-		// --- status (публичная страница /status) ---
+		// --- status (страница «Серверы» / публичная /status) ---
 		{
 			Key: "STATUS_PROBES_ENABLED", Group: "status", Type: SettingBool, Instant: true,
 			Apply:   applyFortuneBool("STATUS_PROBES_ENABLED"),
@@ -617,19 +617,19 @@ func baseRuntimeSettings() []SettingField {
 			Key: "STATUS_WORLD_PROBES", Group: "status", Type: SettingInt, Instant: true,
 			MinInt: intPtr(1), MaxInt: intPtr(10),
 			Apply:   applyBoundedInt("STATUS_WORLD_PROBES", 1, 10),
-			Current: cabinetIntCurrent("STATUS_WORLD_PROBES", 3),
+			Current: cabinetIntCurrent("STATUS_WORLD_PROBES", 1),
 		},
 		{
 			Key: "STATUS_RUSSIA_PROBES", Group: "status", Type: SettingInt, Instant: true,
 			MinInt: intPtr(1), MaxInt: intPtr(30),
 			Apply:   applyBoundedInt("STATUS_RUSSIA_PROBES", 1, 30),
-			Current: cabinetIntCurrent("STATUS_RUSSIA_PROBES", 20),
+			Current: cabinetIntCurrent("STATUS_RUSSIA_PROBES", 10),
 		},
 		{
 			Key: "STATUS_PROBE_INTERVAL_MIN", Group: "status", Type: SettingInt, Instant: true,
 			MinInt: intPtr(5), MaxInt: intPtr(180),
 			Apply:   applyBoundedInt("STATUS_PROBE_INTERVAL_MIN", 5, 180),
-			Current: cabinetIntCurrent("STATUS_PROBE_INTERVAL_MIN", 20),
+			Current: cabinetIntCurrent("STATUS_PROBE_INTERVAL_MIN", 60),
 		},
 		{
 			Key: "STATUS_SHOW_MAP", Group: "status", Type: SettingBool, Instant: true,
@@ -638,12 +638,12 @@ func baseRuntimeSettings() []SettingField {
 		},
 		{
 			Key: "STATUS_PAGE_TITLE", Group: "status", Type: SettingText, Instant: true,
-			Apply:   applyLandingText("STATUS_PAGE_TITLE", 120),
+			Apply:   applyBoundedText("STATUS_PAGE_TITLE", 120),
 			Current: fortuneCurrent("STATUS_PAGE_TITLE"),
 		},
 		{
 			Key: "STATUS_PAGE_LEAD", Group: "status", Type: SettingText, Instant: true,
-			Apply:   applyLandingText("STATUS_PAGE_LEAD", 400),
+			Apply:   applyBoundedText("STATUS_PAGE_LEAD", 400),
 			Current: fortuneCurrent("STATUS_PAGE_LEAD"),
 		},
 
@@ -1056,6 +1056,18 @@ func applyFortuneInt(key string, min int) func(string) error {
 			return fmt.Errorf("must be >= %d", min)
 		}
 		setRuntimeOverride(key, strconv.Itoa(v))
+		return nil
+	}
+}
+
+// applyBoundedText хранит короткий текст; пустая строка возвращает перевод по умолчанию.
+func applyBoundedText(key string, maxRunes int) func(string) error {
+	return func(value string) error {
+		v := strings.TrimSpace(value)
+		if utf8.RuneCountInString(v) > maxRunes {
+			return fmt.Errorf("must be at most %d characters", maxRunes)
+		}
+		setRuntimeOverride(key, v)
 		return nil
 	}
 }

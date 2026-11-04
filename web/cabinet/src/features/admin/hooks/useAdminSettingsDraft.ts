@@ -111,6 +111,7 @@ export function useAdminSettingsDraft() {
     draft,
     setDraftValue,
     togglingKey,
+    savingGroup,
     isGroupSaving,
     handleToggle,
     handleInstantEnum,

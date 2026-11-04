@@ -1,0 +1,143 @@
+{
+  "/admin/status/targets": {
+    "targets": [
+      {
+        "id": "a1",
+        "name": "Нидерланды",
+        "country": "NL",
+        "address": "198.51.100.10",
+        "enabled": true,
+        "interval_min": 20,
+        "world_probes": 0,
+        "russia_probes": 0,
+        "note": "Основной",
+        "kind": "regular",
+        "whitelist": false,
+        "repeat_cities": true,
+        "node_uuid": "11111111-aaaa",
+        "exit_node_uuid": "",
+        "no_external": false
+      },
+      {
+        "id": "a4",
+        "name": "Обход РФ · Москва",
+        "country": "RU",
+        "address": "203.0.113.40",
+        "enabled": true,
+        "interval_min": 30,
+        "world_probes": 0,
+        "russia_probes": 0,
+        "note": "Белые списки",
+        "kind": "bypass",
+        "whitelist": true,
+        "repeat_cities": true,
+        "node_uuid": "22222222-bbbb",
+        "exit_node_uuid": "33333333-cccc",
+        "no_external": false
+      }
+    ]
+  },
+  "/admin/status/nodes": {
+    "nodes": [
+      {
+        "uuid": "11111111-aaaa",
+        "name": "NL-1",
+        "country": "NL",
+        "address": "198.51.100.10",
+        "state": "up"
+      },
+      {
+        "uuid": "22222222-bbbb",
+        "name": "RU-ENTRY-1",
+        "country": "RU",
+        "address": "203.0.113.40",
+        "state": "up"
+      },
+      {
+        "uuid": "33333333-cccc",
+        "name": "DE-EXIT-1",
+        "country": "DE",
+        "address": "192.0.2.7",
+        "state": "partial"
+      },
+      {
+        "uuid": "44444444-dddd",
+        "name": "FI-1",
+        "country": "FI",
+        "address": "198.51.100.55",
+        "state": "down"
+      }
+    ]
+  },
+  "/admin/status/quota": {
+    "per_hour": 10,
+    "limit": 250,
+    "token_set": false,
+    "latencylab_set": true,
+    "globalping_paused_until": "2030-01-01T15:40:00Z"
+  },
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "status",
+        "fields": [
+          {
+            "key": "STATUS_PROBES_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_WORLD_PROBES",
+            "type": "int",
+            "value": "3",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 10
+          },
+          {
+            "key": "STATUS_RUSSIA_PROBES",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 30
+          },
+          {
+            "key": "STATUS_PROBE_INTERVAL_MIN",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 5,
+            "max_int": 180
+          },
+          {
+            "key": "STATUS_SHOW_MAP",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_TITLE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_LEAD",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Server, Plus, Trash2, Edit, Globe, Bell, History } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+// Локальный Spinner ниже — загрузка вкладки; этот — спиннер кнопки.
+import { Spinner as ButtonSpinner } from '@/components/ui/spinner'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { AdminModal } from '../components/AdminModal'
@@ -179,6 +181,7 @@ function NodesTab() {
                   </button>
                   <button
                     type="button"
+                    disabled={deleteMutation.isPending && deleteMutation.variables === node.uuid}
                     onClick={() => {
                       if (window.confirm(t('admin.infra.confirmDeleteNode'))) {
                         deleteMutation.mutate(node.uuid)
@@ -186,7 +189,7 @@ function NodesTab() {
                     }}
                     className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
                   >
-                    <Trash2 className="size-4" />
+                    {deleteMutation.isPending && deleteMutation.variables === node.uuid ? <ButtonSpinner /> : <Trash2 className="size-4" />}
                   </button>
                 </div>
               </div>
@@ -242,13 +245,14 @@ function NodesTab() {
               <button
                 type="button"
                 disabled={!form.provider_uuid || !form.node_uuid || createMutation.isPending}
-                className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className={cn('inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', createMutation.isPending && '!opacity-100')}
                 onClick={() => createMutation.mutate({
                   provider_uuid: form.provider_uuid,
                   node_uuid: form.node_uuid,
                   next_billing_at: form.next_billing_at ? new Date(form.next_billing_at).toISOString() : undefined,
                 })}
               >
+                {createMutation.isPending && <ButtonSpinner />}
                 {t('admin.create')}
               </button>
             </div>
@@ -276,12 +280,13 @@ function NodesTab() {
               <button
                 type="button"
                 disabled={!editNode.nextBillingAt || patchMutation.isPending}
-                className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className={cn('inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', patchMutation.isPending && '!opacity-100')}
                 onClick={() => patchMutation.mutate({
                   uuid: editNode.uuid,
                   next_billing_at: new Date(editNode.nextBillingAt).toISOString(),
                 })}
               >
+                {patchMutation.isPending && <ButtonSpinner />}
                 {t('admin.save')}
               </button>
             </div>
@@ -393,6 +398,7 @@ function ProvidersTab() {
                 </button>
                 <button
                   type="button"
+                  disabled={deleteMutation.isPending && deleteMutation.variables === prov.uuid}
                   onClick={() => {
                     if (window.confirm(t('admin.infra.confirmDeleteProvider'))) {
                       deleteMutation.mutate(prov.uuid)
@@ -400,7 +406,7 @@ function ProvidersTab() {
                   }}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 >
-                  <Trash2 className="size-4" />
+                  {deleteMutation.isPending && deleteMutation.variables === prov.uuid ? <ButtonSpinner /> : <Trash2 className="size-4" />}
                 </button>
               </div>
             </div>
@@ -511,9 +517,10 @@ function ProviderForm({
         <button
           type="button"
           disabled={form.name.trim().length < 2 || saving}
-          className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          className={cn('inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', saving && '!opacity-100')}
           onClick={onSave}
         >
+          {saving && <ButtonSpinner />}
           {saveLabel}
         </button>
       </div>
@@ -608,6 +615,7 @@ function HistoryTab() {
                 </div>
                 <button
                   type="button"
+                  disabled={deleteMutation.isPending && deleteMutation.variables === rec.uuid}
                   onClick={() => {
                     if (window.confirm(t('admin.infra.confirmDeleteHistory'))) {
                       deleteMutation.mutate(rec.uuid)
@@ -615,7 +623,7 @@ function HistoryTab() {
                   }}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
                 >
-                  <Trash2 className="size-4" />
+                  {deleteMutation.isPending && deleteMutation.variables === rec.uuid ? <ButtonSpinner /> : <Trash2 className="size-4" />}
                 </button>
               </div>
             ))}
@@ -689,13 +697,14 @@ function HistoryTab() {
             <button
               type="button"
               disabled={!form.provider_uuid || !form.amount || !form.billed_at || createMutation.isPending}
-              className="rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              className={cn('inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', createMutation.isPending && '!opacity-100')}
               onClick={() => createMutation.mutate({
                 provider_uuid: form.provider_uuid,
                 amount: Number(form.amount),
                 billed_at: new Date(form.billed_at).toISOString(),
               })}
             >
+              {createMutation.isPending && <ButtonSpinner />}
               {t('admin.create')}
             </button>
           </div>
@@ -735,10 +744,12 @@ function SettingsTab() {
       <div className="space-y-2">
         {thresholds.map(({ days, key }) => {
           const enabled = data?.[key] ?? false
+          const saving = toggleMutation.isPending && toggleMutation.variables?.days === days
           return (
             <AdminCheckboxField
               key={days}
               checked={enabled}
+              busy={saving}
               onChange={() => toggleMutation.mutate({ days, enabled: !enabled })}
               label={t('admin.infra.notifyBefore', { days })}
               className="px-3 py-2"

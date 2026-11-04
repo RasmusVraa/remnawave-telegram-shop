@@ -8,11 +8,11 @@
 // Запуск из корня репозитория, после `cd web/cabinet && npm run build`:
 //
 //   node tools/cabinet-visual-check/release-shots.mjs internal/cabinet/web/dist \
-//     tools/cabinet-visual-check/fixtures/release-5-26.json release-screenshots
+//     tools/cabinet-visual-check/fixtures/release-5-27.json release-screenshots
 //
 // Под новый релиз меняются только сценарии в конце файла: какую страницу
-// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.26.0
-// (уведомления в кабинете, push в браузер, окно приглашения с QR).
+// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.27.0
+// (страница «Статус серверов»: публичная, в кабинете, в поддержке и в админке).
 // mark(locator, 'Подпись', side): side — top | bottom | left | inside | inside-low.
 // Каждый снимок после съёмки посмотреть глазами: подпись не должна закрывать
 // текст интерфейса, рамка — резать соседние строки.
@@ -39,12 +39,15 @@ const base = {
   '/admin/bootstrap': { providers: {}, features: {} },
   ...JSON.parse(fs.readFileSync(fixturesFile, 'utf8')),
 }
+// Время замеров в фикстуре — «4 минуты назад», а не дата записи фикстуры: иначе на снимке «Обновлено 1000 мин назад».
+const measuredStamp = new Date(Date.now() - 4 * 60 * 1000).toISOString()
+for (const n of base['/public/status']?.nodes ?? []) if (n.probe) n.probe.measured_at = measuredStamp
 // Декор-тема приходит в /auth/bootstrap: сцена — та же фикстура с другой темой.
 const withDecor = (theme) => ({ ...base, '/auth/bootstrap': { ...base['/auth/bootstrap'], decor_theme: theme } })
 fs.mkdirSync(outDir, { recursive: true })
 
 const b = await chromium.launch()
-async function open(w, h, fx, route) {
+async function open(w, h, fx, route, prefix = '/cabinet') {
   const ctx = await b.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, colorScheme: 'dark', locale: 'ru-RU', timezoneId: 'Europe/Moscow' })
   await ctx.addInitScript(() => {
     localStorage.setItem('onboarding_completed', 'true')
@@ -57,7 +60,7 @@ async function open(w, h, fx, route) {
   const page = await ctx.newPage()
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
-  await page.goto(`http://localhost:5604/cabinet${route}`, { waitUntil: 'networkidle' })
+  await page.goto(`http://localhost:5604${prefix}${route}`, { waitUntil: 'networkidle' })
   // Сцены декор-тем проявляются плавно — даём им дорисоваться.
   await page.waitForTimeout(2600)
   return { ctx, page, errors }
@@ -135,65 +138,60 @@ const shot = (page, name) => page.screenshot({ path: path.join(outDir, name) })
 const withSub = (patch) => ({ ...base, '/me/subscription': { ...base['/me/subscription'], ...patch } })
 
 {
-  // Лента на ПК: окно из колокольчика.
-  const { ctx, page, errors } = await open(1440, 900, base, '/dashboard#notifications')
-  await mark(page.locator('[role=dialog]'), 'Уведомления в кабинете', 'left')
-  await shot(page, '01-notifications-desktop.png')
+  // Публичная страница без входа: карта и таблица, проблемные серверы подсвечены.
+  const { ctx, page, errors } = await open(1440, 1000, base, '/status', '')
+  await page.mouse.move(2, 900)
+  await scrollToBlock(page, page.getByText('Локация', { exact: true }), 140)
+  await page.waitForTimeout(1500)
+  await mark(page.locator('li').filter({ hasText: 'США' }).first().getByText('Недоступен', { exact: true }).first(), 'Проблемный сервер виден сразу', 'top')
+  await shot(page, '01-status-public.png')
   console.log('1', errors)
   await ctx.close()
 }
 {
-  // Важное — красной плашкой на главной, счётчик на колокольчике красный.
-  const { ctx, page, errors } = await open(390, 844, base, '/dashboard')
-  await mark(page.locator('button').filter({ hasText: 'сменился адрес' }), 'Важное висит на главной', 'bottom')
-  await mark(page.locator('header button[aria-expanded]').first(), '', 'top')
-  await shot(page, '02-important-phone.png')
+  // Страница статуса внутри кабинета (ПК).
+  const { ctx, page, errors } = await open(1440, 900, base, '/status')
+  await mark(page.locator('.cabinet-status-page').locator('div').filter({ hasText: 'Недоступен' }).filter({ hasText: 'США' }).last(), '', 'top')
+  await caption(page, 'Что не работает — подсвечено', 208)
+  await shot(page, '02-status-cabinet.png')
   console.log('2', errors)
   await ctx.close()
 }
 {
-  // Лента на телефоне — шторка снизу.
-  const { ctx, page, errors } = await open(390, 844, base, '/dashboard#notifications')
-  await caption(page, 'Лента на телефоне', 44)
-  await shot(page, '03-notifications-phone.png')
+  // То же на телефоне.
+  const { ctx, page, errors } = await open(390, 844, base, '/status')
+  await shot(page, '03-status-phone.png')
   console.log('3', errors)
   await ctx.close()
 }
 {
-  // Админ решает, что слать push в браузер.
-  const { ctx, page, errors } = await open(1440, 1000, base, '/admin/settings')
-  await page.getByRole('tab', { name: 'Уведомления' }).or(page.getByRole('button', { name: 'Уведомления', exact: true })).first().click()
-  await page.waitForTimeout(400)
-  await page.getByRole('button', { name: 'Push в браузер' }).first().click()
-  // Курсор уводим: иначе шапка группы останется подсвеченной наведением.
-  await page.mouse.move(2, 600)
-  await page.waitForTimeout(700)
-  await mark(page.getByRole('tab', { name: 'Уведомления' }).or(page.getByRole('button', { name: 'Уведомления', exact: true })), 'Новый раздел: что слать push', 'top')
-  await mark(page.getByText('Это не включение уведомлений').locator('xpath=..'), '', 'top')
-  await shot(page, '04-push-settings.png')
+  // Вкладка «Статус» на странице поддержки — живая сводка вместо кнопки.
+  const { ctx, page, errors } = await open(1440, 1100, base, '/support')
+  await page.getByRole('button', { name: 'Статус', exact: true }).click()
+  await page.mouse.move(2, 1000)
+  await page.waitForTimeout(600)
+  await scrollToBlock(page, page.getByText('Статус серверов').first(), 140)
+  await mark(page.locator('ul.divide-y').first(), 'Сводка прямо в поддержке', 'left')
+  await shot(page, '04-status-support.png')
   console.log('4', errors)
   await ctx.close()
 }
 {
-  // Рассылка — и в кабинет, в том числе тем, кто без Telegram.
-  const { ctx, page, errors } = await open(1440, 1000, base, '/admin/broadcast')
-  const delivery = page.locator('div.rounded-lg').filter({ has: page.getByText('Куда отправить', { exact: true }) }).last()
-  // «Кабинет» включён по умолчанию — переключатель «Важное» уже виден.
-  await page.mouse.move(2, 600)
-  await page.waitForTimeout(400)
-  await scrollToBlock(page, delivery, 140)
-  await mark(delivery, 'Рассылка и в кабинет', 'inside')
-  await shot(page, '05-broadcast-cabinet.png')
+  // Админка: список серверов, откуда берутся данные, настройки страницы.
+  const { ctx, page, errors } = await open(1440, 1200, base, '/admin/status')
+  await mark(page.getByRole('button', { name: 'Добавить сервер' }), 'Серверы из панели или вручную', 'top')
+  await shot(page, '05-admin-status.png')
   console.log('5', errors)
   await ctx.close()
 }
 {
-  // Окно приглашения: QR открывают обычной камерой.
-  const { ctx, page, errors } = await open(390, 844, base, '/dashboard')
-  await page.getByRole('button', { name: /Добавить доп/ }).first().click()
-  await page.waitForTimeout(900)
-  await caption(page, 'QR — обычной камерой телефона', 44)
-  await shot(page, '06-invite-qr-phone.png')
+  // Окно сервера обхода: хост для проверки, вход и зарубежный выход каскада.
+  const { ctx, page, errors } = await open(1440, 1100, base, '/admin/status')
+  await page.getByRole('button', { name: 'Изменить' }).nth(1).click()
+  await page.waitForTimeout(700)
+  await page.mouse.move(2, 1000)
+  await mark(page.getByText('Хост для проверки', { exact: true }), 'Сервер обхода: хост и выход каскада', 'left')
+  await shot(page, '06-admin-bypass.png')
   console.log('6', errors)
   await ctx.close()
 }

@@ -197,7 +197,10 @@ export function AdminTariffSquadsApplyPanel({ tariffId, squads, dirty }: ApplyPa
         type="button"
         disabled={disabled}
         onClick={() => setModalOpen(true)}
-        className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background/40 px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 sm:w-auto"
+        className={cn(
+          'mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-background/40 px-4 py-2 text-sm font-medium transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50 sm:w-auto',
+          busy && '!opacity-100',
+        )}
       >
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Server className="size-4" />}
         {t('admin.tariffs.squadsApply.openButton')}
@@ -367,7 +370,10 @@ export function AdminTariffSquadsSaveDialog({
             type="button"
             onClick={() => onSubmit(applyNow)}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            className={cn(
+              'inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50',
+              loading && '!opacity-100',
+            )}
           >
             {loading && <Loader2 className="size-4 animate-spin" />}
             {t('admin.save')}

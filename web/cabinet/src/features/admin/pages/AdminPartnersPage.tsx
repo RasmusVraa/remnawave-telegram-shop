@@ -24,6 +24,7 @@ import {
 import { formatMoney, formatPercent, formatDayShort } from '@/features/partner/format'
 import { RecordCard } from '@/components/RecordCard'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import type { AdminPartnerDTO, AdminPartnerPayoutDTO } from '@/lib/types/admin'
 
 type TabId = 'applications' | 'partners' | 'payouts'
@@ -233,8 +234,9 @@ function ShowMoreButton({ query }: { query: PageQuery }) {
       type="button"
       disabled={query.isFetchingNextPage}
       onClick={() => void query.fetchNextPage()}
-      className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60"
+      className={cn('flex w-full items-center justify-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60', query.isFetchingNextPage && '!opacity-100')}
     >
+      {query.isFetchingNextPage && <Spinner className="h-3.5 w-3.5" />}
       {query.isFetchingNextPage ? t('admin.partners.detail.loading') : t('admin.partners.detail.showMore')}
     </button>
   )
@@ -312,7 +314,7 @@ function ApplicationCard({ partner }: { partner: AdminPartnerDTO }) {
                   terms: { first_percent: parsePercent(first), renewal_percent: parsePercent(renewal), comment },
                 })
               }
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+              className={cn('flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60', approve.isPending && '!opacity-100')}
             >
               {approve.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
               {t('admin.partners.applications.approve')}
@@ -321,9 +323,9 @@ function ApplicationCard({ partner }: { partner: AdminPartnerDTO }) {
               type="button"
               disabled={busy}
               onClick={() => reject.mutate({ id: partner.id, comment })}
-              className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60"
+              className={cn('flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60', reject.isPending && '!opacity-100')}
             >
-              <X className="size-3.5" />
+              {reject.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <X className="size-3.5" />}
               {t('admin.partners.applications.reject')}
             </button>
           </div>
@@ -567,8 +569,9 @@ function GrantModal({ open, onClose }: { open: boolean; onClose: () => void }) {
           type="button"
           onClick={submit}
           disabled={grant.isPending}
-          className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={cn('flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60', grant.isPending && '!opacity-100')}
         >
+          {grant.isPending && <Spinner />}
           {t('admin.partners.grant.submit')}
         </button>
       </div>
@@ -850,16 +853,18 @@ function PayoutCard({
               type="button"
               disabled={action.isPending}
               onClick={() => action.mutate({ id: payout.id, action: 'paid', externalRef, comment })}
-              className="flex-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60"
+              className={cn('flex flex-1 items-center justify-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-medium text-primary-foreground disabled:opacity-60', action.isPending && action.variables?.action === 'paid' && '!opacity-100')}
             >
+              {action.isPending && action.variables?.action === 'paid' && <Spinner className="h-3.5 w-3.5" />}
               {t('admin.partners.payouts.markPaid')}
             </button>
             <button
               type="button"
               disabled={action.isPending}
               onClick={() => action.mutate({ id: payout.id, action: 'reject', comment })}
-              className="flex-1 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60"
+              className={cn('flex flex-1 items-center justify-center gap-1 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60', action.isPending && action.variables?.action === 'reject' && '!opacity-100')}
             >
+              {action.isPending && action.variables?.action === 'reject' && <Spinner className="h-3.5 w-3.5" />}
               {t('admin.partners.payouts.reject')}
             </button>
           </div>

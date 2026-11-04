@@ -3,9 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '@/lib/api'
+import { HolidayAtmosphere, HolidayWeather, useHolidayTheme } from '@/features/decor/HolidayAtmosphere'
 import { useLandingBrand } from './useLandingBrand'
 import { useLandingCopy } from './useLandingCopy'
-import { LandingHolidayFrame } from './components/LandingHolidayFrame'
 import { LandingHeader } from './components/LandingHeader'
 import { LandingFooter } from './components/LandingFooter'
 import { Rise } from './components/LandingMotion'
@@ -24,6 +24,7 @@ interface StatusResponse {
   total?: number
   show_map?: boolean
   probes_enabled?: boolean
+  bypass_probes?: boolean
   probe_world?: number
   probe_russia?: number
   probe_interval_min?: number
@@ -37,11 +38,20 @@ export default function StatusPage() {
   const { t } = useTranslation()
   const brand = useLandingBrand()
   const copy = useLandingCopy()
+  const holiday = useHolidayTheme()
 
+  // Страница всегда тёмная, как и лендинг: тема кабинета на время показа
+  // переключается в dark и восстанавливается при уходе.
   useLayoutEffect(() => {
     const root = document.documentElement
+    const hadDark = root.classList.contains('dark')
+    const hadLight = root.classList.contains('light')
+    root.classList.add('dark')
+    root.classList.remove('light')
     root.dataset.landing = '1'
     return () => {
+      if (!hadDark) root.classList.remove('dark')
+      if (hadLight) root.classList.add('light')
       delete root.dataset.landing
     }
   }, [])
@@ -66,16 +76,30 @@ export default function StatusPage() {
     if (down === 0) return t('landing.status.allUp')
     return t('landing.status.partial')
   }, [available, data, down, query.isLoading, t, total])
-  const probeWorld = data?.probe_world || 3
-  const probeRussia = data?.probe_russia || 20
-  const probeMinutes = data?.probe_interval_min || 20
+  const probeWorld = data?.probe_world || 1
+  const probeRussia = data?.probe_russia || 10
+  const probeMinutes = data?.probe_interval_min || 60
   const title = data?.title?.trim() || liveTitle
   const lead =
     data?.lead?.trim() ||
     (available ? t('landing.status.leadProbes') : t('landing.status.whatBody'))
 
   return (
-    <LandingHolidayFrame>
+    <div className="dark landing-root" data-holiday={holiday ?? undefined}>
+      <div className="landing-backdrop" aria-hidden>
+        {holiday ? (
+          <HolidayAtmosphere theme={holiday} />
+        ) : (
+          <>
+            <div className="landing-backdrop__grid" />
+            <div className="landing-orb landing-orb--cyan" />
+            <div className="landing-orb landing-orb--violet" />
+            <div className="landing-orb landing-orb--emerald" />
+          </>
+        )}
+      </div>
+      {holiday && <HolidayWeather theme={holiday} />}
+      <div className="relative z-10">
         <LandingHeader brand={brand} copy={copy} />
         <main className="mx-auto max-w-6xl px-4 pb-20 pt-10 sm:px-6 sm:pt-16">
           <Rise>
@@ -109,7 +133,7 @@ export default function StatusPage() {
             </Rise>
           )}
 
-          <StatusNodeList nodes={nodes} />
+          <StatusNodeList nodes={nodes} bypassProbes={data?.bypass_probes !== false} />
 
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
             <Rise delay={0.05} className="h-full">
@@ -147,7 +171,8 @@ export default function StatusPage() {
           </div>
         </main>
         <LandingFooter brand={brand} />
-    </LandingHolidayFrame>
+      </div>
+    </div>
   )
 }
 

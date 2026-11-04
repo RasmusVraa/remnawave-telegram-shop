@@ -6,17 +6,17 @@ func TestProbeLimitsDefaultsAndClamp(t *testing.T) {
 	t.Setenv("STATUS_WORLD_PROBES", "")
 	t.Setenv("STATUS_RUSSIA_PROBES", "")
 	w, ru := ProbeLimits()
-	if w != 3 || ru != 20 {
+	if w != 1 || ru != 10 {
 		t.Fatalf("defaults: world=%d russia=%d", w, ru)
 	}
 
 	t.Setenv("STATUS_WORLD_PROBES", "8")
 	t.Setenv("STATUS_RUSSIA_PROBES", "99")
 	w, ru = ProbeLimits()
-	if w != 8 || ru != 20 {
+	if w != 8 || ru != 10 {
 		t.Fatalf("clamp: world=%d russia=%d", w, ru)
 	}
-	if ProbeIntervalMinutes() != 20 {
+	if ProbeIntervalMinutes() != 60 {
 		t.Fatalf("interval default %d", ProbeIntervalMinutes())
 	}
 }

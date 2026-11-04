@@ -119,7 +119,10 @@ export function AdminSetExpireModal({
               onApply(dateToExpireIso(date))
             }}
             disabled={isPending || !date}
-            className="inline-flex items-center gap-2 rounded-btn bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            className={cn(
+              'inline-flex items-center gap-2 rounded-btn bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50',
+              isPending && '!opacity-100',
+            )}
           >
             {isPending ? <Loader2 className="size-4 animate-spin" /> : null}
             {t('admin.users.extendApply')}

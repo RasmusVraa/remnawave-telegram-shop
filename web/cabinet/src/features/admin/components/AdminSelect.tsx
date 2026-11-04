@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, ChevronDown } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import { surface } from './Surface'
 
 const LIST_MAX_HEIGHT_PX = 240
@@ -33,6 +34,8 @@ interface AdminSelectProps<T extends string | number = string> {
   allowEmpty?: boolean
   emptyLabel?: string
   disabled?: boolean
+  /** Выбор сохраняется на сервере: селект заблокирован, вместо стрелки спиннер. */
+  busy?: boolean
   id?: string
 }
 
@@ -50,9 +53,11 @@ export function AdminSelect<T extends string | number = string>({
   className,
   allowEmpty = false,
   emptyLabel,
-  disabled = false,
+  disabled: disabledProp = false,
+  busy = false,
   id,
 }: AdminSelectProps<T>) {
+  const disabled = disabledProp || busy
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState<DropdownPosition | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -195,6 +200,7 @@ export function AdminSelect<T extends string | number = string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
+        aria-busy={busy || undefined}
         className={cn(
           // Фон на ступень светлее карточки, а не `cabinet-elevated-card`: тот
           // заливает контрол градиентом card → secondary поверх такой же
@@ -204,17 +210,22 @@ export function AdminSelect<T extends string | number = string>({
           'flex min-h-11 w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-accent/40',
           open && 'border-primary/40 ring-1 ring-primary/20',
           disabled && 'cursor-not-allowed opacity-60 hover:bg-transparent',
+          busy && 'cursor-wait !opacity-100',
         )}
       >
         <span className="truncate text-left" style={selectedOption?.labelStyle}>
           {selectedLabel}
         </span>
-        <ChevronDown
-          className={cn(
-            'size-4 shrink-0 text-muted-foreground transition-transform',
-            open && (position?.openUp ? 'rotate-0' : 'rotate-180'),
-          )}
-        />
+        {busy ? (
+          <Spinner className="text-muted-foreground" />
+        ) : (
+          <ChevronDown
+            className={cn(
+              'size-4 shrink-0 text-muted-foreground transition-transform',
+              open && (position?.openUp ? 'rotate-0' : 'rotate-180'),
+            )}
+          />
+        )}
       </button>
 
       {listbox && createPortal(listbox, document.body)}

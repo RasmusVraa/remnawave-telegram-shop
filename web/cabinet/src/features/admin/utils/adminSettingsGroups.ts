@@ -132,7 +132,7 @@ export function adminSettingsGroupIconStyle(id: string): AdminSettingsGroupIconS
  */
 export const ADMIN_PRODUCT_SETTINGS_GROUPS = ['tariffs', 'trial', 'hwid', 'stars'] as const
 
-/** Группа живёт на отдельной странице «Статус», не в общих настройках и не на тарифах. */
+/** Группа живёт на отдельной странице «Статус серверов», не в общих настройках и не на тарифах. */
 export const ADMIN_STATUS_SETTINGS_GROUP: AdminSettingsGroupId = 'status'
 
 /** Крупные категории на странице «Настройки бота». */

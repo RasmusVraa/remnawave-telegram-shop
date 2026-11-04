@@ -23,6 +23,7 @@ import {
 
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import type { AdminBroadcastHistoryItemDTO, AdminBroadcastMediaKind } from '@/lib/types/admin'
 
 import { AdminLayout } from '../layout/AdminLayout'
@@ -623,9 +624,9 @@ export default function AdminBroadcastPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadMutation.isPending}
-                  className={surface('raised', 'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-accent disabled:opacity-50')}
+                  className={surface('raised', cn('inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm transition-colors hover:bg-accent disabled:opacity-50', uploadMutation.isPending && '!opacity-100'))}
                 >
-                  <ImagePlus className="size-4" />
+                  {uploadMutation.isPending ? <Spinner /> : <ImagePlus className="size-4" />}
                   {uploadMutation.isPending
                     ? t('admin.broadcast.uploadingMedia')
                     : t('admin.broadcast.attachMedia')}

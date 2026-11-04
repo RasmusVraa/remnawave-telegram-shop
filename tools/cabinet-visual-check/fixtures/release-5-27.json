@@ -1,0 +1,490 @@
+{
+  "/public/status": {
+    "available": true,
+    "updated_at": "2026-11-03T20:00:00Z",
+    "online": 3,
+    "total": 5,
+    "show_map": true,
+    "probes_enabled": true,
+    "probe_world": 1,
+    "probe_russia": 10,
+    "probe_interval_min": 60,
+    "nodes": [
+      {
+        "id": "a1",
+        "name": "Нидерланды",
+        "country": "NL",
+        "kind": "regular",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "world_ping_ms": 41,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 20,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "hits": [
+            {
+              "city": "Москва",
+              "network": "МТС",
+              "country": "RU",
+              "ok": true,
+              "ping_ms": 48,
+              "lat": 55.75,
+              "lon": 37.6
+            },
+            {
+              "city": "Казань",
+              "network": "Билайн",
+              "country": "RU",
+              "ok": true,
+              "ping_ms": 61,
+              "lat": 55.8,
+              "lon": 49.1
+            }
+          ]
+        }
+      },
+      {
+        "id": "a2",
+        "name": "Германия",
+        "country": "DE",
+        "note": "Франкфурт",
+        "kind": "regular",
+        "state": "partial",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 19,
+          "russia_total": 20,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 10,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0.5,
+            1,
+            1,
+            1,
+            0.5,
+            1
+          ]
+        }
+      },
+      {
+        "id": "a3",
+        "name": "США",
+        "country": "US",
+        "kind": "regular",
+        "state": "down",
+        "probe": {
+          "world_ok": 0,
+          "world_total": 3,
+          "russia_ok": 0,
+          "russia_total": 20,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 10,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0.5,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "id": "a4",
+        "name": "Обход РФ · Москва",
+        "country": "RU",
+        "note": "Белые списки",
+        "kind": "bypass",
+        "whitelist": true,
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 0,
+          "russia_total": 0,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 30,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "hits": [
+            {
+              "network": "МТС",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 62,
+              "tcp_ok": true,
+              "tcp_ms": 71
+            },
+            {
+              "network": "Мегафон",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 58,
+              "tcp_ok": true,
+              "tcp_ms": 66
+            },
+            {
+              "network": "Билайн",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 74,
+              "tcp_ok": true,
+              "tcp_ms": 80
+            },
+            {
+              "network": "T2",
+              "kind": "whitelist",
+              "ok": false,
+              "icmp_ok": false,
+              "tcp_ok": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "a5",
+        "name": "Финляндия",
+        "country": "FI",
+        "kind": "regular",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "world_ping_ms": 33,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 20,
+          "history": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    ]
+  },
+  "/content/faq": {
+    "info": {
+      "title": "Информация",
+      "tabs": [
+        {
+          "id": "faq",
+          "label": "FAQ"
+        },
+        {
+          "id": "documents",
+          "label": "Документы"
+        },
+        {
+          "id": "status",
+          "label": "Статус"
+        }
+      ],
+      "documents": [],
+      "useful_links": [],
+      "status": {
+        "title": "Статус сервисов",
+        "description": "Проверяйте актуальное состояние сервисов",
+        "button": "Открыть статус"
+      }
+    },
+    "faq": [
+      {
+        "id": "1",
+        "question": "Как подключиться?",
+        "answer": "Откройте главную."
+      }
+    ],
+    "support": {
+      "title": "Поддержка",
+      "description": "Напишите нам",
+      "primary_button": "Написать в поддержку",
+      "extra_links": []
+    }
+  },
+  "/admin/status/targets": {
+    "targets": [
+      {
+        "id": "a1",
+        "name": "Нидерланды",
+        "country": "NL",
+        "address": "198.51.100.10",
+        "enabled": true,
+        "interval_min": 20,
+        "world_probes": 0,
+        "russia_probes": 0,
+        "note": "Основной",
+        "kind": "regular",
+        "whitelist": false,
+        "repeat_cities": true,
+        "node_uuid": "11111111-aaaa",
+        "exit_node_uuid": "",
+        "no_external": false
+      },
+      {
+        "id": "a4",
+        "name": "Обход РФ · Москва",
+        "country": "RU",
+        "address": "ru-edge.example.com",
+        "enabled": true,
+        "interval_min": 30,
+        "world_probes": 0,
+        "russia_probes": 0,
+        "note": "Белые списки",
+        "kind": "bypass",
+        "whitelist": true,
+        "repeat_cities": true,
+        "node_uuid": "22222222-bbbb",
+        "exit_node_uuid": "33333333-cccc",
+        "no_external": false
+      }
+    ]
+  },
+  "/admin/status/nodes": {
+    "nodes": [
+      {
+        "uuid": "11111111-aaaa",
+        "name": "NL-1",
+        "country": "NL",
+        "address": "198.51.100.10",
+        "state": "up"
+      },
+      {
+        "uuid": "22222222-bbbb",
+        "name": "RU-ENTRY-1",
+        "country": "RU",
+        "address": "203.0.113.40",
+        "state": "up"
+      },
+      {
+        "uuid": "33333333-cccc",
+        "name": "DE-EXIT-1",
+        "country": "DE",
+        "address": "192.0.2.7",
+        "state": "partial"
+      },
+      {
+        "uuid": "44444444-dddd",
+        "name": "FI-1",
+        "country": "FI",
+        "address": "198.51.100.55",
+        "state": "down"
+      }
+    ]
+  },
+  "/admin/status/quota": {
+    "per_hour": 22,
+    "limit": 250,
+    "token_set": false,
+    "latencylab_set": true
+  },
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "status",
+        "fields": [
+          {
+            "key": "STATUS_PROBES_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_WORLD_PROBES",
+            "type": "int",
+            "value": "3",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 10
+          },
+          {
+            "key": "STATUS_RUSSIA_PROBES",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 30
+          },
+          {
+            "key": "STATUS_PROBE_INTERVAL_MIN",
+            "type": "int",
+            "value": "20",
+            "source": "default",
+            "instant": true,
+            "min_int": 5,
+            "max_int": 180
+          },
+          {
+            "key": "STATUS_SHOW_MAP",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_TITLE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "STATUS_PAGE_LEAD",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": true
+          }
+        ]
+      }
+    ]
+  }
+}

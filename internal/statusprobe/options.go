@@ -30,12 +30,12 @@ func ShowMap() bool {
 
 // ProbeLimits — сколько зондов брать из мира и из России.
 func ProbeLimits() (world, russia int) {
-	return clampEnvInt("STATUS_WORLD_PROBES", 3, 1, 10), clampEnvInt("STATUS_RUSSIA_PROBES", 20, 1, 30)
+	return clampEnvInt("STATUS_WORLD_PROBES", 1, 1, 10), clampEnvInt("STATUS_RUSSIA_PROBES", 10, 1, 30)
 }
 
 // ProbeIntervalMinutes — как часто пинговать, если у страны не задан свой интервал.
 func ProbeIntervalMinutes() int {
-	return clampEnvInt("STATUS_PROBE_INTERVAL_MIN", 20, 5, 180)
+	return clampEnvInt("STATUS_PROBE_INTERVAL_MIN", 60, 5, 180)
 }
 
 // PageCopy — заголовок и подзаголовок. Пустая строка значит «взять перевод кабинета».

@@ -153,7 +153,7 @@ export function PartnerLinksTab({ partner }: { partner: PartnerAccountDTO }) {
                 disabled={limitReached}
                 className={PARTNER_INPUT}
               />
-              <Button type="submit" disabled={create.isPending || limitReached} className="shrink-0">
+              <Button type="submit" loading={create.isPending} disabled={limitReached} className="shrink-0">
                 {t('partnerPage.links.create')}
               </Button>
             </form>
@@ -194,6 +194,15 @@ export function PartnerLinksTab({ partner }: { partner: PartnerAccountDTO }) {
               onArchive={() => archive.mutate({ id: link.id, archived: !link.archived })}
               onDelete={() => remove.mutate(link.id)}
               busy={rename.isPending || archive.isPending || remove.isPending}
+              pending={
+                rename.isPending && rename.variables?.id === link.id
+                  ? 'rename'
+                  : archive.isPending && archive.variables?.id === link.id
+                    ? 'archive'
+                    : remove.isPending && remove.variables === link.id
+                      ? 'delete'
+                      : null
+              }
             />
           </RevealItem>
         ))
@@ -213,6 +222,7 @@ function StreamCard({
   onArchive,
   onDelete,
   busy,
+  pending,
 }: {
   link: PartnerLinkDTO
   isEditing: boolean
@@ -224,6 +234,8 @@ function StreamCard({
   onArchive: () => void
   onDelete: () => void
   busy: boolean
+  /** Какой запрос по этой ссылке сейчас в работе — на его кнопке спиннер. */
+  pending: 'rename' | 'archive' | 'delete' | null
 }) {
   const { t } = useTranslation()
   const share = useShareStreamLink()
@@ -242,7 +254,7 @@ function StreamCard({
                 className={PARTNER_INPUT}
               />
               <div className="flex gap-2">
-                <Button size="sm" onClick={onEditSave} disabled={busy || !editingName.trim()}>
+                <Button size="sm" onClick={onEditSave} loading={pending === 'rename'} disabled={busy || !editingName.trim()}>
                   {t('partnerPage.links.save')}
                 </Button>
                 <Button size="sm" variant="secondary" onClick={onEditCancel}>
@@ -288,7 +300,7 @@ function StreamCard({
               {t('partnerPage.links.rename')}
             </Button>
             {link.can_archive ? (
-              <Button size="sm" variant="secondary" className="gap-1" onClick={onArchive} disabled={busy}>
+              <Button size="sm" variant="secondary" className="gap-1" onClick={onArchive} loading={pending === 'archive'} disabled={busy}>
                 {link.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                 {link.archived ? t('partnerPage.links.restore') : t('partnerPage.links.archive')}
               </Button>
@@ -304,6 +316,7 @@ function StreamCard({
                 variant="secondary"
                 className="gap-1 border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20"
                 onClick={onDelete}
+                loading={pending === 'delete'}
                 disabled={busy}
               >
                 <Trash2 size={14} />

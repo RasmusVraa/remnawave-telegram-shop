@@ -98,6 +98,20 @@ type Sample struct {
 	WhitelistDone bool
 	MeasuredAt    time.Time
 	Probes        []ProbeHit
+	// FailStreak — сколько замеров подряд не ответил никто: ни мир, ни Россия, ни операторы.
+	FailStreak int
+}
+
+// AllFailed — в этом замере не ответил ни один зонд. Частичный провал не считается:
+// сбой одного города не делает сервер недоступным.
+func (s Sample) AllFailed() bool {
+	if s.WorldTotal+s.RussiaTotal == 0 {
+		return false
+	}
+	if s.WorldOK > 0 || s.RussiaOK > 0 {
+		return false
+	}
+	return s.WhitelistTotal == 0 || s.WhitelistOK == 0
 }
 
 // PublicTarget оставляет хост, который можно отдать внешнему зонду.
@@ -173,7 +187,7 @@ type gpResult struct {
 
 // MeasurePing запускает один замер Globalping: несколько зондов из мира и из России.
 func MeasurePing(ctx context.Context, client *http.Client, target string) (Sample, error) {
-	return MeasurePingCounts(ctx, client, target, 3, 5, true)
+	return MeasurePingCounts(ctx, client, target, 1, 5, true)
 }
 
 // MeasurePingCounts — то же, но число зондов задаёт админка.
@@ -183,10 +197,10 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		client = http.DefaultClient
 	}
 	if world < 1 || world > 10 {
-		world = 3
+		world = 1
 	}
 	if russia < 1 || russia > 30 {
-		russia = 20
+		russia = 10
 	}
 	body, _ := json.Marshal(gpCreate{
 		Type:              "ping",
@@ -209,7 +223,7 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		return Sample{}, err
 	}
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
-	res.Body.Close()
+	_ = res.Body.Close()
 	if res.StatusCode == http.StatusTooManyRequests {
 		return Sample{}, &RateLimitError{RetryAfter: retryAfter(res.Header)}
 	}
@@ -323,7 +337,7 @@ func russiaCities(ctx context.Context, client *http.Client, n int) []string {
 	if len(ranked) == 0 {
 		ranked = fallbackRussiaCities
 	}
-	take := n
+	var take int
 	if len(ranked) > n {
 		take = n + 5
 		if take > len(ranked) {

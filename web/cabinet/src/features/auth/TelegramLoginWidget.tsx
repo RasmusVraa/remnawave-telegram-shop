@@ -22,6 +22,8 @@ export function TelegramLoginWidget({ page, botUsername, onTelegramAuth }: Props
   const { t } = useTranslation()
   const [error, setError] = useState(false)
   const [widgetLoading, setWidgetLoading] = useState(false)
+  /** Виджет вернул пользователя — ждём вход на сервере; подложка закрывает кнопку от повторного нажатия. */
+  const [authPending, setAuthPending] = useState(false)
   const mountRef = useRef<HTMLDivElement>(null)
   const onAuthRef = useRef(onTelegramAuth)
   onAuthRef.current = onTelegramAuth
@@ -42,7 +44,14 @@ export function TelegramLoginWidget({ page, botUsername, onTelegramAuth }: Props
     return mountTelegramLoginWidgetScript(el, {
       page,
       bot,
-      onAuth: (user) => onAuthRef.current(user),
+      onAuth: async (user) => {
+        setAuthPending(true)
+        try {
+          await onAuthRef.current(user)
+        } finally {
+          setAuthPending(false)
+        }
+      },
       onScriptFailed: () => setError(true),
       onScriptLoadingChange: setWidgetLoading,
     })
@@ -58,7 +67,7 @@ export function TelegramLoginWidget({ page, botUsername, onTelegramAuth }: Props
         </Alert>
       )}
       <div className="relative flex min-h-[48px] w-full justify-center">
-        {widgetLoading && !error && (
+        {(widgetLoading || authPending) && !error && (
           <div
             className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/70"
             aria-busy

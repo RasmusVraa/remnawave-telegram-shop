@@ -73,7 +73,12 @@ export function AdminUserActionsPanel({
 
         {hasRwUser &&
           (isActive ? (
-            <button type="button" onClick={onDisable} disabled={disablePending} className={actionClass}>
+            <button
+              type="button"
+              onClick={onDisable}
+              disabled={disablePending}
+              className={cn(actionClass, disablePending && '!opacity-100')}
+            >
               {disablePending ? (
                 <Loader2 className="size-4 shrink-0 animate-spin" />
               ) : (
@@ -89,6 +94,7 @@ export function AdminUserActionsPanel({
               className={cn(
                 actionClass,
                 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-400',
+                enablePending && '!opacity-100',
               )}
             >
               {enablePending ? (

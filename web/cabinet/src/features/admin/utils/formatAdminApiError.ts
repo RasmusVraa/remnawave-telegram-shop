@@ -42,6 +42,9 @@ const BODY_KEY_MAP: Record<string, string> = {
   'interval must be between 5 and 180': 'admin.errors.statusInterval',
   'world probes must be between 1 and 10': 'admin.errors.statusWorld',
   'russia probes must be between 1 and 30': 'admin.errors.statusRussia',
+  'kind must be regular or bypass': 'admin.errors.statusKind',
+  'node id is invalid': 'admin.errors.statusNode',
+  'panel unavailable': 'admin.errors.panelUnavailable',
   'probe already running': 'admin.errors.statusProbeBusy',
   'no targets': 'admin.errors.statusProbeEmpty',
 }

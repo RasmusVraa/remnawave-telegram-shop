@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Bitcoin, ChevronLeft, ChevronRight, CreditCard, Gift, Star, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -64,6 +65,8 @@ export function HistoryPagination({
   onNext: () => void
 }) {
   const { t } = useTranslation()
+  // Спиннер — только у нажатой стрелки: busy приходит общий на обе.
+  const [pressed, setPressed] = useState<'prev' | 'next' | null>(null)
   return (
     <div className="mt-4 flex items-center justify-between gap-3 border-t border-border pt-4">
       <Button
@@ -72,7 +75,11 @@ export function HistoryPagination({
         size="sm"
         className="gap-1"
         disabled={!hasPrev || busy}
-        onClick={onPrev}
+        loading={busy && pressed === 'prev'}
+        onClick={() => {
+          setPressed('prev')
+          onPrev()
+        }}
       >
         <ChevronLeft size={16} aria-hidden />
         {t('common.pagePrev')}
@@ -84,7 +91,11 @@ export function HistoryPagination({
         size="sm"
         className="gap-1"
         disabled={!hasNext || busy}
-        onClick={onNext}
+        loading={busy && pressed === 'next'}
+        onClick={() => {
+          setPressed('next')
+          onNext()
+        }}
       >
         {t('common.pageNext')}
         <ChevronRight size={16} aria-hidden />

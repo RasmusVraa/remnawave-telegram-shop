@@ -89,7 +89,7 @@ export default function PromoCodesPage() {
                   autoComplete="off"
                 />
               </div>
-              <Button type="submit" disabled={apply.isPending}>{apply.isPending ? t('common.loading') : t('promocodes.applyButton')}</Button>
+              <Button type="submit" loading={apply.isPending}>{t('promocodes.applyButton')}</Button>
             </form>
             {error && (
               <Alert className="mt-3" variant="destructive">

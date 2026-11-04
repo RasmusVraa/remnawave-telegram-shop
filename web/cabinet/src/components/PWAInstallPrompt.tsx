@@ -170,7 +170,8 @@ export function PWAInstallPrompt() {
         </div>
         <div className="flex items-center justify-end gap-2 px-3 pb-3">
           {!iosHelp && (
-            <Button size="sm" onClick={install}>
+            // Ждём не сервер, а ответ в системном окне установки — без спиннера.
+            <Button size="sm" onClick={() => { void install() }}>
               <Download size={14} />
               {t('pwa.installAction')}
             </Button>

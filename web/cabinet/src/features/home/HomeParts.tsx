@@ -363,7 +363,8 @@ export function QuickActionsMobile({ data }: { data: HomeData }) {
     <div className={cn('-mx-3 grid px-1 pt-1', actions.length === 3 ? 'grid-cols-3' : 'grid-cols-4')}>
       {actions.map((a) => (
         <ActionTarget key={a.key} action={a} className="flex min-w-0 flex-col items-center gap-2 text-foreground/85">
-          <span className="inline-flex size-14 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
+          {/* data-pending-ring: пока грузится страница, по рамке бежит дуга (index.css) */}
+          <span data-pending-ring className="inline-flex size-14 items-center justify-center rounded-full border border-border bg-secondary text-foreground">
             <a.icon size={24} strokeWidth={1.9} />
           </span>
           <span className="px-0.5 text-center text-[12.5px] leading-[1.25]">{a.label}</span>
@@ -383,7 +384,7 @@ export function QuickActionsDesktop({ data }: { data: HomeData }) {
           action={a}
           className="cabinet-elevated-card flex min-w-0 items-center gap-3 rounded-[18px] px-3.5 py-3 text-left text-[15px] font-semibold text-foreground"
         >
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
+          <span data-pending-ring className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-secondary text-primary">
             <a.icon size={20} />
           </span>
           <span className="min-w-0 leading-tight">{a.label}</span>

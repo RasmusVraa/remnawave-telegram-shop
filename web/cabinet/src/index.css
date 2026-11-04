@@ -5142,3 +5142,88 @@ html:not(.dark) .cabinet-hw-spider {
 .dark .cabinet-shell .home-card-danger.cabinet-elevated-card {
   border-color: hsl(var(--destructive) / 0.5) !important;
 }
+
+/*
+ * Загрузка у кнопок и ссылок (.cursor/docs/frontend/cabinet-loading-states.md).
+ * Вне слоёв нарочно: utility-классы цвета и трансформаций у иконок не должны
+ * перебивать спиннер.
+ *
+ * Button: спиннер встаёт первым ребёнком, ведущая иконка уступает ему место.
+ */
+.cabinet-btn-spinner + svg,
+.cabinet-btn-spinner + span > svg:first-child {
+  display: none;
+}
+
+/*
+ * Переход на ленивую страницу (lib/navPending.ts): трекер ставит нажатому
+ * элементу data-nav-pending, а его первой иконке — data-pending-icon.
+ * Иконка гасит свои линии и крутится кольцом того же размера и цвета.
+ */
+@keyframes cabinet-pending-spin {
+  from {
+    transform: scale(0.8) rotate(0deg);
+  }
+  to {
+    transform: scale(0.8) rotate(360deg);
+  }
+}
+@keyframes cabinet-pending-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+[data-nav-pending] {
+  cursor: progress;
+}
+[data-nav-pending] svg[data-pending-icon] {
+  box-sizing: border-box;
+  border: 2.5px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 9999px;
+  animation: cabinet-pending-spin 0.7s linear infinite;
+}
+[data-nav-pending] svg[data-pending-icon] > * {
+  opacity: 0;
+}
+/* В нижнем меню неактивные иконки серые — спиннер красим акцентом, как в макете. */
+.cabinet-edge-nav-bar [data-nav-pending] svg[data-pending-icon] {
+  color: hsl(var(--primary));
+}
+/* Круглая кнопка (быстрые действия главной): по рамке бежит дуга, иконка приглушается. */
+[data-pending-ring] {
+  position: relative;
+}
+[data-nav-pending] [data-pending-ring]::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  border: 2.5px solid transparent;
+  border-top-color: hsl(var(--primary));
+  border-right-color: hsl(var(--primary));
+  animation: cabinet-pending-ring-spin 0.8s linear infinite;
+  pointer-events: none;
+}
+[data-nav-pending] [data-pending-ring] svg {
+  opacity: 0.45;
+}
+/* Ссылка без иконки: спиннер встаёт перед подписью (у flex-кнопок — через их gap). */
+[data-nav-pending='text']::before {
+  content: '';
+  display: inline-block;
+  box-sizing: border-box;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.4em;
+  vertical-align: -0.15em;
+  flex: none;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 9999px;
+  animation: cabinet-pending-ring-spin 0.7s linear infinite;
+}
+[data-nav-pending='text'].inline-flex::before,
+[data-nav-pending='text'].flex::before {
+  margin-right: 0;
+}

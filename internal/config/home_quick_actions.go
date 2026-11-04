@@ -26,6 +26,7 @@ var HomeQuickActionIDs = []string{
 	"news",
 	"feedback",
 	"sublink",
+	"servers",
 }
 
 // HomeQuickActionSlots — сколько мест настраивается.

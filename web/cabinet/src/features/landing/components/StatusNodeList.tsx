@@ -4,16 +4,8 @@ import { ChevronDown } from 'lucide-react'
 
 import { CountryFlag } from '@/features/admin/components/CountryFlag'
 import { cn } from '@/lib/utils'
+import { StateChip, stateRowTint } from '@/features/status/StateChip'
 import type { StatusMapNode, StatusProbe, StatusProbeHit } from './StatusMap'
-
-function countryName(code: string | undefined, locale: string): string {
-  if (!code || code.length !== 2) return ''
-  try {
-    return new Intl.DisplayNames([locale], { type: 'region' }).of(code) ?? ''
-  } catch {
-    return ''
-  }
-}
 
 function historyLevel(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return ''
@@ -40,7 +32,7 @@ function protocolText(ok: boolean | undefined, ms: number | undefined, up: strin
 }
 
 /** Строки локаций: раскрытие и таблица зондов, с которых шёл пинг. */
-export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
+export function StatusNodeList({ nodes, bypassProbes = true }: { nodes: StatusMapNode[]; bypassProbes?: boolean }) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState<string | null>(null)
   const [providers, setProviders] = useState<string | null>(null)
@@ -60,7 +52,6 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
         <ul>
           {nodes.map((node, index) => {
             const key = node.id || `${node.country}-${node.name}-${index}`
-            const region = countryName(node.country, i18n.language)
             const probe = node.probe
             const hits = russiaHits(probe)
             const whitelist = whitelistHits(probe)
@@ -74,7 +65,7 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
               : null
             const note = node.note?.trim()
             return (
-              <li key={key} className="border-b border-border/50 last:border-b-0">
+              <li key={key} className={cn('border-b border-border/50 last:border-b-0', stateRowTint(node))}>
                 <button
                   type="button"
                   className="grid w-full grid-cols-1 gap-4 px-4 py-4 text-left md:grid-cols-[1.2fr_1fr_1.1fr_1.3fr_auto] md:items-center md:gap-3 sm:px-6"
@@ -87,15 +78,15 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
                   <span className="flex items-center gap-3">
                     <CountryFlag code={node.country} className="h-5 w-7 rounded-[3px]" />
                     <span>
-                      <span className="block font-heading text-base font-bold">{node.name}</span>
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="font-heading text-base font-bold">{node.name}</span>
+                        <StateChip node={node} />
+                      </span>
                       {note ? <span className="mt-0.5 block text-sm text-muted-foreground">{note}</span> : null}
-                      {!note && region && region !== node.name ? (
-                        <span className="mt-0.5 block text-sm text-muted-foreground">{region}</span>
-                      ) : null}
                     </span>
                   </span>
-                  <ProbeWorld probe={probe} />
-                  <ProbeRussia probe={probe} whitelist={isWhitelist} />
+                  <ProbeWorld node={node} />
+                  <ProbeRussia probe={probe} whitelist={isWhitelist} skipped={Boolean(node.no_probe) || (isWhitelist && !bypassProbes)} />
                   <History history={history} measured={measured} pct={pct} />
                   <ChevronDown className={cn('hidden size-4 text-muted-foreground transition-transform md:block', expanded && 'rotate-180')} />
                 </button>
@@ -194,20 +185,22 @@ export function StatusNodeList({ nodes }: { nodes: StatusMapNode[] }) {
   )
 }
 
-function ProbeWorld({ probe }: { probe?: StatusProbe }) {
+function ProbeWorld({ node }: { node: StatusMapNode }) {
   const { t } = useTranslation()
   return (
     <span>
       <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">
         {t('landing.status.colWorld')}
       </span>
-      {!probe || probe.world_total === 0 ? (
+      {node.no_probe ? (
+        <span className="text-sm text-muted-foreground">—</span>
+      ) : !node.probe || node.probe.world_total === 0 ? (
         <span className="text-sm text-muted-foreground">{t('landing.status.worldPending')}</span>
       ) : (
         <span className="block">
           <span className="inline-flex items-center gap-2 text-sm font-medium">
-            <span className={cn('landing-status-dot', probe.world_ok > 0 ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
-            {probe.world_ok > 0 ? t('landing.status.worldUp') : t('landing.status.worldDown')}
+            <span className={cn('landing-status-dot', node.probe.world_ok > 0 ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
+            {node.probe.world_ok > 0 ? t('landing.status.worldUp') : t('landing.status.worldDown')}
           </span>
         </span>
       )}
@@ -215,7 +208,7 @@ function ProbeWorld({ probe }: { probe?: StatusProbe }) {
   )
 }
 
-function ProbeRussia({ probe, whitelist }: { probe?: StatusProbe; whitelist?: boolean }) {
+function ProbeRussia({ probe, whitelist, skipped }: { probe?: StatusProbe; whitelist?: boolean; skipped?: boolean }) {
   const { t } = useTranslation()
   const operators = whitelistHits(probe)
   const total = whitelist ? operators.length : (probe?.russia_total ?? 0)
@@ -227,7 +220,9 @@ function ProbeRussia({ probe, whitelist }: { probe?: StatusProbe; whitelist?: bo
       <span className={cn('mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground', !whitelist && 'md:hidden')}>
         {whitelist ? t('landing.status.whitelistProbes') : t('landing.status.colRussia')}
       </span>
-      {!probe || total === 0 ? (
+      {skipped ? (
+        <span className="text-sm text-muted-foreground">—</span>
+      ) : !probe || total === 0 ? (
         <span className="text-sm text-muted-foreground">{t('landing.status.worldPending')}</span>
       ) : (
         <span className="block">

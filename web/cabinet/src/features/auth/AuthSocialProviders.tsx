@@ -66,6 +66,10 @@ export function AuthSocialProviders({
   const [tgWidgetError, setTgWidgetError] = useState(false)
   const [tgWidgetLoading, setTgWidgetLoading] = useState(true)
   const [miniLoading, setMiniLoading] = useState(false)
+  /** Нажатая кнопка OAuth: страница уходит к провайдеру, до ухода крутится спиннер. */
+  const [redirecting, setRedirecting] = useState<string | null>(null)
+  /** Виджет вернул пользователя — ждём вход на сервере. */
+  const [tgAuthPending, setTgAuthPending] = useState(false)
   const tgMountRef = useRef<HTMLDivElement>(null)
   const onTelegramAuthRef = useRef(onTelegramAuth)
   onTelegramAuthRef.current = onTelegramAuth
@@ -92,7 +96,9 @@ export function AuthSocialProviders({
       key: 'google',
       label: t('auth.socialGoogle'),
       icon: <GoogleBrandIcon className="size-5" />,
+      loading: redirecting === 'google',
       onClick: () => {
+        setRedirecting('google')
         const ref = referralCode?.trim()
         const start = '/cabinet/api/auth/google/start'
         window.location.href = ref ? `${start}?ref=${encodeURIComponent(ref)}` : start
@@ -104,7 +110,9 @@ export function AuthSocialProviders({
       key: 'yandex',
       label: t('auth.socialYandex'),
       icon: <YandexBrandIcon className="size-5" />,
+      loading: redirecting === 'yandex',
       onClick: () => {
+        setRedirecting('yandex')
         const ref = referralCode?.trim()
         const start = '/cabinet/api/auth/yandex/start'
         window.location.href = ref ? `${start}?ref=${encodeURIComponent(ref)}` : start
@@ -116,7 +124,9 @@ export function AuthSocialProviders({
       key: 'vk',
       label: t('auth.socialVK'),
       icon: <VKBrandIcon className="size-5" />,
+      loading: redirecting === 'vk',
       onClick: () => {
+        setRedirecting('vk')
         const ref = referralCode?.trim()
         const start = '/cabinet/api/auth/vk/start'
         window.location.href = ref ? `${start}?ref=${encodeURIComponent(ref)}` : start
@@ -148,7 +158,9 @@ export function AuthSocialProviders({
       key: 'telegram-oidc',
       label: t('auth.socialTelegram'),
       icon: <TelegramBrandIcon className="size-5" />,
+      loading: redirecting === 'telegram-oidc',
       onClick: () => {
+        setRedirecting('telegram-oidc')
         const ref = referralCode?.trim()
         const start = '/cabinet/api/auth/telegram/start'
         window.location.href = ref ? `${start}?ref=${encodeURIComponent(ref)}` : start
@@ -207,7 +219,14 @@ export function AuthSocialProviders({
     return mountTelegramLoginWidgetScript(el, {
       page,
       bot,
-      onAuth: (user) => onTelegramAuthRef.current?.(user) ?? Promise.resolve(),
+      onAuth: async (user) => {
+        setTgAuthPending(true)
+        try {
+          await (onTelegramAuthRef.current?.(user) ?? Promise.resolve())
+        } finally {
+          setTgAuthPending(false)
+        }
+      },
       onScriptFailed: () => setTgWidgetError(true),
       onScriptLoadingChange: setTgWidgetLoading,
     })
@@ -253,7 +272,7 @@ export function AuthSocialProviders({
               </Alert>
             )}
             <div className="relative flex min-h-[48px] w-full justify-center">
-              {tgWidgetLoading && !tgWidgetError && (
+              {(tgWidgetLoading || tgAuthPending) && !tgWidgetError && (
                 <div
                   className="absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-background/70"
                   aria-busy

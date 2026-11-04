@@ -92,7 +92,7 @@ export function PartnerCustomersTab() {
               variant="secondary"
               size="sm"
               className="mt-3 w-full"
-              disabled={isFetchingNextPage}
+              loading={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
             >
               {t('partnerPage.showMore')}
@@ -182,7 +182,7 @@ export function PartnerEarningsTab() {
               variant="secondary"
               size="sm"
               className="mt-3 w-full"
-              disabled={isFetchingNextPage}
+              loading={isFetchingNextPage}
               onClick={() => void fetchNextPage()}
             >
               {t('partnerPage.showMore')}

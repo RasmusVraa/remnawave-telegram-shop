@@ -1,4 +1,5 @@
 import {
+  Activity,
   FileText,
   Handshake,
   Link2,
@@ -29,6 +30,7 @@ export const HOME_QUICK_ACTION_IDS = [
   'news',
   'feedback',
   'sublink',
+  'servers',
 ] as const
 
 export type HomeQuickActionId = (typeof HOME_QUICK_ACTION_IDS)[number]
@@ -75,6 +77,7 @@ export const HOME_QUICK_ACTIONS: Record<HomeQuickActionId, HomeQuickActionMeta> 
     available: (b) => !!siteLink('feedback')(b),
   },
   sublink: { icon: Link2, labelKey: 'home.qaSubLink', copiesSubscriptionLink: true },
+  servers: { icon: Activity, labelKey: 'home.qaServers', to: '/status', available: (b) => b?.status_nav_visible !== false },
 }
 
 export function isHomeQuickActionId(v: string): v is HomeQuickActionId {

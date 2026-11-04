@@ -129,6 +129,7 @@ export function AdminPartnerModal({
                 icon={Pause}
                 label={t('admin.partners.detail.suspend')}
                 busy={setStatus.isPending}
+                loading={setStatus.isPending && setStatus.variables?.status === 'suspended'}
                 tone="primary"
                 onClick={() => setStatus.mutate({ id: partner.id, status: 'suspended' })}
               />
@@ -138,6 +139,7 @@ export function AdminPartnerModal({
                 icon={Play}
                 label={t('admin.partners.detail.resume')}
                 busy={setStatus.isPending}
+                loading={setStatus.isPending && setStatus.variables?.status === 'active'}
                 tone="primary"
                 onClick={() => setStatus.mutate({ id: partner.id, status: 'active' })}
               />
@@ -147,6 +149,7 @@ export function AdminPartnerModal({
                 icon={Ban}
                 label={t('admin.partners.detail.revoke')}
                 busy={setStatus.isPending}
+                loading={setStatus.isPending && setStatus.variables?.status === 'rejected'}
                 tone="danger"
                 onClick={() => setStatus.mutate({ id: partner.id, status: 'rejected' })}
               />
@@ -156,6 +159,7 @@ export function AdminPartnerModal({
                 icon={Play}
                 label={t('admin.partners.detail.restore')}
                 busy={setStatus.isPending}
+                loading={setStatus.isPending && setStatus.variables?.status === 'active'}
                 tone="primary"
                 onClick={() => setStatus.mutate({ id: partner.id, status: 'active' })}
               />
@@ -500,9 +504,13 @@ function ShowMore({
       type="button"
       disabled={query.isFetchingNextPage}
       onClick={() => void query.fetchNextPage()}
-      className="mt-3 w-full rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60"
+      className={cn(
+        'mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-border bg-secondary px-3 py-2 text-xs font-medium transition-colors hover:bg-border disabled:opacity-60',
+        query.isFetchingNextPage && '!opacity-100',
+      )}
     >
-      {query.isFetchingNextPage ? t('admin.partners.detail.loading') : t('admin.partners.detail.showMore')}
+      {query.isFetchingNextPage && <Loader2 className="size-3.5 animate-spin" />}
+      {t('admin.partners.detail.showMore')}
     </button>
   )
 }
@@ -619,12 +627,15 @@ function ActionButton({
   label,
   onClick,
   busy,
+  loading = false,
   tone = 'outline',
 }: {
   icon: LucideIcon
   label: string
   onClick: () => void
   busy: boolean
+  /** Спиннер у той кнопки, чей запрос идёт; busy блокирует все соседние. */
+  loading?: boolean
   tone?: 'outline' | 'primary' | 'danger'
 }) {
   const tones: Record<string, string> = {
@@ -636,13 +647,14 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      disabled={busy}
+      disabled={busy || loading}
       className={cn(
         'flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:opacity-60',
         tones[tone],
+        loading && '!opacity-100',
       )}
     >
-      <Icon className="size-3.5" />
+      {loading ? <Loader2 className="size-3.5 animate-spin" /> : <Icon className="size-3.5" />}
       {label}
     </button>
   )
@@ -738,8 +750,12 @@ function TermsModal({ partner, open, onClose }: { partner: AdminPartnerDTO; open
               { onSuccess: onClose },
             )
           }
-          className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={cn(
+            'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60',
+            update.isPending && '!opacity-100',
+          )}
         >
+          {update.isPending && <Loader2 className="size-4 animate-spin" />}
           {t('admin.partners.detail.save')}
         </button>
       </div>
@@ -789,8 +805,12 @@ function AdjustModal({ partner, open, onClose }: { partner: AdminPartnerDTO; ope
           type="button"
           onClick={submit}
           disabled={adjust.isPending}
-          className="w-full rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          className={cn(
+            'inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground disabled:opacity-60',
+            adjust.isPending && '!opacity-100',
+          )}
         >
+          {adjust.isPending && <Loader2 className="size-4 animate-spin" />}
           {t('admin.partners.detail.save')}
         </button>
       </div>

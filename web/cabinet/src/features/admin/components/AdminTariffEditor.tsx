@@ -513,7 +513,10 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
               type="button"
               onClick={handleSave}
               disabled={saving || hasErrors}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className={cn(
+                'inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50',
+                saving && '!opacity-100',
+              )}
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {t('admin.save')}

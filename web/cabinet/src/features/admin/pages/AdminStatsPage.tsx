@@ -161,7 +161,7 @@ function AdminStatsPageContent() {
       disabled={refreshing}
       aria-label={refreshLabel}
       title={refreshLabel}
-      className="inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card transition-colors hover:bg-accent disabled:opacity-50"
+      className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card transition-colors hover:bg-accent disabled:opacity-50', refreshing && '!opacity-100')}
     >
       {refreshDone ? (
         <Check className="size-4 animate-fade-in text-emerald-500 dark:text-emerald-400" />

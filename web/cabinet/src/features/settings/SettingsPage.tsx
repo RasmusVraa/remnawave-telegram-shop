@@ -21,12 +21,12 @@ function TelegramLinkButton() {
 
   async function onClick() {
     setErr(null)
+    // При успехе api сам уводит на страницу провайдера — спиннер не гасим до ухода.
     setLoading(true)
     try {
       await api.startTelegramOIDCLink()
     } catch (e) {
       setErr(e instanceof ApiError ? e.body || t('settings.telegram.linkStartError') : t('settings.telegram.linkStartError'))
-    } finally {
       setLoading(false)
     }
   }
@@ -48,12 +48,12 @@ function GoogleLinkButton() {
 
   async function onClick() {
     setErr(null)
+    // При успехе api сам уводит на страницу провайдера — спиннер не гасим до ухода.
     setLoading(true)
     try {
       await api.startGoogleOAuthLink()
     } catch (e) {
       setErr(e instanceof ApiError ? e.body || t('settings.google.linkStartError') : t('settings.google.linkStartError'))
-    } finally {
       setLoading(false)
     }
   }
@@ -75,12 +75,12 @@ function YandexLinkButton() {
 
   async function onClick() {
     setErr(null)
+    // При успехе api сам уводит на страницу провайдера — спиннер не гасим до ухода.
     setLoading(true)
     try {
       await api.startYandexOAuthLink()
     } catch (e) {
       setErr(e instanceof ApiError ? e.body || t('settings.yandex.linkStartError') : t('settings.yandex.linkStartError'))
-    } finally {
       setLoading(false)
     }
   }
@@ -102,12 +102,12 @@ function VKLinkButton() {
 
   async function onClick() {
     setErr(null)
+    // При успехе api сам уводит на страницу провайдера — спиннер не гасим до ухода.
     setLoading(true)
     try {
       await api.startVKOAuthLink()
     } catch (e) {
       setErr(e instanceof ApiError ? e.body || t('settings.vk.linkStartError') : t('settings.vk.linkStartError'))
-    } finally {
       setLoading(false)
     }
   }

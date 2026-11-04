@@ -22,6 +22,7 @@ import { AdminPageHeader } from '../components/AdminPageHeader'
 import { Card } from '@/components/ui/card'
 import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import {
   useAdminPromoList,
   useAdminPromoGet,
@@ -212,10 +213,11 @@ function CreatePromoModal({
             {t('admin.cancel')}
           </button>
           <button
-            className="rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className={cn('inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', pending && '!opacity-100')}
             disabled={!form.code.trim() || !form.type || pending}
             onClick={() => onCreate(form)}
           >
+            {pending && <Spinner />}
             {t('admin.create')}
           </button>
       </div>
@@ -231,24 +233,29 @@ function PromoActionButton({
   label,
   className,
   onClick,
+  busy = false,
 }: {
   icon: typeof Pencil
   label: string
   className?: string
   onClick: (e: MouseEvent) => void
+  /** Запрос в работе: спиннер вместо иконки, повторное нажатие заблокировано. */
+  busy?: boolean
 }) {
   return (
     <button
       type="button"
       aria-label={label}
       title={label}
+      disabled={busy}
+      aria-busy={busy || undefined}
       className={cn(
         'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors max-md:size-10 max-md:px-0',
         className,
       )}
       onClick={onClick}
     >
-      <Icon className="size-3.5 shrink-0" />
+      {busy ? <Spinner className="h-3.5 w-3.5" /> : <Icon className="size-3.5 shrink-0" />}
       <span className="hidden md:inline">{label}</span>
     </button>
   )
@@ -372,6 +379,7 @@ function PromoExpandedDetails({
   t,
   onEdit,
   onToggle,
+  toggling,
   onDelete,
   onShowUsed,
 }: {
@@ -380,6 +388,7 @@ function PromoExpandedDetails({
   t: TFunction
   onEdit: () => void
   onToggle: () => void
+  toggling: boolean
   onDelete: () => void
   onShowUsed: () => void
 }) {
@@ -433,6 +442,7 @@ function PromoExpandedDetails({
               ? 'border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-400'
               : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400'
           }
+          busy={toggling}
           onClick={(e) => {
             e.stopPropagation()
             onToggle()
@@ -521,6 +531,7 @@ function PromoListItem({
       t={t}
       onEdit={() => setEditOpen(true)}
       onToggle={toggle}
+      toggling={update.isPending}
       onDelete={() => setDeleteOpen(true)}
       onShowUsed={() => setUsedOpen(true)}
     />
@@ -733,7 +744,7 @@ function EditPromoModal({
             type="button"
             onClick={save}
             disabled={update.isPending}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className={cn('inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50', update.isPending && '!opacity-100')}
           >
             {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             {t('admin.save')}

@@ -41,6 +41,7 @@ export interface StatusMapNode {
   country?: string
   note?: string
   whitelist?: boolean
+  no_probe?: boolean
   state: string
   probe?: StatusProbe
 }
@@ -55,17 +56,9 @@ function worst(a: DotState, b: DotState): DotState {
   return rank[a] <= rank[b] ? a : b
 }
 
+/** Точка на карте — тот же итоговый статус, что на карточках: его считает сервер. Неизвестный рисуем как «частично». */
 function dotState(node: StatusMapNode): DotState {
-  const panel: DotState = node.state === 'up' || node.state === 'partial' || node.state === 'down' ? node.state : 'down'
-  const probe = node.probe
-  if (!probe || (probe.world_total === 0 && probe.russia_total === 0)) return panel
-  const worldFail = probe.world_total > 0 && probe.world_ok === 0
-  const russiaFail = probe.russia_total > 0 && probe.russia_ok === 0
-  const worldPart = probe.world_ok > 0 && probe.world_ok < probe.world_total
-  const russiaPart = probe.russia_ok > 0 && probe.russia_ok < probe.russia_total
-  if (worldFail && russiaFail) return 'down'
-  if (worldFail || russiaFail || worldPart || russiaPart) return 'partial'
-  return panel === 'down' ? 'down' : 'up'
+  return node.state === 'up' || node.state === 'partial' || node.state === 'down' ? node.state : 'partial'
 }
 
 const FILL = { up: '#3dd68c', partial: '#f5b942', down: '#f07178' }

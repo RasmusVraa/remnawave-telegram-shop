@@ -20,14 +20,15 @@
 | [env.md](./env.md) | Справочник переменных окружения |
 | [sales-modes.md](./sales-modes.md) | Classic vs tariffs, цены, тексты покупки |
 | [payments.md](./payments.md) | Платёжные системы, вебхуки и поллинг |
-| [notifications.md](./notifications.md) | Уведомления: истечение, lifecycle, torrent blocker (Remnawave webhook) |
-| [squads.md](./squads.md) | Squads Remnawave (платные и триал) |
+| [notifications.md](./notifications.md) | Уведомления: истечение, lifecycle, лента и push в кабинете, torrent blocker (Remnawave webhook) |
+| [squads.md](./squads.md) | Squads Remnawave (платные и триал, применение состава тарифа к подписчикам) |
 | [partner-program.md](./partner-program.md) | Партнёрская программа: проценты, потоки, холд, выплаты |
 | [customization.md](./customization.md) | Тексты бота/кабинета, кнопки, emoji |
 | [backup.md](./backup.md) | Резервное копирование и восстановление |
 | [moynalog-proxy.md](./moynalog-proxy.md) | «Мой налог» через прокси вне РФ |
 | [reverse-proxy.md](./reverse-proxy.md) | Обратный прокси (Traefik и др.) |
 | [cabinet/landing.md](./cabinet/landing.md) | Публичный лендинг проекта: адреса, что настраивать |
+| [cabinet/server-status.md](./cabinet/server-status.md) | Статус серверов: публичная страница, кабинет, поддержка, настройка и ключи |
 | [updating.md](./updating.md) | Обновление Docker-образа |
 | [compatibility.md](./compatibility.md) | Совместимость версий бота и Remnawave |
 | [cabinet/](./cabinet/) | Web-кабинет: setup, upgrade, support bridge |

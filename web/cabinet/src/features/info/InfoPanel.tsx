@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ExternalLink, FileText, HelpCircle, ShieldCheck } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -8,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useCabinetContentConfig } from './contentConfig'
+import { ServerStatusSummary, useServerStatus } from './ServerStatusSummary'
 
 type TabId = 'faq' | 'documents' | 'status' | 'useful_links'
 
@@ -17,6 +19,7 @@ export type InfoPanelProps = {
 }
 
 export function InfoPanel({ hideTitle }: InfoPanelProps) {
+  const { t } = useTranslation()
   const { data, isLoading } = useAuthBootstrap()
   const { data: content, isLoading: contentLoading } = useCabinetContentConfig()
   const siteLinks = data?.site_links
@@ -27,18 +30,21 @@ export function InfoPanel({ hideTitle }: InfoPanelProps) {
     { id: 'documents' as const, label: 'Документы' },
     { id: 'status' as const, label: 'Статус' },
   ]
+  const statusQuery = useServerStatus()
+  const statusUrl = siteLinks?.server_status
+  // Вкладка «Статус» нужна, если есть что показать: наш список серверов или внешняя ссылка.
+  const hasStatus = (statusQuery.data?.nodes.length ?? 0) > 0 || Boolean(statusUrl)
+  const hideStatusTab = !hasStatus && !statusQuery.isLoading
   const usefulLinks = (content?.info.useful_links ?? []).filter((x) => siteLinks?.[x.link_key])
   const tabs: { id: TabId; label: string }[] = [
-    ...tabsBase.map((t) => ({ id: t.id as TabId, label: t.label })),
+    ...tabsBase.filter((t) => !(hideStatusTab && t.id === 'status')).map((t) => ({ id: t.id as TabId, label: t.label })),
     ...(usefulLinks.length > 0 ? [{ id: 'useful_links' as const, label: 'Полезные ссылки' }] : []),
   ]
   const faq = content?.faq ?? []
   const docs = (content?.info.documents ?? []).filter((x) => siteLinks?.[x.link_key])
-  const statusUrl = siteLinks?.server_status
   const loading = isLoading || contentLoading
   const hasFaq = faq.length > 0
   const hasDocs = docs.length > 0
-  const canShowStatus = Boolean(statusUrl)
 
   const visibleFaq = useMemo(() => faq, [faq])
 
@@ -165,22 +171,14 @@ export function InfoPanel({ hideTitle }: InfoPanelProps) {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <ShieldCheck className="size-5 text-emerald-500" />
-                  {content?.info.status.title ?? 'Статус сервисов'}
+                  {t('infoStatus.title')}
                 </CardTitle>
                 <CardDescription>
-                  {content?.info.status.description ?? 'Проверяйте актуальное состояние сервисов'}
+                  {t('infoStatus.description')}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                {canShowStatus ? (
-                  <Button asChild>
-                    <a href={statusUrl} target="_blank" rel="noopener noreferrer">
-                      {content?.info.status.button ?? 'Открыть статус'}
-                    </a>
-                  </Button>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Ссылка статуса не настроена</p>
-                )}
+                <ServerStatusSummary externalUrl={statusUrl} />
               </CardContent>
             </Card>
           )}

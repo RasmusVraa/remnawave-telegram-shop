@@ -16,6 +16,7 @@ type NodePresence struct {
 }
 
 type nodeWire struct {
+	UUID         string `json:"uuid"`
 	Name         string `json:"name"`
 	Address      string `json:"address"`
 	CountryCode  string `json:"countryCode"`
@@ -26,6 +27,7 @@ type nodeWire struct {
 
 // ProbeTarget — узел для замера. Address остаётся внутри процесса и не уходит в публичный JSON.
 type ProbeTarget struct {
+	UUID        string
 	Name        string
 	CountryCode string
 	State       string
@@ -75,6 +77,7 @@ func (r *Client) ListProbeTargets(ctx context.Context) ([]ProbeTarget, error) {
 			continue
 		}
 		out = append(out, ProbeTarget{
+			UUID:        strings.ToLower(strings.TrimSpace(n.UUID)),
 			Name:        name,
 			CountryCode: strings.ToUpper(strings.TrimSpace(n.CountryCode)),
 			State:       nodeState(n),

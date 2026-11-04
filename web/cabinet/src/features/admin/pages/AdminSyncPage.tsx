@@ -51,7 +51,7 @@ export default function AdminSyncPage() {
 
             <Button
               onClick={() => syncMutation.mutate()}
-              disabled={running}
+              loading={running}
               className="gap-2"
             >
               <RefreshCw className={`size-4 ${running ? 'animate-spin' : ''}`} />

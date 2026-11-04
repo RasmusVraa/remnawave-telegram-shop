@@ -10,6 +10,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -32,7 +33,12 @@ type AuthHandler struct {
 	telegramLoginBotUser string // username без @ для Login Widget; "" — вход через Telegram не настроен
 	telegramOIDCEnabled  bool
 	telegramWebAuthMode  string
+	// statusVisible отвечает, есть ли серверы для страницы статуса. nil — считаем, что есть.
+	statusVisible func(context.Context) bool
 }
+
+// SetStatusVisible подключает проверку «в списке статуса есть серверы» (нужна для bootstrap).
+func (h *AuthHandler) SetStatusVisible(fn func(context.Context) bool) { h.statusVisible = fn }
 
 // NewAuth — конструктор. googleOAuthEnabled и telegramLoginBotUser — публичные
 // подсказки для SPA (см. GET /auth/bootstrap); не секреты.
@@ -124,6 +130,13 @@ func cabinetSiteLinks() map[string]string {
 	return m
 }
 
+func (h *AuthHandler) statusNavVisible(ctx context.Context) bool {
+	if h.statusVisible == nil {
+		return true
+	}
+	return h.statusVisible(ctx)
+}
+
 // AuthBootstrap — GET /cabinet/api/auth/bootstrap.
 // Публичные флаги для страницы логина: какие альтернативные провайдеры доступны.
 func (h *AuthHandler) AuthBootstrap(w http.ResponseWriter, r *http.Request) {
@@ -135,6 +148,8 @@ func (h *AuthHandler) AuthBootstrap(w http.ResponseWriter, r *http.Request) {
 		"telegram_web_auth_mode": h.telegramWebAuthMode,
 		// Совпадает с FORTUNE_ENABLED: скрыть пункт меню в SPA; /fortune по прямой ссылке остаётся.
 		"fortune_nav_visible": cabcfg.GetFortuneWheel().Enabled,
+		// Страница статуса серверов: без единого сервера в списке она пуста, пункт меню и сама страница скрыты.
+		"status_nav_visible": h.statusNavVisible(r.Context()),
 		// Совпадает с PARTNER_PROGRAM_ENABLED: выключенная программа не должна
 		// светиться пунктом меню, который ведёт на «раздел недоступен».
 		"partner_nav_visible":  botcfg.PartnerProgramEnabled(),

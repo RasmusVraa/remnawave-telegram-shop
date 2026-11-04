@@ -1,39 +1,19 @@
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Activity, ExternalLink, Loader2 } from 'lucide-react'
+import { Activity, ExternalLink } from 'lucide-react'
 
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
-import { AdminFeedback } from '../components/AdminFeedback'
-import { AdminSettingsGroupEditor } from '../components/AdminSettingsGroupEditor'
-import { useAdminSettingsDraft } from '../hooks/useAdminSettingsDraft'
-import { ADMIN_STATUS_SETTINGS_GROUP } from '../utils/adminSettingsGroups'
 import { AdminStatusTargets } from '../components/AdminStatusTargets'
+import { AdminStatusChecks } from '../components/AdminStatusChecks'
+import { AdminStatusSettings } from '../components/AdminStatusSettings'
 
-/** Публичная страница /status: зонды, карта и подписи. Те же настройки, что в реестре бота. */
+/** Страница «Статус серверов»: список серверов, откуда берутся данные и вид публичной страницы. */
 export default function AdminStatusPage() {
   const { t } = useTranslation()
-  const {
-    groups,
-    isLoading,
-    isError,
-    draft,
-    setDraftValue,
-    togglingKey,
-    isGroupSaving,
-    handleToggle,
-    handleInstantEnum,
-    handleSaveSection,
-    feedback,
-    clearFeedback,
-  } = useAdminSettingsDraft()
-
-  const [expanded, setExpanded] = useState(true)
-  const group = (groups ?? []).find((g) => g.id === ADMIN_STATUS_SETTINGS_GROUP)
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
+      <div className="space-y-4">
         <AdminPageHeader
           icon={Activity}
           title={t('admin.statusPage.title')}
@@ -51,36 +31,9 @@ export default function AdminStatusPage() {
             </a>
           }
         />
-
-        <p className="max-w-3xl text-sm text-muted-foreground">{t('admin.statusPage.note')}</p>
-
         <AdminStatusTargets />
-
-        <AdminFeedback feedback={feedback} onDismiss={clearFeedback} autoDismissMs={4000} />
-
-        {isError ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-            {t('admin.settings.loadError')}
-          </div>
-        ) : isLoading ? (
-          <div className="flex items-center justify-center py-10 text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" />
-          </div>
-        ) : group ? (
-          <AdminSettingsGroupEditor
-            group={group}
-            draft={draft}
-            searchQuery=""
-            expanded={expanded}
-            onToggleExpand={() => setExpanded((v) => !v)}
-            onDraftChange={setDraftValue}
-            onToggle={handleToggle}
-            onInstantEnum={handleInstantEnum}
-            onSave={(keys) => handleSaveSection(group.id, keys)}
-            saving={isGroupSaving(group.id)}
-            togglingKey={togglingKey}
-          />
-        ) : null}
+        <AdminStatusChecks />
+        <AdminStatusSettings />
       </div>
     </AdminLayout>
   )

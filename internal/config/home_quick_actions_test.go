@@ -49,3 +49,10 @@ func TestApplyRuntimePatch_homeQuickActions(t *testing.T) {
 		t.Fatalf("got %v", got)
 	}
 }
+
+func TestParseHomeQuickActionsServers(t *testing.T) {
+	got, err := ParseHomeQuickActions("servers,promo")
+	if err != nil || len(got) != 2 || got[0] != "servers" {
+		t.Fatalf("servers must be a valid quick action: %v %v", got, err)
+	}
+}

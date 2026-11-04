@@ -192,6 +192,7 @@ function TariffCard({
             <AdminToggleSwitch
               checked={tariff.is_active}
               onChange={(next) => update.mutate({ id: tariff.id, fields: { is_active: next } })}
+              busy={update.isPending}
               aria-label={t('admin.tariffs.toggleActive')}
             />
             <button

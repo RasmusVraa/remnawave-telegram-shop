@@ -6,6 +6,7 @@ import { BellOff, BellRing, CheckCheck, X } from 'lucide-react'
 
 import { ResponsiveSheet } from '@/components/ResponsiveSheet'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import type { NotificationDTO } from '@/lib/api'
 import { enablePush, getPushState, syncPushSubscription, type PushState } from '@/lib/push'
@@ -39,19 +40,28 @@ export function NotificationsTitle() {
 }
 
 /** «Прочитать все» значком в шапке окна — рядом с крестиком. */
-function ReadAllButton({ onClick }: { onClick: () => void }) {
+function ReadAllButton({ onClick }: { onClick: () => Promise<void> | undefined }) {
   const { t } = useTranslation()
   const { data } = useUnreadNotifications()
+  const [busy, setBusy] = useState(false)
   if (!data?.total) return null
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        if (busy) return
+        const run = onClick()
+        if (!run) return
+        setBusy(true)
+        void run.finally(() => setBusy(false))
+      }}
+      disabled={busy}
+      aria-busy={busy || undefined}
       aria-label={t('notifications.readAll')}
       title={t('notifications.readAll')}
       className="inline-flex size-9 shrink-0 items-center justify-center rounded-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
     >
-      <CheckCheck size={17} />
+      {busy ? <Spinner /> : <CheckCheck size={17} />}
     </button>
   )
 }
@@ -61,7 +71,7 @@ function ReadAllButton({ onClick }: { onClick: () => void }) {
  * NotificationsPopover, а очередь отметок живёт в ленте — лента кладёт сюда
  * свой обработчик.
  */
-type ReadAllRef = React.MutableRefObject<(() => void) | null>
+type ReadAllRef = React.MutableRefObject<(() => Promise<void>) | null>
 
 /** Телефон: шторка снизу. ПК — выпадающее окно от колокольчика (NotificationsPopover). */
 export function NotificationsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -210,7 +220,7 @@ function NotificationsBody({ open, readAll }: { open: boolean; readAll: ReadAllR
   useEffect(() => {
     readAll.current = () => {
       setFresh(new Set())
-      void markAllRead()
+      return markAllRead()
     }
     return () => {
       readAll.current = null
@@ -493,9 +503,13 @@ function PushCard({ open }: { open: boolean }) {
   if (!state || state === 'unsupported' || state === 'on') return null
 
   const enable = async () => {
-    setBusy(true)
+    if (busy) return
     setNote(null)
     try {
+      // Пока открыт запрос разрешения браузера, спиннер не крутим: ждём человека, а не сервер.
+      // Дальше enablePush спросит разрешение ещё раз — браузер ответит сразу, без окна.
+      if (Notification.permission === 'default') await Notification.requestPermission()
+      setBusy(true)
       const next = await enablePush()
       setState(next)
       // Браузер не показал запрос (тихий режим Chrome, закрыли окно) — подсказать, где разрешить.

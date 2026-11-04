@@ -174,17 +174,17 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (bootstrap?.fortune_nav_visible !== false) {
       bonuses.push({ key: 'fortune', icon: FortuneWheelIcon, label: t('nav.fortune'), to: '/fortune', decorTo: '/fortune' })
     }
-    const about: MenuItem[] = [
-      { key: 'info', icon: FileText, label: t('nav.info'), to: '/support#cabinet-info' },
-      { key: 'servers', icon: Activity, label: t('nav.servers'), to: '/status', decorTo: '/status' },
-    ]
+    const about: MenuItem[] = [{ key: 'info', icon: FileText, label: t('nav.info'), to: '/support#cabinet-info' }]
+    if (bootstrap?.status_nav_visible !== false) {
+      about.push({ key: 'servers', icon: Activity, label: t('nav.servers'), to: '/status', decorTo: '/status' })
+    }
     if (newsUrl) about.push({ key: 'news', icon: Newspaper, label: t('dashboard.newsCardTitle'), href: newsUrl })
     if (feedbackUrl) about.push({ key: 'feedback', icon: Star, label: t('dashboard.feedbackCardTitle'), href: feedbackUrl })
     return [
       { key: 'bonuses', title: t('home.menuBonuses'), items: bonuses },
       { key: 'about', title: t('home.menuAbout'), items: about },
     ]
-  }, [t, bootstrap?.partner_nav_visible, bootstrap?.fortune_nav_visible, partnerMaxPercent, newsUrl, feedbackUrl])
+  }, [t, bootstrap?.partner_nav_visible, bootstrap?.fortune_nav_visible, bootstrap?.status_nav_visible, partnerMaxPercent, newsUrl, feedbackUrl])
   const navItems = useMemo(() => {
     if (user?.is_admin) {
       return [

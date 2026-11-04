@@ -292,6 +292,8 @@ export function useConnectionGuide() {
     (!subscriptionLink && !inviteHref) ||
     !(selectedApp.urlScheme || '').trim() ||
     (!!encryptApp && encryptedDeeplinkLoading)
+  /** Зашифрованная ссылка ещё едет с сервера — у кнопки «Добавить подписку» спиннер. */
+  const addLoading = !!encryptApp && encryptedDeeplinkLoading
 
   /** Почему «Добавить подписку» не сработает или ещё не готова. */
   const addHint: 'noSubscription' | 'encryptedError' | 'encryptedLoading' | '' =
@@ -328,6 +330,7 @@ export function useConnectionGuide() {
     subscriptionLink,
     openAddSubscription,
     addDisabled,
+    addLoading,
     addHint,
     brandName,
     brandLogoUrl,

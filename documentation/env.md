@@ -3,8 +3,8 @@
 Полный справочник. Шаблон с комментариями — [`.env.sample`](../.env.sample).  
 Краткий минимум для старта — в [`readme.md`](../readme.md).
 
-Часть ключей можно менять без рестарта через web-админку **«Настройки бота»** (`/cabinet/admin/settings`).  
-Только через `.env` (+ рестарт): токены провайдеров, `MOYNALOG_*`, `LIFECYCLE_CRON`, вкл/выкл способов оплаты.
+Часть ключей можно менять без рестарта через web-админку **«Настройки бота»** (`/cabinet/admin/settings`): вкл/выкл способов оплаты, способы ЮKassa, `MOYNALOG_ENABLED` / `MOYNALOG_RECEIPT_FOR` / `MOYNALOG_RETRY_MAX_AGE_HOURS`, триал, HWID, рефералы, партнёрка, лояльность, ссылки меню, оформление кабинета, push-уведомления, колесо фортуны и др. Значение из админки хранится в БД и перекрывает `.env`.  
+Только через `.env` (+ рестарт): токены и реквизиты провайдеров, логин/пароль/URL «Мой налог», `MOYNALOG_RETRY_CRON`, `LIFECYCLE_CRON` и `LIFECYCLE_NOTIFY_ENABLED`, всё про БД, панель, домен и вход в кабинет.
 
 ---
 
@@ -169,6 +169,10 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `MOYNALOG_USERNAME` / `MOYNALOG_PASSWORD` | Логин/пароль |
 | `MOYNALOG_PROXY_URL` | Прокси http/https/socks5. См. [moynalog-proxy.md](./moynalog-proxy.md) |
 | `MOYNALOG_RECEIPT_FOR` | Способы: `yookassa`, `platega`, `crypto`. Не задано = yookassa+platega. Пустая строка = никто |
+| `MOYNALOG_RETRY_CRON` | Расписание повторной отправки чеков, которые не ушли (ФНС недоступна, протухла авторизация). По умолчанию `*/10 * * * *`. Только `.env` |
+| `MOYNALOG_RETRY_MAX_AGE_HOURS` | Сколько часов повторять чек, считая от времени **оплаты** (по умолчанию `720`). Потом чек снимается с повторов и приходит уведомление админу — доход вносится вручную |
+
+Чек сначала записывается в БД, потом отправляется; при сбое повторяется по расписанию, админу приходит одно сообщение о сбое и одно — когда чек всё-таки ушёл. `MOYNALOG_ENABLED`, `MOYNALOG_RECEIPT_FOR` и `MOYNALOG_RETRY_MAX_AGE_HOURS` меняются в админке без рестарта.
 
 ---
 
@@ -251,7 +255,7 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 
 | Переменная | Кнопка |
 |------------|--------|
-| `SERVER_STATUS_URL` | Статус сервера |
+| `SERVER_STATUS_URL` | Статус сервера. Кнопка в боте; в кабинете страница статуса теперь своя ([cabinet/server-status.md](./cabinet/server-status.md)), а эта ссылка нужна только как запасная, пока в списке статуса нет серверов |
 | `SUPPORT_URL` | Поддержка |
 | `FEEDBACK_URL` | Отзывы |
 | `CHANNEL_URL` | Канал |
@@ -337,7 +341,7 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `CABINET_ACCESS_TTL_MINUTES` / `CABINET_REFRESH_TTL_DAYS` | TTL токенов |
 | `CABINET_WEB_TELEGRAM_ID_BASE` | База synthetic Telegram ID для web-only |
 | `CABINET_BRAND_NAME` | Название в UI |
-| `CABINET_BRAND_LOGO_URL` / `CABINET_BRAND_LOGO_FILE` / `CABINET_BRAND_LOGO_FILE_BASE` | Логотип |
+| `CABINET_BRAND_LOGO_URL` / `CABINET_BRAND_LOGO_FILE` | Логотип: URL или файл на диске процесса бота (относительный путь ищется рядом с бинарником, затем в рабочем каталоге). URL важнее файла |
 | `CABINET_PWA_ENABLED` / `CABINET_PWA_APP_NAME` / `CABINET_PWA_SHORT_NAME` | PWA |
 | `CABINET_LIGHT_THEME_ENABLED` | Светлая тема (`true` по умолчанию) |
 | `CABINET_DECOR_THEME` | Декор кабинета и лендинга: `off` (по умолчанию, розово-фиолетовая пастель), `green`, `spring`, `cyber`, `neon`, `ocean`, `new_year`, `new_year_2`, `slate`, `carbon`, `aurora`, `nebula`, `violet`, `lavender`, `pink`, `valentine`, `wine`, `sunset`, `orange`, `halloween`, `halloween_2`, `yellow`, `summer`, `black_friday`. `new_year_2` и `halloween_2` — ночные сцены на весь экран, в том числе на лендинге; светлой темы у них нет, переключатель темы на это время скрыт. Меняется в админке без рестарта |
@@ -353,8 +357,8 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `STATUS_PAGE_TITLE` / `STATUS_PAGE_LEAD` | Заголовок и подзаголовок `/status`. Пусто — перевод кабинета. Меняется в админке без рестарта |
 | `CABINET_DECOR_AUTO_ENABLED` | Авто-смена декор-темы по календарю (`false` по умолчанию). В праздничном окне тема окна перекрывает `CABINET_DECOR_THEME`, вне окон возвращается она же |
 | `CABINET_DECOR_SCHEDULE` | Окна авто-смены: JSON `[{"theme":"new_year","from":"12-01","to":"01-31","enabled":true}]`. Пусто — встроенный пресет праздников. Побеждает первое совпавшее окно; `from > to` — окно через 31 декабря. Редактируется в админке |
-| `CABINET_SUBSCRIPTION_SHOW_LOYALTY` | Плашка уровня лояльности на странице «Подписка» (`false` по умолчанию). Флаг влияет только на эту страницу: раздел `/loyalty` и плашка в профиле доступны всегда, программу целиком выключает `LOYALTY_ENABLED`. Меняется в админке без рестарта |
-| `CABINET_HOME_QUICK_ACTIONS` | Кнопки на местах 3 и 4 быстрых действий главной: два разных id через запятую в порядке показа — `promo`, `invite`, `partner`, `fortune`, `support`, `info`, `news`, `feedback`, `sublink` (копирует ссылку подписки). Пусто — `promo,invite`. Места 1 и 2 зависят от подписки и не настраиваются. Выключенный раздел заменяется кнопкой по умолчанию. Меняется в админке без рестарта |
+| `CABINET_SUBSCRIPTION_SHOW_LOYALTY` | Плашка уровня лояльности на главной кабинета (бывшая страница «Подписка», `false` по умолчанию). Флаг влияет только на эту плашку: раздел `/loyalty` и плашка в профиле доступны всегда, программу целиком выключает `LOYALTY_ENABLED`. Меняется в админке без рестарта |
+| `CABINET_HOME_QUICK_ACTIONS` | Кнопки на местах 3 и 4 быстрых действий главной: два разных id через запятую в порядке показа — `promo`, `invite`, `partner`, `fortune`, `support`, `info`, `news`, `feedback`, `sublink` (копирует ссылку подписки), `servers` (статус серверов; скрыта, пока в списке статуса нет серверов). Пусто — `promo,invite`. Места 1 и 2 зависят от подписки и не настраиваются. Выключенный раздел заменяется кнопкой по умолчанию. Меняется в админке без рестарта |
 | `CABINET_TARIFF_PRICE_DISPLAY` | Витрина: `monthly` или `marketing` |
 | `CABINET_TARIFF_SAVINGS_BADGE` | Плашка «−N %» на карточках сроков: `none` (по умолчанию), `corner` (в углу карточки) или `old_price` (зачёркнутая база «цена 1 мес × N»). Меняется в админке без рестарта |
 | `CABINET_DEEPLINK_HAPP_ENCRYPT` | Шифровать Happ deep link (`happ://crypt…/`) |
@@ -371,6 +375,26 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `CABINET_TELEGRAM_OIDC_*` | Telegram OAuth 2.0 |
 | `CABINET_TURNSTILE_*` | Cloudflare Turnstile |
 | `CABINET_METRICS_USER` / `CABINET_METRICS_PASSWORD` | Basic-auth для `/cabinet/api/metrics`. Оба пустые — метрики выключены (404) |
+
+---
+
+## Статус серверов
+
+Страница `/status` (публичная, без входа) и пункт «Статус серверов» в кабинете (`/cabinet/status`). Список серверов вводится вручную в админке, раздел «Статус серверов». Узлы панели в него сами не попадают: кнопка «Добавить из панели» только подставляет страну и адрес. Пока в списке нет ни одного включённого сервера, страница и все её пункты скрыты. Подробно: [cabinet/server-status.md](./cabinet/server-status.md). Идея и первый вариант страницы взяты из форка RasmusVraa.
+
+| Переменная | Описание |
+|---|---|
+| `STATUS_PROBES_ENABLED` | Пинг внешними зондами Globalping (`true` по умолчанию). Выключено — страница показывает только состояние узлов панели |
+| `STATUS_WORLD_PROBES` / `STATUS_RUSSIA_PROBES` | Зондов из мира (1–10, по умолчанию 1) и из России (1–30, по умолчанию 10). У строки можно задать свои |
+| `STATUS_PROBE_INTERVAL_MIN` | Интервал замера, если у строки свой не задан (5–180 минут, по умолчанию 60) |
+| `STATUS_SHOW_MAP` | Карта на публичной странице (`true` по умолчанию) |
+| `STATUS_PAGE_TITLE` / `STATUS_PAGE_LEAD` | Заголовок и подзаголовок. Пусто — перевод кабинета |
+| `GLOBALPING_TOKEN` | Необязательный токен с dash.globalping.io: лимит поднимается с 250 до 500 единиц в час (каждый зонд — единица). Расход текущего списка показан в админке. При ответе 429 проверка паузится на время из `Retry-After` |
+| `LATENCYLAB_TOKEN` | Ключ `ll_…` из профиля Latency Lab. Нужен строкам типа «Обход»: адрес пингуется модемами операторов с белыми списками. Без ключа такие строки не проверяются, админка об этом предупреждает |
+
+Первые пять настроек меняются в админке без перезапуска, токены — только через `.env`.
+
+Строка списка: тип «Обычный сервер» или «Обход (каскад)», узел панели (по нему берётся статус, иначе ищется по адресу), для обхода — зарубежный выход каскада (статус строки не лучше статуса выхода), галочка «Не отправлять адрес внешним зондам» (адрес не уходит в Globalping и Latency Lab, статус только из панели). «Недоступен» ставится после двух замеров подряд, в которых не ответил никто; один такой замер даёт «частично».
 
 ---
 
@@ -397,6 +421,7 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | Переменная | Описание |
 |------------|----------|
 | `DISABLE_ENV_FILE` | Не читать `.env` из файла (CI и т.п.) |
+| `NO_COLOR` | Если задана (любое значение) — стартовый баннер в логе без цветов |
 
 После правок `.env`:
 

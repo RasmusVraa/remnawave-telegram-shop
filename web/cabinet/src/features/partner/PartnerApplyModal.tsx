@@ -225,8 +225,8 @@ export function PartnerApplyModal({
 
           <p className="text-xs text-muted-foreground">{t('partnerPage.form.note')}</p>
 
-          <Button type="submit" className="w-full" disabled={apply.isPending}>
-            {apply.isPending ? t('partnerPage.form.submitting') : t('partnerPage.form.submit')}
+          <Button type="submit" className="w-full" loading={apply.isPending}>
+            {t('partnerPage.form.submit')}
           </Button>
         </form>
       </div>

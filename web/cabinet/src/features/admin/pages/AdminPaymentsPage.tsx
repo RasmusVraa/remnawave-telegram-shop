@@ -8,6 +8,7 @@ import { AdminTablePagination } from '../components/AdminTablePagination'
 import { AdminPaymentDetailModal } from '../components/AdminPaymentDetailModal'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import { api } from '@/lib/api'
 import { useAdminPaymentsList, type AdminPaymentListItemDTO } from '../hooks/useAdminPayments'
 import { formatInvoiceType } from '../utils/formatInvoiceType'
@@ -161,9 +162,9 @@ export default function AdminPaymentsPage() {
               type="button"
               onClick={() => void handleExport()}
               disabled={exporting}
-              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60"
+              className={cn('inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-60', exporting && '!opacity-100')}
             >
-              <Download className="size-4" />
+              {exporting ? <Spinner /> : <Download className="size-4" />}
               CSV
             </button>
           }

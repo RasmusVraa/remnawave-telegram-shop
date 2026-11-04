@@ -152,6 +152,7 @@ export function AdminUserActionsModal({
               'flex items-center gap-2 rounded-btn px-3 py-2.5 text-sm disabled:opacity-50',
               variantClasses[action.variant ?? 'default'],
               (action.variant ?? 'default') === 'default' && '[&_svg]:text-primary',
+              action.pending && '!opacity-100',
             )}
           >
             {action.pending ? (

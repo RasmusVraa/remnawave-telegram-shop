@@ -7,7 +7,7 @@
 
 | Переменная | Кнопка |
 |------------|--------|
-| `SERVER_STATUS_URL` | Статус сервера |
+| `SERVER_STATUS_URL` | Статус сервера (в кабинете есть своя страница, см. [server-status.md](./cabinet/server-status.md); эта ссылка — запасная) |
 | `SUPPORT_URL` | Поддержка (в кабинете при `SUPPORT_BOT_API=true` — встроенный чат) |
 | `FEEDBACK_URL` | Отзывы |
 | `CHANNEL_URL` | Канал |

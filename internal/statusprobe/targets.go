@@ -34,6 +34,28 @@ type ConfiguredTarget struct {
 	RepeatCities *bool `json:"repeat_cities,omitempty"`
 	// Note — короткая приписка под названием, например «+ белые списки».
 	Note string `json:"note,omitempty"`
+	// Kind — regular (обычная нода) или bypass (каскад обхода: вход в РФ + зарубежный выход).
+	// bypass включает проверку Latency Lab. Пусто у старых записей: тогда решает Whitelist.
+	Kind string `json:"kind,omitempty"`
+	// NodeUUID — узел панели, по которому берётся статус. Пусто — сопоставление по адресу.
+	NodeUUID string `json:"node_uuid,omitempty"`
+	// ExitNodeUUID — зарубежный выход каскада. Статус строки не лучше статуса этого узла.
+	ExitNodeUUID string `json:"exit_node_uuid,omitempty"`
+	// NoExternal — не отдавать адрес внешним зондам; статус только из панели.
+	NoExternal bool `json:"no_external,omitempty"`
+}
+
+const (
+	KindRegular = "regular"
+	KindBypass  = "bypass"
+)
+
+// IsBypass — строка проверяется как обход (белые списки операторов).
+func (t ConfiguredTarget) IsBypass() bool {
+	if t.Kind == KindBypass {
+		return true
+	}
+	return t.Kind == "" && t.Whitelist
 }
 
 // AllowsRepeatCities — по умолчанию города повторяются, чтобы доступность
@@ -92,9 +114,10 @@ func TargetsFrom(list []ConfiguredTarget) []Target {
 			Interval:     time.Duration(item.IntervalMin) * time.Minute,
 			World:        item.WorldProbes,
 			Russia:       item.RussiaProbes,
-			Whitelist:    item.Whitelist,
+			Whitelist:    item.IsBypass(),
 			RepeatCities: item.AllowsRepeatCities(),
 			Disabled:     !item.Enabled,
+			NoExternal:   item.NoExternal,
 		})
 	}
 	splitSharedProbeKeys(out)
@@ -197,6 +220,25 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 		if utf8.RuneCountInString(note) > 48 {
 			return nil, fmt.Errorf("note is too long")
 		}
+		kind := strings.TrimSpace(item.Kind)
+		switch kind {
+		case "":
+			kind = KindRegular
+			if item.Whitelist {
+				kind = KindBypass
+			}
+		case KindRegular, KindBypass:
+		default:
+			return nil, fmt.Errorf("kind must be regular or bypass")
+		}
+		nodeUUID, err := normalizeNodeUUID(item.NodeUUID)
+		if err != nil {
+			return nil, err
+		}
+		exitUUID, err := normalizeNodeUUID(item.ExitNodeUUID)
+		if err != nil {
+			return nil, err
+		}
 		id := strings.TrimSpace(item.ID)
 		if id == "" || len(id) > 40 {
 			id = newTargetID()
@@ -215,12 +257,33 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 			IntervalMin:  interval,
 			WorldProbes:  world,
 			RussiaProbes: russia,
-			Whitelist:    item.Whitelist,
+			Whitelist:    kind == KindBypass,
 			RepeatCities: &repeat,
 			Note:         note,
+			Kind:         kind,
+			NodeUUID:     nodeUUID,
+			ExitNodeUUID: exitUUID,
+			NoExternal:   item.NoExternal,
 		})
 	}
 	return out, nil
+}
+
+// normalizeNodeUUID пропускает пустое значение и UUID панели (hex и дефисы).
+func normalizeNodeUUID(raw string) (string, error) {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	if v == "" {
+		return "", nil
+	}
+	if len(v) > 64 {
+		return "", fmt.Errorf("node id is invalid")
+	}
+	for _, r := range v {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') && r != '-' {
+			return "", fmt.Errorf("node id is invalid")
+		}
+	}
+	return v, nil
 }
 
 func isLocalHostname(host string) bool {

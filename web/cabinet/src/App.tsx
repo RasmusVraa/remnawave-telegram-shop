@@ -2,8 +2,10 @@ import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
+import { NavPendingTracker } from '@/lib/navPending'
 import i18n from '@/i18n'
 import { useAuthStore } from '@/store/auth'
+import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { RouteErrorBoundary } from '@/components/RouteErrorBoundary'
 import { AdminRoute } from '@/components/AdminRoute'
@@ -39,6 +41,7 @@ const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage')
 
 // Публичный лендинг (9a): отдельный маршрут, корень SPA по-прежнему ведёт в кабинет.
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
+// Статус серверов: /status без префикса — публичная страница, /cabinet/status — карточки кабинета.
 const StatusPage = lazy(() => import('@/features/landing/StatusPage'))
 const CabinetStatusPage = lazy(() => import('@/features/status/CabinetStatusPage'))
 
@@ -128,6 +131,7 @@ function normalizePath(pathname: string): string {
 }
 
 function isPublicShellPath(pathname: string): boolean {
+  // /status вне /cabinet — публичная страница, внутри — за авторизацией.
   if (normalizePath(pathname) === '/status') {
     return typeof window === 'undefined' || !window.location.pathname.startsWith('/cabinet')
   }
@@ -139,7 +143,11 @@ function isPublicShellPath(pathname: string): boolean {
 }
 
 function StatusEntry() {
+  const { data, isLoading } = useAuthBootstrap()
   const inCabinet = typeof window !== 'undefined' && window.location.pathname.startsWith('/cabinet')
+  // Пока в списке статуса нет серверов, страница пуста: уводим на главную, а не показываем пустоту.
+  if (isLoading && !data) return null
+  if (data?.status_nav_visible === false) return <Navigate to={inCabinet ? '/dashboard' : '/landing'} replace />
   if (!inCabinet) return <StatusPage />
   return (
     <ProtectedRoute requireVerified>
@@ -554,6 +562,7 @@ export default function App() {
             <BrandFavicon />
             <CabinetDecorThemeSync />
             <BrowserRouter basename={resolveBasename()}>
+              <NavPendingTracker />
               <AppRoutes />
             </BrowserRouter>
           </ToastProvider>

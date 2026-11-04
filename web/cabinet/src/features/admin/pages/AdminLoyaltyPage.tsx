@@ -247,7 +247,7 @@ export default function AdminLoyaltyPage() {
                 type="button"
                 onClick={() => setRecalcOpen(true)}
                 disabled={recalcMut.isPending}
-                className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50"
+                className={cn('inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80 disabled:opacity-50', recalcMut.isPending && '!opacity-100')}
               >
                 <RefreshCw className={`size-4 ${recalcMut.isPending ? 'animate-spin' : ''}`} />
                 {t('admin.loyalty.recalc')}
@@ -382,7 +382,7 @@ export default function AdminLoyaltyPage() {
               type="button"
               onClick={handleSubmit}
               disabled={formSaving}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              className={cn('inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50', formSaving && '!opacity-100')}
             >
               {formSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               {t('admin.save')}

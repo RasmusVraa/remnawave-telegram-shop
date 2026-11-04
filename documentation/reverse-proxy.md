@@ -10,7 +10,10 @@
 | `/cabinet/api/` | API кабинета |
 | `/landing` | публичный лендинг на корне домена (см. [cabinet/landing.md](./cabinet/landing.md)) |
 | `/healthcheck` | проба живости |
-| вебхуки оплат | пути из `.env` |
+| вебхуки оплат | пути из `.env` (`YOOKASA_WEBHOOK_URL`, `PLATEGA_WEBHOOK_URL`, `HELEKET_WEBHOOK_URL`, `TRIBUTE_WEBHOOK_URL`) |
+| вебхук панели | `REMNAWAVE_WEBHOOK_PATH`, если панель шлёт его через прокси ([notifications.md](./notifications.md)) |
+
+Кабинет берёт IP клиента из `X-Forwarded-For` и доверяет только loopback и частным сетям. Если перед вашим nginx стоит ещё один прокси с публичным адресом (например CDN), перечислите его адреса в `CABINET_TRUSTED_PROXIES` — иначе все клиенты получат IP CDN и общий лимит запросов. См. [env.md](./env.md#web-кабинет).
 
 Если конфиг проксирует на бота всё (`location /`), делать ничего не нужно. Если
 посторонние пути уводятся редиректом на `/cabinet/` — для `/landing` нужен свой
@@ -56,7 +59,7 @@ http:
     remnawave-telegram-shop:
       loadBalancer:
         servers:
-          - url: "http://bot:82251"
+          - url: "http://bot:3002"
 ```
 
 Подставьте свой хост и порт сервиса из вашего `docker-compose` (значение `HEALTH_CHECK_PORT` / проброс порта контейнера).

@@ -3,9 +3,14 @@
 На сервере в каталоге проекта:
 
 ```bash
+git pull
 docker compose pull
 docker compose down && docker compose up -d
 ```
+
+Миграции БД применяются сами при старте нового образа.
+
+**Тексты бота берутся с диска.** В `docker-compose.yaml` папка `./translations` смонтирована в контейнер, поэтому бот читает `translations/*.json` из каталога проекта, а не из образа. Новые ключи появляются там только после обновления клона (`git pull` выше; свои правки текстов сохраните заранее). Иначе вместо нового текста бот покажет имя ключа.
 
 После смены переменных в `.env` пересоздайте контейнер:
 
@@ -38,7 +43,7 @@ docker compose up -d --force-recreate
 2. Зафиксируйте текущий рабочий образ бота **по digest**, а не по тегу `latest`, —
    иначе откат вернёт не то, что было.
 3. Обновите панель до `3.3.*` или новее (поддерживается по `3.4.*` включительно):
-   - в её `docker-compose.yml` смените образ `remnawave/backend:2` на `remnawave/backend:3`;
+   - в её compose-файле смените образ `remnawave/backend:2` на `remnawave/backend:3`;
    - в `.env` переименуйте `JWT_AUTH_SECRET` в `APP_SECRET` (значение переносится как есть);
    - удалите `JWT_API_TOKENS_SECRET`, `SWAGGER_PATH`, `SCALAR_PATH`, `IS_DOCS_ENABLED`;
    - примените: `docker compose pull remnawave && docker compose down && docker compose up -d`.

@@ -633,7 +633,7 @@ export default function AdminUserDetailPage() {
                 })
               }}
               disabled={disableMut.isPending}
-              className="inline-flex items-center gap-2 rounded-btn bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50"
+              className={cn('inline-flex items-center gap-2 rounded-btn bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50', disableMut.isPending && '!opacity-100')}
             >
               {disableMut.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
               {t('admin.users.disable')}
@@ -687,7 +687,7 @@ export default function AdminUserDetailPage() {
                 })
               }}
               disabled={deleteMut.isPending}
-              className="inline-flex items-center gap-2 rounded-btn bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50"
+              className={cn('inline-flex items-center gap-2 rounded-btn bg-destructive px-4 py-2 text-sm text-destructive-foreground disabled:opacity-50', deleteMut.isPending && '!opacity-100')}
             >
               {deleteMut.isPending ? <Loader2 className="size-4 animate-spin" /> : null}
               {t('admin.delete')}

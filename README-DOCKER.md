@@ -30,18 +30,27 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 docker compose up -d
 ```
 
-Использует образ: `ghcr.io/mrmeows/remnawave-telegram-shop-bot:latest`
+Использует образ: `ghcr.io/mrme0ws/remnawave-telegram-shop-bot:latest`
 
-### Development (локальная сборка)
+Теги образа:
+
+- `latest` и номер версии (`5.26.0`, а также `5.26`) — собираются из git-тегов релизов; теги без префикса `v`;
+- `dev-<короткий sha>` — сборка каждого коммита в `main`, для тестовых стендов.
+
+### Локальная сборка
+
+`Dockerfile` сам собирает фронтенд кабинета и встраивает его в бинарь:
 
 ```bash
-docker compose -f docker-compose.dev.yaml up -d
+docker build -t remnawave-telegram-shop-bot:local .
 ```
+
+Затем в `docker-compose.yaml` укажите `image: remnawave-telegram-shop-bot:local`.
 
 ## Проверка доступности образа
 
 ```bash
-docker pull ghcr.io/mrmeows/remnawave-telegram-shop-bot:latest
+docker pull ghcr.io/mrme0ws/remnawave-telegram-shop-bot:latest
 ```
 
 ## Использование конкретной версии
@@ -49,11 +58,11 @@ docker pull ghcr.io/mrmeows/remnawave-telegram-shop-bot:latest
 В `docker-compose.yaml` замените:
 
 ```yaml
-image: ghcr.io/mrmeows/remnawave-telegram-shop-bot:latest
+image: ghcr.io/mrme0ws/remnawave-telegram-shop-bot:latest
 ```
 
 На нужную версию, например:
 
 ```yaml
-image: ghcr.io/mrmeows/remnawave-telegram-shop-bot:3.4.0
+image: ghcr.io/mrme0ws/remnawave-telegram-shop-bot:5.26.0
 ```
