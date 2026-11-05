@@ -39,6 +39,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/mail"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
+	"remnawave-tg-shop-bot/internal/cabinet/webauth"
 	"remnawave-tg-shop-bot/internal/database"
 )
 
@@ -82,6 +83,7 @@ type Service struct {
 	telegramToken  string
 	telegramTokens []string
 	linkStore      *pendingLinkStore
+	webAuth        *webauth.Store
 
 	// lookupCustomers / lookupLinks — для Telegram Login после link/merge:
 	// customer уже с реальным telegram_id, но cabinet_identity(telegram) могла не создаваться.
