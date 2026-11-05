@@ -78,7 +78,10 @@ export default function LoginPage() {
   const from = (location.state as { from?: string })?.from ?? '/dashboard'
 
   useEffect(() => {
-    if (accessToken && user?.email_verified) {
+    if (!accessToken) return
+    // /app-auth — вход в клиент; достаточно сессии (в т.ч. Telegram без почты).
+    const toAppAuth = typeof from === 'string' && from.startsWith('/app-auth')
+    if (toAppAuth || user?.email_verified) {
       navigate(from, { replace: true })
     }
   }, [accessToken, user?.email_verified, from, navigate])

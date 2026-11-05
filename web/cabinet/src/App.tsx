@@ -38,6 +38,7 @@ const RegisterPage = lazy(() => import('@/features/auth/RegisterPage'))
 const VerifyEmailPage = lazy(() => import('@/features/auth/VerifyEmailPage'))
 const ForgotPasswordPage = lazy(() => import('@/features/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('@/features/auth/ResetPasswordPage'))
+const AppAuthPage = lazy(() => import('@/features/auth/AppAuthPage'))
 
 // Публичный лендинг (9a): отдельный маршрут, корень SPA по-прежнему ведёт в кабинет.
 const LandingPage = lazy(() => import('@/features/landing/LandingPage'))
@@ -111,6 +112,8 @@ const PUBLIC_AUTH_PATHS = new Set([
   '/verify-email',
   '/password/forgot',
   '/password/reset',
+  // Подтверждение входа в десктоп-клиент (токен из /auth/deeplink/request).
+  '/app-auth',
 ])
 
 /** Показывать оболочку до init auth (публичные страницы + deeplink и лендинг без сессии). */
@@ -183,6 +186,8 @@ function AppRoutes() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/password/forgot" element={<ForgotPasswordPage />} />
       <Route path="/password/reset" element={<ResetPasswordPage />} />
+      {/* Подтверждение входа в десктоп/мобильный клиент (web_url из /auth/deeplink/request). */}
+      <Route path="/app-auth" element={<AppAuthPage />} />
 
       {/* Публичная страница редиректа на custom scheme — открывается из мини-приложения во внешнем браузере (без сессии). */}
       <Route path="/deeplink" element={<DeepLinkRedirectPage />} />

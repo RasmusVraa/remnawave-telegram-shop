@@ -1201,6 +1201,31 @@ export const api = {
       ...(referralCode ? { referral_code: referralCode } : {}),
     }),
 
+  /** Одноразовый токен входа из приложения (Telegram /start или /app-auth). */
+  webAuthRequest: () =>
+    request<{
+      token: string
+      bot_username: string
+      expires_in: number
+      telegram_url: string
+      web_url: string
+      start_payload: string
+    }>('POST', '/auth/deeplink/request'),
+
+  webAuthPoll: (token: string) =>
+    request<{
+      access_token: string
+      access_exp: number
+      csrf_token: string
+      refresh_token?: string
+      subscription_link?: string
+      status?: string
+    }>('POST', '/auth/deeplink/poll', { token }),
+
+  /** Подтверждение токена залогиненным пользователем на /cabinet/app-auth. */
+  webAuthComplete: (token: string) =>
+    request<{ status: string }>('POST', '/auth/deeplink/complete', { token }),
+
   /** Вход через Telegram Login Widget (без Bearer). */
   telegramAuthWidget: (
     user: {

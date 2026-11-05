@@ -8,6 +8,8 @@
   "cabinet_minimal_date_placeholder": "—",
   "cabinet_minimal_expiring": "⚠️ expires in %d days",
   "cabinet_minimal_footer": "🌐 Cabinet - cabinet.me0ws.store\n📰 News channel - @VPN_meows_news",
+  "webauth_ok": "App login confirmed. You can return to the client.",
+  "webauth_failed": "Could not confirm app login. Request a new link in the client.",
   "cabinet_minimal_btn_trial": {
     "text": "Try free",
     "emoji_id": "5424972470023104089",

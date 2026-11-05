@@ -43,6 +43,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/supportbot"
 	"remnawave-tg-shop-bot/internal/cabinet/tgprofile"
 	"remnawave-tg-shop-bot/internal/cabinet/web"
+	"remnawave-tg-shop-bot/internal/cabinet/webauth"
 	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
@@ -145,6 +146,14 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	}, accountRepo, identityRepo, sessionRepo, evRepo, prRepo, jwtIssuer, mailer, customerBootstrap, emailMergeCodesRepo)
 	authSvc.SetTelegramCustomerLookup(customerRepo, linkRepo)
 
+	// Токены входа из приложения (Telegram /start webauth_* или /cabinet/app-auth).
+	webAuthStore := webauth.New(webauth.DefaultTTL)
+	webAuthStore.RunGC(ctx)
+	authSvc.SetWebAuthStore(webAuthStore)
+	webauth.SetTelegramApprover(func(c context.Context, token string, telegramID int64, username string) error {
+		return authSvc.ApproveWebAuthFromTelegram(c, token, telegramID, username)
+	})
+
 	// Google OAuth (опционально).
 	oauthStateStore := googleoauth.NewStateStore()
 	oauthStateStore.RunGC(ctx)
@@ -246,6 +255,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	// Приглашения «подключить ещё устройство»: токен подписывается тем же
 	// секретом кабинета (connectinvite выводит из него отдельный ключ).
 	connectInviteHandler := handlers.NewConnectInvite(subscriptionSvc, cabcfg.JWTSecret())
+	webAuthHandler := handlers.NewWebAuth(authSvc, tgWidgetBot, subscriptionSvc)
 
 	activityHandler := handlers.NewCabinetActivity(linkRepo, identityRepo, customerRepo, referralRepo, purchaseRepo, cabcfg.PublicURL())
 	// Уведомления партнёрской программы. Без бота nil — тогда все вызовы
@@ -404,7 +414,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		adminSyncHandler = handlers.NewAdminSync(syncService)
 	}
 
-	registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
+	registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, webAuthHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
 		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
 		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim)
@@ -538,6 +548,7 @@ func registerAPIRoutes(
 	tariffs *handlers.TariffsHandler,
 	subscription *handlers.SubscriptionHandler,
 	connectInvite *handlers.ConnectInviteHandler,
+	webAuth *handlers.WebAuthHandler,
 	activity *handlers.CabinetActivityHandler,
 	partner *handlers.PartnerHandler,
 	promocodes *handlers.PromoCodesHandler,
@@ -708,6 +719,31 @@ func registerAPIRoutes(
 			middleware.RateLimit(verifyEmailConfirmIPLim, ipKey("email_verify_confirm")),
 		)),
 	)
+
+	// Вход из приложения по одноразовому токену:
+	// request → t.me/bot?start=webauth_* или /cabinet/app-auth → poll.
+	if webAuth != nil {
+		api.Handle("/cabinet/api/auth/deeplink/request",
+			onlyPOST(middleware.Chain(
+				http.HandlerFunc(webAuth.Request),
+				middleware.RateLimit(telegramIPLim, ipKey("webauth_request")),
+			)),
+		)
+		api.Handle("/cabinet/api/auth/deeplink/poll",
+			onlyPOST(middleware.Chain(
+				http.HandlerFunc(webAuth.Poll),
+				middleware.RateLimit(telegramIPLim, ipKey("webauth_poll")),
+			)),
+		)
+		api.Handle("/cabinet/api/auth/deeplink/complete",
+			onlyPOST(middleware.Chain(
+				http.HandlerFunc(webAuth.Complete),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.CSRF(),
+				middleware.RateLimit(telegramIPLim, ipKey("webauth_complete")),
+			)),
+		)
+	}
 
 	// GET /avatar?t=<token> — аватарка владельца токена. Маршрут вне RequireAuth
 	// намеренно: <img> не умеет слать Authorization, доступ открывает

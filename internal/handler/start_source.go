@@ -16,6 +16,7 @@ import (
 const (
 	startArgPartnerPrefix  = "p_"
 	startArgReferralPrefix = "ref_"
+	// webauth_ обрабатывается отдельно в StartCommandHandler (вход из приложения).
 )
 
 // parseStartArg достаёт аргумент из текста команды: "/start ref_123" → "ref_123".
@@ -40,6 +41,10 @@ func parseStartArg(text string) string {
 func (h Handler) attachStartSource(ctx context.Context, text string, customer *database.Customer) {
 	arg := parseStartArg(text)
 	if arg == "" || customer == nil {
+		return
+	}
+	// Вход из приложения: /start webauth_<token> — не партнёр и не реферал.
+	if strings.HasPrefix(arg, "webauth_") {
 		return
 	}
 
