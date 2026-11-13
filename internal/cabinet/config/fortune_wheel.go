@@ -16,30 +16,30 @@ type FortuneWheelConfig struct {
 	MaxSpinsPerDay      int
 	MinSubscriptionDays int
 	DailyFreeSpin       bool // FORTUNE_DAILY_FREE_SPIN — один бесплатный спин в сутки (UTC)
-	SpinCostDays         int
+	SpinCostDays        int
 
-	WeightMicro       int
-	WeightXP          int
-	WeightDiscount3   int
-	WeightDays3       int
-	WeightDiscount5   int
-	WeightDays5       int
-	WeightDays7       int
-	WeightDays15      int
-	WeightDays30      int
-	WeightDays180     int
+	WeightMicro     int
+	WeightXP        int
+	WeightDiscount3 int
+	WeightDays3     int
+	WeightDiscount5 int
+	WeightDays5     int
+	WeightDays7     int
+	WeightDays15    int
+	WeightDays30    int
+	WeightDays180   int
 
-	RewardXPAmount          int
-	RewardMicroXPMin        int
-	RewardMicroXPMax        int
-	RewardDiscount3Percent  int
-	RewardDiscount5Percent  int
-	RewardDays3             int
-	RewardDays5             int
-	RewardDays7             int
-	RewardDays15            int
-	RewardDays30            int
-	RewardDays180           int
+	RewardXPAmount         int
+	RewardMicroXPMin       int
+	RewardMicroXPMax       int
+	RewardDiscount3Percent int
+	RewardDiscount5Percent int
+	RewardDays3            int
+	RewardDays5            int
+	RewardDays7            int
+	RewardDays15           int
+	RewardDays30           int
+	RewardDays180          int
 
 	// WinnerTickerEnabled — бегущая строка / блок «кто выиграл» на странице колеса (FORTUNE_WINNER_TICKER_ENABLED).
 	WinnerTickerEnabled bool

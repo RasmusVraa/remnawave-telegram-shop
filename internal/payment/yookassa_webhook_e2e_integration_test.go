@@ -28,6 +28,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"remnawave-tg-shop-bot/internal/adminalert"
 	"remnawave-tg-shop-bot/internal/cache"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
@@ -257,17 +258,11 @@ func newE2EEnv(t *testing.T) *e2eEnv {
 		"REMNAWAVE_URL":       panelSrv.URL,
 		"REMNAWAVE_TOKEN":     "test",
 		"DATABASE_URL":        "postgres://unused",
-		"TRAFFIC_LIMIT":       "100",
 		"TRIAL_TRAFFIC_LIMIT": "10",
 		"TRIAL_DAYS":          "3",
-		"PRICE_1":             "199",
-		"PRICE_3":             "499",
-		"PRICE_6":             "899",
-		"PRICE_12":            "1599",
 		"HWID_ADD_PRICE":      "50",
 		"REFERRAL_DAYS":       strconv.Itoa(e2eReferralDays),
 		"DAYS_IN_MONTH":       strconv.Itoa(e2eDaysInMonth),
-		"SALES_MODE":          "classic",
 		"REFERRAL_MODE":       "default",
 		// Уведомление в группу о платеже тоже проходит через поддельный Bot API.
 		"PAYMENTS_NOTIFY_ENABLED": "true",
@@ -287,6 +282,7 @@ func newE2EEnv(t *testing.T) *e2eEnv {
 	if err != nil {
 		t.Fatalf("bot: %v", err)
 	}
+	adminalert.Init(tgBot)
 
 	rw := remnawave.NewClient(panelSrv.URL, "test", "remote")
 	customers := database.NewCustomerRepository(pool)

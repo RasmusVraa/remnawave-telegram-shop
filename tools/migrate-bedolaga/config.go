@@ -34,23 +34,23 @@ type RemnawaveConfig struct {
 }
 
 type TariffsConfig struct {
-	Mode    string           `yaml:"mode"` // import_from_bedolaga | map_existing
-	Mapping map[int]string   `yaml:"mapping"`
+	Mode    string         `yaml:"mode"` // import_from_bedolaga | map_existing
+	Mapping map[int]string `yaml:"mapping"`
 }
 
 type BalanceConfig struct {
-	Enabled             bool   `yaml:"enabled"`
-	Policy              string `yaml:"policy"` // user_mapped_tariff
-	FallbackPolicy      string `yaml:"fallback_policy"` // cheapest_imported_1m
-	ApplyToRemnawave    bool   `yaml:"apply_to_remnawave"`
+	Enabled          bool   `yaml:"enabled"`
+	Policy           string `yaml:"policy"`          // user_mapped_tariff
+	FallbackPolicy   string `yaml:"fallback_policy"` // cheapest_imported_1m
+	ApplyToRemnawave bool   `yaml:"apply_to_remnawave"`
 }
 
 type CustomersConfig struct {
-	OnConflict         string `yaml:"on_conflict"` // prefer_bedolaga
-	SetLegalAccepted   bool   `yaml:"set_legal_accepted"`
-	SkipDeleted        bool   `yaml:"skip_deleted"`
-	SkipBlocked        bool   `yaml:"skip_blocked"`
-	ImportCabinet      bool   `yaml:"import_cabinet"`
+	OnConflict       string `yaml:"on_conflict"` // prefer_bedolaga
+	SetLegalAccepted bool   `yaml:"set_legal_accepted"`
+	SkipDeleted      bool   `yaml:"skip_deleted"`
+	SkipBlocked      bool   `yaml:"skip_blocked"`
+	ImportCabinet    bool   `yaml:"import_cabinet"`
 }
 
 type ReferralsConfig struct {

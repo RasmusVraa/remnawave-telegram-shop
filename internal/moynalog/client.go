@@ -387,6 +387,12 @@ func (c *Client) sendIncomeRequest(ctx context.Context, incomeURL string, reqBod
 		return "", err
 	}
 
-	slog.Info("Income receipt created successfully", "id", incomeResp.ID, "amount", amount)
-	return incomeResp.ID, nil
+	// Пустой UUID — не повод для повтора: чек у ФНС уже создан, повтор дал бы
+	// дубль. Только предупреждаем, что формат ответа, похоже, изменился.
+	if incomeResp.ApprovedReceiptUUID == "" {
+		slog.Warn("Income receipt created but response has no approvedReceiptUuid", "amount", amount)
+	}
+
+	slog.Info("Income receipt created successfully", "id", incomeResp.ApprovedReceiptUUID, "amount", amount)
+	return incomeResp.ApprovedReceiptUUID, nil
 }

@@ -5,6 +5,7 @@ import { FileText } from 'lucide-react'
 import { AdminModal } from '../AdminModal'
 import { AdminModalSaveFooter } from '../AdminModalSaveFooter'
 import { formatAdminApiError } from '../../utils/formatAdminApiError'
+import { useErrorHaptic } from '@/lib/haptic'
 import {
   useAdminUserSetDescription,
   type AdminUserPanelResponse,
@@ -37,6 +38,7 @@ export function AdminUserDescriptionModal({
   const initialDescription = rw.description ?? ''
   const [draftDescription, setDraftDescription] = useState(initialDescription)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   useEffect(() => {
     if (open) {

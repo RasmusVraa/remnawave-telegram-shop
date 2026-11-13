@@ -607,6 +607,7 @@ function CabinetNotificationPanel({ item, onItemChange }: { item: Item; onItemCh
   const [confirmDelete, setConfirmDelete] = useState(false)
   const cab = item.cabinet
   const update = useMutation({
+    meta: { haptics: true },
     mutationFn: (action: 'important' | 'unimportant' | 'delete') =>
       action === 'delete'
         ? api.adminBroadcastDeleteCabinet(item.id)

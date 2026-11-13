@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/utils"
@@ -149,7 +150,7 @@ func (b *CustomerBootstrap) EnsureForAccountTelegram(ctx context.Context, accoun
 	if botCust == nil {
 		// Telegram-first login: создаём customer сразу с реальным telegram_id,
 		// чтобы не оставлять synthetic id для живого Telegram-пользователя.
-		created, err := b.customerRepo.Create(ctx, &database.Customer{
+		created, err := b.customerRepo.Create(adminevents.WithSource(ctx, adminevents.SourceCabinet), &database.Customer{
 			TelegramID: telegramUserID,
 			Language:   language,
 		})

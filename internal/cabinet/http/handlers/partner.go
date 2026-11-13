@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
 	"remnawave-tg-shop-bot/internal/config"
@@ -606,6 +607,10 @@ func (h *PartnerHandler) Apply(w http.ResponseWriter, r *http.Request) {
 	slog.Info("partner application submitted",
 		"partner_id", partner.ID, "status", partner.Status,
 		"customer_id", utils.MaskHalfInt64(customer.ID))
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.PartnerApplied, CustomerID: customer.ID, Source: adminevents.SourceCabinet,
+		Payload: map[string]any{"auto_approved": partner.Status == database.PartnerStatusActive},
+	})
 
 	if h.notify != nil {
 		if label := h.adminLabel(r.Context(), partner.ID); label != "" {
@@ -997,6 +1002,10 @@ func (h *PartnerHandler) createPayout(w http.ResponseWriter, r *http.Request, pa
 
 	slog.Info("partner payout requested",
 		"partner_id", partner.ID, "payout_id", payout.ID, "amount", payout.Amount)
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.PartnerPayoutRequest, CustomerID: partner.CustomerID, Source: adminevents.SourceCabinet,
+		Payload: map[string]any{"amount": payout.Amount, "currency": "RUB"},
+	})
 
 	if h.notify != nil {
 		if label := h.adminLabel(r.Context(), partner.ID); label != "" {

@@ -12,6 +12,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/translation"
 	"remnawave-tg-shop-bot/utils"
@@ -115,6 +116,12 @@ func (h historyLog) progress(ctx context.Context, c database.BroadcastCounters) 
 }
 
 func (h historyLog) finish(ctx context.Context, status string, c database.BroadcastCounters, errText string) {
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.SystemBroadcast, Source: adminevents.SourceSystem,
+		Payload: map[string]any{
+			"status": status, "total": c.Total, "sent": c.Sent, "blocked": c.Blocked, "failed": c.Failed,
+		},
+	})
 	if h.repo == nil || h.id == 0 {
 		return
 	}

@@ -14,11 +14,12 @@ import (
 
 // CheckoutProvider — enum cabinet_checkout.provider (CHECK в миграции 000017).
 const (
-	CheckoutProviderYookassa         = "yookassa"
-	CheckoutProviderCryptoPay        = "cryptopay"
-	CheckoutProviderTelegram         = "telegram"
-	CheckoutProviderPlategaSBP       = "platega_sbp"
-	CheckoutProviderPlategaCards     = "platega_cards"
+	CheckoutProviderYookassa   = "yookassa"
+	CheckoutProviderCryptoPay  = "cryptopay"
+	CheckoutProviderTelegram   = "telegram"
+	CheckoutProviderPlatega    = "platega"
+	CheckoutProviderPlategaSBP = "platega_sbp"
+	// platega_cards (прежний способ) остался только в старых строках cabinet_checkout.
 	CheckoutProviderPlategaAcquiring = "platega_acquiring"
 	CheckoutProviderPlategaWorldwide = "platega_worldwide"
 	CheckoutProviderPlategaCrypto    = "platega_crypto"

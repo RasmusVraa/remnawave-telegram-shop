@@ -58,22 +58,22 @@ type bedolagaSub struct {
 
 // sourceCaps describes optional columns across Bedolaga 3.x / 4.x schemas.
 type sourceCaps struct {
-	HasAuthType            bool
-	HasRemnawaveUUIDUsers  bool
-	HasRemnawaveIDUsers    bool // Bedolaga 4.x / RW 3.0 era marker
-	HasRemnawaveUUIDSubs   bool
-	HasRemnawaveShortUUID  bool
-	HasIsDaily             bool
-	HasTrafficResetMode    bool
-	HasExternalSquadUUID   bool
-	HasEmailVerified       bool
-	HasGoogleID            bool
-	HasYandexID            bool
-	HasVKID                bool
-	HasPasswordHash        bool
-	HasTariffsTable        bool
-	HasSubscriptionsTable  bool
-	HintGeneration         string // "bedolaga_3x_rw2" | "bedolaga_4x_rw3" | "unknown"
+	HasAuthType           bool
+	HasRemnawaveUUIDUsers bool
+	HasRemnawaveIDUsers   bool // Bedolaga 4.x / RW 3.0 era marker
+	HasRemnawaveUUIDSubs  bool
+	HasRemnawaveShortUUID bool
+	HasIsDaily            bool
+	HasTrafficResetMode   bool
+	HasExternalSquadUUID  bool
+	HasEmailVerified      bool
+	HasGoogleID           bool
+	HasYandexID           bool
+	HasVKID               bool
+	HasPasswordHash       bool
+	HasTariffsTable       bool
+	HasSubscriptionsTable bool
+	HintGeneration        string // "bedolaga_3x_rw2" | "bedolaga_4x_rw3" | "unknown"
 }
 
 type sourceDB struct {

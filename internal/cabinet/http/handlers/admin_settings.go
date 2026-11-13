@@ -151,9 +151,9 @@ func buildAdminSettingsResponse() adminSettingsGetResp {
 	// которая ругнётся в лог, если про это забыли).
 	order := []string{
 		"cabinet", "landing", "status", "cabinet_connect", "tariffs",
-		"trial", "hwid", "referral", "partner", "stars", "loyalty",
-		"payments", "payments_notify", "moynalog", "access", "links", "tags",
-		"lifecycle", "notifications", "fortune",
+		"trial", "hwid", "traffic", "referral", "partner", "stars", "loyalty",
+		"payments", "payments_notify", "admin_alerts", "moynalog", "access", "links", "tags",
+		"lifecycle", "notifications", "monitoring", "fortune",
 	}
 	groupFields := make(map[string][]adminSettingFieldDTO)
 	for _, f := range config.RuntimeSettingsRegistry() {

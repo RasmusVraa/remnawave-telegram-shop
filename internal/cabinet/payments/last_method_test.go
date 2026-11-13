@@ -13,8 +13,8 @@ func TestCheckoutMethodForInvoiceRoundTrip(t *testing.T) {
 	providers := []string{
 		repository.CheckoutProviderCryptoPay,
 		repository.CheckoutProviderTelegram,
+		repository.CheckoutProviderPlatega,
 		repository.CheckoutProviderPlategaSBP,
-		repository.CheckoutProviderPlategaCards,
 		repository.CheckoutProviderPlategaAcquiring,
 		repository.CheckoutProviderPlategaWorldwide,
 		repository.CheckoutProviderPlategaCrypto,

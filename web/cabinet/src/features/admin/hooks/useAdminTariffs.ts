@@ -33,8 +33,14 @@ export interface AdminTariff {
   tier_level?: number | null
   description?: string | null
   description_detail?: string | null
+  /** Нашивка «Популярный» у клиентов; такой тариф не больше одного. */
+  is_popular?: boolean
   prices: AdminTariffPrice[]
   locations?: AdminTariffLocation[]
+  /** Только в списке: лимит обхода (0/нет — обхода нет или раздельный трафик выключен). */
+  bypass_limit_bytes?: number
+  /** Только в списке: сколько пакетов докупки увидит клиент тарифа. */
+  traffic_packs?: number
 }
 
 export interface CreateTariffInput {
@@ -50,6 +56,7 @@ export interface CreateTariffInput {
   tier_level?: number | null
   description?: string | null
   description_detail?: string | null
+  is_popular?: boolean
   rub: [number, number, number, number]
   stars: [number | null, number | null, number | null, number | null]
   locations?: AdminTariffLocation[]
@@ -138,5 +145,17 @@ export function useAdminSquads() {
   })
 }
 
-const STRATEGIES = ['no_reset', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING', 'NO_RESET'] as const
+const STRATEGIES = ['NO_RESET', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING'] as const
 export { STRATEGIES }
+
+/**
+ * Значение стратегии сброса из базы → пункт списка. В базе встречаются и строчные значения
+ * (`month`, `month_rolling`, `no_reset`, `never` — их ставит автосид из env и бот), а в списке
+ * только верхний регистр: без приведения браузер показывал бы первый пункт, а не реальное значение.
+ * Сервер делает то же самое (`normalizeStrategy`): неизвестное значение — MONTH.
+ */
+export function normalizeResetStrategy(value: string | null | undefined): (typeof STRATEGIES)[number] {
+  const v = (value ?? '').trim().toUpperCase()
+  if (v === 'NEVER') return 'NO_RESET'
+  return (STRATEGIES as readonly string[]).includes(v) ? (v as (typeof STRATEGIES)[number]) : 'MONTH'
+}

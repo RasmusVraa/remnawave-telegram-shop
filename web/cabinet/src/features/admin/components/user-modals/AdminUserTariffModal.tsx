@@ -9,6 +9,7 @@ import { surface } from '../Surface'
 import type { AdminCustomerDTO, AdminTariffBriefDTO } from '@/lib/types/admin'
 import { formatAdminApiError } from '../../utils/formatAdminApiError'
 import { useAdminUserSetTariff } from '../../hooks/useAdminUsers'
+import { useErrorHaptic } from '@/lib/haptic'
 
 interface Props {
   open: boolean
@@ -35,6 +36,7 @@ export function AdminUserTariffModal({
 
   const [draftTariffId, setDraftTariffId] = useState<number | null>(currentTariffId)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   useEffect(() => {
     if (open) {

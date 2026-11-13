@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"remnawave-tg-shop-bot/internal/adminevents"
 )
 
 // Виды начислений в журнале. Совпадают с CHECK-ограничением миграции 000043.
@@ -83,8 +84,22 @@ func (r *ReferralBonusLedgerRepository) Insert(ctx context.Context, e ReferralBo
 	if err != nil {
 		return fmt.Errorf("failed to build insert referral bonus query: %w", err)
 	}
-	if _, err := r.pool.Exec(ctx, sqlStr, args...); err != nil {
+	tag, err := r.pool.Exec(ctx, sqlStr, args...)
+	if err != nil {
 		return fmt.Errorf("failed to insert referral bonus: %w", err)
+	}
+	if tag.RowsAffected() == 1 && !e.IsBackfilled && e.Days > 0 {
+		var customerID int64
+		if e.RecipientCustomerID != nil {
+			customerID = *e.RecipientCustomerID
+		}
+		adminevents.Emit(adminevents.Event{
+			Type: adminevents.ReferralBonus, CustomerID: customerID, Source: adminevents.SourceSystem,
+			Payload: map[string]any{
+				"days": e.Days, "kind": e.Kind,
+				"to_referrer": e.RecipientTelegramID == e.ReferrerTelegramID,
+			},
+		})
 	}
 	return nil
 }

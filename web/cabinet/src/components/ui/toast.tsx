@@ -11,6 +11,7 @@ import {
 import { createPortal } from 'react-dom'
 import { AlertTriangle, CheckCircle2, Info, X } from 'lucide-react'
 
+import { hapticError } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 /**
@@ -87,6 +88,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, variant: ToastVariant, options?: ToastOptions) => {
       const text = message.trim()
       if (!text) return
+      // Ошибка вибрирует всегда, успех — только там, где его вызвали явно (lib/haptic.ts).
+      if (variant === 'error') hapticError()
       const id = nextId.current++
       setToasts((prev) => [...prev.slice(-2), { id, message: text, variant, action: options?.action }])
       timers.current.set(

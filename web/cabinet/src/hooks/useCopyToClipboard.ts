@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { copyToClipboard } from '@/lib/clipboard'
+import { hapticError, hapticTap } from '@/lib/haptic'
 
 export type CopyState = 'idle' | 'done' | 'failed'
 
@@ -30,6 +31,9 @@ export function useCopyToClipboard() {
 
   const copy = useCallback(async (value: string): Promise<boolean> => {
     const ok = await copyToClipboard(value)
+    // Скопировали — лёгкий толчок (копируют часто, «успех» тут был бы громким).
+    if (ok) hapticTap()
+    else hapticError()
     setState(ok ? 'done' : 'failed')
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(

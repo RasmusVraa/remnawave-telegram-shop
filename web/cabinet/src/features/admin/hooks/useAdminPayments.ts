@@ -5,9 +5,16 @@ import type { AdminPaymentDetailDTO, AdminPaymentsListDTO } from '@/lib/types/ad
 
 export type { AdminPaymentListItemDTO, AdminPaymentDetailDTO } from '@/lib/types/admin'
 
-export function useAdminPaymentsList(params: { status: string; q: string; page: number; limit: number }) {
+export function useAdminPaymentsList(params: {
+  status: string
+  q: string
+  page: number
+  limit: number
+  sort?: string
+  dir?: string
+}) {
   return useQuery<AdminPaymentsListDTO>({
-    queryKey: ['admin-payments', params.status, params.q, params.page, params.limit],
+    queryKey: ['admin-payments', params.status, params.q, params.page, params.limit, params.sort ?? '', params.dir ?? ''],
     queryFn: () => api.adminPayments(params),
     staleTime: 15_000,
   })

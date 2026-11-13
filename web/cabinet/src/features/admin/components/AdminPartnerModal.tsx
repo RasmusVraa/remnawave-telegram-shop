@@ -39,6 +39,7 @@ import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import { RecordCard } from '@/components/RecordCard'
 import { cn } from '@/lib/utils'
 import { surface } from './Surface'
+import { useErrorHaptic } from '@/lib/haptic'
 import type {
   AdminPartnerDTO,
   AdminPartnerCustomerDTO,
@@ -769,6 +770,7 @@ function AdjustModal({ partner, open, onClose }: { partner: AdminPartnerDTO; ope
   const [amount, setAmount] = useState('')
   const [comment, setComment] = useState('')
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   function submit() {
     const value = Number(amount.replace(',', '.'))

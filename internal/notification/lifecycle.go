@@ -19,14 +19,14 @@ import (
 )
 
 type LifecycleService struct {
-	customerRepo   *database.CustomerRepository
-	purchaseRepo   *database.PurchaseRepository
-	promoRepo      *database.PromoRepository
-	promoService   *promo.Service
+	customerRepo    *database.CustomerRepository
+	purchaseRepo    *database.PurchaseRepository
+	promoRepo       *database.PromoRepository
+	promoService    *promo.Service
 	remnawaveClient *remnawave.Client
-	bot            *bot.Bot
-	tm             *translation.Manager
-	lifecycleRepo  *LifecycleRepository
+	bot             *bot.Bot
+	tm              *translation.Manager
+	lifecycleRepo   *LifecycleRepository
 }
 
 func NewLifecycleService(
@@ -40,14 +40,14 @@ func NewLifecycleService(
 	lifecycleRepo *LifecycleRepository,
 ) *LifecycleService {
 	return &LifecycleService{
-		customerRepo:   customerRepo,
-		purchaseRepo:   purchaseRepo,
-		promoRepo:      promoRepo,
-		promoService:   promoService,
+		customerRepo:    customerRepo,
+		purchaseRepo:    purchaseRepo,
+		promoRepo:       promoRepo,
+		promoService:    promoService,
 		remnawaveClient: remnawaveClient,
-		bot:            bot,
-		tm:             tm,
-		lifecycleRepo:  lifecycleRepo,
+		bot:             bot,
+		tm:              tm,
+		lifecycleRepo:   lifecycleRepo,
 	}
 }
 

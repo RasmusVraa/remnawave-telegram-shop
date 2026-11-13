@@ -14,6 +14,7 @@ import { DeviceRow } from '@/features/subscription/DeviceRow'
 import { DeviceSlotsFullCta, DeviceSlotsModal } from '@/features/subscription/DeviceSlots'
 import { SubscriptionLinkResetLink, SubscriptionLinkResetSheet } from '@/features/subscription/SubscriptionLinkReset'
 import { api } from '@/lib/api'
+import { hapticSuccess } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 import type { HomeData } from './useHomeData'
 
@@ -57,6 +58,7 @@ export function DeviceManagerProvider({ data, children }: { data: HomeData; chil
   const deleteDevice = useMutation({
     mutationFn: (h: string) => api.deleteDevice(h),
     onSuccess: async () => {
+      hapticSuccess()
       await data.devicesQuery.refetch()
     },
     // Удаление устройства молча ничего не делало при отказе сервера.

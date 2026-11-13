@@ -6,6 +6,7 @@ import { ChevronLeft, Menu, ShieldCheck } from 'lucide-react'
 import { Logo } from '@/components/Logo'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LangToggle } from '@/components/LangToggle'
+import { hapticTap } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 import { useAdminShell } from './AdminShellContext'
 import { CabinetDecorLayer } from '@/features/decor/CabinetDecorLayer'
@@ -45,7 +46,10 @@ export function AdminChrome({ children, hideMobileHeader }: AdminChromeProps) {
           <button
             type="button"
             data-admin-nav-toggle
-            onClick={toggleMobileNav}
+            onClick={() => {
+              hapticTap()
+              toggleMobileNav()
+            }}
             aria-expanded={mobileNavExpanded}
             className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-border/60 bg-card/80 px-2.5 py-2 text-sm font-medium lg:hidden"
             aria-label={t('admin.nav.menu')}

@@ -264,7 +264,11 @@ func (h *AdminPaymentsHandler) mapRowToDetailDTO(ctx context.Context, row databa
 
 func parseAdminPaymentFilter(r *http.Request) database.AdminPurchaseFilter {
 	q := r.URL.Query()
-	filter := database.AdminPurchaseFilter{Search: strings.TrimSpace(q.Get("q"))}
+	filter := database.AdminPurchaseFilter{
+		Search:   strings.TrimSpace(q.Get("q")),
+		SortKey:  strings.TrimSpace(q.Get("sort")),
+		SortDesc: strings.EqualFold(strings.TrimSpace(q.Get("dir")), "desc"),
+	}
 	switch strings.ToLower(strings.TrimSpace(q.Get("status"))) {
 	case "new":
 		filter.Status = database.PurchaseStatusNew
@@ -289,7 +293,8 @@ type adminPaymentsListResp struct {
 	Limit int                       `json:"limit"`
 }
 
-// List — GET /cabinet/api/admin/payments?status=&q=&page=&limit=.
+// List — GET /cabinet/api/admin/payments?status=&q=&sort=&dir=&page=&limit=.
+// sort: id|user|amount|provider|status|created_at (иное — новые сверху), dir: asc|desc.
 func (h *AdminPaymentsHandler) List(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -375,6 +380,7 @@ var invoiceTypeCsvLabels = map[database.InvoiceType]string{
 	database.InvoiceTypeYookasa:          "ЮKassa",
 	database.InvoiceTypeTelegram:         "Telegram Stars",
 	database.InvoiceTypeTribute:          "Tribute",
+	database.InvoiceTypePlatega:          "Platega",
 	database.InvoiceTypePlategaSBP:       "Platega СБП",
 	database.InvoiceTypePlategaCards:     "Platega карты",
 	database.InvoiceTypePlategaAcquiring: "Platega эквайринг",

@@ -78,7 +78,7 @@ type TelegramLinkedData struct {
 }
 
 type EmailMergeCodeData struct {
-	Code    string
+	Code     string
 	TTLHuman string
 }
 

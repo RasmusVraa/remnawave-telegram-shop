@@ -57,8 +57,60 @@ func releasePhotosDir(root string) string {
 	return dir
 }
 
-// listReleasePhotos — картинки из папки по имени файла: порядок в альбоме
-// задаётся префиксом вроде 01-, 02-. Нет папки — нет альбома, это не ошибка.
+// listReleaseAlbums — альбомы скриншотов. Подпапки (1/, 2/ …) — по альбому на
+// каждую, в порядке имён: альбом N уходит ответом на N-е сообщение поста.
+// Без подпапок все картинки корня — альбомы по 10 в порядке имён. Смешивать
+// картинки в корне с подпапками нельзя: непонятно, к какому сообщению они.
+// Нет папки — нет альбомов, это не ошибка.
+func listReleaseAlbums(dir string) ([][]string, error) {
+	entries, err := os.ReadDir(dir)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", dir, err)
+	}
+	var subdirs []string
+	for _, e := range entries {
+		if e.IsDir() {
+			subdirs = append(subdirs, filepath.Join(dir, e.Name()))
+		}
+	}
+	sort.Strings(subdirs)
+	root, err := listReleasePhotos(dir)
+	if err != nil {
+		return nil, err
+	}
+	if len(subdirs) == 0 {
+		var albums [][]string
+		for len(root) > 0 {
+			n := min(len(root), telegramMaxAlbum)
+			albums = append(albums, root[:n])
+			root = root[n:]
+		}
+		return albums, nil
+	}
+	if len(root) > 0 {
+		return nil, fmt.Errorf("%s: screenshots both in the folder and in subfolders; move %s into a subfolder", dir, filepath.Base(root[0]))
+	}
+	var albums [][]string
+	for _, sub := range subdirs {
+		photos, err := listReleasePhotos(sub)
+		if err != nil {
+			return nil, err
+		}
+		if len(photos) > telegramMaxAlbum {
+			return nil, fmt.Errorf("%d screenshots in %s: Telegram album takes at most %d", len(photos), sub, telegramMaxAlbum)
+		}
+		if len(photos) > 0 {
+			albums = append(albums, photos)
+		}
+	}
+	return albums, nil
+}
+
+// listReleasePhotos — картинки одной папки по имени файла: порядок в альбоме
+// задаётся префиксом вроде 01-, 02-. Подпапки не смотрит.
 func listReleasePhotos(dir string) ([]string, error) {
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
@@ -75,9 +127,6 @@ func listReleasePhotos(dir string) ([]string, error) {
 		out = append(out, filepath.Join(dir, e.Name()))
 	}
 	sort.Strings(out)
-	if len(out) > telegramMaxAlbum {
-		return nil, fmt.Errorf("%d screenshots in %s: Telegram album takes at most %d", len(out), dir, telegramMaxAlbum)
-	}
 	for _, p := range out {
 		st, err := os.Stat(p)
 		if err != nil {
@@ -179,6 +228,16 @@ func sendTelegramPhotos(cfg telegramConfig, replyTo int, caption, parseMode stri
 	return msgs[0].MessageID, nil
 }
 
-func photosCaption(version string) string {
-	return fmt.Sprintf("Как это выглядит в %s", version)
+// photosCaption — подпись альбома; при нескольких альбомах — с номером.
+func photosCaption(version string, album, total int) string {
+	if total <= 1 {
+		return fmt.Sprintf("Как это выглядит в %s", version)
+	}
+	return fmt.Sprintf("Как это выглядит в %s (%d из %d)", version, album, total)
+}
+
+// albumPost — какому сообщению поста отвечает альбом i: своему по номеру,
+// лишние альбомы — последнему сообщению.
+func albumPost(album, posts int) int {
+	return min(album, posts-1)
 }

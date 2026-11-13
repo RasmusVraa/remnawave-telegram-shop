@@ -9,13 +9,19 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { CountryFlag } from '@/features/admin/components/CountryFlag'
 import type { StatusMapNode, StatusProbe, StatusProbeHit } from '@/features/landing/components/StatusMap'
 import { StateChip, stateTint } from './StateChip'
+import { russiaLabel, russiaTone, summarizeStatus, type RowState } from './statusState'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
+/**
+ * Цвет столбика: один столбик — один замер. Доля — это успешные проверки замера из всех
+ * (10 зондов из России и 1 из мира). Зелёный — все прошли, оранжевый — часть не прошла,
+ * но больше половины ответило, красный — ответила половина или меньше.
+ */
 function historyLevel(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return ''
-  if (value >= 0.99) return 'up'
-  if (value > 0) return 'partial'
+  if (value >= 1) return 'up'
+  if (value > 0.5) return 'partial'
   return 'down'
 }
 
@@ -77,10 +83,10 @@ export default function CabinetStatusPage() {
   const data = query.data
   const nodes = data?.nodes ?? []
   const total = data?.total ?? nodes.length
-  const down = nodes.filter((node) => node.state === 'down').length
+  const summary = summarizeStatus(nodes)
   const available = data?.available === true
   const minutesAgo = minutesSince(newestMeasuredAt(nodes) ?? data?.updated_at)
-  const tone = !available || total === 0 ? 'idle' : down === 0 ? 'up' : 'partial'
+  const tone = !available || total === 0 ? 'idle' : summary.tone
 
   return (
     <AppLayout>
@@ -94,15 +100,12 @@ export default function CabinetStatusPage() {
                 'mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold',
                 tone === 'up' && 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
                 tone === 'partial' && 'bg-amber-500/15 text-amber-800 dark:text-amber-200',
+                tone === 'down' && 'bg-rose-500/15 text-rose-700 dark:text-rose-300',
                 tone === 'idle' && 'bg-muted text-muted-foreground',
               )}
             >
               <Activity className="size-3.5" aria-hidden />
-              {tone === 'up'
-                ? t('landing.status.allUp')
-                : tone === 'partial'
-                  ? t('landing.status.partial')
-                  : t('landing.status.empty')}
+              {tone === 'idle' ? t('landing.status.empty') : t(`landing.status.${summary.level}`)}
             </span>
           </div>
           {available && (
@@ -134,6 +137,7 @@ export default function CabinetStatusPage() {
                 node={node}
                 locale={i18n.language}
                 bypassProbes={data?.bypass_probes !== false}
+                ruFailThreshold={data?.ru_fail_threshold}
                 open={open === key}
                 onToggle={() => {
                   setOpen((current) => (current === key ? null : key))
@@ -152,10 +156,12 @@ function LocationCard({
   node,
   locale,
   bypassProbes,
+  ruFailThreshold,
   open,
   onToggle,
 }: {
   bypassProbes: boolean
+  ruFailThreshold?: number
   node: StatusMapNode
   locale: string
   open: boolean
@@ -194,7 +200,12 @@ function LocationCard({
               <WorldLine node={node} />
             </Metric>
             <Metric label={whitelist ? t('landing.status.whitelistProbes') : t('landing.status.colRussia')}>
-              <RussiaLine probe={probe} whitelist={whitelist} skipped={Boolean(node.no_probe) || (whitelist && !bypassProbes)} />
+              <RussiaLine
+                probe={probe}
+                whitelist={whitelist}
+                threshold={ruFailThreshold}
+                skipped={Boolean(node.no_probe) || (whitelist && !bypassProbes)}
+              />
             </Metric>
           </span>
 
@@ -280,7 +291,23 @@ function WorldLine({ node }: { node: StatusMapNode }) {
   )
 }
 
-function RussiaLine({ probe, whitelist, skipped }: { probe?: StatusProbe; whitelist: boolean; skipped: boolean }) {
+const RUSSIA_DOT: Record<RowState, string> = {
+  up: 'bg-emerald-400',
+  partial: 'bg-amber-400',
+  down: 'bg-rose-400',
+}
+
+function RussiaLine({
+  probe,
+  whitelist,
+  threshold,
+  skipped,
+}: {
+  probe?: StatusProbe
+  whitelist: boolean
+  threshold?: number
+  skipped: boolean
+}) {
   const { t } = useTranslation()
   const operators = whitelistHits(probe)
   const total = whitelist ? operators.length : (probe?.russia_total ?? 0)
@@ -289,17 +316,12 @@ function RussiaLine({ probe, whitelist, skipped }: { probe?: StatusProbe; whitel
   const avg = pings.length ? Math.round(pings.reduce((sum, ms) => sum + ms, 0) / pings.length) : null
   if (skipped) return <span className="text-muted-foreground">—</span>
   if (!probe || total === 0) return <span className="text-muted-foreground">{t('landing.status.worldPending')}</span>
+  const tone = russiaTone(ok, total, whitelist, threshold)
   return (
     <span>
       <span className="inline-flex items-center gap-1.5">
-        <span className={cn('size-2 rounded-full', ok > 0 ? 'bg-emerald-400' : 'bg-rose-400')} />
-        {whitelist
-          ? ok > 0
-            ? t('landing.status.whitelistUp')
-            : t('landing.status.hitDown')
-          : ok > 0
-            ? t('landing.status.russiaUp')
-            : t('landing.status.russiaDown')}
+        <span className={cn('size-2 rounded-full', RUSSIA_DOT[tone])} />
+        {russiaLabel(t, tone, whitelist)}
       </span>
       <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
         {whitelist ? t('landing.status.whitelistRatio', { ok, total }) : t('landing.status.russiaRatio', { ok, total })}

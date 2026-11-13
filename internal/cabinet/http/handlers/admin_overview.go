@@ -55,6 +55,15 @@ type AdminOverviewHandler struct {
 
 	mu    sync.Mutex
 	cache map[string]panelSnapshot
+
+	// incidents — горящие пункты «Мониторинга» (нода лежит, поддержка ждёт):
+	// «Обзор» показывает их в той же полосе «Требует внимания», что и дела.
+	incidents func(ctx context.Context) []AttentionItem
+}
+
+// SetIncidents подключает общий список инцидентов «Мониторинга».
+func (h *AdminOverviewHandler) SetIncidents(fn func(ctx context.Context) []AttentionItem) {
+	h.incidents = fn
 }
 
 // NewAdminOverview — конструктор.
@@ -139,6 +148,9 @@ type adminOverviewResp struct {
 		FortuneNetLossDays int64 `json:"fortune_net_loss_days"`
 	} `json:"attention"`
 
+	// Incidents — то же, что «Требует внимания» в «Мониторинге».
+	Incidents []AttentionItem `json:"incidents"`
+
 	Panel adminOverviewPanelDTO `json:"panel"`
 }
 
@@ -209,6 +221,10 @@ func (h *AdminOverviewHandler) Overview(w http.ResponseWriter, r *http.Request) 
 	resp.Shop.SalesToday = counters.SalesToday
 	resp.Shop.PayersToday = counters.PayersToday
 	resp.Attention.OpenInvoices = counters.OpenInvoices
+	resp.Incidents = []AttentionItem{}
+	if h.incidents != nil {
+		resp.Incidents = h.incidents(r.Context())
+	}
 
 	// Колесо считаем только когда оно включено: у выключенного цифры за месяц
 	// остаются от прошлой жизни и висели бы вечным напоминанием.

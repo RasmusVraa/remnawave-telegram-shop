@@ -5,6 +5,7 @@ import { Gift, Globe, Send, type LucideIcon } from 'lucide-react'
 import { QrCode } from '@/components/QrCode'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 
 import { ReferralCopyRow } from './ReferralCopyRow'
 
@@ -92,7 +93,10 @@ export function ReferralInviteCard({
                     key={link.key}
                     type="button"
                     aria-pressed={isActive}
-                    onClick={() => setActiveKey(link.key)}
+                    onClick={() => {
+                      if (!isActive) hapticSelection()
+                      setActiveKey(link.key)
+                    }}
                     className={cn(
                       'flex h-11 flex-1 items-center justify-center gap-2 rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       isActive

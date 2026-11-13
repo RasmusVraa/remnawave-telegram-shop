@@ -2,7 +2,7 @@ module remnawave-tg-shop-bot
 
 go 1.27.0
 
-toolchain go1.27.3
+toolchain go1.27.4
 
 require (
 	github.com/Masterminds/squirrel v1.5.4

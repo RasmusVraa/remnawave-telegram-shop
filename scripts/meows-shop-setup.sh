@@ -1051,7 +1051,8 @@ setup_bot() {
   else
     ask admin_id "ADMIN_TELEGRAM_ID" "$admin_id"
   fi
-  [[ "$admin_id" =~ ^-?[0-9]+$ ]] || die "ADMIN_TELEGRAM_ID должен быть числом"
+  # Несколько админов — через запятую: веб-админка пускает всех, бот — первого.
+  [[ "$admin_id" =~ ^-?[0-9]+([[:space:]]*,[[:space:]]*-?[0-9]+)*$ ]] || die "ADMIN_TELEGRAM_ID должен быть числом или числами через запятую"
 
   local port_default sales_default
   port_default="$(get_env HEALTH_CHECK_PORT)"

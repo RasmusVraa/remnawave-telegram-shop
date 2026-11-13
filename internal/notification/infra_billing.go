@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/go-telegram/bot"
-	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/adminalert"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/remnawave"
@@ -51,6 +51,11 @@ func (s *InfraBillingNotifyService) ProcessInfraBillingReminders(ctx context.Con
 	if !st.NotifyBefore1 && !st.NotifyBefore3 && !st.NotifyBefore7 && !st.NotifyBefore14 {
 		return nil
 	}
+	// Вид «Оплата серверов» выключен в «Оповещениях админу» — не шлём и не
+	// отмечаем отправленным: после включения напоминание ещё придёт.
+	if _, ok := adminalert.Resolve(config.AdminAlertInfra); !ok {
+		return nil
+	}
 
 	nodesBody, err := s.remnawave.GetInfraBillingNodes(ctx)
 	if err != nil {
@@ -58,7 +63,6 @@ func (s *InfraBillingNotifyService) ProcessInfraBillingReminders(ctx context.Con
 	}
 
 	lang := config.DefaultLanguage()
-	adminID := config.GetAdminTelegramId()
 	now := time.Now()
 
 	thresholds := make([]int, 0, 4)
@@ -104,12 +108,7 @@ func (s *InfraBillingNotifyService) ProcessInfraBillingReminders(ctx context.Con
 				dateStr,
 			)
 
-			_, err = s.bot.SendMessage(ctx, &bot.SendMessageParams{
-				ChatID:    adminID,
-				Text:      text,
-				ParseMode: models.ParseModeHTML,
-			})
-			if err != nil {
+			if err := adminalert.Send(ctx, config.AdminAlertInfra, text, nil); err != nil {
 				slog.Error("infra billing notify send", "billing_uuid", bn.UUID, "threshold", th, "error", err)
 				continue
 			}

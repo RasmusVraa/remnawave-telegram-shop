@@ -16,7 +16,8 @@
         "repeat_cities": true,
         "node_uuid": "11111111-aaaa",
         "exit_node_uuid": "",
-        "no_external": false
+        "no_external": false,
+        "tcp_port": 0
       },
       {
         "id": "a4",
@@ -114,6 +115,22 @@
             "instant": true,
             "min_int": 5,
             "max_int": 180
+          },
+          {
+            "key": "STATUS_RU_FAIL_THRESHOLD",
+            "type": "int",
+            "value": "2",
+            "source": "default",
+            "instant": true,
+            "min_int": 1,
+            "max_int": 30
+          },
+          {
+            "key": "STATUS_ALERT_WORLD",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
           },
           {
             "key": "STATUS_SHOW_MAP",

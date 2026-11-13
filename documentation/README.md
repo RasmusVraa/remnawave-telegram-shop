@@ -11,16 +11,17 @@
 | [`../readme.md`](../readme.md) | Что это, установка за 5 минут |
 | [`cabinet/SETUP-GUIDE-RU.md`](./cabinet/SETUP-GUIDE-RU.md) | Запуск web-кабинета с нуля (домен, SSL, OAuth) |
 | [`env.md`](./env.md) | Все переменные `.env` с пояснениями |
-| [`sales-modes.md`](./sales-modes.md) | Режимы продаж `classic` и `tariffs` |
+| [`sales-modes.md`](./sales-modes.md) | Тарифы и цены |
 
 ## Разделы
 
 | Файл | Тема |
 |------|------|
 | [env.md](./env.md) | Справочник переменных окружения |
-| [sales-modes.md](./sales-modes.md) | Classic vs tariffs, цены, тексты покупки |
+| [sales-modes.md](./sales-modes.md) | Тарифы, цены, тексты покупки |
 | [payments.md](./payments.md) | Платёжные системы, вебхуки и поллинг |
 | [notifications.md](./notifications.md) | Уведомления: истечение, lifecycle, лента и push в кабинете, torrent blocker (Remnawave webhook) |
+| [traffic-split.md](./traffic-split.md) | Раздельный трафик (обычные серверы и обход) и докупка пакетов трафика |
 | [squads.md](./squads.md) | Squads Remnawave (платные и триал, применение состава тарифа к подписчикам) |
 | [partner-program.md](./partner-program.md) | Партнёрская программа: проценты, потоки, холд, выплаты |
 | [customization.md](./customization.md) | Тексты бота/кабинета, кнопки, emoji |

@@ -35,6 +35,7 @@ import { cn } from '@/lib/utils'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { useAdminOverview } from '../hooks/useAdminOverview'
+import { incidentLabel, incidentLink } from '../monitoring/IncidentsCard'
 import { StatsIconChip } from '../stats/components/StatsPanel'
 import { formatRub, statsNumberLocale } from '../stats/utils/statsFormat'
 import { STATS_ACCENT } from '../stats/utils/statsPalette'
@@ -107,7 +108,17 @@ function AdminDashboardContent() {
   // Уровень задаёт не размер числа, а цена промедления: неоплаченный сервер
   // выключится, заявка на выплату — это чужие деньги, которые уже ждут.
   // Заявка в партнёры или висящий счёт подождут до завтра.
-  const attentionItems: AttentionItem[] = [
+  // Сначала то, что горит сейчас (из «Мониторинга»: нода лежит, поддержка
+  // ждёт), потом дела на дни. Список инцидентов общий — один источник на бэке.
+  const incidentItems: AttentionItem[] = (data?.incidents ?? []).map((it, i) => ({
+    key: `incident-${it.key}-${i}`,
+    count: it.count || 1,
+    to: incidentLink(it),
+    severity: it.severity,
+    label: incidentLabel(it, t),
+  }))
+
+  const taskItems: AttentionItem[] = [
     {
       key: 'billingOverdue',
       count: a?.billing_overdue ?? 0,
@@ -155,6 +166,7 @@ function AdminDashboardContent() {
       }),
     },
   ].filter((item) => item.count > 0)
+  const attentionItems = [...incidentItems, ...taskItems]
 
   const worst: Severity | null = attentionItems.some((i) => i.severity === 'crit')
     ? 'crit'

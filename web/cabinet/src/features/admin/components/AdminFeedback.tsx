@@ -3,6 +3,7 @@ import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { hapticError, hapticSuccess } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 export interface AdminFeedbackState {
@@ -36,6 +37,12 @@ export function AdminFeedback({
   autoDismissMs = 4500,
 }: AdminFeedbackProps) {
   const { t } = useTranslation()
+
+  // Результат действия — вибрацией: на этом уведомлении держится почти вся обратная связь админки.
+  useEffect(() => {
+    if (feedback?.type === 'error') hapticError()
+    else if (feedback?.type === 'success') hapticSuccess()
+  }, [feedback])
 
   useEffect(() => {
     if (!feedback || !onDismiss || mode !== 'toast') return

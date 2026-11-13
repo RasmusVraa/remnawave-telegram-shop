@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/utils"
 	"strings"
@@ -60,6 +61,27 @@ type Customer struct {
 	// любая запись лимита в панель подставляет его вместо расчётного
 	// (см. remnawave.Client.SetHwidLimitPin); nil — обычный расчёт.
 	HwidLimitOverride *int `db:"hwid_limit_override"`
+}
+
+// extraScan дописывает к колонкам клиента свои — например, признак вставки.
+type extraScan struct {
+	sc    interface{ Scan(dest ...any) error }
+	extra []any
+}
+
+func (e extraScan) Scan(dest ...any) error {
+	return e.sc.Scan(append(dest, e.extra...)...)
+}
+
+// emitRegistered — событие «новый клиент» для «Мониторинга».
+func emitRegistered(c *Customer, source string) {
+	payload := map[string]any{}
+	if c.Language != "" {
+		payload["lang"] = c.Language
+	}
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.UserRegistered, CustomerID: c.ID, Source: source, Payload: payload,
+	})
 }
 
 func scanCustomer(sc interface{ Scan(dest ...any) error }, c *Customer) error {
@@ -237,17 +259,23 @@ func (cr *CustomerRepository) Create(ctx context.Context, customer *Customer) (*
 }
 
 func (cr *CustomerRepository) FindOrCreate(ctx context.Context, customer *Customer) (*Customer, error) {
+	// (xmax = 0) — строка только что вставлена, а не найдена: так без второго
+	// запроса понятно, что это регистрация.
 	query := `
 	INSERT INTO customer (telegram_id, expire_at, language)
 	VALUES ($1, $2, $3)
 	ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = customer.telegram_id
-	RETURNING ` + customerSelectColumns + `
+	RETURNING ` + customerSelectColumns + `, (xmax = 0)
 	`
 
 	row := cr.pool.QueryRow(ctx, query, customer.TelegramID, customer.ExpireAt, customer.Language)
 	var result Customer
-	if err := scanCustomer(row, &result); err != nil {
+	var inserted bool
+	if err := scanCustomer(extraScan{row, []any{&inserted}}, &result); err != nil {
 		return nil, fmt.Errorf("failed to find or create customer: %w", err)
+	}
+	if inserted {
+		emitRegistered(&result, adminevents.SourceFrom(ctx, adminevents.SourceBot))
 	}
 
 	slog.Info("user found or created in bot database", "telegramId", utils.MaskHalfInt64(result.TelegramID))
@@ -277,16 +305,20 @@ func (cr *CustomerRepository) CreateWebOnly(ctx context.Context, telegramID int6
 	INSERT INTO customer (telegram_id, language, is_web_only)
 	VALUES ($1, $2, TRUE)
 	ON CONFLICT (telegram_id) DO UPDATE SET telegram_id = customer.telegram_id
-	RETURNING ` + customerSelectColumns
+	RETURNING ` + customerSelectColumns + `, (xmax = 0)`
 
 	row := cr.pool.QueryRow(ctx, query, telegramID, language)
 	var result Customer
-	if err := scanCustomer(row, &result); err != nil {
+	var inserted bool
+	if err := scanCustomer(extraScan{row, []any{&inserted}}, &result); err != nil {
 		return nil, fmt.Errorf("failed to create web-only customer: %w", err)
 	}
 
 	if !result.IsWebOnly {
 		return nil, fmt.Errorf("%w: telegram_id=%d", ErrWebOnlyCollision, telegramID)
+	}
+	if inserted {
+		emitRegistered(&result, adminevents.SourceCabinet)
 	}
 	return &result, nil
 }
@@ -1152,12 +1184,47 @@ func (cr *CustomerRepository) CountByListScope(ctx context.Context, scope Custom
 	return n, err
 }
 
+// customerSortExprs — допустимые колонки сортировки админского списка (ключ приходит из запроса).
+// Значения подставляются в SQL как есть, поэтому только из этой карты. NULLS LAST ставится
+// на уровне ORDER BY: пустой @username / срок / тариф всегда внизу, в любом направлении.
+var customerSortExprs = map[string]string{
+	"id":          "customer.id",
+	"telegram_id": "customer.telegram_id",
+	"username":    "LOWER(customer.telegram_username)",
+	"expire_at":   "customer.expire_at",
+	"status":      "(CASE WHEN customer.expire_at IS NOT NULL AND customer.expire_at > NOW() THEN 0 ELSE 1 END)",
+	"tariff":      "LOWER((SELECT COALESCE(NULLIF(TRIM(t.name), ''), t.slug) FROM tariff t WHERE t.id = customer.current_tariff_id))",
+}
+
+// customerOrderBy строит ORDER BY для списка: выбранная колонка плюс id как стабильный tie-break,
+// чтобы строки с равным значением не прыгали между страницами. Неизвестный ключ — порядок вкладки.
+func customerOrderBy(scope CustomerListScope, sortKey string, desc bool) string {
+	expr, ok := customerSortExprs[sortKey]
+	if !ok {
+		return customerListOrder(scope)
+	}
+	dir := "ASC"
+	if desc {
+		dir = "DESC"
+	}
+	order := expr + " " + dir + " NULLS LAST"
+	if sortKey != "id" {
+		order += ", customer.id DESC"
+	}
+	return order
+}
+
 // ListPaged возвращает страницу клиентов для админских списков (Пользователи / неактивные / истекающие).
 func (cr *CustomerRepository) ListPaged(ctx context.Context, scope CustomerListScope, offset, limit int) ([]Customer, error) {
+	return cr.ListPagedSorted(ctx, scope, offset, limit, "", false)
+}
+
+// ListPagedSorted — ListPaged с сортировкой по колонке таблицы (sortKey из customerSortExprs).
+func (cr *CustomerRepository) ListPagedSorted(ctx context.Context, scope CustomerListScope, offset, limit int, sortKey string, desc bool) ([]Customer, error) {
 	buildSelect := sq.Select(customerSelectColumns).
 		From("customer").
 		PlaceholderFormat(sq.Dollar).
-		OrderBy(customerListOrder(scope)).
+		OrderBy(customerOrderBy(scope, sortKey, desc)).
 		Limit(uint64(limit)).
 		Offset(uint64(offset))
 	if w := customerListWhere(scope); w != nil {

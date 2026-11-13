@@ -36,10 +36,10 @@ const stateTTL = 10 * time.Minute
 
 // stateRecord — запись о незавершённом OAuth flow.
 type stateRecord struct {
-	verifier        string    // PKCE code_verifier
-	referralRaw     string    // опционально: ref из /google/start?ref= (для новой регистрации)
-	linkAccountID   int64     // 0 — обычный login/register; >0 — привязка Google к этому cabinet_account
-	expiresAt       time.Time // когда выбрасывать запись
+	verifier      string    // PKCE code_verifier
+	referralRaw   string    // опционально: ref из /google/start?ref= (для новой регистрации)
+	linkAccountID int64     // 0 — обычный login/register; >0 — привязка Google к этому cabinet_account
+	expiresAt     time.Time // когда выбрасывать запись
 }
 
 // StateStore — thread-safe хранилище state → {verifier, expiry}.
@@ -230,4 +230,3 @@ func randomHex(n int) (string, error) {
 	}
 	return fmt.Sprintf("%x", b), nil
 }
-

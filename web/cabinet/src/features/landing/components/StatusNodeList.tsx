@@ -5,12 +5,18 @@ import { ChevronDown } from 'lucide-react'
 import { CountryFlag } from '@/features/admin/components/CountryFlag'
 import { cn } from '@/lib/utils'
 import { StateChip, stateRowTint } from '@/features/status/StateChip'
+import { russiaLabel, russiaTone, type RowState } from '@/features/status/statusState'
 import type { StatusMapNode, StatusProbe, StatusProbeHit } from './StatusMap'
 
+/**
+ * Цвет столбика: один столбик — один замер. Доля — это успешные проверки замера из всех
+ * (10 зондов из России и 1 из мира). Зелёный — все прошли, оранжевый — часть не прошла,
+ * но больше половины ответило, красный — ответила половина или меньше.
+ */
 function historyLevel(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return ''
-  if (value >= 0.99) return 'up'
-  if (value > 0) return 'partial'
+  if (value >= 1) return 'up'
+  if (value > 0.5) return 'partial'
   return 'down'
 }
 
@@ -32,7 +38,15 @@ function protocolText(ok: boolean | undefined, ms: number | undefined, up: strin
 }
 
 /** Строки локаций: раскрытие и таблица зондов, с которых шёл пинг. */
-export function StatusNodeList({ nodes, bypassProbes = true }: { nodes: StatusMapNode[]; bypassProbes?: boolean }) {
+export function StatusNodeList({
+  nodes,
+  bypassProbes = true,
+  ruFailThreshold,
+}: {
+  nodes: StatusMapNode[]
+  bypassProbes?: boolean
+  ruFailThreshold?: number
+}) {
   const { t, i18n } = useTranslation()
   const [open, setOpen] = useState<string | null>(null)
   const [providers, setProviders] = useState<string | null>(null)
@@ -86,7 +100,12 @@ export function StatusNodeList({ nodes, bypassProbes = true }: { nodes: StatusMa
                     </span>
                   </span>
                   <ProbeWorld node={node} />
-                  <ProbeRussia probe={probe} whitelist={isWhitelist} skipped={Boolean(node.no_probe) || (isWhitelist && !bypassProbes)} />
+                  <ProbeRussia
+                    probe={probe}
+                    whitelist={isWhitelist}
+                    threshold={ruFailThreshold}
+                    skipped={Boolean(node.no_probe) || (isWhitelist && !bypassProbes)}
+                  />
                   <History history={history} measured={measured} pct={pct} />
                   <ChevronDown className={cn('hidden size-4 text-muted-foreground transition-transform md:block', expanded && 'rotate-180')} />
                 </button>
@@ -208,7 +227,23 @@ function ProbeWorld({ node }: { node: StatusMapNode }) {
   )
 }
 
-function ProbeRussia({ probe, whitelist, skipped }: { probe?: StatusProbe; whitelist?: boolean; skipped?: boolean }) {
+const RUSSIA_DOT: Record<RowState, string> = {
+  up: 'landing-status-dot--up',
+  partial: 'landing-status-dot--partial',
+  down: 'landing-status-dot--down',
+}
+
+function ProbeRussia({
+  probe,
+  whitelist,
+  skipped,
+  threshold,
+}: {
+  probe?: StatusProbe
+  whitelist?: boolean
+  skipped?: boolean
+  threshold?: number
+}) {
   const { t } = useTranslation()
   const operators = whitelistHits(probe)
   const total = whitelist ? operators.length : (probe?.russia_total ?? 0)
@@ -227,14 +262,8 @@ function ProbeRussia({ probe, whitelist, skipped }: { probe?: StatusProbe; white
       ) : (
         <span className="block">
           <span className="inline-flex items-center gap-2 text-sm font-medium">
-            <span className={cn('landing-status-dot', ok > 0 ? 'landing-status-dot--up' : 'landing-status-dot--down')} />
-            {whitelist
-              ? ok > 0
-                ? t('landing.status.whitelistUp')
-                : t('landing.status.hitDown')
-              : ok > 0
-                ? t('landing.status.russiaUp')
-                : t('landing.status.russiaDown')}
+            <span className={cn('landing-status-dot', RUSSIA_DOT[russiaTone(ok, total, Boolean(whitelist), threshold)])} />
+            {russiaLabel(t, russiaTone(ok, total, Boolean(whitelist), threshold), Boolean(whitelist))}
           </span>
           <span className="mt-0.5 block text-sm text-muted-foreground">
             {whitelist ? t('landing.status.whitelistRatio', { ok, total }) : t('landing.status.russiaRatio', { ok, total })}

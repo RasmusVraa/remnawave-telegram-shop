@@ -19,6 +19,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	googleoauth "remnawave-tg-shop-bot/internal/cabinet/auth/oauth"
 	tgverify "remnawave-tg-shop-bot/internal/cabinet/auth/telegram"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/tokens"
@@ -356,6 +357,7 @@ func (s *Service) GoogleCallback(
 	ctx context.Context,
 	state, code, userAgent, ip, refreshFromCookie string,
 ) (GoogleCallbackResult, error) {
+	ctx = withLoginMethod(ctx, repository.ProviderGoogle)
 	var empty GoogleCallbackResult
 	if s.googleProvider == nil {
 		return empty, ErrGoogleDisabled
@@ -452,6 +454,7 @@ func (s *Service) googleOAuthLinkFlow(
 	linkAccountID int64,
 	refreshFromCookie, userAgent, ip string,
 ) (GoogleCallbackResult, error) {
+	ctx = withLoginMethod(ctx, "")
 	_ = referralRaw
 	linkMeta := GoogleCallbackResult{WasLinkAttempt: true}
 
@@ -541,6 +544,7 @@ func (s *Service) googleOAuthLinkFlow(
 		}
 		return linkMeta, fmt.Errorf("google link: create identity: %w", err)
 	}
+	emitAccountEvent(adminevents.AccountLinked, acc.ID, map[string]any{"provider": repository.ProviderGoogle})
 
 	if info.EmailVerified && normEmail != "" && acc.Email != nil && normalizeEmail(*acc.Email) == normEmail && !acc.EmailVerified() {
 		if err := s.accounts.MarkEmailVerified(ctx, acc.ID); err != nil {
@@ -584,6 +588,8 @@ func (s *Service) GoogleLinkConfirm(ctx context.Context, token, userAgent, ip st
 	// Создаём identity. Ошибка UNIQUE-нарушения — допустима (повторный confirm).
 	if _, err := s.ids.Create(ctx, acc.ID, link.provider, link.providerUserID, link.providerEmail, link.rawProfile); err != nil {
 		slog.Debug("oauth link confirm: create identity (may be duplicate)", "provider", link.provider, "error", err)
+	} else {
+		emitAccountEvent(adminevents.AccountLinked, acc.ID, map[string]any{"provider": link.provider})
 	}
 	_ = s.accounts.UpdateLastLogin(ctx, acc.ID)
 	s.ensureCustomer(ctx, acc.ID, acc.Language)
@@ -700,6 +706,7 @@ func (s *Service) oauthLoginFlowGeneric(
 	rawProfile []byte,
 	referralRaw, userAgent, ip, providerLog string,
 ) (GoogleCallbackResult, error) {
+	ctx = withLoginMethod(ctx, provider)
 	var empty GoogleCallbackResult
 	resolved, err := s.ResolveIdentity(ctx, 0, provider, providerUserID)
 	if err != nil {
@@ -765,6 +772,7 @@ func (s *Service) oauthLinkFlowGeneric(
 	rawProfile []byte,
 	userAgent, ip, providerLog string,
 ) (GoogleCallbackResult, error) {
+	ctx = withLoginMethod(ctx, "")
 	linkMeta := GoogleCallbackResult{WasLinkAttempt: true}
 	sessAccID, err := s.accountIDFromValidRefresh(ctx, refreshFromCookie)
 	if err != nil {
@@ -824,6 +832,7 @@ func (s *Service) oauthLinkFlowGeneric(
 	if _, err := s.ids.Create(ctx, acc.ID, provider, providerUserID, providerEmail, rawProfile); err != nil {
 		return linkMeta, fmt.Errorf("%s link: create identity: %w", providerLog, err)
 	}
+	emitAccountEvent(adminevents.AccountLinked, acc.ID, map[string]any{"provider": provider})
 	pair, err := s.issueSession(ctx, acc, uuid.New(), userAgent, ip)
 	if err != nil {
 		return linkMeta, err
@@ -1096,6 +1105,7 @@ func (s *Service) linkTelegramIdentity(ctx context.Context, accountID, tgID int6
 	if _, err := s.ids.Create(ctx, accountID, repository.ProviderTelegram, pid, "", rawProfile); err != nil {
 		return false, err
 	}
+	emitAccountEvent(adminevents.AccountLinked, accountID, map[string]any{"provider": repository.ProviderTelegram})
 	acc, aerr := s.accounts.FindByID(ctx, accountID)
 	if aerr == nil && acc != nil {
 		if err := s.ensureCustomerTelegram(ctx, accountID, acc.Language, tgID, username); err != nil {
@@ -1142,6 +1152,7 @@ func preferReassignTelegramIdentity(linked, orphan *repository.Account) bool {
 // telegramFindOrCreate — ищет cabinet_identity(telegram) → login; иначе
 // аккаунт по customer.telegram_id + link (после merge); иначе создаёт новый.
 func (s *Service) telegramFindOrCreate(ctx context.Context, tgID int64, username, referralCode, userAgent, ip string) (*TokenPair, error) {
+	ctx = withLoginMethod(ctx, repository.ProviderTelegram)
 	pid := strconv.FormatInt(tgID, 10)
 	linkedAcc := s.findAccountLinkedToTelegramCustomer(ctx, tgID)
 	resolved, err := s.ResolveIdentity(ctx, 0, repository.ProviderTelegram, pid)

@@ -1,5 +1,6 @@
 import { Link, useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
@@ -14,6 +15,9 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { api, type PaymentStatusResponse } from '@/lib/api'
+import { hapticError, hapticSuccess } from '@/lib/haptic'
+import { BypassCard, packSizeLabel } from '@/features/home/trafficSplit'
+import { bypassLabel } from '@/lib/bypassLabel'
 import { splitDateTimeShort } from '@/lib/utils'
 
 export default function PaymentStatusPage() {
@@ -40,6 +44,12 @@ export default function PaymentStatusPage() {
   })
 
   const status = data?.status
+
+  // Итог оплаты — вибрацией: успех мягким двойным толчком, отказ — сильным.
+  useEffect(() => {
+    if (status === 'paid') hapticSuccess()
+    else if (status === 'failed' || status === 'expired') hapticError()
+  }, [status])
 
   return (
     <AppLayout>
@@ -121,20 +131,44 @@ function ReceiptRow({ label, children }: { label: string; children: React.ReactN
  * дата рядом с такой покупкой вводит в заблуждение.
  */
 function SuccessState({ data }: { data: PaymentStatusResponse }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language
 
   const kind = data.purchase_kind ?? 'subscription'
   const isExtraHwid = kind === 'extra_hwid'
-  const successHintKey = isExtraHwid
-    ? 'paymentStatus.successHintExtraHwid'
-    : 'paymentStatus.successHint'
+  const isTrafficPack = kind === 'extra_traffic'
+  const successHintKey = isTrafficPack
+    ? 'trafficSplit.successHint'
+    : isExtraHwid
+      ? 'paymentStatus.successHintExtraHwid'
+      : 'paymentStatus.successHint'
+  // Главная кэширует лимиты и подписку: без сброса после оплаты пакета она до минуты показывала бы
+  // «Обход исчерпан» и красную плашку.
+  const qc = useQueryClient()
+  useEffect(() => {
+    if (!isTrafficPack) return
+    void qc.invalidateQueries({ queryKey: ['my-traffic'] })
+    void qc.invalidateQueries({ queryKey: ['subscription'] })
+    void qc.invalidateQueries({ queryKey: ['traffic-usage'] })
+  }, [isTrafficPack, qc])
+  // Свежие лимиты для карточки на экране успеха (пакет уже в панели или будет через минуту).
+  const { data: split } = useQuery({
+    queryKey: ['my-traffic', 'after-pack', data.payment_id],
+    queryFn: () => api.myTraffic(),
+    enabled: isTrafficPack,
+    refetchOnMount: 'always',
+    staleTime: 0,
+  })
+  const packLabel = data.traffic_pack_kind === 'bypass' ? bypassLabel(split?.label) : t('trafficSplit.tabMain')
 
   const months = data.month ?? 0
-  const what = purchaseKindLabel(t, {
-    purchase_kind: kind,
-    month: months,
-    extra_hwid: data.extra_hwid ?? 0,
-  })
+  const what = isTrafficPack
+    ? t('trafficSplit.scenario')
+    : purchaseKindLabel(t, {
+        purchase_kind: kind,
+        month: months,
+        extra_hwid: data.extra_hwid ?? 0,
+      })
   // «Подписка» + «3 месяца»: сам purchaseKindLabel срок не называет, а на чеке
   // он — половина ответа на вопрос «за что списали».
   const whatFull =
@@ -143,7 +177,8 @@ function SuccessState({ data }: { data: PaymentStatusResponse }) {
       : what
 
   const paidAt = splitDateTimeShort(data.paid_at)
-  const expireAt = isExtraHwid ? null : splitDateTimeShort(data.expire_at)
+  // Пакет трафика подписку не продлевает: «Действует до» со сроком подписки рядом с ним вводит в заблуждение.
+  const expireAt = isExtraHwid || isTrafficPack ? null : splitDateTimeShort(data.expire_at)
   const hasAmount = typeof data.amount === 'number' && data.amount > 0
 
   return (
@@ -152,9 +187,19 @@ function SuccessState({ data }: { data: PaymentStatusResponse }) {
         <CheckCircle2 size={36} className="text-emerald-500" strokeWidth={1.5} />
       </div>
       <div>
-        <p className="font-semibold text-lg">{t('paymentStatus.success')}</p>
+        <p className="font-semibold text-lg">
+          {isTrafficPack && data.traffic_pack_bytes
+            ? t('trafficSplit.successTitle', { size: packSizeLabel(data.traffic_pack_bytes, t('dashboard.gigabytes')), label: packLabel })
+            : t('paymentStatus.success')}
+        </p>
         <p className="text-sm text-muted-foreground mt-1">{t(successHintKey)}</p>
       </div>
+
+      {isTrafficPack && data.traffic_pack_kind === 'bypass' && split && (
+        <div className="w-full text-left">
+          <BypassCard split={split} lang={lang} />
+        </div>
+      )}
 
       {hasAmount && (
         <section
@@ -191,7 +236,7 @@ function SuccessState({ data }: { data: PaymentStatusResponse }) {
       )}
 
       <Button asChild className="w-full">
-        <Link to="/dashboard">{t('paymentStatus.toSubscription')}</Link>
+        <Link to="/dashboard">{isTrafficPack ? t('trafficSplit.done') : t('paymentStatus.toSubscription')}</Link>
       </Button>
     </>
   )

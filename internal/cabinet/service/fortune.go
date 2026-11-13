@@ -19,6 +19,7 @@ import (
 	"remnawave-tg-shop-bot/utils"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"remnawave-tg-shop-bot/internal/adminevents"
 )
 
 // FortuneRewardTypesOrder — стабильный порядок секторов на UI (индекс = sector_index в API).
@@ -45,42 +46,42 @@ func (e *fortuneErr) Error() string { return e.Msg }
 
 // FortuneStatusResponse — GET /cabinet/api/fortune/status.
 type FortuneStatusResponse struct {
-	Enabled                  bool               `json:"enabled"`
-	PanelReady               bool               `json:"panel_ready"`
-	CanSpin                  bool               `json:"can_spin"`
-	ReasonCode               string             `json:"reason_code,omitempty"`
-	SpinsUsedToday           int                `json:"spins_used_today"`
-	MaxSpinsPerDay           int                `json:"max_spins_per_day"` // лимит платных спинов за UTC-сутки (для UI)
-	DailyFreeEnabled         bool               `json:"daily_free_enabled"`
-	DailyFreeAvailable       bool               `json:"daily_free_available"` // FORTUNE_DAILY_FREE_SPIN, сегодня ещё не крутили бесплатно
-	MinSubscriptionDays      int                `json:"min_subscription_days"`
-	SpinCostDays             int                `json:"spin_cost_days"`
-	SubscriptionRemainHrs    float64            `json:"subscription_remain_hours,omitempty"`
-	SubscriptionRemainDays   int                `json:"subscription_remain_days"`
-	ExpireAt                 *time.Time         `json:"expire_at,omitempty"`
-	Sectors                  []FortuneSectorDTO `json:"sectors"`
-	WinnerFeed               *FortuneWinnerFeedMeta `json:"winner_feed,omitempty"`
+	Enabled                bool                   `json:"enabled"`
+	PanelReady             bool                   `json:"panel_ready"`
+	CanSpin                bool                   `json:"can_spin"`
+	ReasonCode             string                 `json:"reason_code,omitempty"`
+	SpinsUsedToday         int                    `json:"spins_used_today"`
+	MaxSpinsPerDay         int                    `json:"max_spins_per_day"` // лимит платных спинов за UTC-сутки (для UI)
+	DailyFreeEnabled       bool                   `json:"daily_free_enabled"`
+	DailyFreeAvailable     bool                   `json:"daily_free_available"` // FORTUNE_DAILY_FREE_SPIN, сегодня ещё не крутили бесплатно
+	MinSubscriptionDays    int                    `json:"min_subscription_days"`
+	SpinCostDays           int                    `json:"spin_cost_days"`
+	SubscriptionRemainHrs  float64                `json:"subscription_remain_hours,omitempty"`
+	SubscriptionRemainDays int                    `json:"subscription_remain_days"`
+	ExpireAt               *time.Time             `json:"expire_at,omitempty"`
+	Sectors                []FortuneSectorDTO     `json:"sectors"`
+	WinnerFeed             *FortuneWinnerFeedMeta `json:"winner_feed,omitempty"`
 }
 
 // FortuneSectorDTO — описание сектора для отрисовки колеса (веса RNG не сериализуем).
 type FortuneSectorDTO struct {
-	Index        int    `json:"index"`
-	RewardType   string `json:"reward_type"`
-	Weight       int    `json:"-"`
-	DisplayDays  int    `json:"display_days,omitempty"`
-	DisplayPct   int    `json:"display_percent,omitempty"`
+	Index       int    `json:"index"`
+	RewardType  string `json:"reward_type"`
+	Weight      int    `json:"-"`
+	DisplayDays int    `json:"display_days,omitempty"`
+	DisplayPct  int    `json:"display_percent,omitempty"`
 }
 
 // FortuneSpinResponse — POST /cabinet/api/fortune/spin.
 type FortuneSpinResponse struct {
-	SectorIndex   int        `json:"sector_index"`
-	RewardType    string     `json:"reward_type"`
-	RewardValue   int        `json:"reward_value"`
-	CostDays      int        `json:"cost_days"`
-	IsFreeSpin    bool       `json:"is_free_spin"`
-	IsDailyFree   bool       `json:"is_daily_free,omitempty"`
-	NewExpireAt   *time.Time `json:"new_expire_at,omitempty"`
-	LoyaltyXPNew  *int64     `json:"loyalty_xp_new,omitempty"`
+	SectorIndex  int        `json:"sector_index"`
+	RewardType   string     `json:"reward_type"`
+	RewardValue  int        `json:"reward_value"`
+	CostDays     int        `json:"cost_days"`
+	IsFreeSpin   bool       `json:"is_free_spin"`
+	IsDailyFree  bool       `json:"is_daily_free,omitempty"`
+	NewExpireAt  *time.Time `json:"new_expire_at,omitempty"`
+	LoyaltyXPNew *int64     `json:"loyalty_xp_new,omitempty"`
 }
 
 // FortuneService — бизнес-логика колеса фортуны.
@@ -239,13 +240,13 @@ func (s *FortuneService) loadCustomer(ctx context.Context, accountID int64) (*da
 func (s *FortuneService) Status(ctx context.Context, accountID int64) (*FortuneStatusResponse, error) {
 	cfg := s.cfg()
 	out := &FortuneStatusResponse{
-		Enabled:              cfg.Enabled,
-		PanelReady:           s.rw != nil,
-		MaxSpinsPerDay:       cfg.MaxSpinsPerDay,
-		DailyFreeEnabled:     cfg.DailyFreeSpin,
-		MinSubscriptionDays:  cfg.MinSubscriptionDays,
-		SpinCostDays:         cfg.SpinCostDays,
-		Sectors:              s.buildSectors(cfg),
+		Enabled:             cfg.Enabled,
+		PanelReady:          s.rw != nil,
+		MaxSpinsPerDay:      cfg.MaxSpinsPerDay,
+		DailyFreeEnabled:    cfg.DailyFreeSpin,
+		MinSubscriptionDays: cfg.MinSubscriptionDays,
+		SpinCostDays:        cfg.SpinCostDays,
+		Sectors:             s.buildSectors(cfg),
 	}
 	if !cfg.Enabled {
 		out.ReasonCode = "module_disabled"
@@ -553,7 +554,7 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 				t := u.ExpireAt.UTC()
 				newExp = &t
 				_ = s.customer.UpdateFields(ctx, cust.ID, map[string]interface{}{
-					"expire_at":          newExp,
+					"expire_at":         newExp,
 					"subscription_link": u.SubscriptionUrl,
 				})
 			}
@@ -566,13 +567,13 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 	}
 
 	resp := &FortuneSpinResponse{
-		SectorIndex:  fortuneSectorIndex(rewardType),
-		RewardType:   rewardType,
-		RewardValue:  rewardVal,
-		CostDays:     costDays,
-		IsFreeSpin:   isFree,
-		IsDailyFree:  isDailyFree,
-		NewExpireAt:  newExp,
+		SectorIndex: fortuneSectorIndex(rewardType),
+		RewardType:  rewardType,
+		RewardValue: rewardVal,
+		CostDays:    costDays,
+		IsFreeSpin:  isFree,
+		IsDailyFree: isDailyFree,
+		NewExpireAt: newExp,
 	}
 	if rewardType == "xp" || rewardType == "micro" {
 		if fresh, err := s.customer.FindById(ctx, cust.ID); err == nil && fresh != nil {
@@ -589,6 +590,13 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		"free", isFree,
 		"daily_free", isDailyFree,
 	)
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.FortuneSpin, CustomerID: cust.ID, Source: adminevents.SourceCabinet,
+		Payload: map[string]any{
+			"reward_type": resp.RewardType, "reward_value": resp.RewardValue,
+			"cost_days": resp.CostDays, "free": resp.IsFreeSpin,
+		},
+	})
 
 	return resp, nil
 }

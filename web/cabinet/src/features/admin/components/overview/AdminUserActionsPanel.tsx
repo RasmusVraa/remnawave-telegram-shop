@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { CalendarPlus, Check, Copy, Loader2, Power, PowerOff, Trash2 } from 'lucide-react'
+import { CalendarPlus, Check, Copy, History, Loader2, Power, PowerOff, Trash2 } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -17,6 +17,9 @@ interface Props {
   disablePending?: boolean
   enablePending?: boolean
   copy: { available: boolean; copied: boolean; failed: boolean; copy: () => void }
+  /** Кнопка «История» — шторка с событиями клиента из «Мониторинга». */
+  onHistory?: () => void
+  historyLabel?: string
 }
 
 /**
@@ -37,6 +40,8 @@ export function AdminUserActionsPanel({
   disablePending,
   enablePending,
   copy,
+  onHistory,
+  historyLabel,
 }: Props) {
   const { t } = useTranslation()
   const isActive = rwStatus?.toUpperCase() === 'ACTIVE'
@@ -105,6 +110,16 @@ export function AdminUserActionsPanel({
               {t('admin.users.enable')}
             </button>
           ))}
+        {onHistory && (
+          <button
+            type="button"
+            onClick={onHistory}
+            className={cn(actionClass, 'border-primary/40 bg-primary/10 text-primary hover:bg-primary/15')}
+          >
+            <History className="size-4 shrink-0" />
+            {historyLabel}
+          </button>
+        )}
       </div>
 
       {copy.failed && <p className="mt-2 text-xs text-destructive">{t('admin.users.copyLinkError')}</p>}

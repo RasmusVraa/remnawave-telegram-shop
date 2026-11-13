@@ -12,8 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError, type TariffItem } from '@/lib/api'
 import { TariffLocationPicker } from '@/features/checkout/TariffLocationPicker'
+import { hapticSelection, useErrorHaptic } from '@/lib/haptic'
 import { newIdempotencyKey } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
+import { bypassLabel } from '@/lib/bypassLabel'
 import { formatNumber } from '@/lib/format'
 import { AdminToggleSwitch } from '@/features/admin/components/AdminToggleSwitch'
 import { CheckoutPayButton, PROVIDER_ORDER, SummaryRow, type Provider } from '@/features/checkout/checkoutShared'
@@ -32,6 +34,7 @@ export default function CheckoutPage() {
   const [locationId, setLocationId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   // Fetch tariffs to get the selected tariff details.
   const { data: tariffsData, isLoading: tariffsLoading } = useQuery({
@@ -230,6 +233,18 @@ export default function CheckoutPage() {
                     }
                   />
                 )}
+                {/* Трафик: безлимит или лимит; при отдельном лимите обхода — второй показатель. */}
+                <SummaryRow
+                  label={t('checkout.traffic')}
+                  value={[
+                    tariff.traffic_gb != null && tariff.traffic_gb > 0
+                      ? `${formatNumber(tariff.traffic_gb)} ${t('dashboard.gigabytes')}`
+                      : t('checkout.trafficUnlimited'),
+                    tariff.bypass_gb != null ? `${bypassLabel(tariff.bypass_label)} ${formatNumber(tariff.bypass_gb)} ${t('dashboard.gigabytes')}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                />
                 {shouldAskExtraRenew && (
                   <div className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2.5">
                     <div className="min-w-0 flex-1">
@@ -246,7 +261,10 @@ export default function CheckoutPage() {
                     </div>
                     <AdminToggleSwitch
                       checked={Boolean(renewExtraHwid)}
-                      onChange={setRenewExtraHwid}
+                      onChange={(v) => {
+                        hapticSelection()
+                        setRenewExtraHwid(v)
+                      }}
                       aria-label={t('checkout.extraHwidRenewToggle')}
                     />
                   </div>
@@ -328,7 +346,6 @@ export default function CheckoutPage() {
             initialId={checkoutMethod.initial.id}
             initialSource={checkoutMethod.initial.source}
             loading={checkoutMethod.loading}
-            providerEnabled={providerEnabled}
             onSelect={checkoutMethod.setMethod}
           />
         </RevealItem>

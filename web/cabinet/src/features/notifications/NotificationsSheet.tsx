@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode }
 import { Link } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { BellOff, BellRing, CheckCheck, X } from 'lucide-react'
+import { AlertTriangle, BellOff, BellRing, CheckCheck, X } from 'lucide-react'
 
 import { ResponsiveSheet } from '@/components/ResponsiveSheet'
 import { Button } from '@/components/ui/button'
@@ -315,7 +315,17 @@ function NotificationItem({
   const hoverTimer = useRef<number | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [clamped, setClamped] = useState(false)
-  const cat = notificationCategory(item)
+  const baseCat = notificationCategory(item)
+  // Предупреждения о трафике красятся по тону кнопки: красное — исчерпано, жёлтое — приближается.
+  const toneKey = item.buttons.map((b) => NOTIFICATION_BUTTONS[b.key]?.tone).find(Boolean)
+  const cat = toneKey
+    ? {
+        ...baseCat,
+        icon: AlertTriangle,
+        tone: toneKey === 'red' ? 'text-red-500 dark:text-red-400' : 'text-amber-600 dark:text-amber-400',
+        tint: toneKey === 'red' ? 'bg-red-500/15' : 'bg-amber-500/15',
+      }
+    : baseCat
   const Icon = cat.icon
   const { title, body } = useMemo(() => splitTitle(item), [item])
 
@@ -451,9 +461,15 @@ function NotificationItem({
                   }}
                   className={cn(
                     'inline-flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[13px] font-semibold transition-colors',
-                    item.important && unread && i === 0
+                    meta.tone === 'red'
                       ? 'bg-red-500 text-white hover:bg-red-500/90'
-                      : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+                      : meta.tone === 'amber'
+                        ? 'bg-amber-500 text-amber-950 hover:bg-amber-500/90'
+                        : item.kind === 'traffic'
+                          ? cat.btn
+                          : item.important && unread && i === 0
+                            ? 'bg-red-500 text-white hover:bg-red-500/90'
+                            : 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
                   )}
                 >
                   <BtnIcon size={15} className="shrink-0" />

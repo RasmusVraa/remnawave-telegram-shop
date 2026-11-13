@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 
+import { hapticTap } from '@/lib/haptic'
 import { useAdminShell } from '../layout/AdminShellContext'
+import { getAdminMobileNavWidthPx } from '../layout/adminMobileNav'
 
 const MOBILE_MQ = '(max-width: 1023px)'
 /** Не с самого края — иначе срабатывает системный жест «назад». */
@@ -18,6 +20,12 @@ const CANCEL_VERTICAL_PX = 14
 const DRAG_START_MIN_PX = 10
 /** Собственные тач-цели шторки: бургер и сама панель. Свайп их не перехватывает. */
 const NAV_OWN_TARGETS = '[data-admin-nav-panel],[data-admin-nav-toggle]'
+/**
+ * Элементы со своим горизонтальным жестом (например, ручка перетаскивания
+ * тарифа): касание, начатое на них, не считается стартом свайпа за меню.
+ * Проверяется в touchstart, поэтому не зависит от React-состояния «тянем».
+ */
+const NO_EDGE_SWIPE_TARGETS = '[data-admin-no-edge-swipe]'
 
 /**
  * Свайп вправо из левой зоны — плавно выдвигает мобильное админ-меню.
@@ -34,6 +42,7 @@ export function useAdminLeftEdgeSwipe(enabled: boolean) {
     startY: 0,
     preventBack: false,
     lastOffset: 0,
+    armed: false,
   })
 
   useEffect(() => {
@@ -49,6 +58,7 @@ export function useAdminLeftEdgeSwipe(enabled: boolean) {
         startY: 0,
         preventBack: false,
         lastOffset: 0,
+        armed: false,
       }
     }
 
@@ -69,6 +79,7 @@ export function useAdminLeftEdgeSwipe(enabled: boolean) {
       // по ним обязано остаться обычным тапом.
       const target = e.target
       if (target instanceof Element && target.closest(NAV_OWN_TARGETS)) return
+      if (target instanceof Element && target.closest(NO_EDGE_SWIPE_TARGETS)) return
       const x = touch.clientX
       if (x < EDGE_START_MIN_PX || x > EDGE_START_MAX_PX) return
       trackingRef.current = {
@@ -78,6 +89,7 @@ export function useAdminLeftEdgeSwipe(enabled: boolean) {
         startY: touch.clientY,
         preventBack: false,
         lastOffset: 0,
+        armed: false,
       }
     }
 
@@ -108,6 +120,10 @@ export function useAdminLeftEdgeSwipe(enabled: boolean) {
       }
 
       state.lastOffset = dx
+      // Толчок в момент, когда меню уже откроется при отпускании (порог — как в commitMobileNavDrag).
+      const armed = dx >= getAdminMobileNavWidthPx() * 0.35
+      if (armed && !state.armed) hapticTap()
+      state.armed = armed
       setMobileNavDrag(dx)
     }
 

@@ -5,6 +5,7 @@ import {
   CalendarClock,
   CreditCard,
   Dices,
+  Gauge,
   Gift,
   Handshake,
   Headset,
@@ -14,6 +15,7 @@ import {
   MonitorSmartphone,
   Package,
   Plug,
+  Plus,
   Receipt,
   ShoppingCart,
   Star,
@@ -32,25 +34,27 @@ import type { NotificationDTO } from '@/lib/api'
  * tone — цвет подписи и значка, tint — подложка значка; обе пары и для
  * светлой темы, и для тёмной.
  */
-export type NotificationCategory = { labelKey: string; icon: LucideIcon; tone: string; tint: string }
+export type NotificationCategory = { labelKey: string; icon: LucideIcon; tone: string; tint: string; btn: string }
 
 const IMPORTANT: NotificationCategory = {
   labelKey: 'notifications.kinds.important',
   icon: AlertTriangle,
   tone: 'text-red-600 dark:text-red-400',
   tint: 'bg-red-500/15',
+  btn: 'bg-red-500 text-white hover:bg-red-500/90',
 }
 
 const CATEGORIES: Record<string, NotificationCategory> = {
-  broadcast: { labelKey: 'notifications.kinds.broadcast', icon: Megaphone, tone: 'text-primary', tint: 'bg-primary/15' },
-  payment: { labelKey: 'notifications.kinds.payment', icon: CreditCard, tone: 'text-emerald-600 dark:text-emerald-400', tint: 'bg-emerald-500/15' },
-  expiring: { labelKey: 'notifications.kinds.expiring', icon: CalendarClock, tone: 'text-amber-600 dark:text-amber-400', tint: 'bg-amber-500/15' },
-  referral: { labelKey: 'notifications.kinds.referral', icon: Gift, tone: 'text-violet-600 dark:text-violet-400', tint: 'bg-violet-500/15' },
-  support: { labelKey: 'notifications.kinds.support', icon: Headset, tone: 'text-blue-600 dark:text-blue-400', tint: 'bg-blue-500/15' },
-  partner: { labelKey: 'notifications.kinds.partner', icon: Handshake, tone: 'text-indigo-600 dark:text-indigo-400', tint: 'bg-indigo-500/15' },
-  devices: { labelKey: 'notifications.kinds.devices', icon: MonitorSmartphone, tone: 'text-teal-600 dark:text-teal-400', tint: 'bg-teal-500/15' },
-  loyalty: { labelKey: 'notifications.kinds.loyalty', icon: Star, tone: 'text-yellow-600 dark:text-yellow-400', tint: 'bg-yellow-500/15' },
-  torrent: { labelKey: 'notifications.kinds.torrent', icon: Ban, tone: 'text-orange-600 dark:text-orange-400', tint: 'bg-orange-500/15' },
+  broadcast: { labelKey: 'notifications.kinds.broadcast', icon: Megaphone, tone: 'text-primary', tint: 'bg-primary/15', btn: 'bg-primary text-primary-foreground hover:bg-primary/90' },
+  payment: { labelKey: 'notifications.kinds.payment', icon: CreditCard, tone: 'text-emerald-600 dark:text-emerald-400', tint: 'bg-emerald-500/15', btn: 'bg-emerald-600 text-white hover:bg-emerald-600/90' },
+  expiring: { labelKey: 'notifications.kinds.expiring', icon: CalendarClock, tone: 'text-amber-600 dark:text-amber-400', tint: 'bg-amber-500/15', btn: 'bg-amber-500 text-amber-950 hover:bg-amber-500/90' },
+  referral: { labelKey: 'notifications.kinds.referral', icon: Gift, tone: 'text-violet-600 dark:text-violet-400', tint: 'bg-violet-500/15', btn: 'bg-violet-600 text-white hover:bg-violet-600/90' },
+  support: { labelKey: 'notifications.kinds.support', icon: Headset, tone: 'text-blue-600 dark:text-blue-400', tint: 'bg-blue-500/15', btn: 'bg-blue-600 text-white hover:bg-blue-600/90' },
+  partner: { labelKey: 'notifications.kinds.partner', icon: Handshake, tone: 'text-indigo-600 dark:text-indigo-400', tint: 'bg-indigo-500/15', btn: 'bg-indigo-600 text-white hover:bg-indigo-600/90' },
+  devices: { labelKey: 'notifications.kinds.devices', icon: MonitorSmartphone, tone: 'text-teal-600 dark:text-teal-400', tint: 'bg-teal-500/15', btn: 'bg-teal-600 text-white hover:bg-teal-600/90' },
+  loyalty: { labelKey: 'notifications.kinds.loyalty', icon: Star, tone: 'text-yellow-600 dark:text-yellow-400', tint: 'bg-yellow-500/15', btn: 'bg-yellow-500 text-yellow-950 hover:bg-yellow-500/90' },
+  torrent: { labelKey: 'notifications.kinds.torrent', icon: Ban, tone: 'text-orange-600 dark:text-orange-400', tint: 'bg-orange-500/15', btn: 'bg-orange-600 text-white hover:bg-orange-600/90' },
+  traffic: { labelKey: 'notifications.kinds.traffic', icon: Gauge, tone: 'text-violet-600 dark:text-violet-400', tint: 'bg-violet-500/15', btn: 'bg-violet-600 text-white hover:bg-violet-600/90' },
 }
 
 export function notificationCategory(item: Pick<NotificationDTO, 'kind' | 'important'>): NotificationCategory {
@@ -64,7 +68,7 @@ export function notificationCategory(item: Pick<NotificationDTO, 'kind' | 'impor
  * разошёлся бы с ботом. Эмодзи из неё убирается — вместо него значок
  * интерфейса, как у остальных кнопок кабинета.
  */
-export type NotificationButton = { route: string; icon: LucideIcon; labelKey: string }
+export type NotificationButton = { route: string; icon: LucideIcon; labelKey: string; tone?: 'red' | 'amber' }
 
 export const NOTIFICATION_BUTTONS: Record<string, NotificationButton> = {
   buy: { route: '/tariffs', icon: ShoppingCart, labelKey: 'admin.broadcast.buttons.buy' },
@@ -83,6 +87,14 @@ export const NOTIFICATION_BUTTONS: Record<string, NotificationButton> = {
   loyalty: { route: '/loyalty', icon: Star, labelKey: 'admin.broadcast.links.loyalty' },
   fortune: { route: '/fortune', icon: Dices, labelKey: 'admin.broadcast.links.fortune' },
   support: { route: '/support', icon: Headset, labelKey: 'admin.broadcast.links.support' },
+  // «Докупить» из предупреждений о трафике: главная открывает окно докупки на нужной вкладке.
+  traffic_buy_main: { route: '/dashboard?buy=main', icon: Plus, labelKey: 'trafficSplit.buyShort' },
+  traffic_buy_bypass: { route: '/dashboard?buy=bypass', icon: Plus, labelKey: 'trafficSplit.buyShort' },
+  // Цвет кнопки — по важности уведомления: красная при исчерпании, жёлтая при приближении.
+  traffic_buy_main_red: { route: '/dashboard?buy=main', icon: Plus, labelKey: 'trafficSplit.buyShort', tone: 'red' },
+  traffic_buy_bypass_red: { route: '/dashboard?buy=bypass', icon: Plus, labelKey: 'trafficSplit.buyShort', tone: 'red' },
+  traffic_buy_main_amber: { route: '/dashboard?buy=main', icon: Plus, labelKey: 'trafficSplit.buyShort', tone: 'amber' },
+  traffic_buy_bypass_amber: { route: '/dashboard?buy=bypass', icon: Plus, labelKey: 'trafficSplit.buyShort', tone: 'amber' },
 }
 
 /** Эмодзи, флаги и пробелы в начале строки: «⚠️ Важно» → «Важно». */

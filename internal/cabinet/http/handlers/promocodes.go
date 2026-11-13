@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
@@ -163,7 +164,7 @@ func (h *PromoCodesHandler) Apply(w http.ResponseWriter, r *http.Request) {
 		username = strings.TrimSpace(*customer.TelegramUsername)
 	}
 	ctx := context.WithValue(r.Context(), remnawave.CtxKeyUsername, username)
-	res, err := h.promo.Activate(ctx, customer.TelegramID, username, customer, code)
+	res, err := h.promo.Activate(adminevents.WithSource(ctx, adminevents.SourceCabinet), customer.TelegramID, username, customer, code)
 	if err != nil {
 		if promo.IsPromoValidationErr(err) {
 			kind := promo.ClassifyActivateError(err)

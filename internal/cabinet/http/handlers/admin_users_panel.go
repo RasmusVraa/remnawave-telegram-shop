@@ -152,6 +152,7 @@ func (h *AdminUsersHandler) Panel(w http.ResponseWriter, r *http.Request) {
 
 	if rw, err := h.findRWUser(ctx, cust); err == nil && rw != nil {
 		resp.HasRWUser = true
+		h.syncPanelEmail(ctx, cust.ID, rw)
 		dto := mapRWToPanelDTO(rw)
 		resp.RW = &dto
 		applyRWStatusToDTO(&resp.Customer, rw)
@@ -173,6 +174,32 @@ func (h *AdminUsersHandler) Panel(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// syncPanelEmail дописывает подтверждённую почту в поле email пользователя
+// панели, если там пусто или устарело.
+//
+// Покупки и пробный период пишут почту сами; это добор для тех, кто попал в
+// панель раньше, — срабатывает, когда админ открывает карточку. Ошибка только
+// в лог: карточка от неё не зависит.
+func (h *AdminUsersHandler) syncPanelEmail(ctx context.Context, customerID int64, rw *remnawave.User) {
+	if h.customers == nil || rw == nil {
+		return
+	}
+	email, err := h.customers.VerifiedCabinetEmail(ctx, customerID)
+	if err != nil {
+		slog.Warn("admin users: panel email — load", "customer_id", customerID, "error", err)
+		return
+	}
+	if email == "" || (rw.Email != nil && strings.EqualFold(strings.TrimSpace(*rw.Email), email)) {
+		return
+	}
+	// Status не передаём: PATCH меняет только почту и не трогает истёкших и отключённых.
+	if _, err := h.rw.PatchUser(ctx, &remnawave.UpdateUserRequest{ID: &rw.ID, Email: &email}); err != nil {
+		slog.Warn("admin users: panel email — patch", "customer_id", customerID, "error", err)
+		return
+	}
+	rw.Email = &email
 }
 
 // SetSquads — PATCH /cabinet/api/admin/users/{id}/squads.
@@ -461,6 +488,7 @@ func (h *AdminUsersHandler) SetTariff(w http.ResponseWriter, r *http.Request) {
 	if err := h.adminRelimitExtraAfterTariff(ctx, cust, tariff); err != nil {
 		slog.Warn("admin users: set tariff extra relimit", "error", err.Error())
 	}
+	h.snapshotBypassAfterTariff(r, cust, tariff.ID, out)
 
 	slog.Info("admin: set tariff", "customer_id", id, "tariff_id", body.TariffID, "admin_account_id", adminAccountID(r))
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

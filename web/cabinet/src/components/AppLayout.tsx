@@ -26,7 +26,7 @@ import { Logo } from './Logo'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
 import { FortuneWheelIcon } from '@/features/fortune/FortuneWheelIcon'
-import { hapticImpactLight } from '@/lib/telegram-web-app'
+import { hapticTap } from '@/lib/haptic'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useAuthStore } from '@/store/auth'
 import { CabinetDecorLayer } from '@/features/decor/CabinetDecorLayer'
@@ -399,7 +399,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 title={t('nav.moreMenu')}
                 className={cn('size-10', menuOpen && 'bg-secondary')}
                 onClick={() => {
-                  hapticImpactLight()
+                  hapticTap()
                   setMenuOpen((o) => !o)
                 }}
               >
@@ -593,7 +593,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 id={to === '/profile' ? 'cabinet-onboarding-profile-nav-mobile' : undefined}
                 aria-label={label}
                 aria-current={active ? 'page' : undefined}
-                onClick={() => hapticImpactLight()}
+                onClick={() => hapticTap()}
                 className={cn(
                   'flex min-w-0 flex-1 max-w-[4.5rem] flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 py-1 text-muted-foreground transition-colors',
                   active && cn('bg-secondary', navAccentActiveClass),

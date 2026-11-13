@@ -20,7 +20,7 @@ type StarsNotifyMeta struct {
 // CryptoNotifyMeta — фрагмент ответа CryptoPay API по счёту; только для уведомления.
 type CryptoNotifyMeta struct {
 	Hash, Status, CurrencyType, Asset, PaidAsset, PaidAmount string
-	PayUrl, BotInvoiceUrl, FeeAmount                          string
+	PayUrl, BotInvoiceUrl, FeeAmount                         string
 }
 
 // WithStarsNotifyMeta кладёт метаданные Stars в ctx (перед ProcessPurchaseById).

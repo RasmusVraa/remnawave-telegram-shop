@@ -1,0 +1,364 @@
+{
+  "/admin/tariffs": [
+    {
+      "id": 1,
+      "slug": "standard",
+      "name": "Базовый",
+      "sort_order": 0,
+      "is_active": true,
+      "device_limit": 2,
+      "traffic_limit_bytes": 214748364800,
+      "traffic_limit_reset_strategy": "MONTH",
+      "active_internal_squad_uuids": "00000000-0000-0000-0000-000000000000",
+      "tier_level": 0,
+      "description": "<blockquote>• <i><b>2 устройства</b></i>\n• <i>Лимит трафика 200 ГБ/мес</i>\n• <i>Без обхода белых списков</i></blockquote>",
+      "description_detail": null,
+      "prices": [
+        {
+          "tariff_id": 1,
+          "months": 1,
+          "amount_rub": 150,
+          "amount_stars": 100
+        },
+        {
+          "tariff_id": 1,
+          "months": 3,
+          "amount_rub": 400,
+          "amount_stars": 266
+        },
+        {
+          "tariff_id": 1,
+          "months": 6,
+          "amount_rub": 750,
+          "amount_stars": 500
+        },
+        {
+          "tariff_id": 1,
+          "months": 12,
+          "amount_rub": 1320,
+          "amount_stars": 880
+        }
+      ],
+      "traffic_packs": 2
+    },
+    {
+      "id": 2,
+      "slug": "standard-plus",
+      "name": "Стандарт",
+      "sort_order": 1,
+      "is_active": true,
+      "device_limit": 3,
+      "traffic_limit_bytes": 0,
+      "traffic_limit_reset_strategy": "MONTH",
+      "active_internal_squad_uuids": "00000000-0000-0000-0000-000000000000",
+      "tier_level": 1,
+      "description": "<blockquote>• <b>3 устройства</b>\n• Безлимит на обычных серверах\n• <i>Обход белых списков: 30 ГБ/мес</i></blockquote>",
+      "description_detail": null,
+      "prices": [
+        {
+          "tariff_id": 2,
+          "months": 1,
+          "amount_rub": 200,
+          "amount_stars": 133
+        },
+        {
+          "tariff_id": 2,
+          "months": 3,
+          "amount_rub": 510,
+          "amount_stars": 340
+        },
+        {
+          "tariff_id": 2,
+          "months": 6,
+          "amount_rub": 960,
+          "amount_stars": 640
+        },
+        {
+          "tariff_id": 2,
+          "months": 12,
+          "amount_rub": 1800,
+          "amount_stars": 1200
+        }
+      ],
+      "bypass_limit_bytes": 32212254720
+    },
+    {
+      "id": 3,
+      "slug": "premium",
+      "name": "Премиум",
+      "sort_order": 2,
+      "is_active": true,
+      "device_limit": 5,
+      "traffic_limit_bytes": 0,
+      "traffic_limit_reset_strategy": "MONTH",
+      "active_internal_squad_uuids": "00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001",
+      "tier_level": 2,
+      "description": "<blockquote>• <b>5 устройств</b>\n• Все серверы\n• Обход: 50 ГБ/мес, можно докупить</blockquote>",
+      "description_detail": null,
+      "prices": [
+        {
+          "tariff_id": 3,
+          "months": 1,
+          "amount_rub": 300,
+          "amount_stars": 200
+        },
+        {
+          "tariff_id": 3,
+          "months": 3,
+          "amount_rub": 810,
+          "amount_stars": 540
+        },
+        {
+          "tariff_id": 3,
+          "months": 6,
+          "amount_rub": 1500,
+          "amount_stars": 1000
+        },
+        {
+          "tariff_id": 3,
+          "months": 12,
+          "amount_rub": 2700,
+          "amount_stars": 1800
+        }
+      ],
+      "bypass_limit_bytes": 53687091200,
+      "traffic_packs": 3
+    },
+    {
+      "id": 4,
+      "slug": "family",
+      "name": "Семейный",
+      "sort_order": 3,
+      "is_active": false,
+      "device_limit": 8,
+      "traffic_limit_bytes": 1073741824000,
+      "traffic_limit_reset_strategy": "MONTH",
+      "active_internal_squad_uuids": "00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001",
+      "tier_level": 3,
+      "description": "<blockquote>• <b>8 устройств</b>\n• Для всей семьи\n• Трафик 1 ТБ/мес</blockquote>",
+      "description_detail": null,
+      "prices": [
+        {
+          "tariff_id": 4,
+          "months": 1,
+          "amount_rub": 450,
+          "amount_stars": 300
+        },
+        {
+          "tariff_id": 4,
+          "months": 3,
+          "amount_rub": 1200,
+          "amount_stars": 800
+        },
+        {
+          "tariff_id": 4,
+          "months": 6,
+          "amount_rub": 2250,
+          "amount_stars": 1500
+        },
+        {
+          "tariff_id": 4,
+          "months": 12,
+          "amount_rub": 4000,
+          "amount_stars": 2666
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "slug": "corp-trial",
+      "name": "Пробный корпоративный",
+      "sort_order": 4,
+      "is_active": true,
+      "device_limit": 10,
+      "traffic_limit_bytes": 0,
+      "traffic_limit_reset_strategy": "MONTH",
+      "active_internal_squad_uuids": "00000000-0000-0000-0000-000000000000,00000000-0000-0000-0000-000000000001,00000000-0000-0000-0000-000000000002",
+      "tier_level": 4,
+      "description": "<blockquote>• <b>10 устройств</b>\n• Корпоративный доступ\n• Обход: 100 ГБ/мес</blockquote>",
+      "description_detail": null,
+      "prices": [
+        {
+          "tariff_id": 5,
+          "months": 1,
+          "amount_rub": 2500,
+          "amount_stars": 1666
+        },
+        {
+          "tariff_id": 5,
+          "months": 3,
+          "amount_rub": 7000,
+          "amount_stars": 4666
+        },
+        {
+          "tariff_id": 5,
+          "months": 6,
+          "amount_rub": 13000,
+          "amount_stars": 8666
+        },
+        {
+          "tariff_id": 5,
+          "months": 12,
+          "amount_rub": 24000,
+          "amount_stars": 16000
+        }
+      ],
+      "bypass_limit_bytes": 107374182400,
+      "traffic_packs": 1
+    }
+  ],
+  "/admin/squads": {
+    "items": [
+      {
+        "uuid": "11111111-1111-1111-1111-111111111111",
+        "name": "БС"
+      },
+      {
+        "uuid": "22222222-2222-2222-2222-222222222222",
+        "name": "Нидерланды"
+      },
+      {
+        "uuid": "33333333-3333-3333-3333-333333333333",
+        "name": "Германия"
+      }
+    ]
+  },
+  "/admin/tariffs/1/squads": {
+    "tariff_squads": [
+      "11111111-1111-1111-1111-111111111111"
+    ],
+    "active_count": 100,
+    "run": null
+  },
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "tariffs",
+        "fields": [
+          {
+            "key": "CABINET_TARIFF_PRICE_DISPLAY",
+            "type": "enum",
+            "value": "monthly",
+            "source": "default",
+            "instant": true,
+            "enum_values": [
+              "monthly",
+              "marketing"
+            ]
+          },
+          {
+            "key": "CABINET_TARIFF_SAVINGS_BADGE",
+            "type": "enum",
+            "value": "corner",
+            "source": "db",
+            "instant": true,
+            "enum_values": [
+              "none",
+              "corner",
+              "old_price"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "/admin/tariffs/1/traffic": {
+    "bypass_limit_bytes": 32212254720,
+    "bypass_squad_uuids": "11111111-1111-1111-1111-111111111111",
+    "bypass_node_uuids": "aaaaaaaa-0000-0000-0000-000000000001,aaaaaaaa-0000-0000-0000-000000000002",
+    "split_enabled": true,
+    "bypass_label": "Обход",
+    "packs": [
+      {
+        "kind": "bypass",
+        "bytes": 5368709120,
+        "amount_rub": 59,
+        "is_active": true
+      },
+      {
+        "kind": "bypass",
+        "bytes": 21474836480,
+        "amount_rub": 199,
+        "is_active": true
+      }
+    ],
+    "main_limit_bytes": 0,
+    "main_limit_global": false
+  },
+  "/admin/tariffs/1/traffic/nodes": [
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000001",
+      "name": "Германия",
+      "country_code": "DE",
+      "connected": true,
+      "tracking_enabled": true
+    },
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000002",
+      "name": "CDN Yandex",
+      "country_code": "RU",
+      "connected": true,
+      "tracking_enabled": true
+    },
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000003",
+      "name": "Эстония",
+      "country_code": "EE",
+      "connected": true,
+      "tracking_enabled": false
+    }
+  ],
+  "/admin/tariffs/2/squads": {
+    "tariff_squads": [
+      "11111111-1111-1111-1111-111111111111"
+    ],
+    "active_count": 100,
+    "run": null
+  },
+  "/admin/tariffs/2/traffic": {
+    "bypass_limit_bytes": 32212254720,
+    "bypass_squad_uuids": "11111111-1111-1111-1111-111111111111",
+    "bypass_node_uuids": "aaaaaaaa-0000-0000-0000-000000000001,aaaaaaaa-0000-0000-0000-000000000002",
+    "split_enabled": true,
+    "bypass_label": "Обход",
+    "packs": [
+      {
+        "kind": "bypass",
+        "bytes": 5368709120,
+        "amount_rub": 59,
+        "is_active": true
+      },
+      {
+        "kind": "bypass",
+        "bytes": 21474836480,
+        "amount_rub": 199,
+        "is_active": true
+      }
+    ],
+    "main_limit_bytes": 0,
+    "main_limit_global": false
+  },
+  "/admin/tariffs/2/traffic/nodes": [
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000001",
+      "name": "Германия",
+      "country_code": "DE",
+      "connected": true,
+      "tracking_enabled": true
+    },
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000002",
+      "name": "CDN Yandex",
+      "country_code": "RU",
+      "connected": true,
+      "tracking_enabled": true
+    },
+    {
+      "uuid": "aaaaaaaa-0000-0000-0000-000000000003",
+      "name": "Эстония",
+      "country_code": "EE",
+      "connected": true,
+      "tracking_enabled": false
+    }
+  ]
+}

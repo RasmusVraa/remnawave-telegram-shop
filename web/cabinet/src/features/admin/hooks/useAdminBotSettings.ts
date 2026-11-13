@@ -26,6 +26,8 @@ export function useAdminBotSettingsPatch() {
         'CABINET_SUBSCRIPTION_SHOW_LOYALTY' in variables ||
         'CABINET_HOME_QUICK_ACTIONS' in variables ||
         'YOOKASA_PAYMENT_METHODS' in variables ||
+        'PLATEGA_PAYMENT_METHODS' in variables ||
+        'PLATEGA_ENABLED' in variables ||
         'CABINET_CHECKOUT_DEFAULT_METHOD' in variables
       ) {
         void queryClient.invalidateQueries({ queryKey: ['auth-bootstrap'] })

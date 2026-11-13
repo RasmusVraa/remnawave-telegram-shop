@@ -85,9 +85,16 @@ func (c *Client) doRequest(ctx context.Context, method, endpoint string, body an
 	return nil
 }
 
+// CreateTransaction без PaymentMethod создаёт ссылку на общую форму через v2:
+// способ плательщик выбирает на странице Platega. С PaymentMethod — прежний
+// метод API, покупатель сразу попадает на нужный способ.
 func (c *Client) CreateTransaction(ctx context.Context, req *CreateTransactionRequest) (*CreateTransactionResponse, error) {
+	endpoint := "/v2/transaction/process"
+	if req.PaymentMethod != 0 {
+		endpoint = "/transaction/process"
+	}
 	var resp CreateTransactionResponse
-	err := c.doRequest(ctx, http.MethodPost, "/transaction/process", req, &resp)
+	err := c.doRequest(ctx, http.MethodPost, endpoint, req, &resp)
 	if err != nil {
 		return nil, fmt.Errorf("create transaction failed: %w", err)
 	}

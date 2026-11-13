@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { getTurnstileToken } from '@/lib/turnstile'
 import { useAuthStore } from '@/store/auth'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -101,6 +102,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [securityChecking, setSecurityChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

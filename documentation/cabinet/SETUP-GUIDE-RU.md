@@ -195,6 +195,27 @@ server {
         proxy_set_header X-Forwarded-Port  $server_port;
     }
 
+    # Чат поддержки: сообщения с картинками — до 5 файлов по 10 МБ, 25 МБ вместе.
+    location = /cabinet/api/support/messages {
+        # Точный location забирает запрос у location / вместе с его limit_req —
+        # лимит частоты повторяем здесь, иначе на этом пути его не будет.
+        limit_req zone=cabinet_api_ip burst=10 nodelay;
+        client_max_body_size 26m;
+        # Скриншоты с мобильного интернета в серверные 15s не укладываются.
+        client_body_timeout 120s;
+        proxy_pass http://127.0.0.1:3002;
+        proxy_http_version 1.1;
+        proxy_connect_timeout 10s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 90s;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host  $host;
+        proxy_set_header X-Forwarded-Port  $server_port;
+    }
+
     # Остальной трафик кабинета.
     location / {
         limit_req zone=cabinet_api_ip burst=40 nodelay;
@@ -285,7 +306,7 @@ server {
 - `proxy_connect_timeout 10s` — максимум времени на **установку TCP-соединения** nginx → backend (бот). Если бот не отвечает, nginx оборвёт попытку быстрее, чем «висеть» долго.
 - `proxy_send_timeout 60s` — таймаут **отправки запроса** от nginx к upstream (в т.ч. тело POST). Длинные загрузки редки для кабинета; при необходимости увеличьте.
 - `proxy_read_timeout 60s` — таймаут **ожидания ответа** от upstream. Если бот долго обрабатывает запрос (тяжёлый checkout, внешние API), увеличьте значение, иначе клиент получит 502.
-- `client_max_body_size 2m` — максимальный размер **тела запроса** от браузера к nginx (загрузки, большие JSON). Для обычного кабинета 1–4 МБ обычно достаточно; под аватарки/файлы — поднимайте осознанно. Исключение — загрузка вложения для рассылки (`/cabinet/api/admin/broadcast/upload-media`): на этом location лимит поднят до `50m`. С общими 2m PNG-скриншоты отбивались `413 Request Entity Too Large` ещё на nginx, не доходя до бота (JPEG проходил только потому, что весит меньше), а видео не проходило бы и подавно. 50 MiB — предел Bot API на файл, отправляемый ботом, столько же принимает и сам бот; ставить больше бессмысленно, Telegram всё равно откажет. Важно: у этого `location` обязателен свой `proxy_pass` со всеми заголовками — точное совпадение (`location = …`) перехватывает запрос целиком и в `location /` его не передаёт, так что блок из одной строки с лимитом превратит загрузку в 404. И применяйте правку там, где nginx на самом деле работает: если он в контейнере (`remnawave-nginx`), то хостовый `nginx -t` проверит совсем другой файл и напишет «ok» про него, а перезагрузка нужна внутри — `docker exec remnawave-nginx nginx -t` и `nginx -s reload`. Убедиться, что контейнер видит правку: `docker exec remnawave-nginx nginx -T | grep -A4 upload-media`.
+- `client_max_body_size 2m` — максимальный размер **тела запроса** от браузера к nginx (загрузки, большие JSON). Для обычного кабинета 1–4 МБ обычно достаточно; под аватарки/файлы — поднимайте осознанно. Исключение — загрузка вложения для рассылки (`/cabinet/api/admin/broadcast/upload-media`): на этом location лимит поднят до `50m`. С общими 2m PNG-скриншоты отбивались `413 Request Entity Too Large` ещё на nginx, не доходя до бота (JPEG проходил только потому, что весит меньше), а видео не проходило бы и подавно. 50 MiB — предел Bot API на файл, отправляемый ботом, столько же принимает и сам бот; ставить больше бессмысленно, Telegram всё равно откажет. Важно: у этого `location` обязателен свой `proxy_pass` со всеми заголовками — точное совпадение (`location = …`) перехватывает запрос целиком и в `location /` его не передаёт, так что блок из одной строки с лимитом превратит загрузку в 404. И применяйте правку там, где nginx на самом деле работает: если он в контейнере (`remnawave-nginx`), то хостовый `nginx -t` проверит совсем другой файл и напишет «ok» про него, а перезагрузка нужна внутри — `docker exec remnawave-nginx nginx -t` и `nginx -s reload`. Убедиться, что контейнер видит правку: `docker exec remnawave-nginx nginx -T | grep -A4 upload-media`. То же для изображений в чате поддержки (`/cabinet/api/support/messages`, `26m`): без этого location скриншоты больше 2 МБ отбиваются nginx с `413`, не доходя до кабинета.
 
 В минимальном примере выше эти директивы опущены — nginx использует дефолты. Добавляйте их, если нужен явный контроль таймаутов.
 
@@ -716,7 +737,8 @@ Telegram DM в support-боте — без изменений (source=telegram)
 
 - Работающий web-кабинет (`CABINET_ENABLED=true`).
 - Отдельно развёрнутый **telegram-support-bot** (форум-супергруппа, `/setprivacy` → Disable — см. README support-bot).
-- Миграция shop: **`000036_cabinet_support`** (`cabinet_support_ticket`, `cabinet_support_message`).
+- Миграция shop: **`000036_cabinet_support`** (`cabinet_support_ticket`, `cabinet_support_message`); для изображений — **`000064_cabinet_support_attachments`** (`cabinet_support_attachment`).
+- **Обязательно для изображений в чате:** support-bot с поддержкой вложений (старый не примет файлы) и `location = /cabinet/api/support/messages` с `client_max_body_size 26m` в nginx (см. пример конфига выше): без него скриншоты больше 2 МБ отбиваются nginx с `413`. Без этих двух условий не обновляйтесь.
 
 ### Переменные shop (`.env`)
 
@@ -728,7 +750,7 @@ Telegram DM в support-боте — без изменений (source=telegram)
 
 При `SUPPORT_BOT_API=true` без `SUPPORT_BOT_API_URL` или `SUPPORT_BRIDGE_SECRET` процесс shop не стартует.
 
-Фронт узнаёт о включении из **`GET /cabinet/api/auth/bootstrap`** → поле **`support_chat_enabled`**.
+Фронт узнаёт о включении из **`GET /cabinet/api/auth/bootstrap`** → поле **`support_chat_enabled`**; об изображениях — **`support_attachments_enabled`**, **`support_attachments_max_files`**, **`support_attachments_max_mb`**.
 
 ### Переменные support-bot (`.env`)
 
@@ -767,20 +789,21 @@ HTTP_PORT=8080
 Пользовательские (JWT + CSRF на POST):
 
 - `GET /cabinet/api/support/summary` — open-тикет, счётчик непрочитанных
-- `GET /cabinet/api/support/conversation` — сообщения open-тикета
-- `POST /cabinet/api/support/messages` — `{"text":"..."}` (только текст)
+- `GET /cabinet/api/support/conversation` — сообщения open-тикета; у сообщения с картинками — `attachments: [{id, mime, width?, height?, size?, name?}]`
+- `POST /cabinet/api/support/messages` — `{"text":"..."}` или `multipart/form-data`: поле `text` (может быть пустым) и до 5 частей `files` (JPEG, PNG, WebP, BMP, GIF, HEIC/HEIF, AVIF, TIFF; до 10 МБ каждая, 25 МБ вместе). Ошибки: `400 too many files`, `413 file too large`, `415 unsupported media type`
+- `GET /cabinet/api/support/attachments/{id}` — картинка из чата этого аккаунта (чужая — `404`); `Cache-Control: private, max-age=86400, immutable`. Файлы хранит Telegram, shop скачивает их у support-bot (`GET /internal/cabinet/file/{id}?account_id=`)
 - `POST /cabinet/api/support/read` — отметить входящие прочитанными
 
 Внутренний webhook (Bearer `SUPPORT_BRIDGE_SECRET`):
 
-- `POST /cabinet/api/internal/support/webhook` — ответы саппорта и событие закрытия тикета
+- `POST /cabinet/api/internal/support/webhook` — ответы саппорта (с `attachments`, если сотрудник прислал фото или картинку файлом; `text` тогда может быть пустым) и событие закрытия тикета
 
 Idempotency: исходящие сообщения пользователя сохраняют **`client_message_id`** (UUID) в `cabinet_support_message`; повтор при сетевом retry не создаёт дубликат.
 
 ### Ограничения MVP
 
-- Только **текст** от пользователя кабинета.
-- **Медиа** от саппорта в кабинет **не доставляются**.
+- От пользователя кабинета — **текст и изображения**.
+- От саппорта в кабинет — **текст и изображения**; видео, голосовые и стикеры не доставляются.
 - **Один open-тикет** на `account_id`.
 - После **`/close`** в топике история в модале **не показывается**; новое сообщение открывает **новый** тикет.
 

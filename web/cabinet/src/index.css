@@ -298,6 +298,17 @@
     @apply bg-border rounded-full;
   }
 
+  /* Числовые поля — без стрелок вверх/вниз (значение вводят руками). */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
   /* Native date/time pickers follow light/dark theme (calendar icon in datetime-local). */
   .admin-input[type="datetime-local"],
   .admin-input[type="date"],
@@ -537,6 +548,84 @@
   }
 
   /*
+   * Популярный тариф (админ отметил в «Тарифах»): единственная цветная карточка
+   * на витрине — рамка и свечение в цвет темы (--primary).
+   *
+   * Здесь, в слое components, а не утилитами на месте вызова: обводку и тень
+   * карточки держат правила выше с !important, а !important из более раннего
+   * слоя побеждает и утилиты, и CSS вне слоёв. Наведение не снимает рамку,
+   * как у обычной карточки, а только поднимает карточку и усиливает свечение;
+   * кольцо-градиент ::before выключено — поверх сплошной рамки оно дало бы
+   * двойной контур.
+   */
+  .cabinet-card.tariff-card-popular {
+    border-color: hsl(var(--primary)) !important;
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 16px 36px -18px hsl(var(--primary) / 0.45),
+      0 4px 6px -1px rgb(0 0 0 / 0.08) !important;
+  }
+
+  .dark .cabinet-card.tariff-card-popular {
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 18px 48px -18px hsl(var(--primary) / 0.5),
+      0 12px 30px rgba(3, 10, 24, 0.35) !important;
+  }
+
+  .cabinet-card.tariff-card-popular:hover,
+  .cabinet-card.tariff-card-popular:focus-visible,
+  .cabinet-shell .cabinet-card.tariff-card-popular:hover,
+  .cabinet-shell .cabinet-card.tariff-card-popular:focus-within {
+    border-color: hsl(var(--primary)) !important;
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 20px 44px -16px hsl(var(--primary) / 0.55),
+      0 4px 6px -1px rgb(0 0 0 / 0.08) !important;
+  }
+
+  .dark .cabinet-card.tariff-card-popular:hover,
+  .dark .cabinet-card.tariff-card-popular:focus-visible,
+  .dark .cabinet-shell .cabinet-card.tariff-card-popular:hover,
+  .dark .cabinet-shell .cabinet-card.tariff-card-popular:focus-within {
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 22px 56px -16px hsl(var(--primary) / 0.62),
+      0 12px 30px rgba(3, 10, 24, 0.4) !important;
+  }
+
+  .cabinet-shell .cabinet-card.tariff-card-popular::before {
+    display: none;
+  }
+
+  /*
+   * В мобильной карусели свечение короче: лента прокручивается по горизонтали,
+   * overflow режет и вертикаль, и длинная тень обрывалась ровной полосой под карточкой.
+   */
+  .cabinet-card.tariff-card-popular.tariff-card-popular--tight,
+  .cabinet-shell .cabinet-card.tariff-card-popular.tariff-card-popular--tight:hover,
+  .cabinet-shell .cabinet-card.tariff-card-popular.tariff-card-popular--tight:focus-within {
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 8px 18px -12px hsl(var(--primary) / 0.5) !important;
+  }
+
+  .dark .cabinet-card.tariff-card-popular.tariff-card-popular--tight,
+  .dark .cabinet-shell .cabinet-card.tariff-card-popular.tariff-card-popular--tight:hover,
+  .dark .cabinet-shell .cabinet-card.tariff-card-popular.tariff-card-popular--tight:focus-within {
+    box-shadow:
+      inset 0 0 0 1px hsl(var(--primary)),
+      0 8px 20px -10px hsl(var(--primary) / 0.55) !important;
+  }
+
+  /* Нашивка «Популярный» — цвет главной кнопки темы (у nebula ниже — её градиент). */
+  .tariff-popular-badge {
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    box-shadow: 0 6px 16px -6px hsl(var(--primary) / 0.75);
+  }
+
+  /*
    * То же кольцо, но по явной пометке — для админ-статистики.
    *
    * Слой выше ограничен .cabinet-shell намеренно: включать пластику всей
@@ -761,63 +850,22 @@
   }
 
   /*
-   * Кольцевой индикатор. Значение — в --cabinet-ring-value (0–100), цвет
-   * наследуется из --cabinet-ring-color, поэтому тон задаётся снаружи одной
-   * переменной и одинаково работает для дней, трафика и устройств.
+   * Кольцевой индикатор: рамка с числом по центру. Сама дуга — SVG внутри
+   * (components/RingArc.tsx): скруглённые концы и тень у кончика conic-gradient
+   * не умеет. Толщина здесь — только для безлимитного кольца ниже, она равна
+   * RING_THICKNESS_PX.
    */
   .cabinet-ring {
-    --cabinet-ring-value: 0;
-    --cabinet-ring-color: var(--primary);
     --cabinet-ring-thickness: 7px;
     position: relative;
     display: grid;
     place-items: center;
     aspect-ratio: 1;
     border-radius: 50%;
-    background: conic-gradient(
-      hsl(var(--cabinet-ring-color)) calc(var(--cabinet-ring-value) * 1%),
-      hsl(var(--muted)) 0
-    );
   }
 
-  /* Вырезаем середину — получается кольцо, а не круг. */
-  .cabinet-ring::before {
-    content: "";
-    position: absolute;
-    inset: var(--cabinet-ring-thickness);
-    border-radius: 50%;
-    background-color: hsl(var(--card));
-  }
-
-  .cabinet-ring > * {
+  .cabinet-ring > div {
     position: relative;
-  }
-
-  /*
-   * Заполнение кольца анимацией.
-   *
-   * conic-gradient сам по себе не интерполируется: без @property браузер
-   * считает --cabinet-ring-value обычной строкой и переключает её скачком.
-   * Регистрация типа делает переменную анимируемой, и дуга набегает.
-   *
-   * Отдельным модификатором, а не на всех кольцах сразу: у трафика и устройств
-   * значение приходит вместе со страницей, и там набегающая дуга читалась бы
-   * как загрузка данных, которой уже нет.
-   */
-  @property --cabinet-ring-value {
-    syntax: "<number>";
-    inherits: false;
-    initial-value: 0;
-  }
-
-  .cabinet-ring--animate {
-    transition: --cabinet-ring-value 1.1s var(--cabinet-ease);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .cabinet-ring--animate {
-      transition: none;
-    }
   }
 
   /*
@@ -825,12 +873,7 @@
    * быть не может, но место в сетке показателей занять надо.
    */
   .cabinet-ring--unbounded {
-    background: none;
     border: var(--cabinet-ring-thickness) solid hsl(var(--muted));
-  }
-
-  .cabinet-ring--unbounded::before {
-    content: none;
   }
 
   /*
@@ -3868,6 +3911,17 @@ html[data-cabinet-decor="nebula"] .cabinet-btn-primary:focus-visible::after {
   transform: translateX(120%);
 }
 
+/* Нашивка «Популярный» на карточке тарифа — тем же градиентом, что и кнопки. */
+html[data-cabinet-decor="nebula"] .tariff-popular-badge {
+  background-image: linear-gradient(
+    135deg,
+    hsl(var(--nb-cyan)) 0%,
+    hsl(210 90% 52%) 55%,
+    hsl(var(--nb-violet)) 100%
+  );
+  box-shadow: 0 6px 16px -6px hsl(var(--nb-violet) / 0.7);
+}
+
 html[data-cabinet-decor="nebula"] .cabinet-btn-primary:hover {
   box-shadow:
     0 14px 34px -12px hsl(var(--nb-cyan) / 0.8),
@@ -5226,4 +5280,27 @@ html:not(.dark) .cabinet-hw-spider {
 [data-nav-pending='text'].inline-flex::before,
 [data-nav-pending='text'].flex::before {
   margin-right: 0;
+}
+
+/*
+ * Знак «∞» на безлимитном кольце плитки «Трафик» (NestedStatRing). В светлой теме — цвет акцента как есть,
+ * в тёмной — осветлённый, иначе на приглушённом кольце он терялся бы. Цвет берётся от --primary,
+ * поэтому следует за декор-темами и акцентом.
+ */
+.nested-ring-infinity {
+  color: hsl(var(--primary));
+}
+.dark .nested-ring-infinity {
+  color: color-mix(in srgb, hsl(var(--primary)) 55%, white);
+}
+
+/*
+ * Тень у кончика кольца (RingArc). На светлой дорожке полная тень читается грязным
+ * пятном, поэтому в светлой теме она вдвое слабее.
+ */
+.ring-tip-shadow {
+  fill-opacity: 0.35;
+}
+.dark .ring-tip-shadow {
+  fill-opacity: 0.75;
 }

@@ -544,5 +544,7 @@
   "broadcast_cabinet_line_on": "Cabinet: yes",
   "broadcast_cabinet_line_important": "Cabinet: yes, important — pinned and shown on the home page",
   "broadcast_cabinet_line_off": "Cabinet: no",
-  "broadcast_cabinet_line_no_text": "Cabinet: no — the broadcast has no text, and the cabinet doesn't show attachments yet"
+  "broadcast_cabinet_line_no_text": "Cabinet: no — the broadcast has no text, and the cabinet doesn't show attachments yet",
+  "cabinet_mail_down_admin": "⚠️ <b>Cabinet email is not being sent</b>\n\nVerification codes and password reset links don't reach customers, while the cabinet still tells them “email sent”.\n\nError:\n<code>%s</code>\n\nCheck CABINET_SMTP_* and that the server can reach <code>%s</code>. Hosting providers often block outgoing ports 465 and 587 — Resend also accepts 2465 and 2587.\n\nI'll remind you every 6 hours until it's fixed.",
+  "cabinet_mail_up_admin": "✅ <b>Cabinet email is being sent again</b>"
 }

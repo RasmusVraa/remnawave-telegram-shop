@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { useAuthStore } from '@/store/auth'
 
 export default function LinkEmailPage() {
@@ -34,6 +35,7 @@ export default function LinkEmailPage() {
   const [showPw, setShowPw] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [verifyCodeRequired, setVerifyCodeRequired] = useState(false)
   const [maskedEmail, setMaskedEmail] = useState<string>('')
   const [code, setCode] = useState('')

@@ -1,10 +1,18 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { cn } from '@/lib/utils'
+
+/*
+ * Открытые окна друг над другом (шторка расхода и поверх неё окно докупки): Esc закрывает только верхнее,
+ * а прокрутка страницы возвращается, когда закрыто последнее. Без общего счётчика второе окно запоминало
+ * «overflow: hidden» от первого и оставляло страницу без прокрутки.
+ */
+const openSheets: symbol[] = []
+let bodyOverflowBefore = ''
 
 /** Длительность появления и ухода; из неё же считается задержка размонтирования. */
 const ANIM_MS = 250
@@ -24,6 +32,8 @@ export function ResponsiveSheet({
   actions,
   children,
   className,
+  footer,
+  centered,
 }: {
   open: boolean
   onClose: () => void
@@ -33,6 +43,10 @@ export function ResponsiveSheet({
   actions?: ReactNode
   children: ReactNode
   className?: string
+  /** Закреплён внизу шторки, пока содержимое прокручивается (главная кнопка действия). */
+  footer?: ReactNode
+  /** На ПК — по центру экрана, а не от верхнего края. */
+  centered?: boolean
 }) {
   const { t } = useTranslation()
   const [mounted, setMounted] = useState(open)
@@ -59,26 +73,38 @@ export function ResponsiveSheet({
     return () => window.clearTimeout(id)
   }, [open])
 
+  // onClose меняется от рендера к рендеру; в эффекте держим актуальную функцию, не перезапуская его
+  // (иначе окно теряло бы своё место в стеке).
+  const closeRef = useRef(onClose)
+  closeRef.current = onClose
+
   useEffect(() => {
     if (!open) return
+    const id = Symbol('sheet')
     function onEsc(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && openSheets[openSheets.length - 1] === id) closeRef.current()
     }
+    if (openSheets.length === 0) {
+      bodyOverflowBefore = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+    }
+    openSheets.push(id)
     document.addEventListener('keydown', onEsc)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onEsc)
-      document.body.style.overflow = prev
+      const at = openSheets.indexOf(id)
+      if (at >= 0) openSheets.splice(at, 1)
+      if (openSheets.length === 0) document.body.style.overflow = bodyOverflowBefore
     }
-  }, [open, onClose])
+  }, [open])
 
   if (typeof document === 'undefined' || !mounted) return null
 
   return createPortal(
     <div
       className={cn(
-        'fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-[250ms] ease-out sm:items-start sm:px-4 sm:pt-[7.5rem]',
+        'fixed inset-0 z-[2000] flex items-end justify-center bg-black/60 backdrop-blur-sm transition-opacity duration-[250ms] ease-out sm:px-4',
+        centered ? 'sm:items-center sm:py-6' : 'sm:items-start sm:pt-[7.5rem]',
         visible ? 'opacity-100' : 'opacity-0',
       )}
       onClick={onClose}
@@ -91,7 +117,8 @@ export function ResponsiveSheet({
         onClick={(e) => e.stopPropagation()}
         className={cn(
           'home-sheet flex max-h-[calc(100dvh-3.5rem-var(--cabinet-tg-safe-top))] w-full flex-col overflow-hidden border border-border bg-background shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-[opacity,transform] duration-[250ms] ease-out',
-          'rounded-t-[28px] sm:max-h-[calc(100dvh-9rem)] sm:max-w-[540px] sm:rounded-[26px] sm:shadow-[0_30px_80px_rgba(0,0,0,0.6)]',
+          'rounded-t-[28px] sm:max-w-[540px] sm:rounded-[26px] sm:shadow-[0_30px_80px_rgba(0,0,0,0.6)]',
+          centered ? 'sm:max-h-[calc(100dvh-3rem)]' : 'sm:max-h-[calc(100dvh-9rem)]',
           visible
             ? 'translate-y-0 opacity-100 sm:scale-100'
             : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-[0.97]',
@@ -122,6 +149,11 @@ export function ResponsiveSheet({
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto overscroll-contain px-4 pb-[max(1.5rem,calc(1rem+var(--cabinet-sheet-safe-bottom)))] sm:px-5 sm:pb-5">
           {children}
         </div>
+        {footer && (
+          <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] pt-3 sm:px-5 sm:pb-5">
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

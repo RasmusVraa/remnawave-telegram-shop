@@ -9,6 +9,8 @@ interface AdminToggleSwitchProps {
   busy?: boolean
   id?: string
   'aria-label'?: string
+  /** sm — для тесных мест вроде плитки тарифа. */
+  size?: 'md' | 'sm'
 }
 
 /** Toggle в стиле Android/iOS — light/dark через design tokens. */
@@ -19,7 +21,10 @@ export function AdminToggleSwitch({
   busy = false,
   id,
   'aria-label': ariaLabel,
+  size = 'md',
 }: AdminToggleSwitchProps) {
+  const sm = size === 'sm'
+
   return (
     <button
       type="button"
@@ -31,8 +36,9 @@ export function AdminToggleSwitch({
       disabled={disabled || busy}
       onClick={() => onChange(!checked)}
       className={cn(
-        'relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors',
+        'relative inline-flex shrink-0 items-center rounded-full border-2 border-transparent transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        sm ? 'h-5 w-9' : 'h-7 w-12',
         checked ? 'bg-primary' : 'bg-muted-foreground/30 dark:bg-muted-foreground/40',
         (disabled || busy) && 'pointer-events-none',
         disabled && !busy && 'opacity-50',
@@ -40,8 +46,9 @@ export function AdminToggleSwitch({
     >
       <span
         className={cn(
-          'pointer-events-none flex size-5 items-center justify-center rounded-full bg-background shadow-sm ring-0 transition-transform',
-          checked ? 'translate-x-5' : 'translate-x-0.5',
+          'pointer-events-none flex items-center justify-center rounded-full bg-background shadow-sm ring-0 transition-transform',
+          sm ? 'size-4' : 'size-5',
+          checked ? (sm ? 'translate-x-[14px]' : 'translate-x-5') : 'translate-x-0.5',
         )}
       >
         {busy && <Spinner className="h-3 w-3 border-[1.5px] text-muted-foreground" />}

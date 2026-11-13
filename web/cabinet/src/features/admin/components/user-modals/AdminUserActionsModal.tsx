@@ -3,6 +3,7 @@ import {
   CalendarPlus,
   Check,
   Copy,
+  History,
   Loader2,
   Power,
   PowerOff,
@@ -40,6 +41,9 @@ interface Props {
   copy: { available: boolean; copied: boolean; copy: () => void }
   /** Смена тарифа доступна только в режиме продаж «тарифы». */
   onChangeTariff?: () => void
+  /** «История» — шторка с событиями клиента. */
+  onHistory?: () => void
+  historyLabel?: string
 }
 
 const variantClasses: Record<NonNullable<ActionItem['variant']>, string> = {
@@ -70,6 +74,8 @@ export function AdminUserActionsModal({
   enablePending,
   copy,
   onChangeTariff,
+  onHistory,
+  historyLabel,
 }: Props) {
   const { t } = useTranslation()
   const isActive = rwStatus?.toUpperCase() === 'ACTIVE'
@@ -124,6 +130,14 @@ export function AdminUserActionsModal({
             pending: enablePending,
             variant: 'success' as const,
           }]
+      : []),
+    ...(onHistory
+      ? [{
+          key: 'history',
+          label: historyLabel ?? t('admin.monitoring.history.title'),
+          icon: History,
+          onClick: run(onHistory),
+        }]
       : []),
   ]
 

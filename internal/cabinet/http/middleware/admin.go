@@ -19,12 +19,13 @@ func RequireAdmin(checker *adminauth.Checker) func(http.Handler) http.Handler {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return
 			}
-			if !checker.IsAdmin(r.Context(), claims.AccountID) {
+			actor, ok := checker.AdminTelegramID(r.Context(), claims.AccountID)
+			if !ok {
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
 			}
 			ctx := context.WithValue(r.Context(), ctxKeyIsAdmin, true)
-			next.ServeHTTP(w, r.WithContext(ctx))
+			auditAdminAction(w, r.WithContext(ctx), actor, next)
 		})
 	}
 }

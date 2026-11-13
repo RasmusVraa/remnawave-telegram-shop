@@ -12,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"golang.org/x/net/proxy"
 )
@@ -53,7 +52,9 @@ func sendTelegramHTML(cfg telegramConfig, html string) (int, error) {
 	if strings.TrimSpace(html) == "" {
 		return 0, fmt.Errorf("telegram message is empty")
 	}
-	if n := utf8.RuneCountInString(html); n > telegramMaxMessageRunes {
+	// Telegram считает видимый текст, а не разметку: с тегами пост на 3800
+	// символов уже «больше» 4096 и падал бы зря.
+	if n := telegramTextRunes(html); n > telegramMaxMessageRunes {
 		return 0, fmt.Errorf("telegram message is %d runes (limit %d); shorten Telegram section in RELEASE_NOTES.md", n, telegramMaxMessageRunes)
 	}
 

@@ -98,7 +98,9 @@ func TestParseCheckoutDefaultMethod(t *testing.T) {
 		"":              "",
 		"yookassa:sbp":  "yookassa:sbp",
 		"YooKassa:All":  "yookassa:all",
-		" platega_sbp ": "platega_sbp",
+		" platega ":     "platega",
+		"platega_sbp":   "platega_sbp",
+		"platega_cards": "platega_acquiring",
 		"telegram":      "telegram",
 		"heleket":       "heleket",
 	}
@@ -112,8 +114,28 @@ func TestParseCheckoutDefaultMethod(t *testing.T) {
 			t.Errorf("%q: got %q, want %q", in, got, want)
 		}
 	}
-	for _, in := range []string{"yookassa", "yookassa:card", "tribute", "platega"} {
+	for _, in := range []string{"yookassa", "yookassa:card", "tribute", "platega_unknown"} {
 		if _, err := ParseCheckoutDefaultMethod(in); err == nil {
+			t.Errorf("%q accepted", in)
+		}
+	}
+}
+
+func TestParsePlategaPaymentMethods(t *testing.T) {
+	ok := map[string][]string{
+		"":                   {"all"},
+		" , ":                {"all"},
+		"sbp":                {"sbp"},
+		" ALL , sbp ,crypto": {"all", "sbp", "crypto"},
+	}
+	for in, want := range ok {
+		got, err := ParsePlategaPaymentMethods(in)
+		if err != nil || !reflect.DeepEqual(got, want) {
+			t.Errorf("%q: got %v, %v; want %v", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"sbp,sbp", "cards", "card"} {
+		if _, err := ParsePlategaPaymentMethods(in); err == nil {
 			t.Errorf("%q accepted", in)
 		}
 	}

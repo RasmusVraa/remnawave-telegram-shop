@@ -5,6 +5,8 @@ import { CreditCard, Download, Search, ChevronRight } from 'lucide-react'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { AdminTablePagination } from '../components/AdminTablePagination'
+import { HeaderFilter } from '../components/HeaderFilter'
+import { SortableTh, nextSort, type SortDir, type SortState } from '../components/SortableTh'
 import { AdminPaymentDetailModal } from '../components/AdminPaymentDetailModal'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
@@ -101,6 +103,16 @@ function PaymentMobileCard({
   )
 }
 
+/** Колонки, по которым умеет сортировать сервер; «Описание» собирается на лету и не сортируется. */
+const SORT_FIRST_DIR: Record<string, SortDir> = {
+  id: 'desc',
+  user: 'asc',
+  amount: 'desc',
+  provider: 'asc',
+  status: 'asc',
+  created_at: 'desc',
+}
+
 export default function AdminPaymentsPage() {
   const { t } = useTranslation()
 
@@ -111,6 +123,12 @@ export default function AdminPaymentsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState<string | null>(null)
+  const [sort, setSort] = useState<SortState | null>(null)
+
+  const onSort = useCallback((key: string) => {
+    setSort((cur) => nextSort(cur, key, SORT_FIRST_DIR[key] ?? 'asc'))
+    setPage(1)
+  }, [])
 
   const debounceRef = useMemo(() => ({ timer: null as ReturnType<typeof setTimeout> | null }), [])
   const onSearchChange = useCallback(
@@ -131,6 +149,8 @@ export default function AdminPaymentsPage() {
     q: debouncedSearch,
     page,
     limit: PAGE_LIMIT,
+    sort: sort?.key,
+    dir: sort?.dir,
   })
 
   const items = data?.items ?? []
@@ -141,7 +161,7 @@ export default function AdminPaymentsPage() {
     setExporting(true)
     setExportError(null)
     try {
-      await api.adminPaymentsExportCsv({ status: statusParam, q: debouncedSearch })
+      await api.adminPaymentsExportCsv({ status: statusParam, q: debouncedSearch, sort: sort?.key, dir: sort?.dir })
     } catch {
       setExportError(t('admin.errors.requestFailed'))
     } finally {
@@ -187,7 +207,7 @@ export default function AdminPaymentsPage() {
           />
         </div>
 
-        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 pb-0.5">
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 pb-0.5 md:hidden">
           <div className="inline-flex min-w-full gap-1 rounded-lg border border-border/50 bg-card/50 p-1 sm:min-w-0 sm:w-full">
             {STATUSES.map((s) => (
               <button
@@ -231,13 +251,27 @@ export default function AdminPaymentsPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      <th className="w-[1%] whitespace-nowrap px-3 py-2">ID</th>
-                      <th className="px-3 py-2">{t('admin.users.username')}</th>
-                      <th className="px-3 py-2">{t('admin.payments.amount')}</th>
-                      <th className="hidden px-3 py-2 sm:table-cell">{t('admin.payments.provider')}</th>
+                      <SortableTh sortKey="id" sort={sort} onSort={onSort} className="w-[1%] whitespace-nowrap">ID</SortableTh>
+                      <SortableTh sortKey="user" sort={sort} onSort={onSort}>{t('admin.users.username')}</SortableTh>
+                      <SortableTh sortKey="amount" sort={sort} onSort={onSort}>{t('admin.payments.amount')}</SortableTh>
+                      <SortableTh sortKey="provider" sort={sort} onSort={onSort} className="hidden sm:table-cell">{t('admin.payments.provider')}</SortableTh>
                       <th className="hidden px-3 py-2 md:table-cell">{t('admin.payments.description')}</th>
-                      <th className="px-3 py-2">{t('admin.payments.statusLabel')}</th>
-                      <th className="hidden px-3 py-2 lg:table-cell">{t('admin.payments.createdAt')}</th>
+                      <SortableTh
+                        sortKey="status"
+                        sort={sort}
+                        onSort={onSort}
+                        filter={
+                          <HeaderFilter
+                            value={scope}
+                            options={STATUSES.map((s) => ({ value: s, label: t(STATUS_LABEL_KEYS[s]) }))}
+                            onChange={(s) => { setScope(s); setPage(1) }}
+                            ariaLabel={t('admin.payments.statusLabel')}
+                          />
+                        }
+                      >
+                        {t('admin.payments.statusLabel')}
+                      </SortableTh>
+                      <SortableTh sortKey="created_at" sort={sort} onSort={onSort} className="hidden lg:table-cell">{t('admin.payments.createdAt')}</SortableTh>
                     </tr>
                   </thead>
                   <tbody>

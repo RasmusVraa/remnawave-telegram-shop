@@ -8,6 +8,8 @@ interface AdminPageHeaderProps {
   title: string
   subtitle?: string
   actions?: ReactNode
+  /** Между заголовком и действиями (например, вкладки страницы). */
+  center?: ReactNode
   accent?: 'primary' | 'emerald' | 'amber' | 'violet' | 'rose' | 'blue' | 'indigo' | 'slate' | 'cyan'
 }
 
@@ -28,6 +30,7 @@ export function AdminPageHeader({
   title,
   subtitle,
   actions,
+  center,
   accent = 'primary',
 }: AdminPageHeaderProps) {
   return (
@@ -41,6 +44,7 @@ export function AdminPageHeader({
           {subtitle && <p className="text-sm text-muted-foreground">{subtitle}</p>}
         </div>
       </div>
+      {center && <div className="flex min-w-0 flex-1 items-center justify-center self-center">{center}</div>}
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )

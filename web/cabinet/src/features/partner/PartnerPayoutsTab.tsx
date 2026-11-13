@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { api, ApiError, type PartnerAccountDTO } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 
 import { PARTNER_STATE_KEY } from './partnerKeys'
 import { formatMoney, formatDayMonth, formatDayShort } from './format'
@@ -39,7 +40,9 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
   const [details, setDetails] = useState(partner.payout_details ?? '')
   const [amount, setAmount] = useState(String(Math.floor(partner.balance)))
   const [detailsError, setDetailsError] = useState<string | null>(null)
+  useErrorHaptic(detailsError)
   const [payoutError, setPayoutError] = useState<string | null>(null)
+  useErrorHaptic(payoutError)
   const [saved, setSaved] = useState(false)
 
   /*
@@ -63,6 +66,7 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
   const saveDetails = useMutation({
     mutationFn: () => api.partnerSavePayoutDetails(method.trim(), details.trim()),
     onSuccess: async () => {
+      hapticSuccess()
       setDetailsError(null)
       setSaved(true)
       await qc.invalidateQueries({ queryKey: PARTNER_STATE_KEY })
@@ -80,6 +84,7 @@ export function PartnerPayoutsTab({ partner }: { partner: PartnerAccountDTO }) {
   const requestPayout = useMutation({
     mutationFn: () => api.partnerRequestPayout(Number(amount.replace(',', '.'))),
     onSuccess: async () => {
+      hapticSuccess()
       setPayoutError(null)
       await qc.invalidateQueries({ queryKey: PARTNER_STATE_KEY })
       await qc.invalidateQueries({ queryKey: ['partner-payouts'] })

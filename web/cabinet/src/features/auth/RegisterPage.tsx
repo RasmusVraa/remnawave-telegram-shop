@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { getTurnstileToken } from '@/lib/turnstile'
 import { useAuthStore } from '@/store/auth'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -67,6 +68,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [securityChecking, setSecurityChecking] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   function validate(): string | null {
     if (!email) return t('errors.required')

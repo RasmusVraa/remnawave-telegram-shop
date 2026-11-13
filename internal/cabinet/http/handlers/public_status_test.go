@@ -70,7 +70,7 @@ func TestMergeStatusTargetsBindsByNodeUUID(t *testing.T) {
 	if got[1].State != "up" || got[1].exit != "" || got[1].Kind != statusprobe.KindRegular {
 		t.Fatalf("plain row: %+v", got[1])
 	}
-	final := statusprobe.EffectiveState(got[0].State, nil, got[0].exit)
+	final := statusprobe.EffectiveState(got[0].State, nil, true, got[0].exit)
 	if final != statusprobe.StateDown {
 		t.Fatalf("dead exit must pull the cascade down, got %s", final)
 	}

@@ -7,6 +7,7 @@ import { DevicePlatformIcon } from '@/components/DevicePlatformIcon'
 import { Spinner } from '@/components/ui/spinner'
 import { useToast } from '@/components/ui/toast'
 import { api, type DeviceInfo } from '@/lib/api'
+import { hapticSuccess } from '@/lib/haptic'
 
 // Совпадает с DeviceNameMaxLen на бэкенде (VARCHAR(64) в device_name).
 const DEVICE_NAME_MAX_LEN = 64
@@ -49,6 +50,7 @@ export function DeviceRow({
   const rename = useMutation({
     mutationFn: (name: string) => api.renameDevice(device.hwid, name),
     onSuccess: async () => {
+      hapticSuccess()
       await queryClient.invalidateQueries({ queryKey: ['devices'] })
       setEditing(false)
     },

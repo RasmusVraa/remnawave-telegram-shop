@@ -36,6 +36,10 @@ const CtxKeyUsername ctxKey = "username"
 // CtxKeyPanelUsername is an optional explicit username for Remnawave panel user.
 const CtxKeyPanelUsername ctxKey = "panel_username"
 
+// CtxKeyEmail — подтверждённая почта клиента из кабинета; уходит в поле email
+// пользователя панели. Пусто — поле не трогаем.
+const CtxKeyEmail ctxKey = "email"
+
 type Client struct {
 	httpClient *http.Client
 	baseURL    string
@@ -571,6 +575,13 @@ func UsernameFromCtx(ctx context.Context) string {
 	return ""
 }
 
+func emailFromCtx(ctx context.Context) string {
+	if v, ok := ctx.Value(CtxKeyEmail).(string); ok {
+		return strings.TrimSpace(v)
+	}
+	return ""
+}
+
 func panelUsernameFromCtx(ctx context.Context) string {
 	if v, ok := ctx.Value(CtxKeyPanelUsername).(string); ok {
 		return strings.TrimSpace(v)
@@ -684,6 +695,9 @@ func (r *Client) updateUserWithBase(ctx context.Context, customerID, telegramID 
 	if username != "" {
 		userUpdate.Description = &username
 	}
+	if email := emailFromCtx(ctx); email != "" {
+		userUpdate.Email = &email
+	}
 
 	var resp apiResponse[User]
 	if err := r.doJSON(ctx, http.MethodPatch, "/api/users", userUpdate, &resp); err != nil {
@@ -766,6 +780,9 @@ func (r *Client) createUser(ctx context.Context, customerId int64, telegramId in
 	tgUsername := UsernameFromCtx(ctx)
 	if tgUsername != "" {
 		createReq.Description = &tgUsername
+	}
+	if email := emailFromCtx(ctx); email != "" {
+		createReq.Email = &email
 	}
 
 	var resp apiResponse[User]

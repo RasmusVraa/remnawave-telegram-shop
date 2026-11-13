@@ -1,0 +1,215 @@
+{
+  "/admin/settings": {
+    "groups": [
+      {
+        "id": "cabinet",
+        "fields": [
+          {
+            "key": "CABINET_LIGHT_THEME_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DECOR_THEME",
+            "type": "enum",
+            "value": "carbon",
+            "source": "db",
+            "instant": true,
+            "enum_values": [
+              "off",
+              "green",
+              "spring",
+              "cyber",
+              "neon",
+              "ocean",
+              "new_year",
+              "new_year_2",
+              "slate",
+              "carbon",
+              "aurora",
+              "nebula",
+              "violet",
+              "lavender",
+              "pink",
+              "valentine",
+              "wine",
+              "sunset",
+              "orange",
+              "halloween",
+              "halloween_2",
+              "yellow",
+              "summer",
+              "black_friday"
+            ]
+          },
+          {
+            "key": "CABINET_DECOR_AUTO_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DECOR_SCHEDULE",
+            "type": "text",
+            "value": "",
+            "source": "default",
+            "instant": false
+          },
+          {
+            "key": "CABINET_SUBSCRIPTION_SHOW_LOYALTY",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_HOME_QUICK_ACTIONS",
+            "type": "text",
+            "value": "fortune,support",
+            "source": "db",
+            "instant": false
+          }
+        ]
+      },
+      {
+        "id": "cabinet_connect",
+        "fields": [
+          {
+            "key": "CABINET_DEEPLINK_HAPP_ENCRYPT",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_DEEPLINK_HAPP_CRYPT_VERSION",
+            "type": "enum",
+            "value": "crypt5",
+            "source": "default",
+            "instant": true,
+            "enum_values": [
+              "crypt5",
+              "crypt4"
+            ]
+          },
+          {
+            "key": "CABINET_DEEPLINK_INCY_ENCRYPT",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          },
+          {
+            "key": "CABINET_TELEGRAM_SHOW_CHANNEL_BUTTON",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CABINET_TELEGRAM_SHOW_FEEDBACK_BUTTON",
+            "type": "bool",
+            "value": "false",
+            "source": "default",
+            "instant": true
+          }
+        ]
+      },
+      {
+        "id": "payments",
+        "fields": [
+          {
+            "key": "YOOKASA_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "PLATEGA_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "CRYPTO_PAY_ENABLED",
+            "type": "bool",
+            "value": "false",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "HELEKET_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "TELEGRAM_STARS_ENABLED",
+            "type": "bool",
+            "value": "true",
+            "source": "db",
+            "instant": true
+          },
+          {
+            "key": "YOOKASA_PAYMENT_METHODS",
+            "type": "text",
+            "value": "sbp,bank_card,sberbank",
+            "source": "db",
+            "instant": false
+          },
+          {
+            "key": "PLATEGA_PAYMENT_METHODS",
+            "type": "text",
+            "value": "all,sbp",
+            "source": "db",
+            "instant": false
+          },
+          {
+            "key": "CABINET_CHECKOUT_DEFAULT_METHOD",
+            "type": "text",
+            "value": "yookassa:sbp",
+            "source": "db",
+            "instant": false
+          }
+        ]
+      }
+    ]
+  },
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "cryptopay": false,
+      "telegram": true,
+      "platega": true,
+      "platega_sbp": true,
+      "heleket": true
+    },
+    "site_links": {
+      "channel": "https://t.me/example",
+      "feedback": "https://t.me/example_reviews"
+    },
+    "partner_max_percent": 20,
+    "support_chat_enabled": true,
+    "yookassa_methods": [
+      "sbp",
+      "bank_card",
+      "sberbank"
+    ],
+    "checkout_default_method": "yookassa:sbp",
+    "home_quick_actions": [
+      "fortune",
+      "support"
+    ],
+    "fortune_enabled": true,
+    "platega_methods": [
+      "all",
+      "sbp"
+    ]
+  }
+}

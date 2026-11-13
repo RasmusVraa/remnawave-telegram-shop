@@ -1,19 +1,21 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, Moon, Sun } from 'lucide-react'
+import { Globe, Moon, Smartphone, Sun, Vibrate, VibrateOff } from 'lucide-react'
 
 import { useLightThemeAllowed } from '@/components/ThemePolicyProvider'
 import { useTheme } from '@/hooks/useTheme'
 import { setLanguage } from '@/i18n'
+import { hapticSelection, setHapticsEnabled, useHapticsEnabled } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 /**
- * «Настройки» в профиле: язык и тема.
+ * «Настройки» в профиле: язык, тема и вибрация.
  *
  * На телефоне шапка кабинета — только логотип и ☰, поэтому переключатели
  * переехали сюда. На ПК они остаются и в шапке: одна и та же логика,
  * карточка ничего не дублирует, а просто находится там, где её ищут.
  * Тему прячем, если админ разрешил только тёмную (праздничные темы).
+ * Вибрация показывается всегда, даже на ПК: выбор общий для браузера и ничему не мешает.
  *
  * Язык — флагами, тема — луной и солнцем: короче подписей и читается сразу.
  * Флаги нарисованы SVG, а не эмодзи: на Windows эмодзи-флаги показываются
@@ -41,6 +43,7 @@ export function ProfileSettingsCard() {
         />
       </SettingRow>
       {lightAllowed && <ThemeRow />}
+      <HapticsRow />
     </section>
   )
 }
@@ -58,6 +61,24 @@ function ThemeRow() {
         ]}
         onChange={(v) => set(v as 'dark' | 'light')}
         ariaLabel={t('home.settingsTheme')}
+      />
+    </SettingRow>
+  )
+}
+
+function HapticsRow() {
+  const { t } = useTranslation()
+  const on = useHapticsEnabled()
+  return (
+    <SettingRow icon={<Smartphone className="size-4" />} label={t('home.settingsHaptics')}>
+      <Segmented
+        value={on ? 'on' : 'off'}
+        options={[
+          { value: 'off', label: <VibrateOff className="size-4" strokeWidth={2} />, title: t('home.settingsHapticsOff') },
+          { value: 'on', label: <Vibrate className="size-4" strokeWidth={2} />, title: t('home.settingsHapticsOn') },
+        ]}
+        onChange={(v) => setHapticsEnabled(v === 'on')}
+        ariaLabel={t('home.settingsHaptics')}
       />
     </SettingRow>
   )
@@ -94,7 +115,12 @@ function Segmented({
           aria-checked={value === o.value}
           aria-label={o.title}
           title={o.title}
-          onClick={() => onChange(o.value)}
+          onClick={() => {
+            if (value === o.value) return
+            onChange(o.value)
+            // После onChange: включение вибрации сразу даёт её почувствовать, выключение — молчит.
+            hapticSelection()
+          }}
           className={cn(
             'inline-flex h-7 w-10 items-center justify-center rounded-[7px] transition-[background-color,color,opacity]',
             value === o.value

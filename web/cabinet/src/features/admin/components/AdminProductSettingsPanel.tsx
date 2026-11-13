@@ -57,17 +57,12 @@ export function AdminProductSettingsPanel() {
     <section className="space-y-3">
       <AdminFeedback feedback={feedback} onDismiss={clearFeedback} autoDismissMs={4000} />
 
-      <div className="flex flex-col gap-0.5">
-        <h2 className="text-base font-semibold tracking-tight">{t('admin.tariffs.settingsTitle')}</h2>
-        <p className="text-sm text-muted-foreground">{t('admin.tariffs.settingsSubtitle')}</p>
-      </div>
-
       {isLoading ? (
         <div className="flex items-center justify-center py-10 text-muted-foreground">
           <Loader2 className="size-5 animate-spin" />
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
           {productGroups.map((group) => (
             <AdminSettingsGroupEditor
               key={group.id}

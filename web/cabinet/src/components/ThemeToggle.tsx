@@ -4,6 +4,7 @@ import { useLightThemeAllowed } from '@/components/ThemePolicyProvider'
 import { useTheme } from '@/hooks/useTheme'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 
 interface ThemeToggleProps {
   className?: string
@@ -25,7 +26,10 @@ function ThemeToggleButton({ className }: ThemeToggleProps) {
     <Button
       variant="ghost"
       size="icon"
-      onClick={toggle}
+      onClick={() => {
+        hapticSelection()
+        toggle()
+      }}
       title={t('theme.toggle')}
       aria-label={t('theme.toggle')}
       className={cn(className)}

@@ -189,4 +189,3 @@ func ComputeUpgradeBonusDays(customer *database.Customer, tpOld, tpNew *database
 	}
 	return int(math.Round(bonus))
 }
-

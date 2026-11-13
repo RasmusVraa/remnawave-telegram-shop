@@ -3,10 +3,14 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
 	cabsvc "remnawave-tg-shop-bot/internal/cabinet/service"
+	"remnawave-tg-shop-bot/internal/config"
+	"remnawave-tg-shop-bot/internal/database"
+	"remnawave-tg-shop-bot/internal/remnawave"
 )
 
 // Расход трафика по дням за расчётный период — для графика на главной кабинета.
@@ -36,6 +40,9 @@ type meTrafficUsageResp struct {
 	Points []float64 `json:"points"`
 	// TotalBytes — сумма за период.
 	TotalBytes float64 `json:"total_bytes"`
+	// BypassPoints — часть расхода по дням, ушедшая на серверы обхода (та же длина, что Points).
+	// Есть только у клиентов с отдельным лимитом обхода; остальное — обычные серверы.
+	BypassPoints []float64 `json:"bypass_points,omitempty"`
 }
 
 func emptyTrafficUsage(enabled bool) meTrafficUsageResp {
@@ -92,6 +99,22 @@ func (h *MeHandler) GetTrafficUsage(w http.ResponseWriter, r *http.Request) {
 	if earliest := end.AddDate(0, 0, -usageMaxDays); start.Before(earliest) {
 		start = earliest
 	}
+	// График показывает текущий календарный месяц: прошлый месяц он всё равно не рисует, а запрашивать его незачем.
+	if month := database.TrafficPeriodStart(end); start.Before(month) {
+		start = month
+	}
+
+	// Раздельный трафик: лимиты считаются по календарному месяцу, и график должен
+	// начинаться с 1-го числа, а не с последнего сброса счётчика в панели.
+	var splitState *database.BypassState
+	if h.traffic != nil && config.TrafficSplitEnabled() {
+		if st, err := h.traffic.GetState(r.Context(), c.ID); err == nil && st != nil && st.LimitBytes > 0 {
+			splitState = st
+			if month := database.TrafficPeriodStart(end); month.Before(start) {
+				start = month
+			}
+		}
+	}
 
 	series, err := h.rw.GetUserUsageByRange(r.Context(), rwUser.ID, start, end)
 	if err != nil {
@@ -116,8 +139,34 @@ func (h *MeHandler) GetTrafficUsage(w http.ResponseWriter, r *http.Request) {
 		resp.Points = []float64{}
 	}
 
+	if splitState != nil {
+		resp.BypassPoints = bypassDailyPoints(series, splitState.NodeUUIDs)
+	}
+
 	// Данные меняются раз в сутки, но кэш держим коротким: страница открывается
 	// часто, а лишний поход в панель на каждое открытие ни к чему.
 	w.Header().Set("Cache-Control", "private, max-age=300")
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// bypassDailyPoints — расход по дням только на нодах обхода (uuid через запятую).
+func bypassDailyPoints(series *remnawave.UserUsageSeries, nodeUUIDs string) []float64 {
+	want := map[string]struct{}{}
+	for _, p := range strings.Split(nodeUUIDs, ",") {
+		if p = strings.ToLower(strings.TrimSpace(p)); p != "" {
+			want[p] = struct{}{}
+		}
+	}
+	out := make([]float64, len(series.Categories))
+	for _, n := range series.Series {
+		if _, ok := want[strings.ToLower(n.UUID)]; !ok {
+			continue
+		}
+		for i, v := range n.Data {
+			if i < len(out) {
+				out[i] += v
+			}
+		}
+	}
+	return out
 }

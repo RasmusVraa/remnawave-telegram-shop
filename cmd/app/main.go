@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"remnawave-tg-shop-bot/internal/adminalert"
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/broadcast"
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
 	cabinethttp "remnawave-tg-shop-bot/internal/cabinet/http"
@@ -33,9 +35,11 @@ import (
 	"remnawave-tg-shop-bot/internal/remnawavewebhook"
 	"remnawave-tg-shop-bot/internal/sync"
 	"remnawave-tg-shop-bot/internal/tgclient"
+	"remnawave-tg-shop-bot/internal/trafficquota"
 	"remnawave-tg-shop-bot/internal/translation"
 	"remnawave-tg-shop-bot/internal/tribute"
 	"remnawave-tg-shop-bot/internal/yookasa"
+	"remnawave-tg-shop-bot/utils"
 	"strconv"
 	"strings"
 	"syscall"
@@ -127,11 +131,17 @@ func main() {
 	cache := cache.NewCache(30 * time.Minute)
 
 	// Создание репозиториев для работы с данными в БД
-	customerRepository := database.NewCustomerRepository(pool)                  // Работа с пользователями
+	customerRepository := database.NewCustomerRepository(pool) // Работа с пользователями
 	// Уведомления в кабинете: лента под колокольчиком и push. Общий сервис
 	// заводится до всех, кто пишет людям, — оплаты, кронов, рассылок.
 	cabinetNotify := cabinetnotify.New(pool, tm)
 	cabinetnotify.SetDefault(cabinetNotify)
+	// Журнал «Мониторинга» в админке: пишет фоновой очередью пачками. Заводится
+	// до всех, кто сообщает о событиях, — оплат, кабинета, кронов.
+	adminEventStore := adminevents.NewStore(pool)
+	adminEventWriter := adminevents.NewWriter(adminEventStore)
+	adminEventWriter.Start()
+	adminevents.SetDefault(adminEventWriter)
 	purchaseRepository := database.NewPurchaseRepository(pool)                  // Работа с покупками
 	tariffRepository := database.NewTariffRepository(pool)                      // Тарифы (SALES_MODE=tariffs)
 	referralRepository := database.NewReferralRepository(pool)                  // Работа с реферальной системой
@@ -184,7 +194,7 @@ func main() {
 
 	// Создание экземпляра Telegram бота с 3 воркерами для параллельной обработки запросов
 	botInflight := &handler.Inflight{}
-	botOptions := []bot.Option{bot.WithWorkers(3), bot.WithMiddlewares(handler.RecoverMiddleware(botInflight))}
+	botOptions := []bot.Option{bot.WithWorkers(3), bot.WithMiddlewares(handler.RecoverMiddleware(botInflight), handler.MonitoringMiddleware())}
 	// Значения по умолчанию go-telegram/bot: long poll и таймаут клиента — минута.
 	botPollTimeout := time.Minute
 	var botHTTP tgclient.Doer = &http.Client{Timeout: botPollTimeout}
@@ -224,6 +234,11 @@ func main() {
 	// Инициализация сервиса платежей, который объединяет все платежные системы
 	paymentService := payment.NewPaymentService(tm, purchaseRepository, tariffRepository, remnawaveClient, customerRepository, b, cryptoPayClient, yookasaClient, plategaClient, heleketClient, referralRepository, referralLedgerRepository, partnerRepository, cache, receiptQueue, promoService, loyaltyTierRepository)
 
+	// Раздельный трафик: лимит обхода, пакеты докупки, предупреждения (воркер раз в минуту решает, пора ли).
+	trafficRepository := database.NewTrafficSplitRepository(pool)
+	trafficService := trafficquota.New(trafficRepository, customerRepository, tariffRepository, remnawaveClient, trafficquota.NewTelegramNotifier(b, tm))
+	paymentService.SetTrafficSplit(trafficRepository, trafficService)
+
 	// Один Reconciler на вебхук и на поллинг: решение «зачесть / отменить /
 	// позвать админа» принимается в одном месте.
 	heleketReconciler := heleket.NewReconciler(heleketClient, purchaseRepository, paymentService, paymentService, paymentService)
@@ -239,6 +254,7 @@ func main() {
 
 	// Инициализация сервиса уведомлений о подписках
 	subService := notification.NewSubscriptionService(customerRepository, purchaseRepository, paymentService, b, tm)
+	adminalert.Init(b)
 	infraBillingNotifyService := notification.NewInfraBillingNotifyService(remnawaveClient, infraBillingRepository, b, tm)
 
 	// Настройка cron-задачи для проверки истечения подписок (каждый день в 16:00)
@@ -246,6 +262,10 @@ func main() {
 	subscriptionNotificationCronScheduler := subscriptionChecker(subService, infraBillingNotifyService)
 	subscriptionNotificationCronScheduler.Start()
 	schedulers = append(schedulers, subscriptionNotificationCronScheduler)
+
+	trafficCronScheduler := trafficQuotaChecker(trafficService)
+	trafficCronScheduler.Start()
+	schedulers = append(schedulers, trafficCronScheduler)
 
 	// Lifecycle notifications cron (отдельно от daily 16:00)
 	var lifecycleCronScheduler *cron.Cron
@@ -295,6 +315,30 @@ func main() {
 	cabinetCleanupScheduler := cabinetExpiredCleaner(pool)
 	cabinetCleanupScheduler.Start()
 	schedulers = append(schedulers, cabinetCleanupScheduler)
+
+	adminEventsScheduler := adminEventsJobs(adminEventStore)
+	adminEventsScheduler.Start()
+	schedulers = append(schedulers, adminEventsScheduler)
+
+	// Ноды панели для «Мониторинга»: раз в минуту, «упала / поднялась» и счётчик в сети.
+	nodeWatcher := adminevents.NewNodeWatcher(func(c context.Context) ([]adminevents.NodeStatus, error) {
+		list, err := remnawaveClient.ListNodes(c)
+		if err != nil {
+			return nil, err
+		}
+		out := make([]adminevents.NodeStatus, 0, len(list))
+		for _, n := range list {
+			if n.IsDisabled {
+				continue
+			}
+			out = append(out, adminevents.NodeStatus{
+				UUID: n.UUID, Name: n.Name, Country: n.CountryCode, Online: n.IsConnected,
+			})
+		}
+		return out, nil
+	})
+	adminevents.SetNodeWatcher(nodeWatcher)
+	utils.Go("admin-events-nodes", func() { nodeWatcher.Run(ctx) })
 
 	// Инициализация сервиса синхронизации с Remnawave
 	syncService := sync.NewSyncService(remnawaveClient, customerRepository)
@@ -932,7 +976,7 @@ func main() {
 	// Запуск бота (блокирующий вызов, работает до получения сигнала прерывания)
 	b.Start(ctx)
 
-	shutdown(srv, botInflight, schedulers, pool)
+	shutdown(srv, botInflight, schedulers, adminEventWriter, pool)
 }
 
 // shutdownTimeout — сколько ждём незавершённую работу при остановке. Docker
@@ -943,7 +987,7 @@ const shutdownTimeout = 9 * time.Second
 // оплат, кабинет) и дожидается начатых запросов, затем дожидается начатых
 // обработчиков бота и задач cron, и только потом закрывает пул БД — иначе
 // начатая выдача подписки обрывалась бы на полпути.
-func shutdown(srv *http.Server, botInflight *handler.Inflight, schedulers []*cron.Cron, pool *pgxpool.Pool) {
+func shutdown(srv *http.Server, botInflight *handler.Inflight, schedulers []*cron.Cron, events *adminevents.Writer, pool *pgxpool.Pool) {
 	slog.Info("Shutting down…")
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -966,6 +1010,8 @@ func shutdown(srv *http.Server, botInflight *handler.Inflight, schedulers []*cro
 			slog.Warn("Shutdown: cron job still running")
 		}
 	}
+	// Журнал «Мониторинга» дописываем последним: в него пишут и обработчики, и кроны.
+	events.Stop(ctx)
 	pool.Close()
 	slog.Info("Shutdown complete")
 }
@@ -1067,6 +1113,20 @@ func subscriptionChecker(subService *notification.SubscriptionService, infraNoti
 	return c
 }
 
+// trafficQuotaChecker — раз в минуту будит воркер раздельного трафика; тот сам решает, пора ли
+// проходить по клиентам (TRAFFIC_POLL_MINUTES), а при выключенном TRAFFIC_SPLIT_ENABLED занимается только пакетами обычного трафика (истечение, возврат сквадов).
+func trafficQuotaChecker(svc *trafficquota.Service) *cron.Cron {
+	c := newCron()
+	if _, err := c.AddFunc("@every 1m", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+		svc.RunDue(ctx)
+	}); err != nil {
+		panic(err)
+	}
+	return c
+}
+
 // lifecycleChecker - настраивает cron для lifecycle-уведомлений (no-connect, win-back, trial expiring)
 // Запускается по расписанию из LIFECYCLE_CRON (по умолчанию каждые 30 минут)
 func lifecycleChecker(lifecycleService *notification.LifecycleService) *cron.Cron {
@@ -1111,6 +1171,25 @@ func partnerHoldReleaser(partners *database.PartnerRepository) *cron.Cron {
 	if err != nil {
 		panic(fmt.Sprintf("Failed to add partner hold cron job: %v", err))
 	}
+	return c
+}
+
+// adminEventsJobs — фоновые задачи журнала «Мониторинга»: раз в час отметить
+// истёкшие подписки, раз в сутки — сводка по ним и очистка старых строк.
+func adminEventsJobs(store *adminevents.Store) *cron.Cron {
+	c := newCron()
+	add := func(spec string, fn func(ctx context.Context)) {
+		if _, err := c.AddFunc(spec, func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+			defer cancel()
+			fn(ctx)
+		}); err != nil {
+			panic(fmt.Sprintf("Failed to add admin events cron job %q: %v", spec, err))
+		}
+	}
+	add("5 * * * *", func(ctx context.Context) { store.RunExpiredScan(ctx, time.Now()) })
+	add("0 9 * * *", func(ctx context.Context) { store.RunExpiredDigest(ctx, time.Now()) })
+	add("40 4 * * *", store.RunPurge)
 	return c
 }
 

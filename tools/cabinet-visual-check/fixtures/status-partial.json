@@ -1,0 +1,351 @@
+{
+  "/public/status": {
+    "available": true,
+    "updated_at": "2026-11-03T20:00:00Z",
+    "online": 3,
+    "total": 5,
+    "show_map": true,
+    "probes_enabled": true,
+    "probe_world": 3,
+    "probe_russia": 20,
+    "probe_interval_min": 20,
+    "nodes": [
+      {
+        "id": "a1",
+        "name": "Нидерланды",
+        "country": "NL",
+        "kind": "regular",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "world_ping_ms": 41,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 20,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "hits": [
+            {
+              "city": "Москва",
+              "network": "МТС",
+              "country": "RU",
+              "ok": true,
+              "ping_ms": 48,
+              "lat": 55.75,
+              "lon": 37.6
+            },
+            {
+              "city": "Казань",
+              "network": "Билайн",
+              "country": "RU",
+              "ok": true,
+              "ping_ms": 61,
+              "lat": 55.8,
+              "lon": 49.1
+            }
+          ]
+        }
+      },
+      {
+        "id": "a2",
+        "name": "Германия",
+        "country": "DE",
+        "note": "Франкфурт",
+        "kind": "regular",
+        "state": "partial",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 15,
+          "russia_total": 20,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 10,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            0.5,
+            1,
+            1,
+            1,
+            0.5,
+            1
+          ]
+        }
+      },
+      {
+        "id": "a3",
+        "name": "США",
+        "country": "US",
+        "kind": "regular",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 10,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      {
+        "id": "a4",
+        "name": "Обход РФ · Москва",
+        "country": "RU",
+        "note": "Белые списки",
+        "kind": "bypass",
+        "whitelist": true,
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 0,
+          "russia_total": 0,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 30,
+          "history": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "hits": [
+            {
+              "network": "МТС",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 62,
+              "tcp_ok": true,
+              "tcp_ms": 71
+            },
+            {
+              "network": "Мегафон",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 58,
+              "tcp_ok": true,
+              "tcp_ms": 66
+            },
+            {
+              "network": "Билайн",
+              "kind": "whitelist",
+              "ok": true,
+              "icmp_ok": true,
+              "icmp_ms": 74,
+              "tcp_ok": true,
+              "tcp_ms": 80
+            },
+            {
+              "network": "T2",
+              "kind": "whitelist",
+              "ok": false,
+              "icmp_ok": false,
+              "tcp_ok": false
+            }
+          ]
+        }
+      },
+      {
+        "id": "a5",
+        "name": "Финляндия",
+        "country": "FI",
+        "kind": "regular",
+        "state": "up",
+        "probe": {
+          "world_ok": 3,
+          "world_total": 3,
+          "russia_ok": 20,
+          "russia_total": 20,
+          "world_ping_ms": 33,
+          "measured_at": "2026-11-03T19:56:00Z",
+          "next_min": 20,
+          "history": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    ],
+    "ru_fail_threshold": 2
+  },
+  "/content/faq": {
+    "info": {
+      "title": "Информация",
+      "tabs": [
+        {
+          "id": "faq",
+          "label": "FAQ"
+        },
+        {
+          "id": "documents",
+          "label": "Документы"
+        },
+        {
+          "id": "status",
+          "label": "Статус"
+        }
+      ],
+      "documents": [],
+      "useful_links": [],
+      "status": {
+        "title": "Статус сервисов",
+        "description": "Проверяйте актуальное состояние сервисов",
+        "button": "Открыть статус"
+      }
+    },
+    "faq": [
+      {
+        "id": "1",
+        "question": "Как подключиться?",
+        "answer": "Откройте главную."
+      }
+    ],
+    "support": {
+      "title": "Поддержка",
+      "description": "Напишите нам",
+      "primary_button": "Написать в поддержку",
+      "extra_links": []
+    }
+  }
+}

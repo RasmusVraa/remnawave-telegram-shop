@@ -46,6 +46,10 @@ interface AdminModalProps {
   icon?: LucideIcon
   iconTone?: RwIconTone
   iconAccent?: AdminSectionIconAccent
+  /** Кнопка в шапке напротив заголовка (например, фильтр). */
+  headerAction?: ReactNode
+  /** Без крестика: окно закрывается тапом вне его. Только вместе с headerAction. */
+  hideClose?: boolean
 }
 
 export function AdminModal({
@@ -62,6 +66,8 @@ export function AdminModal({
   icon: Icon,
   iconTone = 'default',
   iconAccent,
+  headerAction,
+  hideClose,
 }: AdminModalProps) {
   const { t } = useTranslation()
   const { sheetRef, handlers: dragHandlers } = useSheetDragDismiss({ open, onDismiss: onClose })
@@ -136,14 +142,25 @@ export function AdminModal({
                 )}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-btn p-1 hover:bg-accent"
-              aria-label={t('common.close')}
-            >
-              <X className="size-4" />
-            </button>
+            {headerAction && (
+              <div
+                className="shrink-0"
+                onPointerDown={(e) => e.stopPropagation()}
+                onTouchStart={(e) => e.stopPropagation()}
+              >
+                {headerAction}
+              </div>
+            )}
+            {!(hideClose && headerAction) && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-btn p-1 hover:bg-accent"
+                aria-label={t('common.close')}
+              >
+                <X className="size-4" />
+              </button>
+            )}
           </div>
           {/* Нижний отступ с учётом кнопок навигации Android несёт последний
               блок: футер, а без него — тело окна. */}

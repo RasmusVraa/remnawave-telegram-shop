@@ -37,8 +37,8 @@
         "updatedAt": "2026-01-01T00:00:00Z",
         "provider": {
           "uuid": "p2",
-          "name": "Senko",
-          "faviconLink": "https://hostvds.com",
+          "name": "Cloudline",
+          "faviconLink": "https://example.com",
           "loginUrl": ""
         },
         "node": {
@@ -91,7 +91,7 @@
         "provider": {
           "uuid": "p2",
           "name": "HostVDS",
-          "faviconLink": "https://hostvds.com",
+          "faviconLink": "https://example.com",
           "loginUrl": ""
         }
       },

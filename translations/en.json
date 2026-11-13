@@ -1,5 +1,5 @@
 {
-  "greeting": "🎁 7 days of VPN for FREE!\nConnect right now!\n\n🌐 Servers:<blockquote>🇱🇻 Latvia  🇩🇪 Germany\n🇸🇪 Sweden  🇷🇺 Russia</blockquote>\n\n🚀 Fast speed unlimited traffic\n💪 No ads\n♾️ Bypassing WS\n\n🌐 Cabinet: cabinet.me0ws.store\n\n<b><a href=\"tg://resolve?domain=Meows_support_bot\">🆘 Help and TG proxy</a></b>",
+  "greeting": "🎁 7 days of VPN for FREE!\nConnect right now!\n\n🌐 Servers:<blockquote>🇱🇻 Latvia  🇩🇪 Germany\n🇸🇪 Sweden  🇷🇺 Russia</blockquote>\n\n🚀 Fast speed unlimited traffic\n💪 No ads\n♾️ Bypassing WS\n\n🌐 Cabinet: cabinet.me0ws.store\n\n<b><a href=\"tg://resolve?domain=Meows_support_bot\">🆘 Help</a></b>",
   "cabinet_minimal_user_line": "👤 <b>%s</b>",
   "cabinet_minimal_status_active": "📱 Subscription: 💎 Active",
   "cabinet_minimal_status_expired": "📱 Subscription: 🔴 Expired",
@@ -85,6 +85,7 @@
   "tariff_selected_description_line": "📝 %s",
   "tariff_choose_period": "<b>Choose a period:</b>",
   "tariff_payment_methods_text": "<b>Payment methods:</b>\n💸 Bank card\n⭐ Telegram Stars - after 1 payment",
+  "buy_no_tariffs": "Purchases are unavailable right now. Please check back later.",
   "month_1": "1 mo – %d ₽",
   "month_3": "3 mo – %d ₽",
   "month_6": "6 mo – %d ₽",
@@ -106,20 +107,20 @@
   "yookasa_yoo_money_button": {
     "text": "👛 YooMoney"
   },
-  "platega_sbp_button": {
-    "text": "💳 SBP"
+  "platega_button": {
+    "text": "💳 Platega"
   },
-  "platega_cards_button": {
-    "text": "💳 Card"
+  "platega_sbp_button": {
+    "text": "💳 SBP - Platega"
   },
   "platega_acquiring_button": {
-    "text": "💳 Card"
+    "text": "💳 Card - Platega"
   },
   "platega_worldwide_button": {
-    "text": "💳 Card"
+    "text": "💳 International card - Platega"
   },
   "platega_crypto_button": {
-    "text": "₿ Crypto"
+    "text": "₿ Crypto - Platega"
   },
   "heleket_button": {
     "text": "₿ Other crypto"
@@ -448,10 +449,22 @@
   "cabinet_notify_referral_title": "Referral bonus",
   "cabinet_notify_referral_body": "Your friend paid for a subscription — you get +%d days.",
   "cabinet_notify_support_title": "Support replied",
+  "cabinet_notify_support_photo": "📷 Photo",
   "cabinet_notify_partner_title": "Partner program",
   "cabinet_notify_devices_title": "Device slots",
   "cabinet_notify_devices_body": "You have more device slots now: %d → %d.",
   "cabinet_notify_loyalty_title": "New loyalty level",
   "cabinet_notify_loyalty_body": "You reached level %d — %d%% off renewals.",
-  "cabinet_notify_torrent_title": "Server temporarily unavailable"
+  "cabinet_notify_torrent_title": "Server temporarily unavailable",
+  "traffic_kind_main": "Regular servers",
+  "traffic_alert_warn_title": "%[1]d%% of traffic used (%[2]s)",
+  "traffic_alert_warn_body": "%[1]s left of %[2]s. The limit resets on %[3]s.",
+  "traffic_alert_full_title": "Traffic limit (%[1]s) reached",
+  "traffic_alert_full_bypass_body": "“%[1]s” servers are off until %[2]s. Regular servers keep working as before.\nBuy a pack and access returns within 5 minutes.",
+  "traffic_alert_full_main_body": "Traffic on “%[1]s” is used up. Buy a pack or wait until %[2]s.",
+  "traffic_buy_button": "➕ Buy traffic",
+  "traffic_my_button": "📊 My traffic",
+  "traffic_pack_paid_title": "Traffic pack purchased",
+  "traffic_pack_paid_body": "+%[1]s (“%[2]s”). Valid until %[3]s, then the limit returns to your plan.",
+  "traffic_pack_paid_dm": "✅ Traffic pack purchased: <b>+%[1]s</b> (“%[2]s”).\nValid until %[3]s, then the limit returns to your plan. If bypass servers were off, they come back within 5 minutes — refresh your subscription in the app."
 }

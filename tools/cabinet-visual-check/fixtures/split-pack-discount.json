@@ -1,0 +1,206 @@
+{
+  "/me": {
+    "id": 1,
+    "email": "user@example.invalid",
+    "email_verified": true,
+    "language": "ru",
+    "providers": [
+      "password",
+      "telegram"
+    ],
+    "has_telegram_link": true,
+    "has_password": true,
+    "is_admin": true,
+    "customer_id": 1
+  },
+  "/auth/bootstrap": {
+    "site_links": {
+      "channel": "https://t.me/example",
+      "feedback": "https://t.me/example_reviews"
+    },
+    "partner_max_percent": 20,
+    "support_chat_enabled": true
+  },
+  "/me/subscription": {
+    "expire_at": "2027-01-29T04:00:14.230Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 3,
+    "traffic_used_gb": 18.4,
+    "traffic_limit_gb": null,
+    "is_trial": false,
+    "tariff": {
+      "id": 1,
+      "slug": "premium",
+      "name": "Премиум",
+      "traffic_gb": null,
+      "device_limit": 5
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": {
+      "enabled": true,
+      "ui_visible": true,
+      "current_limit": 5,
+      "base_limit": 3,
+      "max_limit": 8,
+      "extra_active": 2,
+      "can_increase": true,
+      "can_decrease": true,
+      "price_rub_month": 75,
+      "stars_price_month": 40,
+      "days_left": 41
+    },
+    "traffic_reset_strategy": null,
+    "next_traffic_reset_at": null
+  },
+  "/me/devices": {
+    "enabled": true,
+    "device_limit": 5,
+    "connected": 5,
+    "devices": [
+      {
+        "hwid": "h1",
+        "platform": "iOS",
+        "os_version": "18.1",
+        "device_model": "iPhone 13"
+      },
+      {
+        "hwid": "h2",
+        "platform": "Android",
+        "os_version": "14",
+        "device_model": "Redmi Note 12"
+      },
+      {
+        "hwid": "h3",
+        "platform": "Windows",
+        "os_version": "11",
+        "device_model": "Ноутбук"
+      },
+      {
+        "hwid": "h4",
+        "platform": "AndroidTV",
+        "os_version": "11",
+        "device_model": "Mi TV"
+      },
+      {
+        "hwid": "h5",
+        "platform": "macOS",
+        "os_version": "15.1",
+        "device_model": "MacBook Air"
+      }
+    ]
+  },
+  "/me/traffic-usage": {
+    "enabled": true,
+    "period_start": "2026-11-01",
+    "period_end": "2026-11-14",
+    "categories": [
+      "2026-11-01",
+      "2026-11-02",
+      "2026-11-03",
+      "2026-11-04",
+      "2026-11-05",
+      "2026-11-06",
+      "2026-11-07",
+      "2026-11-08",
+      "2026-11-09",
+      "2026-11-10",
+      "2026-11-11",
+      "2026-11-12",
+      "2026-11-13",
+      "2026-11-14"
+    ],
+    "points": [
+      1073741824,
+      1610612736,
+      751619276.8000001,
+      1181116006.4,
+      2147483648,
+      966367641.6,
+      644245094.4000001,
+      1395864371.2,
+      1073741824,
+      1825361100.8000002,
+      1503238553.6000001,
+      858993459.2,
+      1288490188.8000002,
+      966367641.6
+    ],
+    "total_bytes": 17287243366.4,
+    "bypass_points": [
+      0,
+      214748364.8,
+      0,
+      0,
+      644245094.4000001,
+      107374182.4,
+      0,
+      322122547.20000005,
+      214748364.8,
+      429496729.6,
+      0,
+      107374182.4,
+      214748364.8,
+      322122547.20000005
+    ]
+  },
+  "/me/trial": {
+    "enabled": true,
+    "can_activate": false,
+    "days": 3
+  },
+  "/me/connect-invite": {
+    "url": "https://example.invalid/c/abc",
+    "expires_at": "2026-11-07T16:00:14.230Z"
+  },
+  "/me/traffic": {
+    "enabled": true,
+    "can_buy": true,
+    "label": "Обход",
+    "reset_at": "2026-12-01T00:00:00Z",
+    "main": {
+      "limit_bytes": 0,
+      "base_bytes": 0,
+      "extra_bytes": 0,
+      "used_bytes": 19756849561.6
+    },
+    "extras": [],
+    "bypass_blocked": true,
+    "packs": [
+      {
+        "id": 11,
+        "kind": "bypass",
+        "bytes": 5368709120,
+        "amount_rub": 59
+      },
+      {
+        "id": 12,
+        "kind": "bypass",
+        "bytes": 21474836480,
+        "amount_rub": 199
+      },
+      {
+        "id": 13,
+        "kind": "bypass",
+        "bytes": 53687091200,
+        "amount_rub": 399
+      }
+    ],
+    "bypass": {
+      "limit_bytes": 32212254720,
+      "base_bytes": 32212254720,
+      "extra_bytes": 0,
+      "used_bytes": 32212254720
+    }
+  },
+  "/payments/traffic/preview": {
+    "pack_id": 11,
+    "bytes": 5368709120,
+    "kind": "bypass",
+    "amount_rub": 30,
+    "base_amount_rub": 59,
+    "currency": "RUB",
+    "promo_discount_pct": 50,
+    "total_discount_pct": 50
+  }
+}

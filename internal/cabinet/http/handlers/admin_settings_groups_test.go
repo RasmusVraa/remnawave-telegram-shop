@@ -105,3 +105,22 @@ func TestNotificationsGroupIsExposed(t *testing.T) {
 		t.Errorf("в группе %d полей, want %d: %v", len(got), len(want), got)
 	}
 }
+
+// В общем редакторе настроек Instant значит «сохранить сразу при переключении»:
+// у переключателя и списка. Текст или число с Instant не уходят по «Сохранить
+// секцию», а черновик откатывается к значению с сервера — поле выглядит
+// редактируемым, но ничего не сохраняет. Так сломались TRAFFIC_BYPASS_LABEL и
+// TRAFFIC_ALERT_PERCENT. Группа status живёт на своей странице и сохраняет поля
+// явным списком, поэтому её не проверяем.
+func TestInstantOnlyForTogglesAndEnums(t *testing.T) {
+	for _, g := range buildAdminSettingsResponse().Groups {
+		if g.ID == "status" {
+			continue
+		}
+		for _, f := range g.Fields {
+			if f.Instant && f.Type != "bool" && f.Type != "enum" {
+				t.Errorf("%s (группа %s): type=%s с instant — в админке не сохранится", f.Key, g.ID, f.Type)
+			}
+		}
+	}
+}

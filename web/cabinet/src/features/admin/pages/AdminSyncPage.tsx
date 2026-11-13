@@ -23,6 +23,7 @@ export default function AdminSyncPage() {
   })
 
   const syncMutation = useMutation({
+    meta: { haptics: true },
     mutationFn: () => api.adminSync(),
     onSuccess: (data) => queryClient.setQueryData(statusKey, data),
   })

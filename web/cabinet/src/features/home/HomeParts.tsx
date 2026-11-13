@@ -1,20 +1,24 @@
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import { CalendarPlus, Check, ChevronRight, Infinity as InfinityIcon, MonitorSmartphone, Zap, type LucideIcon } from 'lucide-react'
+import { CalendarPlus, Check, ChevronRight, Infinity as InfinityIcon, MonitorSmartphone, Plus, Zap, type LucideIcon } from 'lucide-react'
 
 import { AddDeviceIcon } from '@/components/AddDeviceIcon'
 import { DevicePlatformIcon } from '@/components/DevicePlatformIcon'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
+import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
+import { NestedStatRing, SPLIT_DOT_COLOR } from '@/components/NestedStatRing'
 import { StatRing, UnboundedRing } from '@/components/StatRing'
 import { ConnectDeviceButton, RenewNowButton, RenewWarnButton } from '@/components/SubscriptionActions'
 import { SubscriptionStatusBadge } from '@/components/SubscriptionStatusBadge'
 import { formatDayMonth } from '@/features/subscription/DeviceSlots'
+import { formatUtcDayMonth } from '@/lib/splitDates'
 import type { SubscriptionResponse, TrafficUsageResponse } from '@/lib/api'
 import { cn, formatDate } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 import type { ToneLevel } from '@/lib/subscriptionTone'
 import { useDeviceManager } from './DeviceManager'
 import {
@@ -23,6 +27,7 @@ import {
   resolveHomeQuickActions,
   type HomeQuickActionId,
 } from './homeQuickActions'
+import { SplitBlocks, useTrafficBuy } from './trafficSplit'
 import { formatGbValue, type HomeData } from './useHomeData'
 
 /** Опорный горизонт для кольца дней: 90 суток закрывают типичные периоды подписки. */
@@ -61,12 +66,20 @@ export function HomeTitle({ data, lang, compact }: { data: HomeData; lang: strin
           {date ? (expired ? t('home.expiredSince', { date }) : t('dashboard.untilDate', { date })) : ''}
         </p>
       </div>
-      <SubscriptionStatusBadge
-        days={effectiveDays}
-        isActive={isActive}
-        isTrial={isTrial}
-        trafficExhausted={state === 'traffic'}
-      />
+      {data.bypass?.blocked && state === 'ok' ? (
+        // Подписка жива, обычные серверы работают — статус оранжевый, а не красный.
+        <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-orange-400/50 bg-orange-500/10 px-3 py-1 text-[13px] font-bold text-orange-700 dark:text-orange-300">
+          <span className="size-[7px] rounded-full bg-orange-500" />
+          {t('trafficSplit.chipBlocked')}
+        </span>
+      ) : (
+        <SubscriptionStatusBadge
+          days={effectiveDays}
+          isActive={isActive}
+          isTrial={isTrial}
+          trafficExhausted={state === 'traffic'}
+        />
+      )}
     </div>
   )
 }
@@ -145,7 +158,7 @@ export function HomeRings({
   devicesChevron?: boolean
 }) {
   const { t } = useTranslation()
-  const { isExpiredByDate, days, dayTone, trafficLimit, trafficUsed, trafficPct, trafficTone, connected, deviceLimit, allSlotsTaken } = data
+  const { isExpiredByDate, days, dayTone, trafficLimit, trafficUsed, trafficPct, trafficTone, connected, deviceLimit, allSlotsTaken, bypass } = data
   const size = compact ? 64 : 76
   // При исчерпанном трафике срок ещё идёт — кольцо дней показывает его как есть.
   const shownDays = !isExpiredByDate && days !== null ? Math.max(0, days) : 0
@@ -162,13 +175,48 @@ export function HomeRings({
       <RingCard
         compact={compact}
         onClick={onTraffic}
+        labelClass={
+          bypass && bypass.tone !== 'calm'
+            ? bypass.tone === 'danger'
+              ? 'font-bold text-destructive'
+              : 'font-bold text-amber-600 dark:text-amber-400'
+            : undefined
+        }
         label={
-          trafficLimit !== null
-            ? t('home.trafficUsedOfLimit', { used: formatGbValue(trafficUsed), limit: formatGbValue(trafficLimit) })
-            : t('home.statTraffic')
+          bypass ? (
+            // Раздельный трафик: подпись про обход (у него лимит), точка — цвет его кольца.
+            <>
+              <span
+                aria-hidden
+                className="mr-1 inline-block size-[7px] rounded-full align-[1px]"
+                style={{ background: SPLIT_DOT_COLOR.bypass[bypass.tone] }}
+              />
+              {t('home.trafficUsedOfLimit', { used: formatGbValue(bypass.used), limit: formatGbValue(bypass.limit) })}
+            </>
+          ) : trafficLimit !== null ? (
+            t('home.trafficUsedOfLimit', { used: formatGbValue(trafficUsed), limit: formatGbValue(trafficLimit) })
+          ) : (
+            t('home.statTraffic')
+          )
         }
       >
-        {trafficPct === null ? (
+        {bypass ? (
+          <NestedStatRing
+            size={size}
+            outer={{ value: trafficPct, tone: trafficTone }}
+            inner={{ value: bypass.pct, tone: bypass.tone }}
+          >
+            <span
+              className={cn(
+                'font-heading font-extrabold',
+                compact ? (bypass.pct >= 100 || (trafficPct ?? 0) >= 100 ? 'text-[9.5px]' : 'text-[11px]') : 'text-[13px]',
+                TONE_TEXT[trafficPct !== null && trafficPct > bypass.pct ? trafficTone : bypass.tone],
+              )}
+            >
+              {Math.round(trafficPct !== null && trafficPct > bypass.pct ? trafficPct : bypass.pct)}%
+            </span>
+          </NestedStatRing>
+        ) : trafficPct === null ? (
           <UnboundedRing size={size} />
         ) : (
           <StatRing value={trafficPct} tone={trafficTone} size={size}>
@@ -209,9 +257,18 @@ const ALERT_CRIT = 'bg-destructive/[0.12] text-red-700 dark:text-red-200'
  * трафике ≥70% — на телефоне его роль играет жёлтая карточка «Трафик».
  */
 export function HomeAlert({ data, desktop }: { data: HomeData; desktop?: boolean }) {
-  const { t } = useTranslation()
-  const { state, days, trafficTone, trafficLimit, trafficUsed } = data
+  const { t, i18n } = useTranslation()
+  const lang = i18n.language
+  const { state, days, trafficTone, trafficLimit, trafficUsed, bypass, split } = data
 
+  // Обход исчерпан, но подписка жива и обычные серверы работают: плашка про него, а не про продление.
+  if (bypass?.blocked && state === 'ok') {
+    return (
+      <div className={cn(ALERT_BASE, ALERT_CRIT)}>
+        {t('trafficSplit.stripBlocked', { label: bypass.label, date: formatUtcDayMonth(split?.reset_at, lang) })}
+      </div>
+    )
+  }
   if (state === 'warn') {
     return (
       <div className={cn(ALERT_BASE, ALERT_WARN, 'flex-col items-stretch gap-2.5')}>
@@ -251,8 +308,24 @@ export function HomeAlert({ data, desktop }: { data: HomeData; desktop?: boolean
 // ─── Главная кнопка ─────────────────────────────────────────────────────
 
 export function HomeMainButton({ data }: { data: HomeData }) {
-  const { state, effectiveDays, connected, deviceLimit, isTrial } = data
+  const { t } = useTranslation()
+  const { state, effectiveDays, connected, deviceLimit, isTrial, bypass } = data
+  const trafficBuy = useTrafficBuy()
   if (state === 'expired' || state === 'traffic') return <RenewNowButton expired />
+  // Обход исчерпан: главное действие — докупить, а «Подключить устройство» уходит в быстрые действия.
+  if (bypass?.blocked && trafficBuy.canBuy && state === 'ok') {
+    return (
+      <Button
+        type="button"
+        size="lg"
+        className="h-[52px] w-full rounded-full text-base font-bold"
+        onClick={() => trafficBuy.open('bypass')}
+      >
+        <Plus size={20} />
+        {t('trafficSplit.buy')}
+      </Button>
+    )
+  }
   if (state === 'crit') return <RenewNowButton expired={false} />
   return (
     <ConnectDeviceButton
@@ -324,7 +397,7 @@ function useQuickActions(data: HomeData): QuickAction[] {
     const third = fallbacks.find((id) => !configured.includes(id))
     return third ? [...tail, toAction(third)] : tail
   }
-  if (state === 'crit') {
+  if (state === 'crit' || (data.bypass?.blocked && data.split?.can_buy && state === 'ok')) {
     return [addExtra, { key: 'connect', icon: MonitorSmartphone, label: t('home.qaConnect'), to: '/connections' }, ...tail]
   }
   // Календарь с плюсом — «добавить дни к сроку». У пробного продлевать
@@ -431,104 +504,225 @@ export function DevicesWideCard({ data, onOpen }: { data: HomeData; onOpen: () =
   )
 }
 
-/** Сколько дней в графике шторки: две недели читаются на телефоне без сжатия подписей. */
-const CHART_DAYS = 14
+/** Минимальная ширина столбика, при которой весь месяц ещё читается; уже — показываем половину месяца. */
+const MIN_BAR_PX = 8
+const DENSE_GAP_PX = 3
+const HALF_MONTH = 15
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
 
 /**
- * Последние CHART_DAYS дней расчётного периода. Если период короче (тариф
- * куплен вчера), слева дописываем пустые дни: столбики остаются обычной
- * ширины, а не растягиваются на всю карточку.
+ * Раскладка графика на весь календарный месяц: от 1-го числа до последнего, независимо от того,
+ * сколько дней уже прошло. Дни до начала периода («не считалось») и после сегодняшнего («ещё не наступили»)
+ * остаются пустыми серыми столбиками, поэтому первого числа виден один день, а остальные пусты.
+ *
+ * Месяц берётся из period_end (там сегодняшняя дата): прошлый месяц запрос не отдаёт.
  */
-function chartWindow(usage: TrafficUsageResponse | undefined) {
-  if (!usage?.enabled || usage.categories.length === 0) return { points: [] as number[], cats: [] as string[], pad: 0 }
-  const points = usage.points.slice(-CHART_DAYS)
-  const cats = usage.categories.slice(-CHART_DAYS)
-  const real = points.length
-  const first = new Date(`${cats[0]}T00:00:00Z`)
-  if (Number.isFinite(first.getTime())) {
-    for (let i = 1; points.length < CHART_DAYS; i++) {
-      points.unshift(0)
-      cats.unshift(new Date(first.getTime() - i * 86_400_000).toISOString().slice(0, 10))
-    }
+export function chartWindow(usage: TrafficUsageResponse | undefined) {
+  const empty = { points: [] as number[], cats: [] as string[], pad: 0, future: 0, bypass: undefined as number[] | undefined }
+  if (!usage?.enabled || usage.categories.length === 0) return empty
+  const todayIso = usage.period_end || usage.categories[usage.categories.length - 1]
+  const y = Number(todayIso.slice(0, 4))
+  const m = Number(todayIso.slice(5, 7))
+  const today = Number(todayIso.slice(8, 10))
+  if (!y || !m || !today) return empty
+  const length = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  const cats = Array.from({ length }, (_, i) => `${y}-${pad2(m)}-${pad2(i + 1)}`)
+  const index = new Map(usage.categories.map((c, i) => [c, i]))
+  const pick = (src: number[] | undefined) => cats.map((c) => (src && index.has(c) ? (src[index.get(c) as number] ?? 0) : 0))
+  const startsThisMonth = usage.period_start?.slice(0, 7) === `${y}-${pad2(m)}`
+  const startDay = startsThisMonth ? Number(usage.period_start?.slice(8, 10)) || 1 : 1
+  return {
+    points: pick(usage.points),
+    cats,
+    pad: startDay - 1,
+    future: Math.max(0, length - today),
+    bypass: usage.bypass_points ? pick(usage.bypass_points) : undefined,
   }
-  // pad — сколько дней слева дописано до начала периода: про них данных нет
-  return { points, cats, pad: points.length - real }
 }
 
 /**
  * График расхода по дням. Под каждым столбиком — число месяца; выбранный
  * день (нажатием, на ПК — наведением) подписан над столбиком: «370 МБ · 27 окт».
  * Сразу выбран последний день с расходом — чаще всего это «сегодня» или
- * «вчера», то, что и хотят увидеть. Дни до начала периода серые и не
- * нажимаются: это не «ноль», а «не считалось».
+ * «вчера», то, что и хотят увидеть. Дни до начала периода и будущие серые и не
+ * нажимаются: это не «ноль», а «не считалось» и «ещё не было».
+ *
+ * Весь месяц показывается, пока столбики не тоньше MIN_BAR_PX; на узком экране — половина месяца
+ * (1–15, а со второй половины месяца 16–конец), чтобы столбики не превращались в нитки.
  */
-function UsageChart({ points, cats, pad, lang }: { points: number[]; cats: string[]; pad: number; lang: string }) {
+export function UsageChart({
+  points,
+  cats,
+  pad,
+  future,
+  lang,
+  bypass,
+  compact,
+}: {
+  points: number[]
+  cats: string[]
+  /** Дней в начале месяца до начала периода. */
+  pad: number
+  /** Дней в конце месяца, которые ещё не наступили. */
+  future: number
+  lang: string
+  /** Часть каждого дня, ушедшая на обход: рисуется фиолетовым слоем сверху. */
+  bypass?: number[]
+  /** Ниже обычного: для карточки на широком экране. */
+  compact?: boolean
+}) {
   const { t } = useTranslation()
-  const lastWithData = points.reduce((acc, p, i) => (p > 0 ? i : acc), points.length - 1)
-  const [sel, setSel] = useState(lastWithData)
-  // Данные пришли позже первого рендера (или обновились) — выбор переводим на свежий день.
-  useEffect(() => setSel(lastWithData), [lastWithData])
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((entries) => setWidth(entries[0]?.contentRect.width ?? 0))
+    ro.observe(el)
+    setWidth(el.getBoundingClientRect().width)
+    return () => ro.disconnect()
+  }, [])
 
-  const max = Math.max(...points, 1)
-  const n = points.length
-  // Столбики занимают до 76% высоты: сверху остаётся место под подпись.
-  const h = (p: number) => Math.max(3, (p / max) * 76)
+  const total = points.length
+  const monthGap = total > 20 ? DENSE_GAP_PX : 6
+  const fitsMonth = width === 0 || (width - (total - 1) * monthGap) / total >= MIN_BAR_PX
+  const todayIdx = total - future - 1
+  let from = 0
+  let to = total
+  if (!fitsMonth) {
+    if (todayIdx < HALF_MONTH) to = HALF_MONTH
+    else from = HALF_MONTH
+  }
+  const vPoints = points.slice(from, to)
+  const vCats = cats.slice(from, to)
+  const vBypass = bypass?.slice(from, to)
+  const n = vPoints.length
+  const dense = n > 20
+  const gap = dense ? DENSE_GAP_PX : 6
+  const vPad = Math.max(0, Math.min(to, pad) - from)
+  const vFuture = Math.max(0, to - Math.max(from, total - future))
+  const selectable = (i: number) => i >= vPad && i < n - vFuture
+
+  const lastWithData = vPoints.reduce((acc, p, i) => (p > 0 && selectable(i) ? i : acc), Math.max(0, n - vFuture - 1))
+  const [sel, setSel] = useState(lastWithData)
+  // Данные пришли позже первого рендера (или обновились, или сменилось окно) — выбор переводим на свежий день.
+  useEffect(() => setSel(lastWithData), [lastWithData, from])
+
+  const max = Math.max(...vPoints, 1)
+  // Столбики занимают до 76% высоты (с двумя строками в подсказке — до 58%): сверху остаётся место под подпись.
+  const h = (p: number) => Math.max(3, (p / max) * (vBypass ? 58 : 76))
   const align = sel <= 1 ? '-translate-x-[18%]' : sel >= n - 2 ? '-translate-x-[82%]' : '-translate-x-1/2'
+  const cols = { gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap }
 
   return (
-    <div className="mt-1">
-      <div className="relative h-[190px] border-b border-border/70">
-        {sel >= pad && (
+    <div className="mt-1" ref={wrapRef}>
+      <div className={cn('relative border-b border-border/70', compact ? 'h-[150px]' : 'h-[190px]')}>
+        {selectable(sel) && vPoints[sel] !== undefined && (
           <div
             className={cn(
               'pointer-events-none absolute z-10 whitespace-nowrap rounded-lg bg-secondary px-2 py-1 text-xs font-bold text-foreground shadow-md transition-[left,bottom] duration-150',
               align,
             )}
-            style={{ left: `${((sel + 0.5) / n) * 100}%`, bottom: `calc(${h(points[sel])}% + 8px)` }}
+            style={{ left: `${((sel + 0.5) / n) * 100}%`, bottom: `calc(${h(vPoints[sel])}% + 8px)` }}
           >
-            {formatBytes(points[sel], t)}
-            <span className="font-medium text-muted-foreground"> · {shortDate(cats[sel], lang)}</span>
+            {formatBytes(vPoints[sel], t)}
+            <span className="font-medium text-muted-foreground"> · {shortDate(vCats[sel], lang)}</span>
+            {vBypass && (
+              <span className="mt-0.5 flex items-center gap-2.5 font-medium text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <i className="size-2 rounded-full bg-primary" />
+                  {formatBytes(Math.max(0, vPoints[sel] - (vBypass[sel] ?? 0)), t)}
+                </span>
+                <span className="flex items-center gap-1">
+                  <i className="size-2 rounded-full bg-[hsl(var(--split-bypass))]" />
+                  {formatBytes(vBypass[sel] ?? 0, t)}
+                </span>
+              </span>
+            )}
           </div>
         )}
-        <div className="absolute inset-0 grid items-end gap-1.5" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }}>
-          {points.map((p, i) =>
-            i < pad ? (
-              <span key={i} className="block w-full self-end rounded-[5px] bg-muted-foreground/15" style={{ height: '3%' }} />
+        <div className="absolute inset-0 grid items-end" style={cols}>
+          {vPoints.map((p, i) =>
+            !selectable(i) ? (
+              <span key={i} className="block w-full self-end rounded-[4px] bg-muted-foreground/15" style={{ height: '3%' }} />
             ) : (
               <button
                 key={i}
                 type="button"
-                onClick={() => setSel(i)}
+                onClick={() => {
+                  if (i !== sel) hapticSelection()
+                  setSel(i)
+                }}
                 onMouseEnter={() => setSel(i)}
                 aria-pressed={i === sel}
-                aria-label={`${shortDate(cats[i], lang)}: ${formatBytes(p, t)}`}
+                aria-label={`${shortDate(vCats[i], lang)}: ${formatBytes(p, t)}`}
                 className="flex h-full w-full items-end"
               >
-                <span
-                  className={cn(
-                    'block w-full rounded-[5px] transition-colors',
-                    i === sel ? 'bg-primary' : 'bg-primary/40 hover:bg-primary/60',
-                  )}
-                  style={{ height: `${h(p)}%` }}
-                />
+                {vBypass && vBypass[i] > 0 && p > 0 ? (
+                  <span className="flex w-full flex-col justify-end" style={{ height: `${h(p)}%` }}>
+                    <span className="block w-full rounded-t-[4px] bg-[hsl(var(--split-bypass))]" style={{ height: `${Math.min(100, Math.max(6, (vBypass[i] / p) * 100))}%` }} />
+                    <span
+                      className={cn('block w-full transition-colors', i === sel ? 'bg-primary' : 'bg-primary/60')}
+                      style={{ height: `${Math.max(0, 100 - Math.min(100, Math.max(6, (vBypass[i] / p) * 100)))}%` }}
+                    />
+                  </span>
+                ) : (
+                  <span
+                    className={cn(
+                      'block w-full rounded-[4px] transition-colors',
+                      i === sel ? 'bg-primary' : 'bg-primary/40 hover:bg-primary/60',
+                    )}
+                    style={{ height: `${h(p)}%` }}
+                  />
+                )}
               </button>
             ),
           )}
         </div>
       </div>
-      <div className="mt-1.5 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))` }} aria-hidden>
-        {cats.map((c, i) => (
-          <span
-            key={c}
-            className={cn(
-              'text-center text-[11px] tabular-nums',
-              i === sel ? 'font-bold text-foreground' : i < pad ? 'text-muted-foreground/50' : 'text-muted-foreground',
-            )}
-          >
-            {Number(c.slice(8, 10)) || ''}
-          </span>
-        ))}
+      <div className="mt-1.5 grid" style={cols} aria-hidden>
+        {vCats.map((c, i) => {
+          const day = Number(c.slice(8, 10)) || 0
+          // В плотном месяце подписываем 1-е, каждое пятое число и выбранный день: иначе цифры слипаются.
+          // Соседей выбранного дня прячем — «14» вплотную к «15» налезали друг на друга.
+          const nearSel = dense && sel != null && Math.abs(i - sel) === 1
+          const shown = i === sel || ((!dense || day === 1 || day % 5 === 0) && !nearSel)
+          return (
+            <span
+              key={c}
+              className={cn(
+                'text-center text-[11px] tabular-nums',
+                i === sel ? 'font-bold text-foreground' : !selectable(i) ? 'text-muted-foreground/50' : 'text-muted-foreground',
+              )}
+            >
+              {shown ? day || '' : ''}
+            </span>
+          )
+        })}
       </div>
+    </div>
+  )
+}
+
+/** Легенда графика: сколько за период ушло на обычные серверы и сколько на обход. */
+export function ChartLegend({ label, points, bypass }: { label?: string; points: number[]; bypass: number[] }) {
+  const { t } = useTranslation()
+  // Оба числа считаются по тем же 14 дням, что показаны на графике: иначе «обычные» (итог за месяц минус обход за 14 дней) разъезжались бы с графиком.
+  const byp = bypass.reduce((a, b) => a + b, 0)
+  const total = points.reduce((a, b) => a + b, 0)
+  return (
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-[13px]">
+      <span className="flex items-center gap-1.5">
+        <i className="size-2.5 rounded-full bg-primary" />
+        <span className="text-muted-foreground">{t('trafficSplit.legendMain')}</span>
+        <b>{formatBytes(Math.max(0, total - byp), t)}</b>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <i className="size-2.5 rounded-full bg-[hsl(var(--split-bypass))]" />
+        <span className="text-muted-foreground">{label ?? ''}</span>
+        <b>{formatBytes(byp, t)}</b>
+      </span>
     </div>
   )
 }
@@ -587,13 +781,13 @@ function UsageTile({ label, value, unit }: { label: string; value: string; unit:
 
 /**
  * Шторка «Расход трафика» (SPEC §9, вариант A): сверху сколько потрачено и
- * когда обнулится, ниже график за две недели прямо на фоне шторки и две
+ * когда обнулится, ниже график за месяц (на узком экране за полмесяца) прямо на фоне шторки и две
  * плитки — в среднем и пик. Без карточек внутри шторки.
  */
 export function TrafficDetails({ data, lang }: { data: HomeData; lang: string }) {
   const { t } = useTranslation()
   const { sub, usage, trafficLimit, trafficUsed, trafficTone } = data
-  const { points, cats, pad } = chartWindow(usage)
+  const { points, cats, pad, future, bypass: bypassPoints } = chartWindow(usage)
   const hasPoints = points.some((p) => p > 0)
   const totalBytes = usage?.enabled ? usage.total_bytes : trafficUsed * 1024 ** 3
   const peakIdx = hasPoints ? points.indexOf(Math.max(...points)) : -1
@@ -609,7 +803,9 @@ export function TrafficDetails({ data, lang }: { data: HomeData; lang: string })
 
   return (
     <>
-      {trafficLimit !== null ? (
+      {data.bypass ? (
+        <SplitBlocks data={data} lang={lang} usedText={formatBytes(Math.max(0, totalBytes - (usage?.bypass_points ?? []).reduce((a, b) => a + b, 0)), t)} />
+      ) : trafficLimit !== null ? (
         <div>
           <p className="font-heading text-[34px] font-extrabold leading-[1.1]">
             {t('home.trafficUsedOfLimit', { used: formatGbValue(trafficUsed), limit: formatGbValue(trafficLimit) })}
@@ -632,7 +828,9 @@ export function TrafficDetails({ data, lang }: { data: HomeData; lang: string })
         </div>
       )}
 
-      {points.length > 0 && <UsageChart points={points} cats={cats} pad={pad} lang={lang} />}
+      {bypassPoints && <ChartLegend label={data.bypass?.label} points={points} bypass={bypassPoints} />}
+
+      {points.length > 0 && <UsageChart points={points} cats={cats} pad={pad} future={future} lang={lang} bypass={bypassPoints} />}
 
       {hasPoints && (
         <div className="grid grid-cols-2 gap-2.5">
@@ -644,6 +842,7 @@ export function TrafficDetails({ data, lang }: { data: HomeData; lang: string })
           />
         </div>
       )}
+
     </>
   )
 }

@@ -26,6 +26,7 @@ import { RecordCard } from '@/components/RecordCard'
 import { cn } from '@/lib/utils'
 import { Spinner } from '@/components/ui/spinner'
 import type { AdminPartnerDTO, AdminPartnerPayoutDTO } from '@/lib/types/admin'
+import { useErrorHaptic } from '@/lib/haptic'
 
 type TabId = 'applications' | 'partners' | 'payouts'
 
@@ -520,6 +521,7 @@ function GrantModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [first, setFirst] = useState('')
   const [renewal, setRenewal] = useState('')
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   function submit() {
     const tg = Number(telegramID.trim())

@@ -23,24 +23,24 @@ const (
 )
 
 type PromoCode struct {
-	ID                         int64      `db:"id"`
-	Code                       string     `db:"code"`
-	Type                       string     `db:"type"`
-	SubscriptionDays           *int       `db:"subscription_days"`
-	TrialDays                  *int       `db:"trial_days"`
-	ExtraHwidDelta             *int       `db:"extra_hwid_delta"`
-	DiscountPercent            *int       `db:"discount_percent"`
-	DiscountTTLHours           *int       `db:"discount_ttl_hours"`
-	MaxUses                    *int       `db:"max_uses"`
-	UsesCount                  int        `db:"uses_count"`
-	ValidUntil                 *time.Time `db:"valid_until"`
-	Active                     bool       `db:"active"`
-	FirstPurchaseOnly          bool       `db:"first_purchase_only"`
-	RequireCustomerInDB        bool       `db:"require_customer_in_db"`
-	AllowTrialWithoutPayment   bool       `db:"allow_trial_without_payment"`
-	CreatedAt                  time.Time  `db:"created_at"`
-	DiscountMaxSubscriptionPaymentsPerCustomer int    `db:"discount_max_subscription_payments_per_customer"`
-	TariffID                   *int64     `db:"tariff_id"`
+	ID                                         int64      `db:"id"`
+	Code                                       string     `db:"code"`
+	Type                                       string     `db:"type"`
+	SubscriptionDays                           *int       `db:"subscription_days"`
+	TrialDays                                  *int       `db:"trial_days"`
+	ExtraHwidDelta                             *int       `db:"extra_hwid_delta"`
+	DiscountPercent                            *int       `db:"discount_percent"`
+	DiscountTTLHours                           *int       `db:"discount_ttl_hours"`
+	MaxUses                                    *int       `db:"max_uses"`
+	UsesCount                                  int        `db:"uses_count"`
+	ValidUntil                                 *time.Time `db:"valid_until"`
+	Active                                     bool       `db:"active"`
+	FirstPurchaseOnly                          bool       `db:"first_purchase_only"`
+	RequireCustomerInDB                        bool       `db:"require_customer_in_db"`
+	AllowTrialWithoutPayment                   bool       `db:"allow_trial_without_payment"`
+	CreatedAt                                  time.Time  `db:"created_at"`
+	DiscountMaxSubscriptionPaymentsPerCustomer int        `db:"discount_max_subscription_payments_per_customer"`
+	TariffID                                   *int64     `db:"tariff_id"`
 }
 
 type PromoRedemption struct {
@@ -51,14 +51,14 @@ type PromoRedemption struct {
 }
 
 type PendingDiscount struct {
-	ID                  int64      `db:"id"`
-	CustomerID          int64      `db:"customer_id"`
-	PromoCodeID         int64      `db:"promo_code_id"`
-	Percent             int        `db:"percent"`
-	ExpiresAt           *time.Time `db:"expires_at"`
-	UntilFirstPurchase  bool       `db:"until_first_purchase"`
-	CreatedAt           time.Time  `db:"created_at"`
-	SubscriptionPaymentsRemaining int `db:"subscription_payments_remaining"`
+	ID                            int64      `db:"id"`
+	CustomerID                    int64      `db:"customer_id"`
+	PromoCodeID                   int64      `db:"promo_code_id"`
+	Percent                       int        `db:"percent"`
+	ExpiresAt                     *time.Time `db:"expires_at"`
+	UntilFirstPurchase            bool       `db:"until_first_purchase"`
+	CreatedAt                     time.Time  `db:"created_at"`
+	SubscriptionPaymentsRemaining int        `db:"subscription_payments_remaining"`
 }
 
 // openInvoiceWindow — сколько неоплаченный счёт со скидкой держит её за собой.

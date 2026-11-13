@@ -27,9 +27,9 @@ export type AdminUserPanelResponse = AdminUserPanelDTO
 export type AdminUsersListResponse = AdminUsersListDTO
 export type AdminUsersSearchResponse = { items: AdminCustomerDTO[] }
 
-export function useAdminUsers(params: { scope: string; page: number; limit: number }) {
+export function useAdminUsers(params: { scope: string; page: number; limit: number; sort?: string; dir?: string }) {
   return useQuery<AdminUsersListResponse>({
-    queryKey: ['admin-users', params.scope, params.page, params.limit],
+    queryKey: ['admin-users', params.scope, params.page, params.limit, params.sort ?? '', params.dir ?? ''],
     queryFn: () => api.adminUsers(params),
     staleTime: 15_000,
   })

@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { api, ApiError, type PartnerApplication } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 import { PARTNER_INPUT } from './layout'
@@ -43,12 +44,14 @@ export function PartnerApplyModal({
   const [channels, setChannels] = useState(application?.channels ?? '')
   const [expected, setExpected] = useState(application?.expected ?? '')
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [entered, setEntered] = useState(false)
 
   const apply = useMutation({
     mutationFn: () =>
       api.partnerApply({ about: about.trim(), channels: channels.trim(), expected: expected.trim() }),
     onSuccess: async () => {
+      hapticSuccess()
       setError(null)
       // Закрываем сразу: страница под модалкой перерисуется в «заявка на
       // рассмотрении», и держать поверх неё форму было бы враньём.

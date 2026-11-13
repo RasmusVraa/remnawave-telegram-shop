@@ -306,7 +306,8 @@
           ]
         }
       }
-    ]
+    ],
+    "ru_fail_threshold": 2
   },
   "/content/faq": {
     "info": {

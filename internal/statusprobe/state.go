@@ -39,33 +39,79 @@ func WorseState(a, b string) string {
 	return a
 }
 
+// RussiaLow — из России ответила половина зондов или меньше. Та же граница,
+// что у красного столбика истории.
+func (s Sample) RussiaLow() bool {
+	return s.RussiaTotal > 0 && s.RussiaOK*2 <= s.RussiaTotal
+}
+
+// WhitelistNone — в проходе по операторам не ответил ни один.
+func (s Sample) WhitelistNone() bool {
+	return s.WhitelistTotal > 0 && s.WhitelistOK == 0
+}
+
+// ProbeState — что говорят одни зонды, без панели и выхода каскада.
+// threshold — сколько зондов из России должны не ответить, чтобы сервер стал «частично».
+//
+// Обычный сервер: «недоступен», если два замера подряд не ответил никто или из России
+// ответила половина и меньше; «частично», если из России не ответили threshold и больше,
+// не ответил мир или один замер подряд не ответил никто. Меньше threshold сбоев — шум зондов.
+//
+// Обход с проверкой операторов: решают только операторы. Мир и датацентры России
+// клиенту на мобильном интернете с белыми списками ничего не говорят.
+// Без данных по операторам обход судится по зондам России, без мира.
+func ProbeState(s Sample, bypass bool, threshold int) string {
+	if threshold < 1 {
+		threshold = 1
+	}
+	if s.FailStreak >= failStreakDown {
+		return StateDown
+	}
+	if bypass && s.WhitelistTotal > 0 {
+		switch {
+		case s.WhitelistLowStreak >= failStreakDown:
+			return StateDown
+		case s.WhitelistOK < s.WhitelistTotal:
+			return StatePartial
+		}
+		return StateUp
+	}
+	switch {
+	case s.RussiaLowStreak >= failStreakDown:
+		return StateDown
+	case s.FailStreak == 1:
+		return StatePartial
+	case s.RussiaTotal > 0 && s.RussiaTotal-s.RussiaOK >= threshold:
+		return StatePartial
+	case !bypass && s.WorldTotal > 0 && s.WorldOK == 0:
+		return StatePartial
+	}
+	return StateUp
+}
+
 // EffectiveState собирает итоговый статус строки.
 //   - entry — состояние узла входа в панели; пусто, если узел не найден;
 //   - sample — последний замер зондов, nil если замера ещё нет;
+//   - bypass — строка-обход, судится по операторам;
 //   - exit — состояние зарубежного выхода каскада; пусто, если не задан.
 //
-// «Недоступен» по зондам ставится только после двух замеров подряд без единого ответа.
-// Один такой замер даёт «частично». Если узла панели нет, а зонды живы — «работает».
-// Панель говорит «не работает», а зонды достучались — «частично»: нода могла потерять связь
+// Зонды считает ProbeState. Если узла панели нет — решают зонды. Панель говорит
+// «не работает», а зонды достучались — «частично»: нода могла потерять связь
 // с панелью, но отвечать из интернета. Ничего не известно вовсе — StateUnknown, а не «частично».
-func EffectiveState(entry string, sample *Sample, exit string) string {
+func EffectiveState(entry string, sample *Sample, bypass bool, exit string) string {
 	state := entry
 	if stateRank(state) < 0 {
 		state = ""
 	}
 	if sample != nil {
+		probe := ProbeState(*sample, bypass, RussiaFailThreshold())
 		switch {
-		case sample.FailStreak >= failStreakDown:
-			state = StateDown
-		case sample.FailStreak == 1:
-			if state == "" {
-				state = StateUp
-			}
-			state = WorseState(state, StatePartial)
 		case state == "":
-			state = StateUp
-		case state == StateDown && !sample.AllFailed():
+			state = probe
+		case state == StateDown && probe != StateDown && !sample.AllFailed():
 			state = StatePartial
+		default:
+			state = WorseState(state, probe)
 		}
 	}
 	if state == "" {

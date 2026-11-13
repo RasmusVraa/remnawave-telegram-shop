@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import { useAuthStore } from '@/store/auth'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +23,7 @@ export function ChangePasswordCollapsible({ onSuccess }: { onSuccess: (token: st
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [ok, setOk] = useState(false)
 
   async function submit(e: React.FormEvent) {
@@ -39,6 +41,7 @@ export function ChangePasswordCollapsible({ onSuccess }: { onSuccess: (token: st
     try {
       const data = await api.changePassword(current, next)
       onSuccess(data.access_token)
+      hapticSuccess()
       setOk(true)
       setCurrent('')
       setNext('')
@@ -133,6 +136,7 @@ export function DeleteAccountSection({ className }: { className?: string }) {
   const [confirmStep, setConfirmStep] = useState(false)
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  useErrorHaptic(err)
 
   async function submit() {
     setErr(null)

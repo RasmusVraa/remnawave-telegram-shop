@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { ChevronDown, CircleHelp, Loader2 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -11,7 +12,7 @@ import { ADMIN_STATUS_SETTINGS_GROUP } from '../utils/adminSettingsGroups'
 const inputClass =
   'h-10 w-full rounded-lg border border-border/60 bg-background px-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/60 focus-visible:ring-2 focus-visible:ring-ring'
 
-const NUMBER_KEYS = ['STATUS_WORLD_PROBES', 'STATUS_RUSSIA_PROBES', 'STATUS_PROBE_INTERVAL_MIN'] as const
+const NUMBER_KEYS = ['STATUS_WORLD_PROBES', 'STATUS_RUSSIA_PROBES', 'STATUS_PROBE_INTERVAL_MIN', 'STATUS_RU_FAIL_THRESHOLD'] as const
 const TEXT_KEYS = ['STATUS_PAGE_TITLE', 'STATUS_PAGE_LEAD'] as const
 const ADVANCED_KEYS = [...TEXT_KEYS, ...NUMBER_KEYS]
 
@@ -66,6 +67,19 @@ export function AdminStatusSettings() {
           busy={togglingKey === 'STATUS_SHOW_MAP'}
           onChange={(v) => void handleToggle('STATUS_SHOW_MAP', v)}
         />
+        <AdminToggleRow
+          label={t('admin.statusPage.alertWorldToggle')}
+          hint={t('admin.statusPage.alertWorldToggleHint')}
+          checked={on('STATUS_ALERT_WORLD')}
+          busy={togglingKey === 'STATUS_ALERT_WORLD'}
+          onChange={(v) => void handleToggle('STATUS_ALERT_WORLD', v)}
+        />
+        <p className="pb-1 pt-2 text-xs text-muted-foreground">
+          {t('admin.statusPage.alertsRoute')}{' '}
+          <Link to="/admin/settings" className="font-medium text-primary hover:underline">
+            {t('admin.statusPage.alertsRouteLink')}
+          </Link>
+        </p>
       </div>
 
       <div className="mt-2 rounded-xl border border-border/60">
@@ -94,10 +108,13 @@ export function AdminStatusSettings() {
                 />
               </label>
             ))}
-            <div className="grid items-end gap-3 sm:grid-cols-3">
+            <div className="grid items-end gap-3 sm:grid-cols-2">
               {NUMBER_KEYS.map((key) => (
                 <label key={key} className="block">
-                  <span className="text-sm font-medium">{t(`admin.statusPage.${key}`)}</span>
+                  <span className="inline-flex items-center gap-1.5 text-sm font-medium">
+                    {t(`admin.statusPage.${key}`)}
+                    {key === 'STATUS_RU_FAIL_THRESHOLD' && <InfoHint text={t('admin.statusPage.ruFailHint')} />}
+                  </span>
                   <input
                     className={cn(inputClass, 'mt-1.5')}
                     type="number"

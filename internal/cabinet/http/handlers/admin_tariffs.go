@@ -12,6 +12,7 @@ import (
 
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
+	"remnawave-tg-shop-bot/internal/remnawave"
 	"remnawave-tg-shop-bot/internal/tariffsquads"
 )
 
@@ -45,6 +46,9 @@ type AdminTariffsHandler struct {
 	// nil, если панель Remnawave не сконфигурирована: тарифы при этом
 	// продолжают редактироваться, недоступно только массовое применение.
 	squads *tariffsquads.Service
+	// traffic и rw — раздельный трафик (см. admin_tariffs_traffic.go); nil — раздел недоступен.
+	traffic *database.TrafficSplitRepository
+	rw      *remnawave.Client
 }
 
 func NewAdminTariffs(tariffs *database.TariffRepository, squads *tariffsquads.Service) *AdminTariffsHandler {
@@ -111,8 +115,14 @@ type tariffDTO struct {
 	TierLevel                 *int                      `json:"tier_level"`
 	Description               *string                   `json:"description"`
 	DescriptionDetail         *string                   `json:"description_detail"`
+	IsPopular                 bool                      `json:"is_popular"`
 	Prices                    []tariffPriceDTO          `json:"prices"`
 	Locations                 []database.TariffLocation `json:"locations"`
+	// Только в списке: что показать в чипе трафика карточки тарифа.
+	// BypassLimitBytes — лимит обхода; 0 — обхода нет или раздельный трафик выключен.
+	BypassLimitBytes int64 `json:"bypass_limit_bytes,omitempty"`
+	// TrafficPacks — сколько пакетов докупки увидит клиент этого тарифа.
+	TrafficPacks int `json:"traffic_packs,omitempty"`
 }
 
 func tariffToDTO(t *database.Tariff, prices []database.TariffPrice, locs []database.TariffLocation) tariffDTO {
@@ -139,6 +149,7 @@ func tariffToDTO(t *database.Tariff, prices []database.TariffPrice, locs []datab
 		ActiveInternalSquadUUIDs:  t.ActiveInternalSquadUUIDs,
 		ExternalSquadUUID:         extUUID, RemnawaveTag: t.RemnawaveTag,
 		TierLevel: t.TierLevel, Description: t.Description, DescriptionDetail: t.DescriptionDetail,
+		IsPopular: t.IsPopular,
 		Prices:    priceDTOs,
 		Locations: locs,
 	}
@@ -173,7 +184,9 @@ func (h *AdminTariffsHandler) List(w http.ResponseWriter, r *http.Request) {
 			slog.Error("admin tariffs list locations", "tariff_id", tariffs[i].ID, "error", lerr.Error())
 			locs = []database.TariffLocation{}
 		}
-		result = append(result, tariffToDTO(&tariffs[i], prices, locs))
+		dto := tariffToDTO(&tariffs[i], prices, locs)
+		dto.BypassLimitBytes, dto.TrafficPacks = h.trafficSummary(r.Context(), &tariffs[i])
+		result = append(result, dto)
 	}
 	writeJSON(w, http.StatusOK, result)
 }
@@ -191,6 +204,7 @@ type createTariffReq struct {
 	TierLevel                 *int                      `json:"tier_level"`
 	Description               *string                   `json:"description"`
 	DescriptionDetail         *string                   `json:"description_detail"`
+	IsPopular                 bool                      `json:"is_popular"`
 	Rub                       [4]int                    `json:"rub"`
 	Stars                     [4]*int                   `json:"stars"`
 	Locations                 []database.TariffLocation `json:"locations"`
@@ -228,6 +242,7 @@ func (h *AdminTariffsHandler) Create(w http.ResponseWriter, r *http.Request) {
 		TierLevel:                 req.TierLevel,
 		Description:               req.Description,
 		DescriptionDetail:         req.DescriptionDetail,
+		IsPopular:                 req.IsPopular,
 	}
 	if tag := config.RemnawaveTag(); tag != "" {
 		t.RemnawaveTag = &tag
@@ -315,6 +330,7 @@ func (h *AdminTariffsHandler) Update(w http.ResponseWriter, r *http.Request) {
 		"device_limit": true, "traffic_limit_bytes": true,
 		"traffic_limit_reset_strategy": true, "active_internal_squad_uuids": true,
 		"tier_level": true, "description": true, "description_detail": true,
+		"is_popular": true,
 	}
 
 	fields := make(map[string]interface{})
@@ -328,6 +344,16 @@ func (h *AdminTariffsHandler) Update(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		fields[k] = val
+	}
+
+	// Отдельный лимит обхода возможен только при безлимитных обычных серверах (панель держит один общий лимит).
+	if v, ok := fields["traffic_limit_bytes"]; ok && h.traffic != nil {
+		if n, isNum := v.(float64); isNum && n > 0 {
+			if b, berr := h.traffic.GetTariffBypass(r.Context(), id); berr == nil && b.Enabled() {
+				http.Error(w, "у тарифа включён отдельный лимит обхода: обычные серверы должны быть безлимитными. Сначала отключите обход во вкладке «Трафик»", http.StatusBadRequest)
+				return
+			}
+		}
 	}
 
 	if v, ok := fields["active_internal_squad_uuids"]; ok {
@@ -470,6 +496,10 @@ func (h *AdminTariffsHandler) HandleByID(w http.ResponseWriter, r *http.Request)
 		h.SquadsPreview(w, r, id)
 	case "squads/apply":
 		h.SquadsApply(w, r, id)
+	case "traffic":
+		h.Traffic(w, r, id)
+	case "traffic/nodes":
+		h.TrafficNodes(w, r)
 	default:
 		http.Error(w, "not found", http.StatusNotFound)
 	}

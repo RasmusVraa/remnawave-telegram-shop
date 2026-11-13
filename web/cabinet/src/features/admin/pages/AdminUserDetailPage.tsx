@@ -14,6 +14,7 @@ import {
 } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
 
+import { AdminUserHistoryModal, historyButtonLabel, useAdminUserEventCount } from '../monitoring/AdminUserHistory'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminSectionCard } from '../components/AdminSectionCard'
 import { AdminSetExpireModal } from '../components/AdminSetExpireModal'
@@ -138,6 +139,8 @@ export default function AdminUserDetailPage() {
   }, [panel?.tariffs, allTariffs])
 
   const canEditTariff = salesModeTariffs && tariffOptions.length > 0
+  const historyCount = useAdminUserEventCount(userId ? Number(userId) : undefined)
+  const historyLabel = historyButtonLabel(t, historyCount.data)
 
   const hasRwUser = Boolean(panel?.has_rw_user && panel?.rw)
   const rwStatus = panel?.rw?.status?.toUpperCase()
@@ -147,6 +150,7 @@ export default function AdminUserDetailPage() {
   const [confirmDisable, setConfirmDisable] = useState(false)
   const [disableError, setDisableError] = useState<string | null>(null)
   const [actionsModal, setActionsModal] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [editModal, setEditModal] = useState<UserEditModalKey | null>(null)
   const [paymentsPage, setPaymentsPage] = useState(1)
   const [referralsPage, setReferralsPage] = useState(1)
@@ -319,6 +323,8 @@ export default function AdminUserDetailPage() {
               disablePending={disableMut.isPending}
               enablePending={enableMut.isPending}
               copy={copy}
+              onHistory={() => setHistoryOpen(true)}
+              historyLabel={historyLabel}
             />
           </div>
         </div>
@@ -570,7 +576,11 @@ export default function AdminUserDetailPage() {
         enablePending={enableMut.isPending}
         copy={copy}
         onChangeTariff={canEditTariff ? () => setEditModal('tariff') : undefined}
+        onHistory={() => setHistoryOpen(true)}
+        historyLabel={historyLabel}
       />
+
+      <AdminUserHistoryModal customerId={user.id} open={historyOpen} onClose={() => setHistoryOpen(false)} />
 
       <AdminSetExpireModal
         open={expireModal}

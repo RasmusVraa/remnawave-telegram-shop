@@ -25,25 +25,25 @@ const (
 )
 
 type SupportTicket struct {
-	ID                  int64
-	AccountID           int64
-	SupportBotTicketID  *int64
-	Status              string
-	CreatedAt           time.Time
-	ClosedAt            *time.Time
+	ID                 int64
+	AccountID          int64
+	SupportBotTicketID *int64
+	Status             string
+	CreatedAt          time.Time
+	ClosedAt           *time.Time
 }
 
 type SupportMessage struct {
-	ID                   int64
-	TicketID             int64
-	Direction            string
-	Text                 string
-	AuthorLabel          string
-	SupportBotMessageID  *int64
-	ClientMessageID      *string // UUID idempotency key для исходящих сообщений
-	DeliveryStatus       string
-	CreatedAt            time.Time
-	ReadAt               *time.Time
+	ID                  int64
+	TicketID            int64
+	Direction           string
+	Text                string
+	AuthorLabel         string
+	SupportBotMessageID *int64
+	ClientMessageID     *string // UUID idempotency key для исходящих сообщений
+	DeliveryStatus      string
+	CreatedAt           time.Time
+	ReadAt              *time.Time
 }
 
 type SupportRepo struct {
@@ -336,4 +336,90 @@ func (r *SupportRepo) CountMessagesByTicket(ctx context.Context, ticketID int64)
 		return 0, fmt.Errorf("support: count messages: %w", err)
 	}
 	return n, nil
+}
+
+// SupportAttachment — изображение в сообщении чата поддержки. Файл хранит
+// support-bot (в Telegram), здесь — описание и его id там.
+type SupportAttachment struct {
+	ID                     int64
+	MessageID              int64
+	Position               int
+	SupportBotAttachmentID int64
+	Mime                   string
+	SizeBytes              *int
+	Width                  *int
+	Height                 *int
+	Name                   *string
+	CreatedAt              time.Time
+}
+
+const supportAttachmentCols = `id, message_id, position, support_bot_attachment_id, mime, size_bytes, width, height, name, created_at`
+
+func scanSupportAttachment(row pgx.Row) (*SupportAttachment, error) {
+	var a SupportAttachment
+	if err := row.Scan(&a.ID, &a.MessageID, &a.Position, &a.SupportBotAttachmentID, &a.Mime,
+		&a.SizeBytes, &a.Width, &a.Height, &a.Name, &a.CreatedAt); err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// InsertAttachmentsTx сохраняет вложения сообщения; Position берётся из порядка в items.
+func (r *SupportRepo) InsertAttachmentsTx(ctx context.Context, tx pgx.Tx, messageID int64, items []SupportAttachment) ([]SupportAttachment, error) {
+	const q = `INSERT INTO cabinet_support_attachment (message_id, position, support_bot_attachment_id, mime, size_bytes, width, height, name)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING ` + supportAttachmentCols
+	out := make([]SupportAttachment, 0, len(items))
+	for i, it := range items {
+		a, err := scanSupportAttachment(tx.QueryRow(ctx, q, messageID, i, it.SupportBotAttachmentID, it.Mime,
+			it.SizeBytes, it.Width, it.Height, it.Name))
+		if err != nil {
+			return nil, fmt.Errorf("support: insert attachment: %w", err)
+		}
+		out = append(out, *a)
+	}
+	return out, nil
+}
+
+// ListAttachmentsByMessages — вложения нескольких сообщений одним запросом (лента чата).
+func (r *SupportRepo) ListAttachmentsByMessages(ctx context.Context, messageIDs []int64) (map[int64][]SupportAttachment, error) {
+	out := make(map[int64][]SupportAttachment)
+	if len(messageIDs) == 0 {
+		return out, nil
+	}
+	const q = `SELECT ` + supportAttachmentCols + `
+FROM cabinet_support_attachment
+WHERE message_id = ANY($1)
+ORDER BY message_id, position, id`
+	rows, err := r.pool.Query(ctx, q, messageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("support: list attachments: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		a, err := scanSupportAttachment(rows)
+		if err != nil {
+			return nil, fmt.Errorf("support: scan attachment: %w", err)
+		}
+		out[a.MessageID] = append(out[a.MessageID], *a)
+	}
+	return out, rows.Err()
+}
+
+// GetAttachmentForAccount — вложение, только если оно из тикета этого аккаунта.
+// Чужое и несуществующее неразличимы: ErrSupportNotFound.
+func (r *SupportRepo) GetAttachmentForAccount(ctx context.Context, attachmentID, accountID int64) (*SupportAttachment, error) {
+	const q = `SELECT a.id, a.message_id, a.position, a.support_bot_attachment_id, a.mime, a.size_bytes, a.width, a.height, a.name, a.created_at
+FROM cabinet_support_attachment a
+JOIN cabinet_support_message m ON m.id = a.message_id
+JOIN cabinet_support_ticket t ON t.id = m.ticket_id
+WHERE a.id = $1 AND t.account_id = $2`
+	a, err := scanSupportAttachment(r.pool.QueryRow(ctx, q, attachmentID, accountID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrSupportNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("support: get attachment: %w", err)
+	}
+	return a, nil
 }

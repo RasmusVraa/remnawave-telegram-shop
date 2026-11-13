@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { SupportChatModal } from '@/features/support/SupportChatModal'
 import { ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { hapticTap } from '@/lib/haptic'
 import { useToast } from '@/components/ui/toast'
 
 import { DevicePicker } from './guide/DevicePicker'
@@ -208,6 +209,7 @@ export default function ConnectionsPage() {
 
   async function copyLink() {
     if (!(await copyToClipboard(g.subscriptionLink))) return
+    hapticTap()
     setCopied(true)
     window.setTimeout(() => setCopied(false), 2000)
   }

@@ -7,12 +7,19 @@ import (
 
 // ReleaseNotes is the parsed content of RELEASE_NOTES.md.
 type ReleaseNotes struct {
-	Version      string
-	GitHubBody   string
-	TelegramRaw  string // source block under "## Вариант для Telegram"
-	ReleaseURL   string
-	TGSections   []TGSection
+	Version     string
+	GitHubBody  string
+	TelegramRaw string // source block under "## Вариант для Telegram"
+	ReleaseURL  string
+	TGSections  []TGSection
+	// TGParts — те же секции, разбитые на отдельные сообщения строкой
+	// telegramPartBreak. Без разбивки — одна часть со всеми секциями.
+	TGParts [][]TGSection
 }
+
+// telegramPartBreak — строка в блоке Telegram, после которой начинается
+// следующее сообщение. Нужна, когда пост не влезает в 4096 символов.
+const telegramPartBreak = "==="
 
 // TGSection is one section in the Telegram variant (header + bullets).
 type TGSection struct {
@@ -49,9 +56,13 @@ func ParseReleaseNotes(content string) (*ReleaseNotes, error) {
 	ghBody = stripTrailingMarkdownRule(ghBody)
 
 	tgRaw := strings.TrimSpace(content[tgIdx+len(telegramHeading):])
-	version, releaseURL, sections, err := parseTelegramBlock(tgRaw)
+	version, releaseURL, parts, err := parseTelegramBlock(tgRaw)
 	if err != nil {
 		return nil, err
+	}
+	var sections []TGSection
+	for _, p := range parts {
+		sections = append(sections, p...)
 	}
 
 	return &ReleaseNotes{
@@ -60,6 +71,7 @@ func ParseReleaseNotes(content string) (*ReleaseNotes, error) {
 		TelegramRaw: tgRaw,
 		ReleaseURL:  releaseURL,
 		TGSections:  sections,
+		TGParts:     parts,
 	}, nil
 }
 
@@ -72,7 +84,7 @@ func stripTrailingMarkdownRule(s string) string {
 	return strings.TrimSpace(strings.Join(lines, "\n"))
 }
 
-func parseTelegramBlock(raw string) (version, releaseURL string, sections []TGSection, err error) {
+func parseTelegramBlock(raw string) (version, releaseURL string, parts [][]TGSection, err error) {
 	lines := strings.Split(raw, "\n")
 	if len(lines) == 0 || strings.TrimSpace(lines[0]) == "" {
 		return "", "", nil, fmt.Errorf("telegram block: missing version line")
@@ -84,9 +96,22 @@ func parseTelegramBlock(raw string) (version, releaseURL string, sections []TGSe
 	}
 
 	var cur *TGSection
+	var sections []TGSection
 	for _, line := range lines[1:] {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
+			continue
+		}
+		if trimmed == telegramPartBreak {
+			if cur != nil {
+				sections = append(sections, *cur)
+				cur = nil
+			}
+			if len(sections) == 0 {
+				return "", "", nil, fmt.Errorf("telegram block: %q without sections before it", telegramPartBreak)
+			}
+			parts = append(parts, sections)
+			sections = nil
 			continue
 		}
 		if strings.HasPrefix(trimmed, "• ") || strings.HasPrefix(trimmed, "•") {
@@ -107,7 +132,12 @@ func parseTelegramBlock(raw string) (version, releaseURL string, sections []TGSe
 	if cur != nil {
 		sections = append(sections, *cur)
 	}
-	return version, releaseURL, sections, nil
+	if len(sections) > 0 {
+		parts = append(parts, sections)
+	} else if len(parts) > 0 {
+		return "", "", nil, fmt.Errorf("telegram block: %q at the end, nothing after it", telegramPartBreak)
+	}
+	return version, releaseURL, parts, nil
 }
 
 func parseVersionLine(line string) (version, releaseURL string, err error) {
@@ -182,14 +212,38 @@ func collapsibleSection(sec TGSection) bool {
 // collapsibleSection. На лимит 4096 это не влияет: Telegram считает символы
 // текста, а не разметку, поэтому сворачивание не заменяет сокращение текста.
 func FormatTelegramHTML(n *ReleaseNotes, footer TelegramFooter) string {
+	return formatTelegramPart(n, n.TGSections, "", footer)
+}
+
+// FormatTelegramParts — пост, разбитый на сообщения по telegramPartBreak.
+// У каждого сообщения своя строка версии с пометкой «часть N из M», футер —
+// только у последнего: он подпись под всем постом, а не под кусками.
+func FormatTelegramParts(n *ReleaseNotes, footer TelegramFooter) []string {
+	if len(n.TGParts) <= 1 {
+		return []string{FormatTelegramHTML(n, footer)}
+	}
+	out := make([]string, 0, len(n.TGParts))
+	for i, sections := range n.TGParts {
+		f := TelegramFooter{}
+		if i == len(n.TGParts)-1 {
+			f = footer
+		}
+		label := fmt.Sprintf(" · часть %d из %d", i+1, len(n.TGParts))
+		out = append(out, formatTelegramPart(n, sections, label, f))
+	}
+	return out
+}
+
+func formatTelegramPart(n *ReleaseNotes, sections []TGSection, versionLabel string, footer TelegramFooter) string {
 	var b strings.Builder
 	b.WriteString(`<a href="`)
 	b.WriteString(escapeHTMLAttr(n.ReleaseURL))
 	b.WriteString(`">`)
 	b.WriteString(escapeHTML(n.Version))
 	b.WriteString(`</a>`)
+	b.WriteString(escapeHTML(versionLabel))
 
-	for si, sec := range n.TGSections {
+	for si, sec := range sections {
 		if si == 0 {
 			// Одна пустая строка между версией и первой секцией.
 			b.WriteString("\n\n")

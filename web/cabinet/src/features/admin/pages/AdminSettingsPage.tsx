@@ -238,7 +238,7 @@ export default function AdminSettingsPage() {
           id={ADMIN_SETTINGS_GROUPS_LIST_ANCHOR}
           role="tabpanel"
           aria-labelledby={settingsCategoryTabId(activeCategory)}
-          className="scroll-mt-24 space-y-3"
+          className="grid scroll-mt-24 grid-cols-1 items-start gap-3 lg:grid-cols-2"
         >
           {visibleGroups.map((group) => (
             <AdminSettingsGroupEditor

@@ -296,12 +296,12 @@ func (h *LinkHandler) MergeConfirm(w http.ResponseWriter, r *http.Request) {
 // ============================================================================
 
 type mergeCustomerResp struct {
-	ID              int64 `json:"id"`
-	ExpireAt        any   `json:"expire_at"`
-	LoyaltyXP       int64 `json:"loyalty_xp"`
-	ExtraHwid       int   `json:"extra_hwid"`
-	IsWebOnly       bool  `json:"is_web_only"`
-	HasSubscription bool  `json:"has_subscription"`
+	ID              int64  `json:"id"`
+	ExpireAt        any    `json:"expire_at"`
+	LoyaltyXP       int64  `json:"loyalty_xp"`
+	ExtraHwid       int    `json:"extra_hwid"`
+	IsWebOnly       bool   `json:"is_web_only"`
+	HasSubscription bool   `json:"has_subscription"`
 	CurrentTariffID *int64 `json:"current_tariff_id,omitempty"`
 }
 
@@ -352,10 +352,10 @@ func mergePreviewToResponse(p *linking.MergePreview) mergePreviewResp {
 
 func snapshotToResp(s *linking.CustomerSnapshot) *mergeCustomerResp {
 	r := &mergeCustomerResp{
-		ID:        s.ID,
-		LoyaltyXP: s.LoyaltyXP,
-		ExtraHwid: s.ExtraHwid,
-		IsWebOnly: s.IsWebOnly,
+		ID:              s.ID,
+		LoyaltyXP:       s.LoyaltyXP,
+		ExtraHwid:       s.ExtraHwid,
+		IsWebOnly:       s.IsWebOnly,
 		CurrentTariffID: s.CurrentTariffID,
 	}
 	if s.ExpireAt != nil {

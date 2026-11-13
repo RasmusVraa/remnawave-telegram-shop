@@ -39,17 +39,79 @@ func TestListReleasePhotosOrderAndFilter(t *testing.T) {
 	}
 }
 
-func TestListReleasePhotosMissingDirAndLimit(t *testing.T) {
-	got, err := listReleasePhotos(filepath.Join(t.TempDir(), "nope"))
+func albumSizes(albums [][]string) []int {
+	var n []int
+	for _, a := range albums {
+		n = append(n, len(a))
+	}
+	return n
+}
+
+// Без подпапок — альбомы по 10 подряд; нет папки — нет альбомов.
+func TestListReleaseAlbumsFlat(t *testing.T) {
+	got, err := listReleaseAlbums(filepath.Join(t.TempDir(), "nope"))
 	if err != nil || got != nil {
 		t.Fatalf("missing dir: %v %v, want no album and no error", got, err)
 	}
 	dir := t.TempDir()
-	for i := 0; i < telegramMaxAlbum+1; i++ {
+	for i := 0; i < telegramMaxAlbum+3; i++ {
 		writeFiles(t, dir, fmt.Sprintf("%02d.png", i))
 	}
-	if _, err := listReleasePhotos(dir); err == nil {
-		t.Fatal("11 photos must be rejected: Telegram album takes 10")
+	got, err = listReleaseAlbums(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(albumSizes(got)) != "[10 3]" {
+		t.Fatalf("13 photos: got albums %v, want [10 3]", albumSizes(got))
+	}
+	if filepath.Base(got[1][0]) != "10.png" {
+		t.Fatalf("second album starts with %s, want 10.png", filepath.Base(got[1][0]))
+	}
+}
+
+// Подпапки — по альбому на каждую в порядке имён; больше 10 в одной — ошибка,
+// картинки и в корне, и в подпапках — ошибка.
+func TestListReleaseAlbumsSubfolders(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"2", "1"} {
+		if err := os.Mkdir(filepath.Join(dir, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeFiles(t, filepath.Join(dir, "1"), "01-a.png", "02-b.png")
+	writeFiles(t, filepath.Join(dir, "2"), "01-c.png")
+	got, err := listReleaseAlbums(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fmt.Sprint(albumSizes(got)) != "[2 1]" || filepath.Base(got[1][0]) != "01-c.png" {
+		t.Fatalf("got %v", got)
+	}
+
+	writeFiles(t, dir, "stray.png")
+	if _, err := listReleaseAlbums(dir); err == nil {
+		t.Fatal("photos in the root next to subfolders must be rejected")
+	}
+
+	big := t.TempDir()
+	if err := os.Mkdir(filepath.Join(big, "1"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < telegramMaxAlbum+1; i++ {
+		writeFiles(t, filepath.Join(big, "1"), fmt.Sprintf("%02d.png", i))
+	}
+	if _, err := listReleaseAlbums(big); err == nil {
+		t.Fatal("11 photos in one subfolder must be rejected: Telegram album takes 10")
+	}
+}
+
+// Альбом N отвечает на сообщение N, лишние — последнему.
+func TestAlbumPost(t *testing.T) {
+	cases := []struct{ album, posts, want int }{{0, 2, 0}, {1, 2, 1}, {2, 2, 1}, {1, 1, 0}}
+	for _, c := range cases {
+		if got := albumPost(c.album, c.posts); got != c.want {
+			t.Fatalf("albumPost(%d, %d) = %d, want %d", c.album, c.posts, got, c.want)
+		}
 	}
 }
 

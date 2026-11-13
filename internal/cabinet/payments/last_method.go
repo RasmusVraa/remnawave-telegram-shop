@@ -48,11 +48,12 @@ func checkoutMethodForInvoice(t database.InvoiceType, yookassaMethod *string) st
 		return repository.CheckoutProviderCryptoPay
 	case database.InvoiceTypeTelegram:
 		return repository.CheckoutProviderTelegram
+	case database.InvoiceTypePlatega:
+		return repository.CheckoutProviderPlatega
 	case database.InvoiceTypePlategaSBP:
 		return repository.CheckoutProviderPlategaSBP
-	case database.InvoiceTypePlategaCards:
-		return repository.CheckoutProviderPlategaCards
-	case database.InvoiceTypePlategaAcquiring:
+	// plt_cards — прежний способ, теперь это эквайринг.
+	case database.InvoiceTypePlategaAcquiring, database.InvoiceTypePlategaCards:
 		return repository.CheckoutProviderPlategaAcquiring
 	case database.InvoiceTypePlategaWorldwide:
 		return repository.CheckoutProviderPlategaWorldwide

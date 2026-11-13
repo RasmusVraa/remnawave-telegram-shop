@@ -195,5 +195,20 @@ const withSub = (patch) => ({ ...base, '/me/subscription': { ...base['/me/subscr
   console.log('6', errors)
   await ctx.close()
 }
+{
+  // Лоадер у кнопок: пока идёт запрос, значок кнопки крутится, повторно нажать нельзя.
+  const { ctx, page, errors } = await open(1440, 900, base, '/admin/status')
+  await ctx.route('**/cabinet/api/admin/status/probe', async (route) => {
+    await new Promise((r) => setTimeout(r, 15000))
+    route.fulfill({ status: 202, contentType: 'application/json', body: '{"ok":true}' }).catch(() => {})
+  })
+  await page.getByRole('button', { name: 'Проверить сейчас' }).click()
+  await page.mouse.move(2, 700)
+  await page.waitForTimeout(500)
+  await mark(page.getByRole('button', { name: 'Проверить сейчас' }), 'Кнопка крутится, пока идёт запрос', 'bottom')
+  await shot(page, '07-button-loader.png')
+  console.log('7', errors)
+  await ctx.close()
+}
 await b.close()
 server.close()

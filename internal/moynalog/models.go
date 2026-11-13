@@ -55,14 +55,11 @@ type IncomeClient struct {
 	IncomeType   string  `json:"incomeType"`
 }
 
-// CreateIncomeResponse - ответ на запрос создания дохода
+// CreateIncomeResponse - ответ на запрос создания дохода.
+//
+// ФНС отвечает одним полем: {"approvedReceiptUuid": "..."}. Раньше здесь
+// читалось несуществующее "id", и UUID чека терялся — чек создавался, но в
+// базу receipt_id писался пустым.
 type CreateIncomeResponse struct {
-	ID            string       `json:"id"`
-	OperationTime time.Time    `json:"operationTime"`
-	RequestTime   time.Time    `json:"requestTime"`
-	Services      []Service    `json:"services"`
-	TotalAmount   string       `json:"totalAmount"`
-	Client        IncomeClient `json:"client"`
-	PaymentType   string       `json:"paymentType"`
-	Status        string       `json:"status"`
+	ApprovedReceiptUUID string `json:"approvedReceiptUuid"`
 }

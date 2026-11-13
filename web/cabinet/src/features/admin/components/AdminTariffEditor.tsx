@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Save,
+  Trash2,
   Loader2,
   Pencil,
   Plus,
@@ -11,14 +12,13 @@ import {
   Coins,
   FileText,
   MapPin,
-  Trash2,
   Smartphone,
   HardDrive,
   RotateCcw,
-  ListOrdered,
   Sparkles,
   AlertTriangle,
   Eraser,
+  Star,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -27,8 +27,11 @@ import { surface } from './Surface'
 import { AdminModal } from './AdminModal'
 import { AdminConfirmModal } from './AdminConfirmModal'
 import { TariffDescriptionEditor } from './TariffDescriptionEditor'
+import { AdminTariffTrafficSplit } from './AdminTariffTrafficSplit'
+import { LockedHint } from './LockedHint'
 import { slugifyTariffName } from '../utils/slugifyTariffName'
 import { AdminCheckbox, AdminCheckboxField } from './AdminCheckbox'
+import { AdminToggleSwitch } from './AdminToggleSwitch'
 import {
   adminSectionIconBoxClass,
   adminSectionIconAccentClassNames,
@@ -39,11 +42,15 @@ import { useAdminBotSettings } from '../hooks/useAdminBotSettings'
 import {
   useAdminSquads,
   useAdminTariffSquads,
+  useAdminTariffDelete,
+  useAdminTariffList,
   STRATEGIES,
+  normalizeResetStrategy,
   type AdminTariff,
   type AdminTariffLocation,
   type CreateTariffInput,
 } from '../hooks/useAdminTariffs'
+import { AdminSelect } from './AdminSelect'
 import {
   AdminTariffSquadsApplyPanel,
   AdminTariffSquadsSaveDialog,
@@ -57,12 +64,11 @@ const DEVICE_PRESETS = [1, 2, 3, 5] as const
 const TRAFFIC_PRESETS = [0, 100, 200, 500, 1000] as const
 
 const STRATEGY_I18N_KEYS: Record<string, string> = {
-  no_reset: 'admin.tariffs.strategies.noReset',
+  NO_RESET: 'admin.tariffs.strategies.noReset',
   DAY: 'admin.tariffs.strategies.day',
   WEEK: 'admin.tariffs.strategies.week',
   MONTH: 'admin.tariffs.strategies.month',
   MONTH_ROLLING: 'admin.tariffs.strategies.monthRolling',
-  NO_RESET: 'admin.tariffs.strategies.noResetRw',
 }
 
 function parseSquadUUIDs(raw: string): string[] {
@@ -207,11 +213,59 @@ function TariffEditorTabNav({
   )
 }
 
+/**
+ * Строка «Популярный тариф» на вкладке «Основное». Популярный тариф один: если
+ * отметка уже стоит у другого, предупреждаем, что она переедет сюда.
+ */
+function PopularTariffRow({
+  checked,
+  onChange,
+  otherPopular,
+  inactive,
+}: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  otherPopular?: AdminTariff
+  inactive: boolean
+}) {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <label
+        className={cn(
+          'flex cursor-pointer items-center gap-3 rounded-[12px] border p-3 transition-colors',
+          checked ? 'border-emerald-500/45 bg-emerald-500/[0.06]' : 'border-border/60',
+        )}
+      >
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-[9px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+          <Star className="size-4" fill="currentColor" strokeWidth={0} aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">{t('admin.tariffs.popularLabel')}</span>
+          <span className="block text-xs text-muted-foreground">{t('admin.tariffs.popularHint')}</span>
+        </span>
+        <AdminToggleSwitch checked={checked} onChange={onChange} aria-label={t('admin.tariffs.popularLabel')} />
+      </label>
+      {otherPopular && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+          <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+          {t('admin.tariffs.popularMoves', { name: otherPopular.name?.trim() || otherPopular.slug })}
+        </p>
+      )}
+      {checked && inactive && (
+        <p className="mt-2 text-xs text-muted-foreground">{t('admin.tariffs.popularInactive')}</p>
+      )}
+    </div>
+  )
+}
+
 export interface TariffFormData {
   slug: string
   name: string
   sort_order: number
   is_active: boolean
+  /** Нашивка «Популярный» у клиентов; при сохранении снимается с прежнего популярного. */
+  is_popular: boolean
   device_limit: number
   traffic_gb: number
   traffic_limit_reset_strategy: string
@@ -276,9 +330,10 @@ function tariffToForm(t?: AdminTariff | null): TariffFormData {
     name: t?.name ?? '',
     sort_order: t?.sort_order ?? 0,
     is_active: t?.is_active ?? true,
+    is_popular: t?.is_popular ?? false,
     device_limit: t?.device_limit ?? 1,
     traffic_gb: t ? t.traffic_limit_bytes / GB : 0,
-    traffic_limit_reset_strategy: t?.traffic_limit_reset_strategy ?? 'no_reset',
+    traffic_limit_reset_strategy: t ? normalizeResetStrategy(t.traffic_limit_reset_strategy) : 'NO_RESET',
     squad_uuids: parseSquadUUIDs(t?.active_internal_squad_uuids ?? ''),
     description: t?.description ?? '',
     description_detail: t?.description_detail ?? '',
@@ -295,13 +350,12 @@ function tariffToForm(t?: AdminTariff | null): TariffFormData {
 }
 
 /**
- * tier_level всегда равен «Порядку».
+ * tier_level всегда равен порядку (sort_order).
  *
  * Отдельного поля «Уровень» в форме нет: это два почти всегда одинаковых числа.
- * Раньше при редактировании уровень сохранялся из исходного тарифа и не следовал
- * за изменением порядка — бейдж «Уровень N» и цвет карточки застревали на
- * значении, которое было при создании. TG-админка давно пишет оба поля разом
- * (см. tariff_admin.go, UpdateTariff с tier_level и sort_order), веб просто отстал.
+ * Порядок задаётся перетаскиванием карточек на странице тарифов (там же
+ * пересчитывается и уровень), а форма лишь не теряет текущее значение.
+ * TG-админка тоже пишет оба поля разом (tariff_admin.go, UpdateTariff).
  */
 function formToCreateInput(f: TariffFormData): CreateTariffInput {
   const slug = f.slug.trim() || slugifyTariffName(f.name)
@@ -310,6 +364,7 @@ function formToCreateInput(f: TariffFormData): CreateTariffInput {
     name: f.name.trim() || null,
     sort_order: f.sort_order,
     is_active: f.is_active,
+    is_popular: f.is_popular,
     device_limit: f.device_limit,
     traffic_limit_bytes: Math.round(f.traffic_gb * GB),
     traffic_limit_reset_strategy: f.traffic_limit_reset_strategy,
@@ -337,6 +392,7 @@ function formToUpdateFields(f: TariffFormData): Record<string, unknown> {
     name: input.name,
     sort_order: input.sort_order,
     is_active: input.is_active,
+    is_popular: input.is_popular,
     device_limit: input.device_limit,
     traffic_limit_bytes: input.traffic_limit_bytes,
     traffic_limit_reset_strategy: input.traffic_limit_reset_strategy,
@@ -363,6 +419,8 @@ interface Props {
     isEdit: boolean,
     /** Дифф состава сквадов, который надо применить к действующим подписчикам. */
     applySquads?: { add: string[]; remove: string[] } | null,
+    /** Сохранение вкладки «Трафик»: вызывается после успешного сохранения тарифа (обходу нужен уже сохранённый безлимит). */
+    after?: () => Promise<unknown>,
   ) => void
   saving?: boolean
 }
@@ -370,7 +428,10 @@ interface Props {
 export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Props) {
   const { t } = useTranslation()
   const { data: squadsData } = useAdminSquads()
+  const del = useAdminTariffDelete()
+  const [deleteOpen, setDeleteOpen] = useState(false)
   const { data: botSettings } = useAdminBotSettings()
+  const { data: allTariffs } = useAdminTariffList()
   const [form, setForm] = useState<TariffFormData>(() => tariffToForm(tariff))
   const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
   const isEdit = tariff != null
@@ -403,6 +464,13 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
   }, [open, tariff?.id])
 
   const isDirty = JSON.stringify(form) !== initialSnapshot.current
+  // Несохранённые правки вкладки «Трафик» (она сохраняется своей кнопкой) тоже считаются: закрытие окна и смена вкладки их не теряют.
+  const [trafficDirty, setTrafficDirty] = useState(false)
+  // Включён отдельный лимит обхода: обычные серверы тогда безлимитны, и поле лимита закрыто.
+  const [bypassOn, setBypassOn] = useState(false)
+  const trafficSaveRef = useRef<(() => Promise<unknown>) | null>(null)
+  const [trafficValid, setTrafficValid] = useState(true)
+  const anyDirty = isDirty || trafficDirty
 
   const set = <K extends keyof TariffFormData>(k: K, v: TariffFormData[K]) =>
     setForm((p) => ({ ...p, [k]: v }))
@@ -456,7 +524,20 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
 
   const submit = (applySquads: { add: string[]; remove: string[] } | null) => {
     if (isEdit) {
-      onSave(formToUpdateFields(form), true, applySquads)
+      // Одна кнопка «Сохранить» на весь тариф: сначала поля тарифа, потом вкладка «Трафик». Порядок важен:
+      // отдельный лимит обхода сервер принимает только у тарифа, где безлимит уже сохранён.
+      const saveTraffic = trafficSaveRef.current
+      const after = saveTraffic
+        ? async () => {
+            try {
+              await saveTraffic()
+            } catch (e) {
+              setActiveTab('traffic')
+              throw e
+            }
+          }
+        : undefined
+      onSave(formToUpdateFields(form), true, applySquads, after)
     } else {
       onSave(formToCreateInput(form), false)
     }
@@ -474,7 +555,7 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
   }
 
   const handleRequestClose = () => {
-    if (isDirty) {
+    if (anyDirty) {
       setConfirmCloseOpen(true)
       return
     }
@@ -495,11 +576,23 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
         iconAccent="emerald"
         footer={
           <div className="flex items-center justify-end gap-2">
-            {isDirty && (
+            {/* Удаление необратимо, поэтому оно слева и приглушено — подальше от «Сохранить». */}
+            {isEdit && tariff && (
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground/70 transition-colors hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 className="size-4" />
+                {t('admin.delete')}
+              </button>
+            )}
+            {anyDirty && (
               <span className="mr-auto hidden text-xs text-muted-foreground sm:inline">
                 {t('admin.tariffs.unsavedIndicator')}
               </span>
             )}
+            <span className={isEdit && tariff && !anyDirty ? 'mr-auto' : 'hidden'} />
             {/* Отмена нейтральная: акцентная подсветка читалась как «вот
                 основное действие», хотя рядом стоит «Сохранить». */}
             <button
@@ -512,7 +605,7 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving || hasErrors}
+              disabled={saving || hasErrors || !trafficValid}
               className={cn(
                 'inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50',
                 saving && '!opacity-100',
@@ -560,28 +653,42 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
                   </p>
                 )}
               </div>
-              <div>
-                <TariffFieldLabel icon={ListOrdered}>{t('admin.tariffs.sortOrder')}</TariffFieldLabel>
-                <input
-                  type="number"
-                  className="admin-input w-full max-w-xs px-3 py-2"
-                  value={form.sort_order}
-                  onChange={(e) => set('sort_order', Number(e.target.value))}
+              {/* У существующего тарифа включают и выключают тумблером на карточке; галочка нужна только при создании. */}
+              {!isEdit && (
+                <AdminCheckboxField
+                  checked={form.is_active}
+                  onChange={(v) => set('is_active', v)}
+                  label={t('admin.tariffs.active')}
+                  description={t('admin.tariffs.activeHint')}
+                  className="border border-border/60 p-3"
                 />
-                <p className="mt-1 text-xs text-muted-foreground">{t('admin.tariffs.sortOrderHint')}</p>
-              </div>
-              <AdminCheckboxField
-                checked={form.is_active}
-                onChange={(v) => set('is_active', v)}
-                label={t('admin.tariffs.active')}
-                description={t('admin.tariffs.activeHint')}
-                className="border border-border/60 p-3"
+              )}
+              <PopularTariffRow
+                checked={form.is_popular}
+                onChange={(v) => set('is_popular', v)}
+                otherPopular={
+                  form.is_popular && !tariff?.is_popular
+                    ? allTariffs?.find((x) => x.is_popular && x.id !== tariff?.id)
+                    : undefined
+                }
+                inactive={!form.is_active}
               />
             </section>
           )}
 
           {activeTab === 'traffic' && (
-            <section className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-4">
+            <section className="rounded-xl border border-border/70 bg-card/40">
+              <header className="flex items-center gap-2.5 border-b border-border/60 px-3.5 py-3">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <Gauge className="size-4" aria-hidden />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold leading-tight">{t('admin.tariffs.trafficSplit.regularTitle')}</p>
+                  <p className="text-xs text-muted-foreground">{t('admin.tariffs.trafficSplit.regularSub')}</p>
+                </div>
+              </header>
+              <div className="grid gap-4 p-3.5 sm:grid-cols-2">
               <div>
                 <TariffFieldLabel icon={Smartphone}>{t('admin.tariffs.devices')}</TariffFieldLabel>
                 <input
@@ -598,13 +705,14 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
                   renderLabel={(v) => String(v)}
                 />
               </div>
-              <div>
+              <LockedHint locked={bypassOn} message={t('admin.tariffs.trafficSplit.lockedByBypass')}>
                 <TariffFieldLabel icon={HardDrive}>{t('admin.tariffs.traffic')}</TariffFieldLabel>
                 <input
                   type="number"
                   min={0}
                   step={0.1}
-                  className="admin-input w-full px-3 py-2"
+                  disabled={bypassOn}
+                  className="admin-input w-full px-3 py-2 disabled:opacity-60"
                   value={form.traffic_gb}
                   onChange={(e) => set('traffic_gb', Number(e.target.value))}
                 />
@@ -619,22 +727,44 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
                     {t('admin.tariffs.trafficUnlimitedHint')}
                   </p>
                 )}
-              </div>
+              </LockedHint>
               <div className="sm:col-span-2">
                 <TariffFieldLabel icon={RotateCcw}>{t('admin.tariffs.strategy')}</TariffFieldLabel>
-                <select
-                  className="admin-input w-full max-w-xs px-3 py-2"
+                <AdminSelect
+                  className="w-full max-w-xs"
                   value={form.traffic_limit_reset_strategy}
-                  onChange={(e) => set('traffic_limit_reset_strategy', e.target.value)}
-                >
-                  {STRATEGIES.map((s) => (
-                    <option key={s} value={s}>
-                      {t(STRATEGY_I18N_KEYS[s] ?? s, { defaultValue: s })}
-                    </option>
-                  ))}
-                </select>
+                  options={STRATEGIES.map((s) => ({ value: s as string, label: t(STRATEGY_I18N_KEYS[s] ?? s, { defaultValue: s }) }))}
+                  onChange={(next) => set('traffic_limit_reset_strategy', next ?? form.traffic_limit_reset_strategy)}
+                  placeholder={t('admin.tariffs.strategy')}
+                  ariaLabel={t('admin.tariffs.strategy')}
+                />
+              </div>
               </div>
             </section>
+            {!(isEdit && tariff) && (
+              <p className="rounded-lg border border-dashed border-border/70 px-3 py-2 text-xs text-muted-foreground">
+                {t('admin.tariffs.trafficSplit.saveFirst')}
+              </p>
+            )}
+            </div>
+          )}
+          {/* Не размонтируется при смене вкладки: иначе несохранённые правки обхода и пакетов пропадали бы. */}
+          {isEdit && tariff && (
+            <div className={activeTab === 'traffic' ? 'mt-4' : 'hidden'}>
+              <AdminTariffTrafficSplit
+                tariffId={tariff.id}
+                tariffSquads={form.squad_uuids}
+                formLimitGb={form.traffic_gb}
+                onMakeUnlimited={() => set('traffic_gb', 0)}
+                onDirtyChange={setTrafficDirty}
+                saveRef={trafficSaveRef}
+                onValidChange={setTrafficValid}
+                onBypassChange={(on) => {
+                  setBypassOn(on)
+                  if (on) set('traffic_gb', 0)
+                }}
+              />
+            </div>
           )}
 
           {activeTab === 'servers' && hasSquads && squadsData && (
@@ -797,9 +927,9 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
                     return (
                       <div
                         key={m}
-                        className="grid gap-3 px-4 py-3 sm:grid-cols-[minmax(6rem,1fr)_1fr_1fr] sm:items-start"
+                        className="grid grid-cols-2 gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[minmax(6rem,1fr)_1fr_1fr] sm:items-start sm:gap-3"
                       >
-                        <div className="flex items-center gap-2 sm:block">
+                        <div className="col-span-2 flex items-center gap-2 sm:col-span-1 sm:block">
                           <span className="text-sm font-medium">
                             {t('admin.users.monthsShort', { count: m })}
                           </span>
@@ -934,6 +1064,28 @@ export function AdminTariffEditor({ open, onClose, tariff, onSave, saving }: Pro
           )}
         </div>
       </AdminModal>
+
+      {isEdit && tariff && (
+        <AdminConfirmModal
+          open={deleteOpen}
+          onClose={() => setDeleteOpen(false)}
+          onConfirm={() => {
+            del.mutate(tariff.id, {
+              onSuccess: () => {
+                setDeleteOpen(false)
+                onClose()
+              },
+            })
+          }}
+          title={t('admin.tariffs.deleteTariff')}
+          message={t('admin.tariffs.confirmDelete', { name: tariff.name?.trim() || tariff.slug })}
+          confirmLabel={t('admin.delete')}
+          variant="destructive"
+          loading={del.isPending}
+          icon={Trash2}
+          iconAccent="rose"
+        />
+      )}
 
       <AdminConfirmModal
         open={confirmCloseOpen}

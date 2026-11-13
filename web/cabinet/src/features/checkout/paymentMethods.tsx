@@ -1,9 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bitcoin, CreditCard, Smartphone, Star, Wallet } from 'lucide-react'
+import { Bitcoin, CreditCard, Globe, Layers, Smartphone, Star, Wallet } from 'lucide-react'
 
 import { HeleketBrandIcon, SbpBrandIcon } from '@/components/BrandIcons'
-import { plategaMethodIcon, plategaMethodLabel, type PlategaMethodId } from '@/components/PlategaPaymentExpand'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { api } from '@/lib/api'
 import { PROVIDER_ORDER, useProviderEnabled, type Provider } from '@/features/checkout/checkoutShared'
@@ -21,6 +20,25 @@ export type CheckoutMethodId = string
 /** Способы ЮKassa — синхрон с config.YookasaPaymentMethodIDs. */
 export const YOOKASSA_METHOD_IDS = ['all', 'sbp', 'bank_card', 'sberbank', 'tinkoff_bank', 'yoo_money'] as const
 export type YookassaMethodId = (typeof YOOKASSA_METHOD_IDS)[number]
+
+/** Способы Platega — синхрон с config.PlategaPaymentMethodIDs; «all» — общая форма Platega. */
+export const PLATEGA_METHOD_IDS = ['all', 'sbp', 'acquiring', 'worldwide', 'crypto'] as const
+export type PlategaMethodId = (typeof PLATEGA_METHOD_IDS)[number]
+
+export function isPlategaMethodId(v: string): v is PlategaMethodId {
+  return (PLATEGA_METHOD_IDS as readonly string[]).includes(v)
+}
+
+/** Кнопки Platega из bootstrap; без поля (старый бэкенд) — одна общая форма. */
+export function plategaMethodsFrom(raw: string[] | undefined): PlategaMethodId[] {
+  const list = (raw ?? []).filter(isPlategaMethodId)
+  return list.length > 0 ? list : ['all']
+}
+
+/** id кнопки кабинета для способа Platega: «platega» или «platega_sbp»… */
+export function plategaCheckoutId(id: PlategaMethodId): CheckoutMethodId {
+  return id === 'all' ? 'platega' : `platega_${id}`
+}
 
 const YOOKASSA_PREFIX = 'yookassa:'
 
@@ -49,12 +67,22 @@ export function yookassaMethodsFrom(raw: string[] | undefined): YookassaMethodId
 export function availableCheckoutMethods(
   providerEnabled: Record<Provider, boolean>,
   yookassaMethods: YookassaMethodId[],
+  plategaMethods: PlategaMethodId[] = ['all'],
 ): CheckoutMethodId[] {
   const out: CheckoutMethodId[] = []
   for (const p of PROVIDER_ORDER) {
-    if (!providerEnabled[p]) continue
-    if (p === 'yookassa') out.push(...yookassaMethods.map((m) => YOOKASSA_PREFIX + m))
-    else out.push(p)
+    if (p === 'yookassa') {
+      if (providerEnabled.yookassa) out.push(...yookassaMethods.map((m) => YOOKASSA_PREFIX + m))
+    } else if (p.startsWith('platega')) {
+      // Кнопки Platega идут одним куском, в порядке настройки.
+      if (p !== 'platega') continue
+      for (const m of plategaMethods) {
+        const id = plategaCheckoutId(m)
+        if (providerEnabled[id as Provider]) out.push(id)
+      }
+    } else if (providerEnabled[p]) {
+      out.push(p)
+    }
   }
   return out
 }
@@ -109,12 +137,18 @@ export function checkoutMethodMeta(id: CheckoutMethodId, t: (k: string) => strin
       return { label: t('checkout.telegramStars'), provider: t('checkout.providerHintTelegram'), icon: <Star size={18} className="text-amber-500" /> }
     case 'heleket':
       return { label: t('checkout.otherCrypto'), provider: t('checkout.providerHintHeleket'), icon: <HeleketBrandIcon className="h-[18px] w-[18px]" /> }
+    case 'platega':
+      return { label: t('checkout.plategaAll'), provider: t('checkout.providerHintPlatega'), icon: <Layers size={18} className="text-primary" /> }
+    case 'platega_sbp':
+      return { label: t('checkout.plategaSbp'), provider: t('checkout.providerHintPlatega'), icon: <SbpBrandIcon className="h-[18px] w-[18px]" /> }
+    case 'platega_acquiring':
+      return { label: t('checkout.plategaAcquiring'), provider: t('checkout.providerHintPlatega'), icon: <CreditCard size={18} className="text-violet-500" /> }
+    case 'platega_worldwide':
+      return { label: t('checkout.plategaWorldwide'), provider: t('checkout.providerHintPlatega'), icon: <Globe size={18} className="text-indigo-500" /> }
+    case 'platega_crypto':
+      return { label: t('checkout.plategaCrypto'), provider: t('checkout.providerHintPlatega'), icon: <Bitcoin size={18} className="text-primary" /> }
     default:
-      return {
-        label: plategaMethodLabel(t, id as PlategaMethodId),
-        provider: t('checkout.providerHintPlatega'),
-        icon: plategaMethodIcon(id as PlategaMethodId),
-      }
+      return { label: id, provider: '', icon: <CreditCard size={18} className="text-primary" /> }
   }
 }
 
@@ -132,11 +166,12 @@ export function useCheckoutMethod() {
   const providerEnabled = useProviderEnabled()
   const { data: bootstrap } = useAuthBootstrap()
   const yookassaMethods = yookassaMethodsFrom(bootstrap?.yookassa_methods)
+  const plategaMethods = plategaMethodsFrom(bootstrap?.platega_methods)
   const methods = useMemo(
-    () => availableCheckoutMethods(providerEnabled, yookassaMethods),
+    () => availableCheckoutMethods(providerEnabled, yookassaMethods, plategaMethods),
     // providerEnabled — новый объект на каждый рендер; сравниваем по значениям.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(providerEnabled), yookassaMethods.join(',')],
+    [JSON.stringify(providerEnabled), yookassaMethods.join(','), plategaMethods.join(',')],
   )
 
   const lastQuery = useQuery({

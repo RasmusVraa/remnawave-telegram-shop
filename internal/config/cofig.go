@@ -27,9 +27,7 @@ type config struct {
 	botURL                                                                       string
 	yookasaURL, yookasaShopId, yookasaSecretKey, yookasaEmail, yookasaWebhookURL string
 	plategaMerchantID, plategaSecret, plategaWebhookURL                          string
-	isPlategaSBPEnabled, isPlategaCardsEnabled                                   bool
-	isPlategaAcquiringEnabled, isPlategaWorldwideEnabled                         bool
-	isPlategaCryptoEnabled                                                       bool
+	isPlategaEnabled                                                             bool
 	heleketMerchantID, heleketAPIKey, heleketWebhookURL, heleketCurrency         string
 	heleketOrderPrefix                                                           string
 	heleketLifetime                                                              int
@@ -40,7 +38,7 @@ type config struct {
 	moynalogRetryMaxAgeHours                                                     int
 	telegramProxyURL                                                             string
 	yookasaProxyURL                                                              string
-	trafficLimit, trialTrafficLimit                                              int
+	trialTrafficLimit                                                            int
 	feedbackURL                                                                  string
 	channelURL                                                                   string
 	serverStatusURL                                                              string
@@ -61,7 +59,8 @@ type config struct {
 	isMoynalogEnabled                                                            bool
 	moynalogReceiptYookasa, moynalogReceiptPlatega, moynalogReceiptCrypto        bool // MOYNALOG_RECEIPT_FOR
 	adminTelegramId                                                              int64
-	cabinetAdminEmails                                                           []string
+cabinetAdminEmails                                                           []string
+	adminTelegramIds                                                             []int64
 	forwardUserMessagesToAdmin                                                   bool
 	suspiciousUserFilterEnabled                                                  bool
 	trialDays                                                                    int
@@ -79,10 +78,14 @@ type config struct {
 	trialHwidLimit                                                               int
 	paidHwidLimit                                                                int
 	hwidExtraDevicesEnabled                                                      bool
+	trafficSplitEnabled                                                          bool
+	trafficPacksEnabled                                                          bool
+	trafficBypassLabel                                                           string
+	trafficAlertPercent                                                          int
+	trafficPollMinutes                                                           int
 	miniApp                                                                      string
 	enableAutoPayment                                                            bool
 	healthCheckPort                                                              int
-	tributeWebhookUrl, tributeAPIKey, tributePaymentUrl                          string
 	isWebAppLinkEnabled                                                          bool
 	daysInMonth                                                                  int
 	externalSquadUUID                                                            uuid.UUID
@@ -96,7 +99,6 @@ type config struct {
 	trialRemnawaveTag                                                            string
 	remnawaveHeaders                                                             map[string]string
 	trafficLimitResetStrategy                                                    string
-	salesMode                                                                    string
 	showLongTermSavingsPercent                                                   bool    // подписи кнопок периодов: (-N%) к 3/6/12 мес относительно цены 1 мес
 	rubPerStar                                                                   float64 // рублей за 1 Star; 0 = не задано (подсказка Stars в админке отключена)
 	loyaltyEnabled                                                               bool
@@ -167,15 +169,17 @@ func GetRemnawaveWebhookSecret() string {
 func DefaultLanguage() string {
 	return conf.defaultLanguage
 }
+
+// Tribute устарел и отключён: TRIBUTE_* из env не читаются, вебхук не поднимается, кнопка не показывается.
 func GetTributeWebHookUrl() string {
-	return conf.tributeWebhookUrl
+	return ""
 }
 func GetTributeAPIKey() string {
-	return conf.tributeAPIKey
+	return ""
 }
 
 func GetTributePaymentUrl() string {
-	return conf.tributePaymentUrl
+	return ""
 }
 
 // GetYookasaWebHookURL — только путь вебхука YooKassa (например "/yookassa-hook"), без схемы и домена:
@@ -199,31 +203,9 @@ func GetPlategaWebHookURL() string {
 	return conf.plategaWebhookURL
 }
 
-func IsPlategaSBPEnabled() bool {
-	return conf.isPlategaSBPEnabled
-}
-
-func IsPlategaCardsEnabled() bool {
-	return conf.isPlategaCardsEnabled
-}
-
-func IsPlategaAcquiringEnabled() bool {
-	return conf.isPlategaAcquiringEnabled
-}
-
-func IsPlategaWorldwideEnabled() bool {
-	return conf.isPlategaWorldwideEnabled
-}
-
-func IsPlategaCryptoEnabled() bool {
-	return conf.isPlategaCryptoEnabled
-}
-
-// IsPlategaEnabled — true, если включён хотя бы один метод Platega (и PLATEGA_ENABLED в env).
+// IsPlategaEnabled — включена ли Platega (одна кнопка, способ выбирает плательщик).
 func IsPlategaEnabled() bool {
-	return conf.isPlategaSBPEnabled || conf.isPlategaCardsEnabled ||
-		conf.isPlategaAcquiringEnabled || conf.isPlategaWorldwideEnabled ||
-		conf.isPlategaCryptoEnabled
+	return conf.isPlategaEnabled
 }
 
 func HeleketMerchantID() string {
@@ -365,6 +347,39 @@ func PartnerNotifyMessageThreadID() int {
 	return conf.partnerNotifyThreadID
 }
 
+// TrafficSplitEnabled — общий выключатель раздельного трафика (лимит обхода и воркер).
+func TrafficSplitEnabled() bool { return conf.trafficSplitEnabled }
+
+// TrafficPacksEnabled — продаётся ли докупка трафика пакетами.
+func TrafficPacksEnabled() bool { return conf.trafficPacksEnabled }
+
+// TrafficBypassLabel — как серверы обхода называются у клиента (админ может сменить:
+// платёжным системам не нравятся открытые слова вроде «обход» и «белые списки»).
+// По умолчанию со строчной: в боте и уведомлениях название стоит внутри фразы,
+// а заголовки кабинета сами поднимают первую букву (web/cabinet/src/lib/bypassLabel.ts).
+func TrafficBypassLabel() string {
+	if conf.trafficBypassLabel == "" {
+		return "обход"
+	}
+	return conf.trafficBypassLabel
+}
+
+// TrafficAlertPercent — порог предупреждения о приближении к лимиту (второе уведомление — при 100%).
+func TrafficAlertPercent() int {
+	if conf.trafficAlertPercent < 1 || conf.trafficAlertPercent > 99 {
+		return 80
+	}
+	return conf.trafficAlertPercent
+}
+
+// TrafficPollMinutes — как часто воркер проверяет расход обхода.
+func TrafficPollMinutes() int {
+	if conf.trafficPollMinutes < 1 {
+		return 5
+	}
+	return conf.trafficPollMinutes
+}
+
 func HwidAddPrice() int {
 	return conf.hwidAddPrice
 }
@@ -448,9 +463,9 @@ func TrafficLimitResetStrategy() string {
 	return conf.trafficLimitResetStrategy
 }
 
-// SalesMode: "classic" (цены из env) или "tariffs" (цены из БД).
+// SalesMode — всегда "tariffs" (цены и лимиты из БД). Режим classic устарел; SALES_MODE из env не читается.
 func SalesMode() string {
-	return conf.salesMode
+	return "tariffs"
 }
 
 // ShowLongTermSavingsPercent — добавлять к кнопкам 3/6/12 мес экономию в % относительно покупки по месячной цене (PRICE_1 или цена 1 мес тарифа).
@@ -565,6 +580,14 @@ func ExternalSquadUUID() uuid.UUID {
 // Price — цена периода в рублях (classic). Для периода, которого нет в продаже,
 // — 0: раньше любой месяц вне 1/3/6/12 стоил как один, и подделанная кнопка
 // бота продавала month=120 по цене месяца.
+// Стартовые цены (₽ за 1/3/6/12 мес) для автосида тарифа standard.
+const (
+	defaultPrice1  = 150
+	defaultPrice3  = 400
+	defaultPrice6  = 750
+	defaultPrice12 = 1400
+)
+
 func Price(month int) int {
 	switch month {
 	case 1:
@@ -631,8 +654,11 @@ func YookasaShopId() string {
 func YookasaSecretKey() string {
 	return conf.yookasaSecretKey
 }
+
+// TrafficLimit — запасной лимит обычного трафика, когда у тарифа свой лимит не задан. Всегда 0 (безлимит):
+// лимит задаётся на тарифе, а прежняя переменная TRAFFIC_LIMIT больше не читается.
 func TrafficLimit() int {
-	return conf.trafficLimit * bytesInGigabyte
+	return 0
 }
 
 // placeholderCredentials — значения-заглушки из .env.sample. Тот, кто скопировал
@@ -1055,9 +1081,10 @@ func InitConfig() {
 		}
 	}
 	var err error
-	conf.adminTelegramId, err = strconv.ParseInt(os.Getenv("ADMIN_TELEGRAM_ID"), 10, 64)
+	// Первый id — главный: бот-админка, уведомления и «написать админу».
+	conf.adminTelegramId, conf.adminTelegramIds, err = parseAdminTelegramIDs(os.Getenv("ADMIN_TELEGRAM_ID"))
 	if err != nil {
-		panic("ADMIN_TELEGRAM_ID .env variable not set")
+		panic(fmt.Sprintf("ADMIN_TELEGRAM_ID .env variable not set or invalid: %v", err))
 	}
 	conf.cabinetAdminEmails = ParseCabinetAdminEmails(os.Getenv("CABINET_ADMIN_EMAILS"))
 
@@ -1124,19 +1151,12 @@ func InitConfig() {
 
 	conf.enableAutoPayment = envBool("ENABLE_AUTO_PAYMENT")
 
-	conf.price1 = mustEnvInt("PRICE_1")
-	conf.price3 = mustEnvInt("PRICE_3")
-	conf.price6 = mustEnvInt("PRICE_6")
-	conf.price12 = mustEnvInt("PRICE_12")
+	// Цены задаются в тарифах. PRICE_*/STARS_PRICE_* из env не читаются: это только стартовые цены для автосида
+	// тарифа standard (и запасной ориентир, если у тарифа цена не задана).
+	conf.price1, conf.price3, conf.price6, conf.price12 = defaultPrice1, defaultPrice3, defaultPrice6, defaultPrice12
 
 	conf.isTelegramStarsEnabled = envBool("TELEGRAM_STARS_ENABLED")
-	if conf.isTelegramStarsEnabled {
-		conf.starsPrice1 = envIntDefault("STARS_PRICE_1", conf.price1)
-		conf.starsPrice3 = envIntDefault("STARS_PRICE_3", conf.price3)
-		conf.starsPrice6 = envIntDefault("STARS_PRICE_6", conf.price6)
-		conf.starsPrice12 = envIntDefault("STARS_PRICE_12", conf.price12)
-
-	}
+	conf.starsPrice1, conf.starsPrice3, conf.starsPrice6, conf.starsPrice12 = conf.price1, conf.price3, conf.price6, conf.price12
 	conf.requirePaidPurchaseForStars = envBool("REQUIRE_PAID_PURCHASE_FOR_STARS")
 
 	conf.remnawaveUrl = mustEnv("REMNAWAVE_URL")
@@ -1189,18 +1209,17 @@ func InitConfig() {
 	conf.plategaMerchantID = strings.TrimSpace(os.Getenv("PLATEGA_MERCHANT_ID"))
 	conf.plategaSecret = strings.TrimSpace(os.Getenv("PLATEGA_SECRET"))
 	conf.plategaWebhookURL = strings.TrimSpace(os.Getenv("PLATEGA_WEBHOOK_URL"))
-	// PLATEGA_ENABLED — общий рубильник: при выключенном ни один подметод не
-	// поднимается, как и раньше.
 	if envBool("PLATEGA_ENABLED") {
 		if !credentialsPresent(conf.plategaMerchantID, conf.plategaSecret) {
 			log.Panicf("PLATEGA_ENABLED=true requires PLATEGA_MERCHANT_ID and PLATEGA_SECRET")
 		}
 		warnIfPlaceholders("platega", conf.plategaMerchantID, conf.plategaSecret)
-		conf.isPlategaSBPEnabled = envBool("PLATEGA_SBP_ENABLED")
-		conf.isPlategaCardsEnabled = envBool("PLATEGA_CARDS_ENABLED")
-		conf.isPlategaAcquiringEnabled = envBool("PLATEGA_ACQUIRING_ENABLED")
-		conf.isPlategaWorldwideEnabled = envBool("PLATEGA_WORLDWIDE_ENABLED")
-		conf.isPlategaCryptoEnabled = envBool("PLATEGA_CRYPTO_ENABLED")
+		conf.isPlategaEnabled = true
+		for _, legacy := range []string{"PLATEGA_SBP_ENABLED", "PLATEGA_CARDS_ENABLED", "PLATEGA_ACQUIRING_ENABLED", "PLATEGA_WORLDWIDE_ENABLED", "PLATEGA_CRYPTO_ENABLED"} {
+			if os.Getenv(legacy) != "" {
+				slog.Warn("legacy Platega method flag is ignored: Platega is now one button and the payer picks the method on its page", "var", legacy)
+			}
+		}
 	}
 
 	conf.heleketMerchantID = strings.TrimSpace(os.Getenv("HELEKET_MERCHANT_ID"))
@@ -1217,7 +1236,6 @@ func InitConfig() {
 		conf.isHeleketEnabled = true
 	}
 
-	conf.trafficLimit = mustEnvInt("TRAFFIC_LIMIT")
 	conf.referralDays = mustEnvInt("REFERRAL_DAYS")
 	conf.referralMode = func() string {
 		v := strings.ToLower(envStringDefault("REFERRAL_MODE", "default"))
@@ -1259,6 +1277,11 @@ func InitConfig() {
 	conf.trialHwidLimit = envIntDefault("TRIAL_HWID_LIMIT", 1)
 	conf.paidHwidLimit = envIntDefault("PAID_HWID_LIMIT", 0)
 	conf.hwidExtraDevicesEnabled = envBoolDefault("HWID_EXTRA_DEVICES_ENABLED", true)
+	conf.trafficSplitEnabled = envBoolDefault("TRAFFIC_SPLIT_ENABLED", false)
+	conf.trafficPacksEnabled = envBoolDefault("TRAFFIC_PACKS_ENABLED", true)
+	conf.trafficBypassLabel = strings.TrimSpace(envStringDefault("TRAFFIC_BYPASS_LABEL", "обход"))
+	conf.trafficAlertPercent = envIntDefault("TRAFFIC_ALERT_PERCENT", 80)
+	conf.trafficPollMinutes = envIntDefault("TRAFFIC_POLL_MINUTES", 5)
 
 	conf.serverStatusURL = os.Getenv("SERVER_STATUS_URL")
 	conf.supportURL = os.Getenv("SUPPORT_URL")
@@ -1352,12 +1375,6 @@ func InitConfig() {
 	} else {
 		conf.trialExternalSquadUUID = uuid.Nil
 		slog.Info("No trial external squad UUID specified, will use regular EXTERNAL_SQUAD_UUID")
-	}
-
-	conf.tributeWebhookUrl = os.Getenv("TRIBUTE_WEBHOOK_URL")
-	if conf.tributeWebhookUrl != "" {
-		conf.tributeAPIKey = mustEnv("TRIBUTE_API_KEY")
-		conf.tributePaymentUrl = mustEnv("TRIBUTE_PAYMENT_URL")
 	}
 
 	conf.remnawaveWebhookPath = strings.TrimSpace(os.Getenv("REMNAWAVE_WEBHOOK_PATH"))
@@ -1468,11 +1485,6 @@ func InitConfig() {
 	conf.telegramProxyURL = envStringDefault("TELEGRAM_PROXY_URL", "")
 	conf.yookasaProxyURL = envStringDefault("YOOKASA_PROXY_URL", "")
 
-	conf.salesMode = strings.ToLower(envStringDefault("SALES_MODE", "classic"))
-	if conf.salesMode != "classic" && conf.salesMode != "tariffs" {
-		panic("SALES_MODE must be 'classic' or 'tariffs'")
-	}
-
 	conf.showLongTermSavingsPercent = envBoolDefault("SHOW_LONG_TERM_SAVINGS_PERCENT", false)
 
 	conf.rubPerStar = func() float64 {
@@ -1516,29 +1528,19 @@ func InitConfig() {
 		conf.paymentsNotifyChatID = cid
 	}
 	conf.paymentsNotifyMessageThreadID = envIntDefault("PAYMENTS_NOTIFY_MESSAGE_THREAD_ID", 0)
-	conf.paymentsNotifySendPaid = false
-	conf.paymentsNotifySendCancel = false
-	if conf.paymentsNotifyEnabled {
-		if conf.paymentsNotifyChatID == 0 {
-			slog.Warn("PAYMENTS_NOTIFY_ENABLED=true but PAYMENTS_NOTIFY_CHAT_ID is empty — уведомления о платежах отправляться не будут")
+	// События читаются всегда, а не только при PAYMENTS_NOTIFY_ENABLED=true:
+	// оповещения об оплатах включают и из админки, и тогда пустые флаги
+	// молча глушили бы все уведомления.
+	for _, p := range strings.Split(os.Getenv("PAYMENTS_NOTIFY_EVENTS"), ",") {
+		switch tok := strings.ToLower(strings.TrimSpace(p)); tok {
+		case "", "paid", "cancel", "none":
+		default:
+			slog.Warn("PAYMENTS_NOTIFY_EVENTS: неизвестное значение, пропуск", "token", tok)
 		}
-		eventsRaw := strings.TrimSpace(os.Getenv("PAYMENTS_NOTIFY_EVENTS"))
-		if eventsRaw == "" {
-			conf.paymentsNotifySendPaid = true
-			conf.paymentsNotifySendCancel = true
-		} else {
-			for _, p := range strings.Split(eventsRaw, ",") {
-				switch strings.ToLower(strings.TrimSpace(p)) {
-				case "paid":
-					conf.paymentsNotifySendPaid = true
-				case "cancel":
-					conf.paymentsNotifySendCancel = true
-				case "":
-				default:
-					slog.Warn("PAYMENTS_NOTIFY_EVENTS: неизвестное значение, пропуск", "token", p)
-				}
-			}
-		}
+	}
+	applyPaymentsNotifyEvents(os.Getenv("PAYMENTS_NOTIFY_EVENTS"))
+	if conf.paymentsNotifyEnabled && conf.paymentsNotifyChatID == 0 {
+		slog.Info("PAYMENTS_NOTIFY_CHAT_ID пуст — уведомления о платежах уйдут в общий чат оповещений (ADMIN_ALERTS_CHAT_ID) или в личку админу")
 	}
 
 	// Lifecycle notifications

@@ -32,6 +32,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/csrf"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/jwt"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/password"
@@ -62,15 +63,15 @@ type Config struct {
 
 // Service — фасад аутентификации.
 type Service struct {
-	cfg       Config
-	accounts  *repository.AccountRepo
-	ids       *repository.IdentityRepo
-	sess      *repository.SessionRepo
-	evs       *repository.EmailVerificationRepo
-	prs       *repository.PasswordResetRepo
-	jwt       *jwt.Issuer
-	mailer    *mail.Mailer
-	bootstrap *bootstrap.CustomerBootstrap
+	cfg             Config
+	accounts        *repository.AccountRepo
+	ids             *repository.IdentityRepo
+	sess            *repository.SessionRepo
+	evs             *repository.EmailVerificationRepo
+	prs             *repository.PasswordResetRepo
+	jwt             *jwt.Issuer
+	mailer          *mail.Mailer
+	bootstrap       *bootstrap.CustomerBootstrap
 	emailMergeCodes *repository.EmailMergeVerificationRepo
 
 	// Опциональные поля OAuth/Telegram. Устанавливаются через SetGoogle /
@@ -134,14 +135,14 @@ func New(
 		cfg.RefreshCookiePath = "/cabinet/api/auth"
 	}
 	return &Service{
-		cfg:       cfg,
-		accounts:  accounts,
-		ids:       ids,
-		sess:      sess,
-		evs:       evs,
-		prs:       prs,
-		jwt:       jwtIssuer,
-		mailer:    mailer,
+		cfg:             cfg,
+		accounts:        accounts,
+		ids:             ids,
+		sess:            sess,
+		evs:             evs,
+		prs:             prs,
+		jwt:             jwtIssuer,
+		mailer:          mailer,
 		bootstrap:       boot,
 		emailMergeCodes: emailMergeCodes,
 	}
@@ -259,13 +260,12 @@ var (
 	// ErrEmailNotVerified — попытка войти/обновить до подтверждения email.
 	// Используется точечно (например, в RequireVerifiedEmail middleware).
 	ErrEmailNotVerified = errors.New("auth: email not verified")
-
 )
 
 // Исход привязки email (POST /me/email/link).
 const (
-	LinkEmailOutcomeVerifySent     = "verify_sent"
-	LinkEmailOutcomeMergeRequired = "merge_required"
+	LinkEmailOutcomeVerifySent                = "verify_sent"
+	LinkEmailOutcomeMergeRequired             = "merge_required"
 	LinkEmailOutcomeMergeVerificationRequired = "merge_verification_required"
 )
 
@@ -400,6 +400,7 @@ type TokenPair struct {
 
 // Login аутентифицирует пользователя.
 func (s *Service) Login(ctx context.Context, in LoginInput) (*TokenPair, error) {
+	ctx = withLoginMethod(ctx, "email")
 	start := time.Now()
 	defer s.equalizeLatency(start)
 
@@ -471,6 +472,9 @@ func (s *Service) issueSession(ctx context.Context, acc *repository.Account, fam
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create session: %w", err)
+	}
+	if method := loginMethodFrom(ctx); method != "" {
+		emitAccountEvent(adminevents.UserLogin, acc.ID, map[string]any{"method": method})
 	}
 
 	access, accessExp, err := s.jwt.Issue(acc.ID, emailOr(acc.Email), acc.EmailVerified(), acc.Language)
@@ -706,6 +710,7 @@ func (s *Service) ResetPassword(ctx context.Context, token, newPassword string) 
 	if _, err := s.sess.RevokeAllForAccount(ctx, acc.ID); err != nil {
 		slog.Warn("reset: revoke sessions failed", "error", err)
 	}
+	emitAccountEvent(adminevents.AccountPasswordReset, acc.ID, nil)
 	if err := s.prs.MarkUsed(ctx, pr.ID); err != nil {
 		slog.Warn("reset: mark used failed", "error", err)
 	}
@@ -816,6 +821,7 @@ func (s *Service) ConfirmEmail(ctx context.Context, token, email, refreshFromCoo
 	if err := s.accounts.MarkEmailVerified(ctx, ev.AccountID); err != nil {
 		return nil, err
 	}
+	emitAccountEvent(adminevents.AccountEmailVerified, ev.AccountID, nil)
 	// Перечитываем: токен выписывается по acc, а прочитан он до подтверждения.
 	// Без этого в выданном access-токене было email_verified=false, и до
 	// следующего refresh кабинет получал 403 на подписке и оплате.
@@ -988,6 +994,7 @@ func (s *Service) LinkEmailToAccount(ctx context.Context, accountID int64, email
 		if _, err := s.ids.Create(ctx, accountID, repository.ProviderEmail, pid, email, nil); err != nil {
 			return nil, fmt.Errorf("create email identity: %w", err)
 		}
+		emitAccountEvent(adminevents.AccountLinked, accountID, map[string]any{"provider": repository.ProviderEmail})
 	} else if err != nil {
 		return nil, fmt.Errorf("find email identity: %w", err)
 	} else if err := s.ids.ClearUnlinkedAtForSubject(ctx, accountID, repository.ProviderEmail, pid); err != nil {

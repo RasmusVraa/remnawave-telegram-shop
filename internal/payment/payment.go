@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
+	"remnawave-tg-shop-bot/internal/adminevents"
 )
 
 // skipTelegramCustomerDM — для web-only / synthetic telegram_id нет TG-чата;
@@ -52,10 +53,17 @@ func emailLocalPartForDescription(email string) string {
 }
 
 func (s PaymentService) withRemnawavePanelUsername(ctx context.Context, customer *database.Customer) context.Context {
-	if customer == nil || (!customer.IsWebOnly && !utils.IsSyntheticTelegramID(customer.TelegramID)) {
+	if customer == nil || s.customerRepository == nil {
 		return ctx
 	}
-	if s.customerRepository == nil {
+	// Полный адрес — в поле email панели: в логине и описании от него остаётся
+	// только часть до «@». Касается и Telegram-клиентов с привязанной почтой.
+	if email, err := s.customerRepository.VerifiedCabinetEmail(ctx, customer.ID); err != nil {
+		slog.Warn("payment: load verified cabinet email", "customer_id", customer.ID, "error", err)
+	} else if email != "" {
+		ctx = context.WithValue(ctx, remnawave.CtxKeyEmail, email)
+	}
+	if !customer.IsWebOnly && !utils.IsSyntheticTelegramID(customer.TelegramID) {
 		return ctx
 	}
 	emails, err := s.customerRepository.CabinetAccountEmailsByCustomerIDs(ctx, []int64{customer.ID})
@@ -109,6 +117,7 @@ type PaymentService struct {
 	receiptQueue          *receipt.Service
 	promoService          *promo.Service
 	loyaltyTierRepository *database.LoyaltyTierRepository
+	traffic               *trafficSplit
 }
 
 // PromoMeta attaches an activated percent discount to a new purchase row (optional).
@@ -208,6 +217,9 @@ func (s PaymentService) ProcessPurchaseById(ctx context.Context, purchaseId int6
 		}
 	}
 
+	if purchase.PurchaseKind == database.PurchaseKindExtraTraffic {
+		return s.processTrafficPackPurchase(ctx, purchase, customer)
+	}
 	if purchase.Month <= 0 && purchase.ExtraHwid > 0 {
 		return s.processDevicePurchase(ctx, purchase, customer)
 	}
@@ -222,6 +234,7 @@ func (s PaymentService) ProcessPurchaseById(ctx context.Context, purchaseId int6
 			return fmt.Errorf("tariff %d not found", *purchase.TariffID)
 		}
 		profile := BuildRemnawaveTariffProfile(tariff)
+		profile = s.adjustProfileForTrafficSplit(ctx, customer, tariff, profile)
 
 		// Апгрейд и досрочный даунгрейд: срок от момента оплаты. Остаток старого тарифа уже учтён в bonus
 		// (пересчёт «дневной» стоимости); нельзя прибавлять дни к текущему expire_at — иначе остаток считается дважды.
@@ -700,6 +713,8 @@ func (s PaymentService) finalizePurchase(ctx context.Context, purchase *database
 		return err
 	}
 
+	s.snapshotTrafficSplit(ctx, customer.ID, purchase.TariffID, user)
+
 	// В кабинет — всем, в том числе web-only: им Telegram-сообщение не уходит.
 	cabinetnotify.Notify(ctx, customer.ID, customer.Language, cabinetnotify.Event{
 		Kind:      database.CabinetNotificationPayment,
@@ -776,6 +791,12 @@ func (s PaymentService) maybeNotifyLoyaltyLevelUp(ctx context.Context, customer 
 	if newProg.CurrentTier.SortOrder <= oldProg.CurrentTier.SortOrder {
 		return
 	}
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.LoyaltyLevelUp, CustomerID: customer.ID, Source: adminevents.SourceSystem,
+		Payload: map[string]any{
+			"level": newProg.CurrentTier.SortOrder, "discount": newProg.CurrentTier.DiscountPercent,
+		},
+	})
 	tm := s.translation
 	var b strings.Builder
 	b.WriteString(fmt.Sprintf(tm.GetText(lang, "loyalty_level_up_title"), newProg.CurrentTier.SortOrder))
@@ -1183,6 +1204,8 @@ func buildRubReceiptDescription(months, extraHwid int, extras *TariffPurchaseExt
 // invoiceDescriptionPlategaSuffix — уточнение способа Platega без упоминания криптовалюты (в т.ч. в текстах для «Мой налог»).
 func invoiceDescriptionPlategaSuffix(t database.InvoiceType) string {
 	switch t {
+	case database.InvoiceTypePlatega:
+		return " — Platega"
 	case database.InvoiceTypePlategaSBP:
 		return " — Platega, СБП"
 	case database.InvoiceTypePlategaCards:
@@ -1204,7 +1227,7 @@ func (s PaymentService) CreatePurchase(ctx context.Context, amount float64, mont
 		return s.createCryptoInvoice(ctx, amount, months, 0, customer, meta, tariffID, extras)
 	case database.InvoiceTypeYookasa:
 		return s.createYookasaInvoice(ctx, amount, months, 0, customer, meta, tariffID, extras)
-	case database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
+	case database.InvoiceTypePlatega, database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
 		database.InvoiceTypePlategaWorldwide, database.InvoiceTypePlategaCrypto:
 		return s.createPlategaInvoice(ctx, amount, months, 0, customer, meta, tariffID, extras, invoiceType)
 	case database.InvoiceTypeHeleket:
@@ -1238,7 +1261,7 @@ func (s PaymentService) CreatePurchaseWithExtra(ctx context.Context, amount floa
 		return s.createCryptoInvoice(ctx, amount, months, extraHwid, customer, meta, tariffID, extras)
 	case database.InvoiceTypeYookasa:
 		return s.createYookasaInvoice(ctx, amount, months, extraHwid, customer, meta, tariffID, extras)
-	case database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
+	case database.InvoiceTypePlatega, database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
 		database.InvoiceTypePlategaWorldwide, database.InvoiceTypePlategaCrypto:
 		return s.createPlategaInvoice(ctx, amount, months, extraHwid, customer, meta, tariffID, extras, invoiceType)
 	case database.InvoiceTypeHeleket:
@@ -1267,7 +1290,7 @@ func (s PaymentService) CreateHwidPurchase(ctx context.Context, amount float64, 
 		return s.createCryptoInvoice(ctx, amount, 0, extraHwid, customer, meta, nil, nil)
 	case database.InvoiceTypeYookasa:
 		return s.createYookasaInvoice(ctx, amount, 0, extraHwid, customer, meta, nil, nil)
-	case database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
+	case database.InvoiceTypePlatega, database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
 		database.InvoiceTypePlategaWorldwide, database.InvoiceTypePlategaCrypto:
 		return s.createPlategaInvoice(ctx, amount, 0, extraHwid, customer, meta, nil, nil, invoiceType)
 	case database.InvoiceTypeHeleket:
@@ -1345,6 +1368,7 @@ func (s PaymentService) createCryptoInvoice(ctx context.Context, amount float64,
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	if meta != nil {
 		pur.PromoCodeID = meta.PromoCodeID
 		pur.DiscountPercentApplied = meta.DiscountPercentApplied
@@ -1356,7 +1380,7 @@ func (s PaymentService) createCryptoInvoice(ctx context.Context, amount float64,
 	}
 
 	username, _ := ctx.Value(remnawave.CtxKeyUsername).(string)
-	description := buildRubReceiptDescription(months, extraHwid, extras, database.InvoiceTypeCrypto)
+	description := receiptDescriptionCtx(ctx, months, extraHwid, extras, database.InvoiceTypeCrypto)
 	paidBtnURL := cryptopay.PaidBtnURLFromCtx(ctx)
 	if paidBtnURL == "" {
 		paidBtnURL = config.BotURL()
@@ -1404,6 +1428,7 @@ func (s PaymentService) createYookasaInvoice(ctx context.Context, amount float64
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	if meta != nil {
 		pur.PromoCodeID = meta.PromoCodeID
 		pur.DiscountPercentApplied = meta.DiscountPercentApplied
@@ -1419,7 +1444,7 @@ func (s PaymentService) createYookasaInvoice(ctx context.Context, amount float64
 	method := config.ResolveYookasaPaymentMethod(yookasa.PaymentMethodFromCtx(ctx))
 	ctx = context.WithValue(ctx, yookasa.CtxKeyPaymentMethod, method)
 
-	invDesc := buildRubReceiptDescription(months, extraHwid, extras, database.InvoiceTypeYookasa)
+	invDesc := receiptDescriptionCtx(ctx, months, extraHwid, extras, database.InvoiceTypeYookasa)
 	invoice, err := s.yookasaClient.CreateInvoice(ctx, int(amount), invDesc, customer.ID, purchaseId)
 	if err != nil {
 		slog.Error("Error creating invoice", "error", err, "payment_method", method)
@@ -1437,6 +1462,12 @@ func (s PaymentService) createYookasaInvoice(ctx context.Context, amount float64
 
 	err = s.purchaseRepository.UpdateFields(ctx, purchaseId, updates)
 	if err != nil {
+		// Инвойс в ЮKassa уже есть — отдаём URL даже если локальный UpdateFields упал.
+		url := invoice.Confirmation.ConfirmationURL
+		if url != "" {
+			slog.Error("Error updating purchase after yookasa invoice", "error", err, "purchase_id", purchaseId)
+			return url, purchaseId, nil
+		}
 		slog.Error("Error updating purchase", "error", err)
 		return "", 0, err
 	}
@@ -1464,6 +1495,7 @@ func (s PaymentService) createPlategaInvoice(ctx context.Context, amount float64
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	if meta != nil {
 		pur.PromoCodeID = meta.PromoCodeID
 		pur.DiscountPercentApplied = meta.DiscountPercentApplied
@@ -1478,7 +1510,7 @@ func (s PaymentService) createPlategaInvoice(ctx context.Context, amount float64
 	if ret == "" {
 		ret = config.BotURL()
 	}
-	desc := buildRubReceiptDescription(months, extraHwid, extras, invoiceType)
+	desc := receiptDescriptionCtx(ctx, months, extraHwid, extras, invoiceType)
 	username := remnawave.UsernameFromCtx(ctx)
 	redirectURL, transactionID, err := provider.CreateInvoice(ctx, purchaseId, amount, "RUB", desc, ret, username)
 	if err != nil {
@@ -1519,6 +1551,7 @@ func (s PaymentService) createHeleketInvoice(ctx context.Context, amount float64
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	if meta != nil {
 		pur.PromoCodeID = meta.PromoCodeID
 		pur.DiscountPercentApplied = meta.DiscountPercentApplied
@@ -1533,7 +1566,7 @@ func (s PaymentService) createHeleketInvoice(ctx context.Context, amount float64
 	if ret == "" {
 		ret = config.BotURL()
 	}
-	desc := buildRubReceiptDescription(months, extraHwid, extras, database.InvoiceTypeHeleket)
+	desc := receiptDescriptionCtx(ctx, months, extraHwid, extras, database.InvoiceTypeHeleket)
 	payment, err := s.heleketClient.CreatePayment(
 		ctx,
 		heleket.FormatOrderID(s.heleketClient.OrderPrefix(), purchaseId),
@@ -1571,6 +1604,7 @@ func (s PaymentService) createTelegramInvoice(ctx context.Context, amount float6
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	if meta != nil {
 		pur.PromoCodeID = meta.PromoCodeID
 		pur.DiscountPercentApplied = meta.DiscountPercentApplied
@@ -1673,6 +1707,11 @@ func (s PaymentService) ActivateTrial(ctx context.Context, telegramId int64) (st
 	if err != nil {
 		return "", err
 	}
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.TrialActivated, CustomerID: customer.ID,
+		Source:  adminevents.SourceFrom(ctx, adminevents.SourceBot),
+		Payload: map[string]any{"days": config.TrialDays()},
+	})
 
 	return user.SubscriptionUrl, nil
 
@@ -1763,6 +1802,7 @@ func (s PaymentService) createTributeInvoice(ctx context.Context, amount float64
 	}
 	applyTariffPurchaseExtras(pur, extras)
 	ensurePurchaseKindExtraHwidOnly(pur)
+	applyTrafficPackFromCtx(ctx, pur)
 	purchaseId, err = s.purchaseRepository.Create(ctx, pur)
 	if err != nil {
 		slog.Error("Error creating purchase", "error", err)

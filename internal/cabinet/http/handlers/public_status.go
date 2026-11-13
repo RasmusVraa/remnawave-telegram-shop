@@ -88,17 +88,18 @@ type publicStatusNode struct {
 }
 
 type publicStatusBody struct {
-	Available        bool               `json:"available"`
-	UpdatedAt        string             `json:"updated_at,omitempty"`
-	Online           int                `json:"online"`
-	Total            int                `json:"total"`
-	ShowMap          bool               `json:"show_map"`
-	ProbesEnabled    bool               `json:"probes_enabled"`
+	Available     bool   `json:"available"`
+	UpdatedAt     string `json:"updated_at,omitempty"`
+	Online        int    `json:"online"`
+	Total         int    `json:"total"`
+	ShowMap       bool   `json:"show_map"`
+	ProbesEnabled bool   `json:"probes_enabled"`
 	// BypassProbes — операторы с белыми списками проверяются (задан ключ Latency Lab).
 	BypassProbes     bool               `json:"bypass_probes"`
 	ProbeWorld       int                `json:"probe_world"`
 	ProbeRussia      int                `json:"probe_russia"`
 	ProbeIntervalMin int                `json:"probe_interval_min"`
+	RuFailThreshold  int                `json:"ru_fail_threshold"` // порог «частично» по зондам России, им же красится колонка «Из РФ»
 	Title            string             `json:"title,omitempty"`
 	Lead             string             `json:"lead,omitempty"`
 	Nodes            []publicStatusNode `json:"nodes"`
@@ -154,6 +155,7 @@ func (h *PublicStatus) build(ctx context.Context) publicStatusBody {
 		ProbeWorld:       world,
 		ProbeRussia:      russia,
 		ProbeIntervalMin: intervalMinutes(configured),
+		RuFailThreshold:  statusprobe.RussiaFailThreshold(),
 		Title:            title,
 		Lead:             lead,
 	}
@@ -177,7 +179,8 @@ func (h *PublicStatus) build(ctx context.Context) publicStatusBody {
 		var measured *statusprobe.Sample
 		// Строка без внешних зондов замеров не показывает: старый снимок остался бы навсегда.
 		if h.probes != nil && external {
-			sample, history, ok := h.probes.Snapshot(key)
+			sample, _, ok := h.probes.Snapshot(key)
+			history := h.probes.HistoryWindow(key, n.Whitelist)
 			if ok && (sample.WorldTotal > 0 || sample.RussiaTotal > 0 || sample.WhitelistTotal > 0 || len(sample.Probes) > 0) {
 				if usableForState(sample) {
 					measured = &sample
@@ -205,7 +208,7 @@ func (h *PublicStatus) build(ctx context.Context) publicStatusBody {
 				}
 			}
 		}
-		node.State = statusprobe.EffectiveState(n.State, measured, n.exit)
+		node.State = statusprobe.EffectiveState(n.State, measured, n.Whitelist, n.exit)
 		if node.State == statusprobe.StateUp {
 			body.Online++
 		}

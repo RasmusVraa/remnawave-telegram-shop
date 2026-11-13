@@ -95,7 +95,6 @@ docker compose up -d
 | `TELEGRAM_TOKEN` | Токен бота от [@BotFather](https://t.me/BotFather) |
 | `REMNAWAVE_URL`, `REMNAWAVE_TOKEN` | Адрес и токен панели Remnawave |
 | `DATABASE_URL` или `POSTGRES_*` | База PostgreSQL |
-| `PRICE_1` … `PRICE_12` | Цены за периоды (нужны даже в режиме тарифов) |
 | `ADMIN_TELEGRAM_ID` | Ваш числовой Telegram ID — доступ в админку |
 | `HEALTH_CHECK_PORT` | Порт сервиса (проверка «жив ли бот», кабинет, уведомления от платёжек) |
 
@@ -104,7 +103,7 @@ docker compose up -d
 **Полный список переменных с пояснениями:** [documentation/env.md](documentation/env.md)  
 Шаблон с комментариями: [`.env.sample`](.env.sample)
 
-Режимы продаж (`classic` / `tariffs`): [documentation/sales-modes.md](documentation/sales-modes.md)
+Тарифы и цены: [documentation/sales-modes.md](documentation/sales-modes.md)
 
 ---
 

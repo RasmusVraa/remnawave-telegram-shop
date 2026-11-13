@@ -12,6 +12,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/adminalert"
 	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
@@ -148,18 +149,11 @@ func (n *PartnerNotifier) PayoutRejected(ctx context.Context, customerID int64, 
 
 // --- доставка ---
 
-// notifyAdmin отправляет в чат партнёрки: PARTNER_NOTIFY_CHAT_ID, а если он не
-// задан — в личку админу. Пустой chat id это не «выключено», а «настройка по
-// умолчанию»: чат под партнёрку заводят не все.
+// notifyAdmin отправляет админскую половину по виду partner «Оповещений админу»:
+// PARTNER_NOTIFY_CHAT_ID, иначе общий чат, иначе личка админу. Пустой chat id
+// это не «выключено», а «настройка по умолчанию»: чат под партнёрку заводят не все.
 func (n *PartnerNotifier) notifyAdmin(ctx context.Context, key, linkKey, path string, args ...any) {
-	if !config.PartnerNotifyEnabled() {
-		return
-	}
-	chatID, threadID := config.PartnerNotifyChatID(), config.PartnerNotifyMessageThreadID()
-	if chatID == 0 {
-		chatID, threadID = config.GetAdminTelegramId(), 0
-	}
-	if chatID == 0 {
+	if _, ok := adminalert.Resolve(config.AdminAlertPartner); !ok {
 		return
 	}
 	lang := config.DefaultLanguage()
@@ -167,7 +161,14 @@ func (n *PartnerNotifier) notifyAdmin(ctx context.Context, key, linkKey, path st
 	if text == "" {
 		return
 	}
-	n.deliver(ctx, chatID, threadID, text, n.adminMarkup(lang, linkKey, path), "admin")
+	markup := n.adminMarkup(lang, linkKey, path)
+	utils.Go("partner notify admin", func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+		if err := adminalert.Send(ctx, config.AdminAlertPartner, text, markup); err != nil {
+			slog.Warn("partner notify: send failed", "audience", "admin", "error", err)
+		}
+	})
 }
 
 // notifyPartner отправляет в личку партнёру. Партнёр — обычный клиент, поэтому
@@ -211,14 +212,6 @@ func (n *PartnerNotifier) notifyPartner(ctx context.Context, customerID int64, k
 			return
 		}
 		n.send(ctx, customer.TelegramID, 0, text, n.partnerMarkup(lang), "partner")
-	})
-}
-
-func (n *PartnerNotifier) deliver(ctx context.Context, chatID int64, threadID int, text string, markup models.ReplyMarkup, audience string) {
-	utils.Go("partner notify deliver", func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
-		defer cancel()
-		n.send(ctx, chatID, threadID, text, markup, audience)
 	})
 }
 

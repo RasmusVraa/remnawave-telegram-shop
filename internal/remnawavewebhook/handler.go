@@ -14,6 +14,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/cabinetnotify"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
@@ -192,6 +193,13 @@ func (h *Handler) handleTorrentReport(ctx context.Context, raw json.RawMessage) 
 		return nil
 	}
 	h.notifyCabinet(ctx, customer, data.Node.Name, ar, dedupKey)
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.TorrentReport, CustomerID: customer.ID, Source: adminevents.SourcePanel,
+		Payload: map[string]any{
+			"node":    data.Node.Name,
+			"minutes": DurationMinutes(ar.BlockDuration, ar.ProcessedAt, ar.WillUnblockAt),
+		},
+	})
 	if customer.IsWebOnly || utils.IsSyntheticTelegramID(customer.TelegramID) {
 		slog.Info("remnawave webhook: skip web-only/synthetic customer",
 			"customer_id", utils.MaskHalfInt64(customer.ID),

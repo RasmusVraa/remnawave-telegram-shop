@@ -10,12 +10,14 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { api, ApiError, type FortuneStatusResponse } from '@/lib/api'
+import { hapticImpact, hapticSelection, hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import {
   ensureFortuneAudio,
   playSpinAnticipation,
   playSpinError,
   playWinFanfare,
   scheduleSpinWheelSounds,
+  winTier,
 } from '@/features/fortune/fortuneWheelAudio'
 import { FortunePossiblePrizes } from '@/features/fortune/FortunePossiblePrizes'
 import { FortunePrizeModal } from '@/features/fortune/FortunePrizeModal'
@@ -119,6 +121,7 @@ export default function FortunePage() {
   const [lastResult, setLastResult] = useState<{ type: string; value: number; free: boolean } | null>(null)
   const [showPrizeModal, setShowPrizeModal] = useState(false)
   const [spinError, setSpinError] = useState<string | null>(null)
+  useErrorHaptic(spinError)
   /** Иконка в центре колеса: приз под стрелкой во время/после спина; `null` — дефолтная звезда. */
   const [hubRewardType, setHubRewardType] = useState<string | null>(null)
   const spinTweenRef = useRef<SpinTweenSnapshot | null>(null)
@@ -144,6 +147,8 @@ export default function FortunePage() {
     if (!snap || snap.n <= 0 || snap.sectorTypes.length === 0) return undefined
 
     let raf = 0
+    let lastIdx: number | null = null
+    let lastHapticAt = 0
     const tick = (now: number) => {
       const elapsed = now - snap.t0
       const u = Math.min(1, elapsed / FORTUNE_SPIN_MS)
@@ -152,6 +157,13 @@ export default function FortunePage() {
       const idx = sectorIndexUnderPointer(currentR, snap.n)
       const rt = snap.sectorTypes[idx]
       if (rt) setHubRewardType(rt)
+      // Трещотка: тик на каждый сектор под стрелкой. На разгоне секторы мелькают
+      // десятками в секунду — не чаще раза в 70 мс, иначе вместо тиков сплошное жужжание.
+      if (lastIdx !== null && idx !== lastIdx && now - lastHapticAt >= 70) {
+        hapticSelection()
+        lastHapticAt = now
+      }
+      lastIdx = idx
       if (u < 1) raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
@@ -231,6 +243,13 @@ export default function FortunePage() {
         setSpinning(false)
         setHubRewardType(lastWinnerRewardRef.current)
         setWinCelebration(true)
+        // Вибрация выигрыша не зависит от звука: крупный приз — ещё и сильный толчок.
+        if (winTier(res.reward_type) === 'large') {
+          hapticImpact('heavy')
+          window.setTimeout(hapticSuccess, 140)
+        } else {
+          hapticSuccess()
+        }
         const nSafe = Math.max(1, n)
         const c = sectorCenterDeg(winnerSlot, nSafe)
         const finalPointer = -90 + (rotation + (target - rotation)) * -1 + 90
@@ -468,6 +487,7 @@ export default function FortunePage() {
                     title={soundMuted ? t('fortune.soundEnableHint') : t('fortune.soundDisableHint')}
                     onClick={() => {
                       const next = !soundMuted
+                      hapticSelection()
                       setMutedPersist(next)
                       if (!next) {
                         void ensureFortuneAudio().catch(() => {})

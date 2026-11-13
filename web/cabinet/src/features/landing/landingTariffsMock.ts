@@ -72,6 +72,7 @@ const PLANS_RAW = {
       id: 3,
       slug: 'premium',
       name: 'Премиум',
+      is_popular: true,
       device_limit: 10,
       traffic_limit_bytes: 0,
       prices: [

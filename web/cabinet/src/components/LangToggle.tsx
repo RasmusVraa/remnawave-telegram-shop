@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { setLanguage } from '@/i18n'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 
 interface LangToggleProps {
   className?: string
@@ -20,7 +21,10 @@ export function LangToggle({ className }: LangToggleProps) {
     <Button
       variant="ghost"
       size="sm"
-      onClick={toggle}
+      onClick={() => {
+        hapticSelection()
+        toggle()
+      }}
       className={cn('font-mono text-xs', className)}
       aria-label="Switch language"
     >

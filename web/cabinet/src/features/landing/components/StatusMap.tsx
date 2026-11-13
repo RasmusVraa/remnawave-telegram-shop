@@ -537,7 +537,7 @@ export function StatusMap({ nodes, intervalMin }: { nodes: StatusMapNode[]; inte
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <rect width={WIDTH} height={HEIGHT} fill="#0c1428" />
+        <rect width={WIDTH} height={HEIGHT} className="landing-status-map__sea" />
         <g transform={`translate(${view.x} ${view.y}) scale(${view.k})`}>
           {countries.features.map((shape, i) => (
             <path key={i} d={path(shape) ?? ''} className="landing-status-map__land" />

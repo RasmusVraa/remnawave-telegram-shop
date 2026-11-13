@@ -125,7 +125,9 @@ type Event struct {
 	// TitleKey и BodyKey — ключи переводов бота; Args подставляются в тело.
 	TitleKey string
 	BodyKey  string
-	Args     []any
+	// Title — готовый заголовок с подставленными значениями; если задан, TitleKey не нужен.
+	Title string
+	Args  []any
 	// BodyHTML — готовый текст в Telegram HTML (тот же, что ушёл в бот);
 	// если задан, BodyKey и Args не нужны.
 	BodyHTML string
@@ -142,7 +144,10 @@ func (s *Service) Notify(ctx context.Context, customerID int64, lang string, ev 
 	if s == nil || customerID <= 0 {
 		return
 	}
-	title := strings.TrimSpace(s.text(lang, ev.TitleKey))
+	title := strings.TrimSpace(ev.Title)
+	if title == "" {
+		title = strings.TrimSpace(s.text(lang, ev.TitleKey))
+	}
 	var body string
 	if h := strings.TrimSpace(ev.BodyHTML); h != "" {
 		body = h

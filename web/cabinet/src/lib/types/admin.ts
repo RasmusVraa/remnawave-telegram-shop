@@ -96,8 +96,62 @@ export interface AdminBandwidthDTO {
   difference: string
 }
 
+/** Пункт «Требует внимания» из «Мониторинга»: горит сейчас (incident) или дело на дни (task). */
+export interface AdminAttentionItemDTO {
+  /** node_down | panel_down | support_waiting | support_undelivered */
+  key: string
+  kind: 'incident' | 'task'
+  severity: 'crit' | 'warn'
+  count: number
+  since?: string
+  params?: Record<string, string | number>
+}
+
+/** Строка ленты «Мониторинга» и истории клиента. */
+export interface AdminEventDTO {
+  id: number
+  at: string
+  type: string
+  /** 1 — важное, 2 — нажатие в боте и прочие мелочи. */
+  level: number
+  /** money | users | subs | promo | support | nodes | admin | bot */
+  category: string
+  /** bot | cabinet | panel | system */
+  source: string
+  payload: Record<string, unknown>
+  customer_id?: number
+  customer?: string
+  actor_tg_id?: number
+  actor?: string
+}
+
+export interface AdminEventsDTO {
+  items: AdminEventDTO[]
+  bot_actions_enabled: boolean
+  /** Всего событий клиента — только в первой странице его истории. */
+  total?: number
+}
+
+export type AdminMonitoringPeriod = 'hour' | 'day' | 'week' | 'month'
+
+export interface AdminMonitoringSummaryDTO {
+  period: AdminMonitoringPeriod
+  payments: number
+  revenue: Record<string, number>
+  failed: number
+  failed_provider?: string
+  registrations_bot: number
+  registrations_cabinet: number
+  node_downs: number
+  nodes_online: number
+  nodes_total: number
+  nodes_known: boolean
+}
+
 export interface AdminOverviewDTO {
   captured_at: string
+  /** Инциденты «Мониторинга»: показываются в той же полосе «Требует внимания». */
+  incidents?: AdminAttentionItemDTO[]
   shop: {
     total_customers: number
     active_subscriptions: number
@@ -357,6 +411,18 @@ export interface AdminCustomerDTO {
    * может не быть — тогда сам запрос отвечает 404, и UI рисует инициалы.
    */
   avatar_url?: string | null
+  /**
+   * Веб-кабинет клиента — только в карточке одного пользователя.
+   * Нет поля — клиент живёт только в боте.
+   */
+  cabinet?: AdminCustomerCabinetDTO | null
+}
+
+export interface AdminCustomerCabinetDTO {
+  email: string | null
+  email_verified: boolean
+  /** Способы входа: email (только при заданном пароле), telegram, google, yandex, vk. */
+  providers: string[]
 }
 
 export interface AdminUsersListDTO {
@@ -515,6 +581,7 @@ export interface AdminTariffDTO {
   tier_level?: number | null
   description?: string | null
   description_detail?: string | null
+  is_popular?: boolean
   prices: AdminTariffPriceDTO[]
   locations?: AdminTariffLocationDTO[]
 }
@@ -992,4 +1059,37 @@ export interface AdminPartnerTermsInput {
   renewal_percent?: number | null
   links_limit?: number | null
   comment?: string
+}
+
+export type AdminNodeState = 'online' | 'offline' | 'connecting' | 'disabled'
+
+export interface AdminNodeDTO {
+  uuid: string
+  name: string
+  country_code: string
+  address: string
+  state: AdminNodeState
+  users_online: number
+  provider?: { name: string; favicon_link?: string }
+  /** Есть только у нод с назначенным плагином. */
+  plugin_name?: string
+  /** null — панель не прислала метрики (нода не в сети). */
+  memory_used_pct: number | null
+  load_avg: number[] | null
+  /** Число ядер ноды; 0 — неизвестно. Load average сравнивается с ним. */
+  cpus: number
+  rx_bytes_per_sec: number | null
+  tx_bytes_per_sec: number | null
+  traffic_used_bytes: number
+  /** 0 — без лимита. */
+  traffic_limit_bytes: number
+  /** 0 — у ноды не включено отслеживание трафика. */
+  traffic_reset_day: number
+  xray_uptime_sec: number
+  xray_version?: string
+  node_version?: string
+}
+
+export interface AdminNodesDTO {
+  nodes: AdminNodeDTO[]
 }

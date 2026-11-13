@@ -52,7 +52,8 @@ type PaymentDetails struct {
 }
 
 type CreateTransactionRequest struct {
-	PaymentMethod  PaymentMethod  `json:"paymentMethod"`
+	// PaymentMethod 0 не отправляется: общая форма, способ выбирает плательщик.
+	PaymentMethod  PaymentMethod  `json:"paymentMethod,omitempty"`
 	PaymentDetails PaymentDetails `json:"paymentDetails"`
 	Description    string         `json:"description"`
 	Return         string         `json:"return"`
@@ -64,12 +65,21 @@ type CreateTransactionResponse struct {
 	PaymentMethod  string        `json:"paymentMethod"`
 	TransactionId  string        `json:"transactionId"`
 	Redirect       string        `json:"redirect"`
+	URL            string        `json:"url"`
 	Return         string        `json:"return"`
 	PaymentDetails any           `json:"paymentDetails"`
 	Status         PaymentStatus `json:"status"`
 	ExpiresIn      string        `json:"expiresIn"`
 	MerchantId     string        `json:"merchantId"`
 	UsdtRate       float64       `json:"usdtRate,omitempty"`
+}
+
+// PayURL — ссылка на оплату: v2 отдаёт её в url, прежняя версия — в redirect.
+func (r *CreateTransactionResponse) PayURL() string {
+	if r.URL != "" {
+		return r.URL
+	}
+	return r.Redirect
 }
 
 type TransactionStatusResponse struct {

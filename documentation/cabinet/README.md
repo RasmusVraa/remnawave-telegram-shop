@@ -68,7 +68,7 @@
 
 ## Чат поддержки (bridge к telegram-support-bot)
 
-- Встроенный чат в кабинете при `SUPPORT_BOT_API=true` (миграция `000036_cabinet_support`).
+- Встроенный чат в кабинете при `SUPPORT_BOT_API=true` (миграция `000036_cabinet_support`); изображения в чате — миграция `000064_cabinet_support_attachments`, support-bot с поддержкой вложений и `client_max_body_size 26m` в nginx на `/cabinet/api/support/messages`.
 - Настройка env, Docker-сеть shop ↔ support-bot, smoke-проверка:
   - [SETUP-GUIDE-RU.md](./SETUP-GUIDE-RU.md) — раздел **«18) Чат поддержки (support bridge)»**
 - Документация support-bot: `README.md` в репозитории [telegram-support-bot](https://github.com/MrMe0ws/telegram-support-bot).

@@ -1,5 +1,7 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react'
 
+import { hapticTap } from '@/lib/haptic'
+
 /** Сколько едет шторка вниз после отпускания, прежде чем окно закроется. */
 const DISMISS_MS = 220
 
@@ -34,7 +36,8 @@ export function useSheetDragDismiss<
   const sheetRef = useRef<S>(null)
   /** Необязательный отдельный фон: он гаснет по мере того, как шторку тянут. */
   const backdropRef = useRef<B>(null)
-  const drag = useRef<{ startY: number; lastY: number; lastT: number; v: number } | null>(null)
+  /** armed — дотянули до порога закрытия: отпустят, и шторка уедет. */
+  const drag = useRef<{ startY: number; lastY: number; lastT: number; v: number; armed: boolean } | null>(null)
   const timer = useRef<number | undefined>(undefined)
   const onDismissRef = useRef(onDismiss)
   onDismissRef.current = onDismiss
@@ -54,7 +57,7 @@ export function useSheetDragDismiss<
     if ((e.target as HTMLElement).closest('button, a, input, textarea, select, [role="button"]')) return
     const sheet = sheetRef.current
     if (!sheet) return
-    drag.current = { startY: e.clientY, lastY: e.clientY, lastT: e.timeStamp, v: 0 }
+    drag.current = { startY: e.clientY, lastY: e.clientY, lastT: e.timeStamp, v: 0, armed: false }
     sheet.style.transition = 'none'
     if (backdropRef.current) backdropRef.current.style.transition = 'none'
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -69,6 +72,10 @@ export function useSheetDragDismiss<
     d.lastY = e.clientY
     d.lastT = e.timeStamp
     sheet.style.transform = `translateY(${dy}px)`
+    // Толчок в момент, когда шторку протянули достаточно, — как у системных листов iOS.
+    const armed = dy > sheet.offsetHeight / 3
+    if (armed && !d.armed) hapticTap()
+    d.armed = armed
     if (backdropRef.current) {
       backdropRef.current.style.opacity = String(Math.max(0, 1 - dy / sheet.offsetHeight))
     }

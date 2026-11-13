@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import { AdminDatePicker } from '../../components/AdminDatePicker'
 import { AdminModal } from '../../components/AdminModal'
 import type { StatsCustomRange } from '../utils/statsPeriod'
+import { useErrorHaptic } from '@/lib/haptic'
 
 function toIsoDate(d: Date): string {
   const y = d.getFullYear()
@@ -67,6 +68,7 @@ export function StatsCustomRangePicker({
   )
   const [toDate, setToDate] = useState<Date>(() => (value ? parseIsoDate(value.to) : today))
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   useEffect(() => {
     if (!open) return

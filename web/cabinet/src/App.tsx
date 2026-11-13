@@ -1,7 +1,8 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { I18nextProvider } from 'react-i18next'
+import { hapticError, hapticSuccess } from '@/lib/haptic'
 import { NavPendingTracker } from '@/lib/navPending'
 import i18n from '@/i18n'
 import { useAuthStore } from '@/store/auth'
@@ -57,6 +58,7 @@ const TariffLocationPreviewPage = lazy(() => import('@/features/dev/TariffLocati
 const TariffsPage = lazy(() => import('@/features/tariffs/TariffsPage'))
 const CheckoutPage = lazy(() => import('@/features/checkout/CheckoutPage'))
 const DeviceSlotsCheckoutPage = lazy(() => import('@/features/checkout/DeviceSlotsCheckoutPage'))
+const TrafficCheckoutPage = lazy(() => import('@/features/checkout/TrafficCheckoutPage'))
 const PaymentStatusPage = lazy(() => import('@/features/checkout/PaymentStatusPage'))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage'))
 const LinkEmailPage = lazy(() => import('@/features/settings/LinkEmailPage'))
@@ -83,12 +85,27 @@ const AdminTariffsPage = lazy(() => import('@/features/admin/pages/AdminTariffsP
 const AdminLoyaltyPage = lazy(() => import('@/features/admin/pages/AdminLoyaltyPage'))
 const AdminPartnersPage = lazy(() => import('@/features/admin/pages/AdminPartnersPage'))
 const AdminBroadcastPage = lazy(() => import('@/features/admin/pages/AdminBroadcastPage'))
+const AdminNodesPage = lazy(() => import('@/features/admin/pages/AdminNodesPage'))
+const AdminMonitoringPage = lazy(() => import('@/features/admin/pages/AdminMonitoringPage'))
 const AdminInfraPage = lazy(() => import('@/features/admin/pages/AdminInfraPage'))
 const AdminStatusPage = lazy(() => import('@/features/admin/pages/AdminStatusPage'))
 const AdminSyncPage = lazy(() => import('@/features/admin/pages/AdminSyncPage'))
 const AdminSettingsPage = lazy(() => import('@/features/admin/pages/AdminSettingsPage'))
 
 const queryClient = new QueryClient({
+  /*
+   * Вибрация по итогу мутаций с `meta: { haptics: true }` — для действий админки,
+   * у которых нет своего уведомления (партнёры, инфраструктура, синхронизация).
+   * Только по метке: в кабинете много фоновых мутаций (прочитать чат и т.п.).
+   */
+  mutationCache: new MutationCache({
+    onSuccess: (_data, _variables, _context, mutation) => {
+      if (mutation.meta?.haptics) hapticSuccess()
+    },
+    onError: (_error, _variables, _context, mutation) => {
+      if (mutation.meta?.haptics) hapticError()
+    },
+  }),
   defaultOptions: {
     queries: {
       retry: 1,
@@ -249,6 +266,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute requireVerified>
             <DeviceSlotsCheckoutPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/checkout/traffic"
+        element={
+          <ProtectedRoute requireVerified>
+            <TrafficCheckoutPage />
           </ProtectedRoute>
         }
       />
@@ -483,6 +508,26 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <AdminStatusPage />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/monitoring"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminMonitoringPage />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/nodes"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminNodesPage />
             </AdminRoute>
           </ProtectedRoute>
         }

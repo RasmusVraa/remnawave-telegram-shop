@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	tgverify "remnawave-tg-shop-bot/internal/cabinet/auth/telegram"
 	"remnawave-tg-shop-bot/internal/cabinet/mail"
 	"remnawave-tg-shop-bot/internal/cabinet/repository"
@@ -450,6 +451,12 @@ func (s *MergeService) Merge(ctx context.Context, accountID int64, idempotencyKe
 
 	// Успех — удаляем claim.
 	s.claims.Delete(accountID)
+	if mergeResult != nil {
+		adminevents.Emit(adminevents.Event{
+			Type: adminevents.AccountMerged, CustomerID: mergeResult.CustomerID, AccountID: accountID,
+			Source: adminevents.SourceCabinet, Payload: map[string]any{"result": mergeResult.Result},
+		})
+	}
 
 	return mergeResult, nil
 }

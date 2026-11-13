@@ -54,6 +54,7 @@ import (
 	"remnawave-tg-shop-bot/internal/statusprobe"
 	"remnawave-tg-shop-bot/internal/sync"
 	"remnawave-tg-shop-bot/internal/tariffsquads"
+	"remnawave-tg-shop-bot/internal/trafficquota"
 	"remnawave-tg-shop-bot/internal/translation"
 )
 
@@ -103,6 +104,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	// ветку по config.SalesMode().
 	tariffRepo := database.NewTariffRepository(pool)
 	catalogSvc := cabsvc.NewCatalog(tariffRepo)
+	catalogSvc.SetTrafficRepo(database.NewTrafficSplitRepository(pool))
 
 	// LoyaltyTier — опционально: нужно только /me/subscription, чтобы отдать
 	// display_name текущего уровня. Ошибки в этой таблице не должны ломать API.
@@ -121,6 +123,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		UseTLS:   cabcfg.SMTPTLS(),
 		DryRun:   !cabcfg.SMTPEnabled(),
 	})
+	mailerSender.OnHealthChange(notification.MailHealthAlert(tgBot, translation.GetInstance(), cabcfg.SMTPHost(), cabcfg.SMTPPort()))
 	mailer := mail.NewMailer(mailerSender)
 
 	// JWT issuer. Issuer = хост кабинета — так access-токен нельзя использовать
@@ -248,8 +251,10 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	tgProfiles := tgprofile.New(tgBot)
 	avatarSecret := []byte(cabcfg.JWTSecret())
 
+	meTrafficRepo := database.NewTrafficSplitRepository(pool)
 	meHandler := handlers.NewMe(authSvc, accountRepo, identityRepo, linkRepo, customerBootstrap,
 		paymentService, purchaseRepo, rw, customerRepo, database.NewDeviceNameRepository(pool), adminChecker, tgProfiles, avatarSecret, cabcfg.CookieDomain(), tgWidgetBot, cabcfg.GoogleEnabled(), cabcfg.YandexEnabled(), cabcfg.VKEnabled(), cabcfg.TelegramOIDCEnabled())
+	meHandler.SetTrafficRepo(meTrafficRepo)
 	tariffsHandler := handlers.NewTariffs(catalogSvc)
 	subscriptionHandler := handlers.NewSubscription(subscriptionSvc)
 	// Приглашения «подключить ещё устройство»: токен подписывается тем же
@@ -388,6 +393,8 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	adminStatsHandler := handlers.NewAdminStats(statsRepo, loyaltyRepo, customerRepo, promoRepo, partnerRepo)
 	adminOverviewHandler := handlers.NewAdminOverview(statsRepo, partnerRepo, rw)
 	adminUsersHandler := handlers.NewAdminUsers(customerRepo, purchaseRepo, referralRepo, tariffRepo, loyaltyRepo, rw, avatarSecret)
+	adminTrafficRepo := database.NewTrafficSplitRepository(pool)
+	adminUsersHandler.SetTrafficSplit(adminTrafficRepo, trafficquota.New(adminTrafficRepo, customerRepo, tariffRepo, rw, nil))
 	// CheckoutRepo — только на чтение (ключ идемпотентности/провайдер в модалке платежа);
 	// не зависит от того, собран ли checkoutSvc (PaymentService может быть nil).
 	adminPaymentsCheckoutRepo := repository.NewCheckoutRepo(pool)
@@ -398,6 +405,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	// массовое применение просто отвечает 503.
 	tariffSquadsSvc := tariffsquads.New(customerRepo, tariffRepo, rw)
 	adminTariffsHandler := handlers.NewAdminTariffs(tariffRepo, tariffSquadsSvc)
+	adminTariffsHandler.SetTrafficRepo(database.NewTrafficSplitRepository(pool), rw)
 	adminLoyaltyHandler := handlers.NewAdminLoyalty(loyaltyRepo, customerRepo, purchaseRepo)
 	adminPartnersHandler := handlers.NewAdminPartners(partnerRepo, customerRepo, config.BotURL(), partnerNotifier)
 	adminBroadcastHandler := handlers.NewAdminBroadcast(customerRepo, tariffRepo, database.NewBroadcastRepository(pool), broadcastSender, tgBot)
@@ -407,6 +415,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	}
 	notificationsHandler := handlers.NewNotifications(linkRepo, notifySvc)
 	adminInfraHandler := handlers.NewAdminInfra(rw, infraBillingRepo)
+	adminNodesHandler := handlers.NewAdminNodes(rw)
 	adminSettingsHandler := handlers.NewAdminSettings(runtimeSettingsRepo)
 	adminSquadsHandler := handlers.NewAdminSquads(rw)
 	var adminSyncHandler *handlers.AdminSyncHandler
@@ -414,8 +423,8 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		adminSyncHandler = handlers.NewAdminSync(syncService)
 	}
 
-	registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, webAuthHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
-		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
+registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, webAuthHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
+		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminNodesHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
 		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim)
 	registerNotificationRoutes(api, notificationsHandler, jwtIssuer)
@@ -427,6 +436,9 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		slog.Warn("status probe history import", "error", err)
 	}
 	statusRunner := statusprobe.NewRunner(statusStore)
+	// Сбои серверов — в вид «Статус серверов» «Оповещений админу». До Watch:
+	// первый проход может начаться сразу.
+	statusRunner.OnAlerts(notification.StatusAlerts(cabcfg.PublicURL()))
 	statusRunner.Watch(ctx, func(c context.Context) ([]statusprobe.Target, error) {
 		list, err := statusTargets.Load(c)
 		if err != nil {
@@ -447,11 +459,18 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		}),
 	)
 	adminStatusTargets := handlers.NewAdminStatusTargets(statusTargets, statusRunner, rw, publicStatus.Invalidate)
+	adminAlerts := handlers.NewAdminAlerts()
+	adminMonitoring := handlers.NewAdminMonitoring(pool)
+	adminOverviewHandler.SetIncidents(adminMonitoring.Incidents)
 	for route, handler := range map[string]http.HandlerFunc{
-		"/cabinet/api/admin/status/targets": adminStatusTargets.Handle,
-		"/cabinet/api/admin/status/probe":   adminStatusTargets.Probe,
-		"/cabinet/api/admin/status/nodes":   adminStatusTargets.Nodes,
-		"/cabinet/api/admin/status/quota":   adminStatusTargets.Quota,
+		"/cabinet/api/admin/monitoring/events":  adminMonitoring.Events,
+		"/cabinet/api/admin/monitoring/summary": adminMonitoring.Summary,
+		"/cabinet/api/admin/attention":          adminMonitoring.Attention,
+		"/cabinet/api/admin/alerts/test":        adminAlerts.Test,
+		"/cabinet/api/admin/status/targets":     adminStatusTargets.Handle,
+		"/cabinet/api/admin/status/probe":       adminStatusTargets.Probe,
+		"/cabinet/api/admin/status/nodes":       adminStatusTargets.Nodes,
+		"/cabinet/api/admin/status/quota":       adminStatusTargets.Quota,
 	} {
 		api.Handle(route,
 			middleware.Chain(
@@ -570,6 +589,7 @@ func registerAPIRoutes(
 	adminPartners *handlers.AdminPartnersHandler,
 	adminBroadcast *handlers.AdminBroadcastHandler,
 	adminInfra *handlers.AdminInfraHandler,
+	adminNodes *handlers.AdminNodesHandler,
 	adminSettings *handlers.AdminSettingsHandler,
 	adminSquads *handlers.AdminSquadsHandler,
 	adminSync *handlers.AdminSyncHandler,
@@ -920,6 +940,16 @@ func registerAPIRoutes(
 			),
 		}),
 	)
+	api.Handle("/cabinet/api/me/traffic",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(me.GetTraffic),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireVerifiedEmail(),
+				middleware.RateLimit(subscriptionAcctLim, accountKey("traffic")),
+			),
+		}),
+	)
 	api.Handle("/cabinet/api/me/traffic-usage",
 		methodRouter(map[string]http.Handler{
 			http.MethodGet: middleware.Chain(
@@ -1264,6 +1294,17 @@ func registerAPIRoutes(
 				middleware.RateLimit(supportAcctLim, accountKey("support_send")),
 			)),
 		)
+		// GET /support/attachments/{id} — картинка из чата; браузер кэширует её надолго,
+		// так что лимит чтений чата с запасом покрывает и ленту с десятком вложений.
+		api.Handle("/cabinet/api/support/attachments/{id}",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(support.Attachment),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RateLimit(subscriptionAcctLim, accountKey("support_attachment")),
+				),
+			}),
+		)
 		api.Handle("/cabinet/api/support/read",
 			onlyPOST(middleware.Chain(
 				http.HandlerFunc(support.MarkRead),
@@ -1334,6 +1375,16 @@ func registerAPIRoutes(
 				),
 			}),
 		)
+		api.Handle("/cabinet/api/payments/traffic/preview",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(pay.TrafficPreview),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RequireVerifiedEmail(),
+					middleware.RateLimit(paymentsAcctLim, accountKey("payments")),
+				),
+			}),
+		)
 		api.Handle("/cabinet/api/payments/hwid/preview",
 			methodRouter(map[string]http.Handler{
 				http.MethodGet: middleware.Chain(
@@ -1343,6 +1394,15 @@ func registerAPIRoutes(
 					middleware.RateLimit(paymentsAcctLim, accountKey("payments")),
 				),
 			}),
+		)
+		api.Handle("/cabinet/api/payments/traffic/checkout",
+			onlyPOST(middleware.Chain(
+				http.HandlerFunc(pay.TrafficCheckout),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireVerifiedEmail(),
+				middleware.CSRF(),
+				middleware.RateLimit(paymentsAcctLim, accountKey("payments")),
+			)),
 		)
 		api.Handle("/cabinet/api/payments/hwid/checkout",
 			onlyPOST(middleware.Chain(
@@ -1730,6 +1790,17 @@ func registerAPIRoutes(
 			middleware.CSRF(),
 			middleware.RateLimit(adminAcctLim, accountKey("admin_broadcast_upload")),
 		)),
+	)
+
+	// Admin Nodes (страница «Ноды»)
+	api.Handle("/cabinet/api/admin/nodes",
+		middleware.Chain(
+			http.HandlerFunc(adminNodes.List),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireAdmin(adminChecker),
+			middleware.CSRF(),
+			middleware.RateLimit(adminAcctLim, accountKey("admin_nodes")),
+		),
 	)
 
 	// Admin Infra

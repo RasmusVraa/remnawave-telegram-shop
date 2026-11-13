@@ -136,6 +136,7 @@ export function useAdminPartnerPayouts(status?: string) {
 export function useAdminPartnerApprove() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({ id, terms }: { id: number; terms: AdminPartnerTermsInput }) =>
       api.adminPartnerApprove(id, terms),
     onSuccess: invalidate,
@@ -145,6 +146,7 @@ export function useAdminPartnerApprove() {
 export function useAdminPartnerReject() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({ id, comment }: { id: number; comment: string }) => api.adminPartnerReject(id, comment),
     onSuccess: invalidate,
   })
@@ -153,6 +155,7 @@ export function useAdminPartnerReject() {
 export function useAdminPartnerSetStatus() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({ id, status, comment }: { id: number; status: string; comment?: string }) =>
       api.adminPartnerSetStatus(id, status, comment ?? ''),
     onSuccess: invalidate,
@@ -162,6 +165,7 @@ export function useAdminPartnerSetStatus() {
 export function useAdminPartnerUpdateTerms() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({ id, terms }: { id: number; terms: AdminPartnerTermsInput }) =>
       api.adminPartnerUpdateTerms(id, terms),
     onSuccess: invalidate,
@@ -171,6 +175,7 @@ export function useAdminPartnerUpdateTerms() {
 export function useAdminPartnerAdjust() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({ id, amount, comment }: { id: number; amount: number; comment: string }) =>
       api.adminPartnerAdjust(id, amount, comment),
     onSuccess: invalidate,
@@ -180,6 +185,7 @@ export function useAdminPartnerAdjust() {
 export function useAdminPartnerGrant() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: (body: {
       customer_id?: number
       telegram_id?: number
@@ -194,6 +200,7 @@ export function useAdminPartnerGrant() {
 export function useAdminPartnerPayoutAction() {
   const invalidate = useInvalidatePartners()
   return useMutation({
+    meta: { haptics: true },
     mutationFn: ({
       id,
       action,

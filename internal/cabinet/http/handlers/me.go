@@ -10,6 +10,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	adminauth "remnawave-tg-shop-bot/internal/cabinet/admin/auth"
 	googleoauth "remnawave-tg-shop-bot/internal/cabinet/auth/oauth"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/service"
@@ -40,6 +41,7 @@ type MeHandler struct {
 	rw           *remnawave.Client
 	adminChecker *adminauth.Checker
 	tgProfiles   *tgprofile.Service
+	traffic      *database.TrafficSplitRepository
 	// avatarSecret — секрет кабинета: им подписываются ссылки на аватарку.
 	avatarSecret        []byte
 	cookieDomain        string
@@ -875,6 +877,9 @@ func (h *MeHandler) DeleteDevice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "delete device failed", http.StatusBadRequest)
 		return
 	}
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.DeviceRemoved, CustomerID: c.ID, Source: adminevents.SourceCabinet,
+	})
 	// Название уходит вместе с устройством: при повторном подключении того же
 	// HWID оно не вернётся. Сбой здесь не отменяет уже сделанное удаление.
 	if h.deviceNames != nil {
@@ -970,6 +975,10 @@ func (h *MeHandler) ResetSubscriptionLink(w http.ResponseWriter, r *http.Request
 	}
 
 	slog.Info("me: subscription link reset", "account_id", claims.AccountID, "devices_cleared", devicesCleared)
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.SubscriptionLinkReset, CustomerID: c.ID, Source: adminevents.SourceCabinet,
+		Payload: map[string]any{"devices_cleared": devicesCleared},
+	})
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, meResetSubscriptionLinkResp{
 		OK:               true,
@@ -1206,6 +1215,9 @@ func (h *MeHandler) PostAccountDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	// Для «Мониторинга»: после удаления клиента в базе уже нет. Почту и ник не
+	// пишем — человек попросил удалить свои данные, в журнале остаётся номер.
+	var deletedCustomerID int64
 	if h.rw != nil && h.links != nil && h.customers != nil {
 		link, lerr := h.links.FindByAccountID(r.Context(), claims.AccountID)
 		if lerr != nil && !errors.Is(lerr, repository.ErrNotFound) {
@@ -1216,6 +1228,7 @@ func (h *MeHandler) PostAccountDelete(w http.ResponseWriter, r *http.Request) {
 			if cerr != nil {
 				slog.Warn("me: delete account: find customer failed", "account_id", claims.AccountID, "customer_id", link.CustomerID, "error", cerr.Error())
 			} else if cust != nil {
+				deletedCustomerID = cust.ID
 				user, uerr := h.resolveRemnawaveUserForDelete(r.Context(), cust)
 				if uerr != nil && !errors.Is(uerr, remnawave.ErrUserNotFound) {
 					slog.Error("me: delete account: remnawave lookup failed", "account_id", claims.AccountID, "telegram_id", utils.MaskHalfInt64(cust.TelegramID), "error", uerr.Error())
@@ -1242,6 +1255,10 @@ func (h *MeHandler) PostAccountDelete(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.AccountDeleted, CustomerID: deletedCustomerID, Source: adminevents.SourceCabinet,
+		Payload: map[string]any{"customer": deletedCustomerID},
+	})
 	clearCabinetSessionCookies(w, r, h.cookieDomain)
 	writeJSON(w, http.StatusOK, messageResp{Message: "account deleted"})
 }
@@ -1345,7 +1362,7 @@ func (h *MeHandler) PostTrialActivate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "trial already used", http.StatusConflict)
 		return
 	}
-	linkURL, err := h.payments.ActivateTrial(r.Context(), cust.TelegramID)
+	linkURL, err := h.payments.ActivateTrial(adminevents.WithSource(r.Context(), adminevents.SourceCabinet), cust.TelegramID)
 	if errors.Is(err, payment.ErrTrialAlreadyUsed) {
 		http.Error(w, "trial already used", http.StatusConflict)
 		return
@@ -1385,4 +1402,16 @@ func maskIdentityHintEmail(email string) string {
 		return local[:1] + "***" + domain
 	}
 	return local[:1] + "***" + local[len(local)-1:] + domain
+}
+
+// SetTrafficRepo подключает раздельный трафик (сводка /me/traffic и слой обхода в графике).
+func (h *MeHandler) SetTrafficRepo(r *database.TrafficSplitRepository) { h.traffic = r }
+
+// GetTraffic — GET /cabinet/api/me/traffic: расход, лимиты и пакеты докупки.
+func (h *MeHandler) GetTraffic(w http.ResponseWriter, r *http.Request) {
+	if h.traffic == nil {
+		writeJSON(w, http.StatusOK, trafficOverviewResp{Label: config.TrafficBypassLabel(), Extras: []trafficExtraDTO{}, Packs: []trafficPackDTO{}})
+		return
+	}
+	NewTraffic(h.bootstrap, h.customers, h.traffic, h.rw).Get(w, r)
 }

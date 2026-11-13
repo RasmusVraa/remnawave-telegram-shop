@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError, type MergePreviewResponse, type MergeCustomerSnapshot } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { newIdempotencyKey, formatDate } from '@/lib/utils'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 import { useAuthStore } from '@/store/auth'
@@ -28,6 +29,7 @@ export default function MergePreviewPage() {
   const [force] = useState(false)
   const [keepSide, setKeepSide] = useState<'web' | 'tg' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [done, setDone] = useState(false)
   const [showDoneToast, setShowDoneToast] = useState(false)
 

@@ -8,6 +8,7 @@ import { AdminCheckbox } from '../AdminCheckbox'
 import { cn } from '@/lib/utils'
 import { surface } from '../Surface'
 import { formatAdminApiError } from '../../utils/formatAdminApiError'
+import { useErrorHaptic } from '@/lib/haptic'
 import {
   useAdminUserSetSquads,
   type AdminSquadDTO,
@@ -43,6 +44,7 @@ export function AdminUserSquadsModal({
   const [draftSquads, setDraftSquads] = useState<string[]>(initialUuids)
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   useEffect(() => {
     if (open) {

@@ -35,12 +35,19 @@ var ErrDisabled = errors.New("mail: SMTP is not configured")
 // Sender — обёртка над go-mail клиентом. Потокобезопасный: Send создаёт новый
 // клиент под каждую отправку, что просто и не требует pool'а для MVP.
 type Sender struct {
-	cfg Config
+	cfg    Config
+	health health
 }
 
 // NewSender — конструктор.
 func NewSender(cfg Config) *Sender {
 	return &Sender{cfg: cfg}
+}
+
+// OnHealthChange подписывает fn на смену состояния почты: «перестала
+// отправляться» и «снова отправляется». Вызывать до первой отправки.
+func (s *Sender) OnHealthChange(fn HealthFunc) {
+	s.health.notify = fn
 }
 
 // Send отправляет одно письмо.
@@ -98,7 +105,9 @@ func (s *Sender) Send(ctx context.Context, toEmail, subject, htmlBody, plainBody
 	if err != nil {
 		return fmt.Errorf("mail: client: %w", err)
 	}
-	if err := client.DialAndSendWithContext(ctx, msg); err != nil {
+	err = client.DialAndSendWithContext(ctx, msg)
+	s.health.report(err)
+	if err != nil {
 		return fmt.Errorf("mail: send: %w", err)
 	}
 	return nil

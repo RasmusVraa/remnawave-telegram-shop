@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn, formatDate } from '@/lib/utils'
 import type { TrafficUsageResponse } from '@/lib/api'
+import { ChartLegend, UsageChart, chartWindow } from '@/features/home/HomeParts'
 
 /**
  * График расхода трафика за расчётный период.
@@ -20,11 +21,14 @@ export function TrafficUsageChart({
   loading,
   lang,
   className,
+  bypassLabel,
 }: {
   data: TrafficUsageResponse | undefined
   loading: boolean
   lang: string
   className?: string
+  /** Название обхода для легенды (есть, когда у клиента отдельный лимит обхода). */
+  bypassLabel?: string
 }) {
   const { t } = useTranslation()
 
@@ -53,8 +57,9 @@ export function TrafficUsageChart({
    * хотя на деле человек просто ещё не расходовал трафик. Проверяем именно
    * точки, а не total_bytes: панель может не отдать сумму, а ряд отдать.
    */
-  if (!data?.enabled || data.points.length < 2) return null
+  if (!data?.enabled || data.points.length < 1) return null
   if (!data.points.some((p) => p > 0)) return null
+  const win = chartWindow(data)
 
   return (
     <Card className={cn('cabinet-elevated-card', className)}>
@@ -72,7 +77,11 @@ export function TrafficUsageChart({
             {formatGb(data.total_bytes)} {t('dashboard.gigabytes')}
           </span>
         </div>
-        <Sparkline points={data.points} className="mt-3" />
+        {/* Те же столбики по дням, что в шторке «Расход трафика»: на ПК раньше рисовалась старая линия. */}
+        <div className="mt-3 space-y-3">
+          <UsageChart points={win.points} cats={win.cats} pad={win.pad} future={win.future} lang={lang} bypass={win.bypass} compact />
+          {win.bypass && <ChartLegend label={bypassLabel} points={win.points} bypass={win.bypass} />}
+        </div>
       </CardContent>
     </Card>
   )
@@ -82,37 +91,4 @@ function formatGb(bytes: number): string {
   const gb = bytes / 1024 ** 3
   if (gb >= 100) return String(Math.round(gb))
   return gb.toFixed(1)
-}
-
-function Sparkline({ points, className }: { points: number[]; className?: string }) {
-  const max = Math.max(...points, 1)
-  const step = 100 / (points.length - 1)
-  const line = points.map((p, i) => `${(i * step).toFixed(2)},${(40 - (p / max) * 34).toFixed(2)}`).join(' ')
-
-  return (
-    <svg
-      viewBox="0 0 100 40"
-      preserveAspectRatio="none"
-      className={cn('h-16 w-full', className)}
-      role="img"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="cabinet-usage-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="hsl(var(--primary))" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="hsl(var(--primary))" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <polygon points={`0,40 ${line} 100,40`} fill="url(#cabinet-usage-fill)" />
-      <polyline
-        points={line}
-        fill="none"
-        stroke="hsl(var(--primary))"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        vectorEffect="non-scaling-stroke"
-      />
-    </svg>
-  )
 }

@@ -7,6 +7,7 @@ import { AlertTriangle, Check, Clock, Link2Off, Plus, RotateCcw, Smartphone, X }
 import { Button } from '@/components/ui/button'
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
 import { api, ApiError } from '@/lib/api'
+import { hapticError, hapticSuccess } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 /**
@@ -81,6 +82,7 @@ export function SubscriptionLinkResetSheet({
   const reset = useMutation({
     mutationFn: () => api.resetSubscriptionLink(),
     onSuccess: async (res) => {
+      hapticSuccess()
       setDevicesCleared(res.devices_cleared)
       setStep('done')
       // Приглашения, выпущенные до сброса, сервер больше не принимает, —
@@ -92,6 +94,7 @@ export function SubscriptionLinkResetSheet({
       ])
     },
     onError: (e) => {
+      hapticError()
       if (e instanceof ApiError && e.status === 429) {
         setCooldownUntil(parseAvailableAt(e.body) ?? new Date(Date.now() + 60_000).toISOString())
         return

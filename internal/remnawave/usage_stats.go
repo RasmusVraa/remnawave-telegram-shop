@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -19,6 +20,29 @@ type UserUsageSeries struct {
 	Categories []string `json:"categories"`
 	// Sparkline — расход по дням. Единицы те же, что и в остальном API, — байты.
 	Sparkline []float64 `json:"sparklineData"`
+	// Series — расход по нодам: на каждую ноду байты по дням и сумма за период.
+	// Панель отдаёт их на 2.8 и 3.x одинаково; нода без включённого «Отслеживания
+	// трафика» сюда не попадает.
+	Series []NodeUsageSeries `json:"series"`
+}
+
+// NodeUsageSeries — расход одной ноды за период.
+type NodeUsageSeries struct {
+	UUID  string    `json:"uuid"`
+	Name  string    `json:"name"`
+	Total float64   `json:"total"`
+	Data  []float64 `json:"data"`
+}
+
+// NodesTotal — суммарный расход по перечисленным нодам (uuid в нижнем регистре).
+func (u UserUsageSeries) NodesTotal(nodeUUIDs map[string]struct{}) int64 {
+	var sum float64
+	for _, n := range u.Series {
+		if _, ok := nodeUUIDs[strings.ToLower(n.UUID)]; ok {
+			sum += n.Total
+		}
+	}
+	return int64(sum)
 }
 
 // Total — суммарный расход за период.

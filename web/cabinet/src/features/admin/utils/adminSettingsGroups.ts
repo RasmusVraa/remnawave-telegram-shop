@@ -2,7 +2,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   Activity,
   BadgeRussianRuble,
-  Bell,
   BellRing,
   CalendarDays,
   CircleDot,
@@ -19,6 +18,7 @@ import {
   Megaphone,
   MessageSquare,
   Percent,
+  Radar,
   Receipt,
   RefreshCw,
   Scale,
@@ -47,18 +47,20 @@ export const ADMIN_SETTINGS_GROUP_ORDER = [
   'tariffs',
   'trial',
   'hwid',
+  'traffic',
   'referral',
   'partner',
   'stars',
   'loyalty',
   'payments',
-  'payments_notify',
+  'admin_alerts',
   'moynalog',
-  'access',
   'links',
+  'access',
   'tags',
   'lifecycle',
   'notifications',
+  'monitoring',
   'fortune',
 ] as const
 
@@ -68,18 +70,20 @@ export const ADMIN_SETTINGS_GROUP_ICONS: Record<AdminSettingsGroupId, LucideIcon
   trial: Gift,
   tariffs: BadgeRussianRuble,
   hwid: Smartphone,
+  traffic: Gauge,
   referral: Users,
   partner: Handshake,
   stars: Star,
   loyalty: Gem,
   payments: Wallet,
-  payments_notify: Bell,
+  admin_alerts: Send,
   moynalog: Receipt,
   access: Shield,
   links: Link2,
   tags: Tag,
   lifecycle: RefreshCw,
   notifications: BellRing,
+  monitoring: Radar,
   fortune: CircleDot,
   cabinet: Sparkles,
   landing: PanelTop,
@@ -96,18 +100,20 @@ export const ADMIN_SETTINGS_GROUP_ICON_STYLES: Record<AdminSettingsGroupId, Admi
   trial: { box: 'bg-emerald-500/10 dark:bg-emerald-500/20', icon: 'text-emerald-500' },
   tariffs: { box: 'bg-lime-500/10 dark:bg-lime-500/20', icon: 'text-lime-600 dark:text-lime-400' },
   hwid: { box: 'bg-cyan-500/10 dark:bg-cyan-500/20', icon: 'text-cyan-500' },
+  traffic: { box: 'bg-violet-500/10 dark:bg-violet-500/20', icon: 'text-violet-500' },
   referral: { box: 'bg-violet-500/10 dark:bg-violet-500/20', icon: 'text-violet-500' },
   partner: { box: 'bg-amber-500/10 dark:bg-amber-500/20', icon: 'text-amber-600 dark:text-amber-400' },
   stars: { box: 'bg-amber-500/10 dark:bg-amber-500/20', icon: 'text-amber-500' },
   loyalty: { box: 'bg-teal-500/10 dark:bg-teal-500/20', icon: 'text-teal-500' },
   payments: { box: 'bg-emerald-500/10 dark:bg-emerald-500/20', icon: 'text-emerald-500' },
-  payments_notify: { box: 'bg-rose-500/10 dark:bg-rose-500/20', icon: 'text-rose-500' },
+  admin_alerts: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
   moynalog: { box: 'bg-green-500/10 dark:bg-green-500/20', icon: 'text-green-600 dark:text-green-400' },
   access: { box: 'bg-blue-500/10 dark:bg-blue-500/20', icon: 'text-blue-500' },
   links: { box: 'bg-indigo-500/10 dark:bg-indigo-500/20', icon: 'text-indigo-500' },
   tags: { box: 'bg-orange-500/10 dark:bg-orange-500/20', icon: 'text-orange-500' },
   lifecycle: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
   notifications: { box: 'bg-red-500/10 dark:bg-red-500/20', icon: 'text-red-500' },
+  monitoring: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
   fortune: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
   cabinet: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
   landing: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
@@ -130,7 +136,7 @@ export function adminSettingsGroupIconStyle(id: string): AdminSettingsGroupIconS
  * почём мы продаём», должно лежать рядом с прайсом тарифов, а не на другом
  * экране. Поэтому в ADMIN_SETTINGS_CATEGORIES этих групп нет.
  */
-export const ADMIN_PRODUCT_SETTINGS_GROUPS = ['tariffs', 'trial', 'hwid', 'stars'] as const
+export const ADMIN_PRODUCT_SETTINGS_GROUPS = ['tariffs', 'trial', 'hwid', 'traffic', 'stars'] as const
 
 /** Группа живёт на отдельной странице «Статус серверов», не в общих настройках и не на тарифах. */
 export const ADMIN_STATUS_SETTINGS_GROUP: AdminSettingsGroupId = 'status'
@@ -141,7 +147,6 @@ export const ADMIN_SETTINGS_CATEGORY_ORDER = [
   'marketing',
   'finance',
   'notifications',
-  'operations',
   'access',
 ] as const
 
@@ -173,36 +178,29 @@ export const ADMIN_SETTINGS_CATEGORIES: AdminSettingsCategoryDef[] = [
     iconStyle: { box: 'bg-violet-500/10 dark:bg-violet-500/20', icon: 'text-violet-500' },
   },
   {
-    // Всё, что происходит с деньгами после оплаты: кому сообщить и как
-    // отчитаться перед ФНС. Раньше уведомления жили в «Операциях» вместе со
-    // ссылками и тегами — темы несвязанные, разнесли.
+    // Приём денег и чеки по ним. Уведомления о платежах ушли во вкладку
+    // «Уведомления»: всё, что кому прилетает, лежит в одном месте.
     id: 'finance',
     titleKey: 'admin.settings.categories.finance',
     icon: Wallet,
-    groups: ['payments', 'payments_notify', 'moynalog'],
+    groups: ['payments', 'moynalog'],
     iconStyle: { box: 'bg-emerald-500/10 dark:bg-emerald-500/20', icon: 'text-emerald-500' },
   },
   {
-    // Push в браузер из кабинета: какие виды уведомлений дублировать
-    // системным уведомлением. В ленту под колокольчиком попадает всё.
+    // Что прилетает вам в Telegram (оповещения админу, платежи) и клиентам
+    // в браузер (push). В ленту под колокольчиком попадает всё, push дублирует
+    // выбранные виды.
     id: 'notifications',
     titleKey: 'admin.settings.categories.notifications',
     icon: BellRing,
-    groups: ['notifications'],
+    groups: ['admin_alerts', 'notifications', 'monitoring'],
     iconStyle: { box: 'bg-red-500/10 dark:bg-red-500/20', icon: 'text-red-500' },
-  },
-  {
-    id: 'operations',
-    titleKey: 'admin.settings.categories.operations',
-    icon: Link2,
-    groups: ['links', 'tags'],
-    iconStyle: { box: 'bg-amber-500/10 dark:bg-amber-500/20', icon: 'text-amber-500' },
   },
   {
     id: 'access',
     titleKey: 'admin.settings.categories.access',
     icon: Shield,
-    groups: ['access'],
+    groups: ['links', 'access', 'tags'],
     iconStyle: { box: 'bg-blue-500/10 dark:bg-blue-500/20', icon: 'text-blue-500' },
   },
 ]
@@ -337,44 +335,24 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       keys: ['CABINET_PUSH_PAYMENT', 'CABINET_PUSH_DEVICES', 'CABINET_PUSH_REFERRAL', 'CABINET_PUSH_LOYALTY', 'CABINET_PUSH_PARTNER'],
     },
   ],
-  payments_notify: [
-    {
-      id: 'toggle',
-      titleKey: 'admin.settings.subsections.payments_notify.toggle',
-      icon: Bell,
-      keys: ['PAYMENTS_NOTIFY_ENABLED'],
-    },
-    {
-      id: 'delivery',
-      titleKey: 'admin.settings.subsections.payments_notify.delivery',
-      icon: Send,
-      keys: ['PAYMENTS_NOTIFY_CHAT_ID', 'PAYMENTS_NOTIFY_MESSAGE_THREAD_ID', 'PAYMENTS_NOTIFY_EVENTS'],
-    },
-  ],
   payments: [
     {
       id: 'providers',
       titleKey: 'admin.settings.subsections.payments.providers',
       icon: Wallet,
-      keys: ['YOOKASA_ENABLED', 'CRYPTO_PAY_ENABLED', 'HELEKET_ENABLED', 'TELEGRAM_STARS_ENABLED'],
-    },
-    {
-      id: 'platega',
-      titleKey: 'admin.settings.subsections.payments.platega',
-      icon: CreditCard,
-      keys: [
-        'PLATEGA_SBP_ENABLED',
-        'PLATEGA_CARDS_ENABLED',
-        'PLATEGA_ACQUIRING_ENABLED',
-        'PLATEGA_WORLDWIDE_ENABLED',
-        'PLATEGA_CRYPTO_ENABLED',
-      ],
+      keys: ['YOOKASA_ENABLED', 'PLATEGA_ENABLED', 'CRYPTO_PAY_ENABLED', 'HELEKET_ENABLED', 'TELEGRAM_STARS_ENABLED'],
     },
     {
       id: 'yookassa',
       titleKey: 'admin.settings.subsections.payments.yookassa',
       icon: CreditCard,
       keys: ['YOOKASA_PAYMENT_METHODS'],
+    },
+    {
+      id: 'platega',
+      titleKey: 'admin.settings.subsections.payments.platega',
+      icon: CreditCard,
+      keys: ['PLATEGA_PAYMENT_METHODS'],
     },
     {
       id: 'checkout',

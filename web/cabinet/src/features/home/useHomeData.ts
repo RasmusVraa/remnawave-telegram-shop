@@ -1,7 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { i18n } from '@/i18n'
-import { api, SUBSCRIPTION_STALE_MS, type SubscriptionResponse } from '@/lib/api'
+import { bypassLabel } from '@/lib/bypassLabel'
+import { api, SUBSCRIPTION_STALE_MS, type MyTrafficResponse, type SubscriptionResponse } from '@/lib/api'
 import { daysUntil, trafficUsagePercent } from '@/lib/utils'
 import { daysTone, devicesTone, trafficTone, type ToneLevel } from '@/lib/subscriptionTone'
 
@@ -42,6 +43,32 @@ export function useHomeData() {
     enabled: Boolean(sub),
   })
 
+  // Раздельный трафик (обход) и пакеты докупки. Пустой ответ — у клиента всё как раньше.
+  const splitQuery = useQuery({
+    queryKey: ['my-traffic'],
+    queryFn: () => api.myTraffic(),
+    staleTime: 60_000,
+    retry: 1,
+    enabled: Boolean(sub),
+  })
+  const split: MyTrafficResponse | undefined = splitQuery.data
+  const GB = 1024 ** 3
+  const bypassInfo = split?.bypass
+  const bypassLimitGb = bypassInfo && bypassInfo.limit_bytes > 0 ? bypassInfo.limit_bytes / GB : null
+  const bypassUsedGb = bypassInfo ? bypassInfo.used_bytes / GB : 0
+  const bypassPct = bypassLimitGb ? Math.min(100, (bypassUsedGb / bypassLimitGb) * 100) : null
+  const bypass = bypassInfo && bypassLimitGb
+    ? {
+        limit: bypassLimitGb,
+        used: bypassUsedGb,
+        pct: bypassPct ?? 0,
+        tone: trafficTone(bypassPct),
+        // Исчерпан, как только расход дошёл до лимита: сквад воркер снимает с задержкой до минуты, а клиент уже видит 30/30.
+        blocked: Boolean(split?.bypass_blocked) || (bypassPct ?? 0) >= 100,
+        label: bypassLabel(split?.label),
+      }
+    : null
+
   const devices = devicesQuery.data
   const isTrial = Boolean(sub?.is_trial)
   const days = sub?.expire_at ? daysUntil(sub.expire_at) : null
@@ -57,7 +84,8 @@ export function useHomeData() {
   const deviceLimit = Math.max(sub?.tariff?.device_limit ?? 0, Math.max(0, devices?.device_limit ?? 0))
   const allSlotsTaken = Boolean(devices?.enabled && deviceLimit > 0 && connected >= deviceLimit)
 
-  const dayTone: ToneLevel = isTrial && !isExpiredByDate ? 'calm' : daysTone(effectiveDays)
+  // Цвет срока — по самому сроку: при исчерпанном трафике дни ещё идут, и 120 дней не должны краснеть.
+  const dayTone: ToneLevel = isTrial && !isExpiredByDate ? 'calm' : daysTone(isExpiredByDate ? 0 : days)
   let state: HomeState = 'ok'
   if (isExpiredByDate) state = 'expired'
   else if (isExpiredByTraffic) state = 'traffic'
@@ -74,6 +102,8 @@ export function useHomeData() {
     subQuery,
     devicesQuery,
     usageQuery,
+    split,
+    bypass,
     sub,
     devices,
     usage: usageQuery.data,

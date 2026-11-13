@@ -5,11 +5,10 @@
 | Система | Переключатель | Примечание |
 |---------|---------------|------------|
 | [YooKassa](https://yookassa.ru/developers/api) | `YOOKASA_ENABLED` | Карты / привычные методы YooKassa |
-| [Platega](https://platega.io) | `PLATEGA_ENABLED` + флаги методов | СБП, карты, эквайринг, worldwide, crypto |
+| [Platega](https://platega.io) | `PLATEGA_ENABLED` | Общая форма, СБП, эквайринг, международные карты, крипта |
 | [CryptoPay](https://help.crypt.bot/crypto-pay-api) | `CRYPTO_PAY_ENABLED` | Крипто через Crypto Bot |
 | [Heleket](https://heleket.com) | `HELEKET_ENABLED` | Крипто; в интерфейсе называется «Другая крипта» |
 | Telegram Stars | `TELEGRAM_STARS_ENABLED` | Оплата звёздами в Telegram |
-| Tribute | `TRIBUTE_*` | **Deprecated** — не развивать, лучше не подключать к новым установкам |
 
 Переменные — в [env.md](./env.md) (разделы оплат). Ключи и реквизиты задаются только в `.env`; включать и выключать уже настроенные способы можно без рестарта — в web-админке «Настройки бота» → «Способы оплаты».
 
@@ -48,7 +47,6 @@ YOOKASA_PAYMENT_METHODS=sbp,bank_card,all
 | **Путь задан** | Платёжка может слать уведомление на `https://ваш-домен` + путь (через reverse proxy) |
 
 **CryptoPay** в этом форке подтверждается поллингом.  
-**Tribute** — отдельные `TRIBUTE_*` (см. [env.md](./env.md)); операционно не рекомендуется.
 
 ## Прокси для ЮKassa
 
@@ -84,15 +82,16 @@ YOOKASA_PROXY_URL=socks5://user:pass@host:1080
 Клиент ЮKassa работает с таймаутом 30 секунд, поэтому зависший прокси не удерживает
 HTTP-обработчик кабинета бесконечно.
 
-## Platega: методы
+## Platega: кнопки
 
-При `PLATEGA_ENABLED=true` обязательны `PLATEGA_MERCHANT_ID`, `PLATEGA_SECRET` и хотя бы один флаг:
+При `PLATEGA_ENABLED=true` обязательны `PLATEGA_MERCHANT_ID` и `PLATEGA_SECRET`.
 
-- `PLATEGA_SBP_ENABLED`
-- `PLATEGA_CARDS_ENABLED`
-- `PLATEGA_ACQUIRING_ENABLED`
-- `PLATEGA_WORLDWIDE_ENABLED`
-- `PLATEGA_CRYPTO_ENABLED`
+Кнопки задаёт `PLATEGA_PAYMENT_METHODS` (в админке: Платежи → Platega: кнопки), порядок — как в списке:
+
+- `all` — общая форма: платёж создаётся без `paymentMethod` через `/v2/transaction/process`, способ плательщик выбирает на странице Platega. Это значение по умолчанию.
+- `sbp`, `acquiring` (карты), `worldwide` (международные карты), `crypto` — отдельная кнопка, платёж создаётся с кодом способа (2, 11, 12, 13), плательщик сразу попадает на нужный способ.
+
+Способы кроме `all` должны быть включены в кабинете Platega, иначе платёж не создастся. Прежние флаги `PLATEGA_SBP_ENABLED`, `PLATEGA_CARDS_ENABLED`, `PLATEGA_ACQUIRING_ENABLED`, `PLATEGA_WORLDWIDE_ENABLED`, `PLATEGA_CRYPTO_ENABLED` больше не читаются. Способа «Карта МИР» (код 10) в Platega больше нет, новые счета по нему не создаются; старые остаются в истории.
 
 ## Heleket: «Другая крипта»
 

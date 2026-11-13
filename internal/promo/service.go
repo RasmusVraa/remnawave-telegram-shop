@@ -61,6 +61,12 @@ func ValidCodePattern(s string) bool {
 // Activate validates and applies a promo code for the customer. Customer must be non-nil.
 // One-time discount: pending row is cleared after the next successful subscription payment (see payment flow).
 func (s *Service) Activate(ctx context.Context, telegramID int64, username string, customer *database.Customer, rawCode string) (*ActivateResult, error) {
+	res, err := s.activate(ctx, telegramID, username, customer, rawCode)
+	emitPromoEvent(ctx, customer, rawCode, res, err)
+	return res, err
+}
+
+func (s *Service) activate(ctx context.Context, telegramID int64, username string, customer *database.Customer, rawCode string) (*ActivateResult, error) {
 	if customer == nil {
 		return nil, database.ValidationErrorf("no customer")
 	}
@@ -392,7 +398,7 @@ func (s *Service) PendingDiscountForPayment(ctx context.Context, customerID int6
 		if err != nil {
 			return 0, 0, err
 		}
-		if open >= d.SubscriptionPaymentsRemaining {
+		if open >= openInvoicesLimit(d.SubscriptionPaymentsRemaining) {
 			// Брошенные счета Stars не истекают — освобождаем их и считаем заново.
 			if n, cerr := s.PromoRepo.CancelOpenTelegramPurchasesWithPromo(ctx, customerID, d.PromoCodeID); cerr != nil {
 				slog.Error("cancel stale stars invoices with promo", "error", cerr)
@@ -403,11 +409,24 @@ func (s *Service) PendingDiscountForPayment(ctx context.Context, customerID int6
 				}
 			}
 		}
-		if open >= d.SubscriptionPaymentsRemaining {
+		if open >= openInvoicesLimit(d.SubscriptionPaymentsRemaining) {
 			return 0, 0, nil
 		}
 	}
 	return d.Percent, d.PromoCodeID, nil
+}
+
+// MinOpenInvoicesWithPromo — сколько неоплаченных счетов со скидкой клиент
+// может держать, даже если у промокода осталась одна оплата. Строгое «один
+// счёт — одно использование» лишало скидки клиента, который не смог оплатить
+// первый счёт и создал второй; без потолка же скидку получали все счета подряд.
+const MinOpenInvoicesWithPromo = 5
+
+func openInvoicesLimit(remaining int) int {
+	if remaining < MinOpenInvoicesWithPromo {
+		return MinOpenInvoicesWithPromo
+	}
+	return remaining
 }
 
 // PendingDiscountForConnectUI returns pending discount for the My VPN screen; expired rows are cleared.

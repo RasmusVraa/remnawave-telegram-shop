@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"remnawave-tg-shop-bot/internal/adminalert"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/utils"
 
-	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/google/uuid"
 )
@@ -36,7 +36,7 @@ func invoiceTypeTitle(t database.InvoiceType) string {
 		return "Telegram Stars"
 	case database.InvoiceTypeTribute:
 		return "Tribute"
-	case database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
+	case database.InvoiceTypePlatega, database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
 		database.InvoiceTypePlategaWorldwide, database.InvoiceTypePlategaCrypto:
 		return "Platega"
 	case database.InvoiceTypeHeleket:
@@ -101,7 +101,7 @@ func paymentLinkBlock(p *database.Purchase) string {
 		if p.CryptoInvoiceLink != nil && strings.TrimSpace(*p.CryptoInvoiceLink) != "" {
 			return "🔗 счёт Stars:\n   " + htmlCode(strings.TrimSpace(*p.CryptoInvoiceLink))
 		}
-	case database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
+	case database.InvoiceTypePlatega, database.InvoiceTypePlategaSBP, database.InvoiceTypePlategaCards, database.InvoiceTypePlategaAcquiring,
 		database.InvoiceTypePlategaWorldwide, database.InvoiceTypePlategaCrypto:
 		if p.PlategaID != nil && strings.TrimSpace(*p.PlategaID) != "" {
 			return "🔗 платёж Platega: " + htmlCode(strings.TrimSpace(*p.PlategaID))
@@ -153,6 +153,9 @@ func amountPeriodLine(p *database.Purchase) string {
 		cur = "RUB"
 	}
 	amt := p.Amount
+	if p.PurchaseKind == database.PurchaseKindExtraTraffic {
+		return trafficPackAmountLine(p, cur)
+	}
 	if p.InvoiceType == database.InvoiceTypeTelegram {
 		if cur == "" {
 			cur = "XTR"
@@ -364,6 +367,7 @@ func (s *PaymentService) NotifyHeleketNeedsAttention(ctx context.Context, purcha
 	if s == nil || purchase == nil {
 		return
 	}
+	s.emitPurchaseCanceled(ctx, purchase, "heleket_needs_attention")
 	var b strings.Builder
 	b.WriteString("⚠️ <b>Heleket: нужен ручной разбор</b>\n\n")
 	b.WriteString(reason)
@@ -380,27 +384,13 @@ func (s *PaymentService) NotifyHeleketNeedsAttention(ctx context.Context, purcha
 }
 
 func (s *PaymentService) sendPaymentsGroupHTML(ctx context.Context, text string, replyMarkup models.ReplyMarkup) {
-	if s.telegramBot == nil || !config.PaymentsNotifyEnabled() {
+	if s.telegramBot == nil {
 		return
 	}
-	chatID := config.PaymentsNotifyChatID()
-	if chatID == 0 {
-		slog.Warn("payments notify: PAYMENTS_NOTIFY_CHAT_ID пуст — пропуск отправки")
-		return
-	}
-	params := &bot.SendMessageParams{
-		ChatID:    chatID,
-		Text:      text,
-		ParseMode: models.ParseModeHTML,
-	}
-	if replyMarkup != nil {
-		params.ReplyMarkup = replyMarkup
-	}
-	if tid := config.PaymentsNotifyMessageThreadID(); tid > 0 {
-		params.MessageThreadID = tid
-	}
-	if _, err := s.telegramBot.SendMessage(ctx, params); err != nil {
-		slog.Warn("payments notify: не удалось отправить в группу", "error", err)
+	// Куда — вид payments в «Оповещениях админу»: PAYMENTS_NOTIFY_CHAT_ID, иначе
+	// общий чат, иначе личка. Выключен PAYMENTS_NOTIFY_ENABLED — Send молчит.
+	if err := adminalert.Send(ctx, config.AdminAlertPayments, text, replyMarkup); err != nil {
+		slog.Warn("payments notify: не удалось отправить", "error", err)
 	}
 }
 
@@ -443,6 +433,7 @@ func (s *PaymentService) loyaltyDiscountPercentForNotify(ctx context.Context, _ 
 
 // tryNotifyPurchasePaid — уведомление в группу после успешной оплаты (не влияет на результат покупки).
 func (s *PaymentService) tryNotifyPurchasePaid(ctx context.Context, p *database.Purchase, c *database.Customer, expireBefore, expireAfter *time.Time) {
+	s.emitPurchasePaid(ctx, p, expireBefore, expireAfter)
 	if p == nil || c == nil || !config.PaymentsNotifySendPaid() {
 		return
 	}
@@ -458,6 +449,7 @@ func (s *PaymentService) tryNotifyPurchasePaid(ctx context.Context, p *database.
 
 // tryNotifyPurchaseCancel — уведомление об отмене счёта (YooKassa worker, Tribute cancel и т.д.).
 func (s *PaymentService) tryNotifyPurchaseCancel(ctx context.Context, p *database.Purchase, c *database.Customer) {
+	s.emitPurchaseCanceled(ctx, p, "")
 	if p == nil || !config.PaymentsNotifySendCancel() {
 		return
 	}
@@ -480,4 +472,21 @@ func (s *PaymentService) tryNotifyPurchaseCancel(ctx context.Context, p *databas
 		markup = s.paymentsNotifyToUserReplyMarkup(c.ID)
 	}
 	s.sendPaymentsGroupHTML(ctx, msg, markup)
+}
+
+// trafficPackAmountLine — сумма и пометка «докупка трафика» с размером пакета.
+func trafficPackAmountLine(p *database.Purchase, cur string) string {
+	size := "—"
+	if p.TrafficPackBytes > 0 {
+		size = fmt.Sprintf("%.1f ГБ", float64(p.TrafficPackBytes)/(1<<30))
+		size = strings.Replace(strings.Replace(size, ".0 ", " ", 1), ".", ",", 1)
+	}
+	kind := "обычный"
+	if p.TrafficPackKind != nil && *p.TrafficPackKind == database.TrafficKindBypass {
+		kind = config.TrafficBypassLabel()
+	}
+	if p.InvoiceType == database.InvoiceTypeTelegram {
+		return fmt.Sprintf("💳 %.0f ⭐ · %s · докупка трафика %s (%s)", p.Amount, cur, size, kind)
+	}
+	return fmt.Sprintf("💳 %.2f %s · докупка трафика %s (%s)", p.Amount, cur, size, kind)
 }

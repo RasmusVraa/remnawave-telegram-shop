@@ -211,3 +211,48 @@ func TestGitHubBodyHasNoTelegramMarkup(t *testing.T) {
 		t.Error("разметка утекла в оба варианта")
 	}
 }
+
+// Строка === делит пост на сообщения: у каждого своя строка версии с номером
+// части, футер — только у последнего, плоский список секций — общий.
+func TestFormatTelegramParts(t *testing.T) {
+	split := strings.Replace(sampleNotes, "\n🧱 Технические изменения", "\n===\n\n🧱 Технические изменения", 1)
+	n, err := ParseReleaseNotes(split)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(n.TGParts) != 2 || len(n.TGSections) != 2 {
+		t.Fatalf("parts=%d sections=%d, want 2 and 2", len(n.TGParts), len(n.TGSections))
+	}
+	footer := TelegramFooter{Text: "Meows VPN Group", URL: "https://t.me/meows_vpn_bot"}
+	parts := FormatTelegramParts(n, footer)
+	if len(parts) != 2 {
+		t.Fatalf("got %d messages, want 2", len(parts))
+	}
+	if !strings.Contains(parts[0], "4.12.1</a> · часть 1 из 2") || !strings.Contains(parts[1], "4.12.1</a> · часть 2 из 2") {
+		t.Fatalf("version lines:\n%s\n---\n%s", parts[0], parts[1])
+	}
+	if strings.Contains(parts[0], "Технические") || !strings.Contains(parts[1], "<b>🧱 Технические изменения</b>") {
+		t.Fatalf("sections went to the wrong message:\n%s\n---\n%s", parts[0], parts[1])
+	}
+	if strings.Contains(parts[0], "Meows VPN Group") || !strings.Contains(parts[1], "Meows VPN Group") {
+		t.Fatal("footer must be only under the last message")
+	}
+
+	// Без разбивки — одно сообщение, как раньше.
+	one, err := ParseReleaseNotes(sampleNotes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := FormatTelegramParts(one, footer); len(got) != 1 || got[0] != FormatTelegramHTML(one, footer) {
+		t.Fatal("post without === must stay one message")
+	}
+
+	for _, bad := range []string{
+		strings.Replace(sampleNotes, "\n✨ Улучшения\n", "\n===\n✨ Улучшения\n", 1),
+		strings.TrimRight(sampleNotes, "\n") + "\n===\n",
+	} {
+		if _, err := ParseReleaseNotes(bad); err == nil {
+			t.Fatal("=== at the start or the end of the block must be rejected")
+		}
+	}
+}

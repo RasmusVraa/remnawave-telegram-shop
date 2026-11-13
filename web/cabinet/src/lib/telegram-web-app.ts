@@ -18,15 +18,6 @@ function isTelegramDesktopPlatform(): boolean {
   return false
 }
 
-/** Лёгкая вибрация (Bot API 6.1+). На десктопе/без поддержки — no-op. */
-export function hapticImpactLight(): void {
-  try {
-    webApp()?.HapticFeedback?.impactOccurred?.('light')
-  } catch {
-    // Telegram может бросить, если haptic недоступен
-  }
-}
-
 function syncTelegramChromeColors(tg: TelegramWebApp): void {
   const isDark = document.documentElement.classList.contains('dark')
   const color = isDark ? '#0b1426' : '#f8fafc'

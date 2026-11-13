@@ -254,6 +254,7 @@ export function AuthSocialProviders({
               type="button"
               variant="outline"
               loading={btn.loading}
+              spinnerInFlow
               className={`h-16 w-full flex-col justify-center gap-1 rounded-xl border-border/80 bg-card/70 hover:bg-muted/60 ${
                 isOddTail ? 'col-span-2 mx-auto max-w-[220px]' : ''
               }`}

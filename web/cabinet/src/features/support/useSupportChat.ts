@@ -36,11 +36,13 @@ export function useSupportChat(enabled: boolean, modalOpen: boolean) {
   })
 
   const sendMutation = useMutation({
-    mutationFn: (text: string) => api.supportSendMessage(text),
-    onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: CONVERSATION_KEY })
-      void queryClient.invalidateQueries({ queryKey: SUMMARY_KEY })
-    },
+    mutationFn: ({ text, files }: { text: string; files?: File[] }) => api.supportSendMessage(text, files),
+    // Ждём свежую ленту: так отправленное сообщение сменяет черновик в ленте без мигания.
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_KEY }),
+        queryClient.invalidateQueries({ queryKey: SUMMARY_KEY }),
+      ]),
   })
 
   const markReadMutation = useMutation({

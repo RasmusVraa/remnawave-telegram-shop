@@ -23,9 +23,9 @@ func (h Handler) CreateCustomerIfNotExistMiddleware(next bot.HandlerFunc) bot.Ha
 		} else if update.CallbackQuery != nil {
 			telegramId = update.CallbackQuery.From.ID
 			langCode = update.CallbackQuery.From.LanguageCode
-	} else {
-		next(ctx, b, update)
-		return
+		} else {
+			next(ctx, b, update)
+			return
 		}
 		existingCustomer, err := h.customerRepository.FindByTelegramId(ctx, telegramId)
 		if err != nil {

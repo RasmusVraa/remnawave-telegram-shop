@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check, Share2 } from 'lucide-react'
+import { Check, CircleAlert, CircleCheck, Copy, Share2 } from 'lucide-react'
 
 import { Card } from '@/components/ui/card'
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard'
 import { cn } from '@/lib/utils'
 import { formatNumber } from '@/lib/format'
 import type { AdminCustomerDTO } from '@/lib/types/admin'
@@ -54,10 +55,13 @@ export function AdminUserIdentityCard({
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-lg font-semibold leading-tight">{displayName}</h1>
           <p className="mt-0.5 truncate text-xs tabular-nums text-muted-foreground">
-            {t('admin.users.overview.idLine', {
-              id: user.telegram_id,
-              lang: user.language.toUpperCase(),
-            })}
+            {/* У веб-клиента telegram_id подставной (70000…) — админу он ничего не говорит. */}
+            {user.is_web_only
+              ? t('admin.users.overview.idLineWeb', { lang: user.language.toUpperCase() })
+              : t('admin.users.overview.idLine', {
+                  id: user.telegram_id,
+                  lang: user.language.toUpperCase(),
+                })}
           </p>
         </div>
         {copy.available && (
@@ -89,6 +93,7 @@ export function AdminUserIdentityCard({
       )}
 
       <dl className="mt-3 space-y-1.5 border-t border-border/60 pt-3 text-xs">
+        <CabinetRows cabinet={user.cabinet} />
         <div className="flex items-center justify-between gap-3">
           <dt className="text-muted-foreground">{t('admin.users.overview.customerSince')}</dt>
           <dd className="tabular-nums">{formatAdminDateTime(user.created_at, dateLocale)}</dd>
@@ -106,5 +111,103 @@ export function AdminUserIdentityCard({
         )}
       </dl>
     </Card>
+  )
+}
+
+/** Названия сервисов не переводим; «Почта» — через i18n. */
+const PROVIDER_NAMES: Record<string, string> = {
+  telegram: 'Telegram',
+  google: 'Google',
+  yandex: 'Yandex',
+  vk: 'VK',
+}
+
+/**
+ * Почта, её подтверждение и способы входа.
+ *
+ * Подтверждение здесь важнее, чем в профиле клиента: клиент попадает в
+ * админку сразу после регистрации, ещё до кода из письма, а без кода войти
+ * не может. «Не подтверждена» — ответ на «не могу зайти» в поддержке.
+ */
+function CabinetRows({ cabinet }: { cabinet: AdminCustomerDTO['cabinet'] }) {
+  const { t } = useTranslation()
+  const { state, copy } = useCopyToClipboard()
+
+  if (!cabinet) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <dt className="text-muted-foreground">{t('admin.users.overview.loginVia')}</dt>
+        <dd className="text-muted-foreground">{t('admin.users.overview.loginBotOnly')}</dd>
+      </div>
+    )
+  }
+
+  const email = cabinet.email
+  const providers = cabinet.providers
+    .map((p) => (p === 'email' ? t('admin.users.overview.loginEmail') : PROVIDER_NAMES[p] ?? p))
+    .join(' · ')
+
+  return (
+    <>
+      {/*
+        Колонка узкая (270px): статус встаёт в строку с подписью «Почта», а сам
+        адрес — отдельной строкой во всю ширину, иначе длинные адреса режутся
+        до первых букв.
+      */}
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-muted-foreground">{t('admin.users.overview.email')}</dt>
+          {email ? (
+            <dd
+              className={cn(
+                'inline-flex items-center gap-1 whitespace-nowrap',
+                cabinet.email_verified
+                  ? 'text-emerald-600 dark:text-emerald-400'
+                  : 'text-amber-600 dark:text-amber-400',
+              )}
+            >
+              {cabinet.email_verified ? (
+                <CircleCheck className="size-3.5" aria-hidden />
+              ) : (
+                <CircleAlert className="size-3.5" aria-hidden />
+              )}
+              {t(
+                cabinet.email_verified
+                  ? 'admin.users.overview.emailVerified'
+                  : 'admin.users.overview.emailUnverified',
+              )}
+            </dd>
+          ) : (
+            <dd className="text-muted-foreground">—</dd>
+          )}
+        </div>
+        {email && (
+          <dd className="mt-1 flex min-w-0 items-center gap-1">
+            <span className="min-w-0 truncate text-sm" title={email}>
+              {email}
+            </span>
+            <button
+              type="button"
+              onClick={() => void copy(email)}
+              aria-label={t('admin.users.overview.copyEmail')}
+              title={t('admin.users.overview.copyEmail')}
+              className="-my-1 inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              {state === 'done' ? (
+                <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Copy className="size-3.5" />
+              )}
+            </button>
+          </dd>
+        )}
+      </div>
+      <div className="flex items-start justify-between gap-3">
+        <dt className="shrink-0 text-muted-foreground">{t('admin.users.overview.loginVia')}</dt>
+        <dd className={cn('min-w-0 text-right', !providers && 'text-muted-foreground')}>
+          {providers || '—'}
+        </dd>
+      </div>
+    </>
   )
 }

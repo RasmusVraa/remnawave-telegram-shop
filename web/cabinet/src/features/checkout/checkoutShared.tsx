@@ -17,8 +17,8 @@ export type Provider =
   | 'yookassa'
   | 'cryptopay'
   | 'telegram'
+  | 'platega'
   | 'platega_sbp'
-  | 'platega_cards'
   | 'platega_acquiring'
   | 'platega_worldwide'
   | 'platega_crypto'
@@ -26,8 +26,8 @@ export type Provider =
 
 export const PROVIDER_ORDER: Provider[] = [
   'yookassa',
+  'platega',
   'platega_sbp',
-  'platega_cards',
   'platega_acquiring',
   'platega_worldwide',
   'platega_crypto',
@@ -42,8 +42,8 @@ export function useProviderEnabled(): Record<Provider, boolean> {
     yookassa: bootstrap?.payment_providers?.yookassa ?? true,
     cryptopay: bootstrap?.payment_providers?.cryptopay ?? true,
     telegram: bootstrap?.payment_providers?.telegram ?? false,
+    platega: bootstrap?.payment_providers?.platega ?? false,
     platega_sbp: bootstrap?.payment_providers?.platega_sbp ?? false,
-    platega_cards: bootstrap?.payment_providers?.platega_cards ?? false,
     platega_acquiring: bootstrap?.payment_providers?.platega_acquiring ?? false,
     platega_worldwide: bootstrap?.payment_providers?.platega_worldwide ?? false,
     platega_crypto: bootstrap?.payment_providers?.platega_crypto ?? false,

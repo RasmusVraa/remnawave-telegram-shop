@@ -11,13 +11,13 @@ import (
 )
 
 type EmailMergeVerification struct {
-	ID           int64
-	AccountID    int64
+	ID            int64
+	AccountID     int64
 	PeerAccountID int64
-	CodeHash     string
-	MaskedEmail  string
-	AttemptsLeft int
-	ExpiresAt    time.Time
+	CodeHash      string
+	MaskedEmail   string
+	AttemptsLeft  int
+	ExpiresAt     time.Time
 }
 
 type EmailMergeVerificationRepo struct {

@@ -20,6 +20,26 @@ type TariffPaidProfile struct {
 	ExternalSquadUUID         uuid.UUID
 	Tag                       string
 	BaseDeviceLimit           int
+	// ExcludeSquadUUIDs — сквады, которые не выдаём при этой покупке (сквад обхода
+	// клиента, исчерпавшего свой лимит: возвращает его воркер, а не продление).
+	ExcludeSquadUUIDs []uuid.UUID
+}
+
+func removeSquads(have []uuid.UUID, drop []uuid.UUID) []uuid.UUID {
+	if len(drop) == 0 {
+		return have
+	}
+	dropSet := make(map[uuid.UUID]struct{}, len(drop))
+	for _, u := range drop {
+		dropSet[u] = struct{}{}
+	}
+	out := make([]uuid.UUID, 0, len(have))
+	for _, u := range have {
+		if _, ok := dropSet[u]; !ok {
+			out = append(out, u)
+		}
+	}
+	return out
 }
 
 func filterSquadsByUUIDList(all []internalSquadItem, want []uuid.UUID) []uuid.UUID {
@@ -93,7 +113,7 @@ func (r *Client) updateUserWithTariffProfile(ctx context.Context, customerID, te
 	if err != nil {
 		return nil, err
 	}
-	squadIds := filterSquadsByUUIDList(squads, profile.SquadUUIDs)
+	squadIds := removeSquads(filterSquadsByUUIDList(squads, profile.SquadUUIDs), profile.ExcludeSquadUUIDs)
 	strategy := normalizeStrategy(profile.TrafficLimitResetStrategy)
 	tl := profile.TrafficLimitBytes
 	squadsPatch := append([]uuid.UUID(nil), squadIds...)
@@ -144,7 +164,7 @@ func (r *Client) createUserWithTariffProfile(ctx context.Context, customerID int
 	if err != nil {
 		return nil, err
 	}
-	squadIds := filterSquadsByUUIDList(squads, profile.SquadUUIDs)
+	squadIds := removeSquads(filterSquadsByUUIDList(squads, profile.SquadUUIDs), profile.ExcludeSquadUUIDs)
 	strategy := normalizeStrategy(profile.TrafficLimitResetStrategy)
 	tl := profile.TrafficLimitBytes
 	squadsCreate := append([]uuid.UUID(nil), squadIds...)

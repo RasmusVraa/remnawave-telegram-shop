@@ -21,6 +21,8 @@ import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { AdminModal } from '../components/AdminModal'
 import { AdminConfirmModal } from '../components/AdminConfirmModal'
+import { AdminFeedback } from '../components/AdminFeedback'
+import { useAdminMutationFeedback } from '../hooks/useAdminMutationFeedback'
 import {
   useAdminLoyaltyTiers,
   useAdminLoyaltyCreateTier,
@@ -29,6 +31,7 @@ import {
   useAdminLoyaltyRecalc,
   type AdminLoyaltyTier,
 } from '../hooks/useAdminLoyalty'
+import { hapticSuccess } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 
 interface TierFormState {
@@ -170,6 +173,8 @@ export default function AdminLoyaltyPage() {
   const updateMut = useAdminLoyaltyUpdateTier()
   const deleteMut = useAdminLoyaltyDeleteTier()
   const recalcMut = useAdminLoyaltyRecalc()
+  // Раньше отказ сервера тут нигде не показывался: форма просто не закрывалась, удаление «не срабатывало».
+  const { feedback, clear, showError, showSuccess } = useAdminMutationFeedback()
 
   const [formOpen, setFormOpen] = useState(false)
   const [editTier, setEditTier] = useState<AdminLoyaltyTier | null>(null)
@@ -209,7 +214,13 @@ export default function AdminLoyaltyPage() {
             discount_percent: form.discount_percent,
           },
         },
-        { onSuccess: closeForm },
+        {
+          onSuccess: () => {
+            closeForm()
+            showSuccess(t('admin.feedback.saved'))
+          },
+          onError: showError,
+        },
       )
     } else {
       createMut.mutate(
@@ -217,7 +228,13 @@ export default function AdminLoyaltyPage() {
           xp_min: form.xp_min,
           discount_percent: form.discount_percent,
         },
-        { onSuccess: closeForm },
+        {
+          onSuccess: () => {
+            closeForm()
+            showSuccess(t('admin.feedback.saved'))
+          },
+          onError: showError,
+        },
       )
     }
   }
@@ -227,6 +244,12 @@ export default function AdminLoyaltyPage() {
       onSuccess: () => {
         setRecalcDone(true)
         setRecalcOpen(false)
+        // Итог уже показан плашкой над таблицей — тут только вибрация.
+        hapticSuccess()
+      },
+      onError: (e) => {
+        setRecalcOpen(false)
+        showError(e)
       },
     })
   }
@@ -235,6 +258,7 @@ export default function AdminLoyaltyPage() {
 
   return (
     <AdminLayout>
+      <AdminFeedback feedback={feedback} onDismiss={clear} />
       <div className="space-y-6">
         <AdminPageHeader
           icon={Gem}
@@ -410,7 +434,16 @@ export default function AdminLoyaltyPage() {
         onClose={() => setDeleteTier(null)}
         onConfirm={() => {
           if (!deleteTier) return
-          deleteMut.mutate(deleteTier.id, { onSuccess: () => setDeleteTier(null) })
+          deleteMut.mutate(deleteTier.id, {
+            onSuccess: () => {
+              setDeleteTier(null)
+              showSuccess(t('admin.feedback.saved'))
+            },
+            onError: (e) => {
+              setDeleteTier(null)
+              showError(e)
+            },
+          })
         }}
         title={t('admin.delete')}
         message={t('admin.loyalty.confirmDelete', {

@@ -8,6 +8,9 @@ import (
 	"remnawave-tg-shop-bot/internal/database"
 )
 
+// Provider создаёт ссылку на оплату без заранее выбранного способа: СБП, карту
+// или другой включённый в кабинете Platega способ плательщик выбирает на
+// странице оплаты.
 type Provider struct {
 	client        *Client
 	invoiceType   database.InvoiceType
@@ -55,12 +58,13 @@ func (p *Provider) CreateInvoice(
 		return "", "", fmt.Errorf("create platega transaction: %w", err)
 	}
 
-	return resp.Redirect, resp.TransactionId, nil
+	return resp.PayURL(), resp.TransactionId, nil
 }
 
+// Общая форма (InvoiceTypePlatega) — без метода; остальные — с кодом способа.
 var invoiceTypeToMethod = map[database.InvoiceType]PaymentMethod{
+	database.InvoiceTypePlatega:          0,
 	database.InvoiceTypePlategaSBP:       PaymentMethodSBPQR,
-	database.InvoiceTypePlategaCards:     PaymentMethodCardAcquiring, // 11 — в актуальном API нет отдельного кода «карты РФ» (раньше ошибочно использовали 10)
 	database.InvoiceTypePlategaAcquiring: PaymentMethodCardAcquiring,
 	database.InvoiceTypePlategaWorldwide: PaymentMethodInternationalAcquiring,
 	database.InvoiceTypePlategaCrypto:    PaymentMethodCrypto,
@@ -71,9 +75,31 @@ func ProviderFor(client *Client, invoiceType database.InvoiceType) (*Provider, e
 	if !ok {
 		return nil, fmt.Errorf("unsupported platega invoice type: %s", invoiceType)
 	}
-	return &Provider{
-		client:        client,
-		invoiceType:   invoiceType,
-		paymentMethod: method,
-	}, nil
+	return &Provider{client: client, invoiceType: invoiceType, paymentMethod: method}, nil
+}
+
+// methodIDs — id способа в PLATEGA_PAYMENT_METHODS для каждого типа счёта.
+var methodIDs = map[database.InvoiceType]string{
+	database.InvoiceTypePlatega:          "all",
+	database.InvoiceTypePlategaSBP:       "sbp",
+	database.InvoiceTypePlategaAcquiring: "acquiring",
+	database.InvoiceTypePlategaWorldwide: "worldwide",
+	database.InvoiceTypePlategaCrypto:    "crypto",
+}
+
+// InvoiceTypeForMethod — тип счёта для id способа; пусто, если способа нет.
+func InvoiceTypeForMethod(id string) (database.InvoiceType, bool) {
+	for t, m := range methodIDs {
+		if m == id {
+			return t, true
+		}
+	}
+	return "", false
+}
+
+// MethodEnabled — можно ли сейчас создавать счёт этого типа: Platega включена
+// и способ есть в списке кнопок. Прежний plt_cards новых счетов не создаёт.
+func MethodEnabled(t database.InvoiceType, enabled func(id string) bool) bool {
+	id, ok := methodIDs[t]
+	return ok && enabled(id)
 }

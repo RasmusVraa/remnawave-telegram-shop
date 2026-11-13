@@ -8,6 +8,7 @@ import (
 	gosync "sync"
 	"time"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/remnawave"
 	"remnawave-tg-shop-bot/utils"
@@ -139,5 +140,11 @@ func (s SyncService) Sync(ctx context.Context) (Result, error) {
 	}
 	slog.Info("Synchronization completed",
 		"created", res.Created, "updated", res.Updated, "deleted", res.Deleted, "kept", res.Kept)
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.SystemSync, Source: adminevents.SourceSystem,
+		Payload: map[string]any{
+			"created": res.Created, "updated": res.Updated, "deleted": res.Deleted, "kept": res.Kept,
+		},
+	})
 	return res, nil
 }

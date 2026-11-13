@@ -7,6 +7,7 @@ import { AdminModalSaveFooter } from '../AdminModalSaveFooter'
 import { AdminDeviceLimitEditor } from '../AdminDeviceLimitEditor'
 import { formatAdminApiError } from '../../utils/formatAdminApiError'
 import { baseLimitFromTotal } from '../../utils/deviceLimit'
+import { useErrorHaptic } from '@/lib/haptic'
 import {
   useAdminUserDevices,
   useAdminUserSetHwidLimit,
@@ -55,6 +56,7 @@ export function AdminUserDevicesModal({
   const [pinned, setPinned] = useState(initialPinned)
   const [draftPin, setDraftPin] = useState(initialPin ?? totalLimit)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {

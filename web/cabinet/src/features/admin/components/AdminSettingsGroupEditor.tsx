@@ -10,7 +10,11 @@ import { AdminToggleRow } from './AdminToggleSwitch'
 import { AdminSelect } from './AdminSelect'
 import { AdminDecorScheduleEditor } from './AdminDecorScheduleEditor'
 import { AdminHomeQuickActionsEditor } from './AdminHomeQuickActionsEditor'
-import { AdminCheckoutDefaultMethodEditor, AdminYookassaMethodsEditor } from './AdminPaymentMethodsEditors'
+import {
+  AdminCheckoutDefaultMethodEditor,
+  AdminPlategaMethodsEditor,
+  AdminYookassaMethodsEditor,
+} from './AdminPaymentMethodsEditors'
 import { SettingsSubsectionTitle } from './SettingsSubsectionTitle'
 import {
   ADMIN_SETTINGS_GROUP_ICONS,
@@ -21,6 +25,7 @@ import {
 } from '../utils/adminSettingsGroups'
 import { groupSettingsFieldsForLayout, isTextareaSettingType } from '../utils/adminSettingsFieldLayout'
 import { decorThemeOptionLabelStyle } from '@/features/decor/decorThemeAdmin'
+import { AdminAlertRoutes } from './AdminAlertRoutes'
 import type { AdminSettingFieldDTO, AdminSettingGroupDTO } from '@/lib/types/admin'
 
 export function parseBool(v: string): boolean {
@@ -170,6 +175,18 @@ export function AdminSettingsGroupEditor({
       )
     }
 
+    if (field.key === 'PLATEGA_PAYMENT_METHODS') {
+      return (
+        <div key={field.key} className="border-b border-border/50 py-3 last:border-0">
+          <AdminPlategaMethodsEditor
+            value={value}
+            disabled={saving}
+            onChange={(next) => onDraftChange(field.key, next)}
+          />
+        </div>
+      )
+    }
+
     if (field.key === 'CABINET_CHECKOUT_DEFAULT_METHOD') {
       return (
         <div key={field.key} className="border-b border-border/50 py-3 last:border-0">
@@ -177,6 +194,9 @@ export function AdminSettingsGroupEditor({
             value={value}
             yookassaMethodsValue={
               draft.YOOKASA_PAYMENT_METHODS ?? fieldByKey.get('YOOKASA_PAYMENT_METHODS')?.value ?? ''
+            }
+            plategaMethodsValue={
+              draft.PLATEGA_PAYMENT_METHODS ?? fieldByKey.get('PLATEGA_PAYMENT_METHODS')?.value ?? ''
             }
             disabled={saving}
             onChange={(next) => onDraftChange(field.key, next)}
@@ -317,7 +337,7 @@ export function AdminSettingsGroupEditor({
   const groupIntro = t(`admin.settings.groupIntros.${group.id}`, { defaultValue: '' })
 
   return (
-    <Card id={adminSettingsGroupAnchor(group.id)} className="cabinet-elevated-card scroll-mt-24 overflow-hidden">
+    <Card id={adminSettingsGroupAnchor(group.id)} className={cn('cabinet-elevated-card scroll-mt-24 overflow-hidden', expanded && 'lg:col-span-2')}>
       <button
         type="button"
         onClick={onToggleExpand}
@@ -356,7 +376,16 @@ export function AdminSettingsGroupEditor({
                 <p>{groupIntro}</p>
               </div>
             )}
-            {subsectionBlocks.length === 1 && !subsectionBlocks[0].def ? (
+            {group.id === 'admin_alerts' ? (
+              <AdminAlertRoutes
+                group={group}
+                draft={draft}
+                saving={saving}
+                togglingKey={togglingKey}
+                onDraftChange={onDraftChange}
+                onToggle={onToggle}
+              />
+            ) : subsectionBlocks.length === 1 && !subsectionBlocks[0].def ? (
               <div className="rounded-lg border border-border/60 bg-card/80 px-3 shadow-sm">
                 {renderFieldsLayout(subsectionBlocks[0].fields)}
               </div>

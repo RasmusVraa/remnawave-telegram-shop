@@ -19,6 +19,7 @@ const KIND_LABEL_KEYS: Record<string, string> = {
   subscription: 'admin.payments.kind.subscription',
   tariff_upgrade: 'admin.payments.kind.tariffUpgrade',
   extra_hwid: 'admin.payments.kind.extraHwid',
+  extra_traffic: 'admin.payments.kind.extraTraffic',
 }
 
 export function formatPurchaseKind(kind: string, t: TFunction): string {

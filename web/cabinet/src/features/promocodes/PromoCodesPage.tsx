@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError, type PromoApplyResponse } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 
 export default function PromoCodesPage() {
   const { t } = useTranslation()
@@ -19,6 +20,7 @@ export default function PromoCodesPage() {
   const [code, setCode] = useState('')
   const [result, setResult] = useState<PromoApplyResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   const { data: state, isLoading } = useQuery({
     queryKey: ['promocodes-state'],
@@ -29,6 +31,7 @@ export default function PromoCodesPage() {
   const apply = useMutation({
     mutationFn: async () => api.applyPromoCode(code.trim()),
     onSuccess: async (res) => {
+      hapticSuccess()
       setResult(res)
       setError(null)
       setCode('')

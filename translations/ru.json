@@ -100,6 +100,7 @@
   "tariff_selected_description_line": "📝 %s",
   "tariff_choose_period": "<b>Выберите период:</b>",
   "tariff_payment_methods_text": "<b>Способы оплаты:</b>\n💸 СБП и Банковской картой 💳\n⭐️ Звёзды Telegram",
+  "buy_no_tariffs": "Покупка сейчас недоступна. Загляните позже.",
   "month_1": "1 мес - %d₽",
   "month_3": "3 мес - %d₽",
   "month_6": "6 мес - %d₽",
@@ -120,6 +121,9 @@
   },
   "yookasa_yoo_money_button": {
     "text": "👛 ЮMoney"
+  },
+  "platega_button": {
+    "text": "💳 Platega"
   },
   "pay_button": "💸 Оплатить",
   "subscription_active": "📅 Подписка действует до <b><i>%s</i></b>",
@@ -830,10 +834,22 @@
   "cabinet_notify_referral_title": "Бонус за друга",
   "cabinet_notify_referral_body": "Друг оплатил подписку — вам +%d дн.",
   "cabinet_notify_support_title": "Ответ поддержки",
+  "cabinet_notify_support_photo": "📷 Фото",
   "cabinet_notify_partner_title": "Партнёрская программа",
   "cabinet_notify_devices_title": "Места для устройств",
   "cabinet_notify_devices_body": "Мест для устройств стало больше: было %d, стало %d.",
   "cabinet_notify_loyalty_title": "Новый уровень лояльности",
   "cabinet_notify_loyalty_body": "Вы на уровне %d — скидка %d%% на продление.",
-  "cabinet_notify_torrent_title": "Сервер временно недоступен"
+  "cabinet_notify_torrent_title": "Сервер временно недоступен",
+  "traffic_kind_main": "Обычные сервера",
+  "traffic_alert_warn_title": "Использовано %[1]d%% трафика (%[2]s)",
+  "traffic_alert_warn_body": "Осталось %[1]s из %[2]s. Лимит обнулится %[3]s.",
+  "traffic_alert_full_title": "Лимит трафика (%[1]s) исчерпан",
+  "traffic_alert_full_bypass_body": "Сервера «%[1]s» отключены до %[2]s. Обычные сервера работают как раньше.\nДокупите пакет — доступ вернётся в течение 5 минут.",
+  "traffic_alert_full_main_body": "Трафик на серверах «%[1]s» исчерпан. Докупите пакет или дождитесь %[2]s.",
+  "traffic_buy_button": "➕ Докупить трафик",
+  "traffic_my_button": "📊 Мой трафик",
+  "traffic_pack_paid_title": "Пакет трафика куплен",
+  "traffic_pack_paid_body": "+%[1]s («%[2]s»). Действует до %[3]s, потом лимит вернётся к тарифному.",
+  "traffic_pack_paid_dm": "✅ Пакет трафика куплен: <b>+%[1]s</b> («%[2]s»).\nДействует до %[3]s, потом лимит вернётся к тарифному. Если эти сервера были отключены, они вернутся в приложении в течение 5 минут — обновите подписку."
 }

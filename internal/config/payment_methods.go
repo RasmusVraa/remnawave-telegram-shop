@@ -144,7 +144,7 @@ func yookasaPaymentMethodsCurrent() func() string {
 //
 // Покупателю, который уже платил, кабинет подставляет его прошлый способ; эта
 // настройка — для тех, кто платит впервые. Значение — id кнопки кабинета:
-// "yookassa:<способ ЮKassa>" или провайдер (platega_sbp, telegram, heleket…).
+// "yookassa:<способ ЮKassa>" или провайдер (platega, telegram, heleket…).
 // Пусто — ничего не выбрано заранее, как было до появления настройки. Если
 // выбранный способ потом выключили, кабинет его просто не подставит.
 
@@ -153,8 +153,8 @@ func yookasaPaymentMethodsCurrent() func() string {
 var CheckoutMethodProviders = []string{
 	"cryptopay",
 	"telegram",
+	"platega",
 	"platega_sbp",
-	"platega_cards",
 	"platega_acquiring",
 	"platega_worldwide",
 	"platega_crypto",
@@ -175,6 +175,11 @@ func ParseCheckoutDefaultMethod(value string) (string, error) {
 			return "", fmt.Errorf("unknown YooKassa payment method %q", m)
 		}
 		return value, nil
+	}
+	// Прежние способы Platega слились в одну кнопку.
+	switch value {
+	case "platega_cards":
+		return "platega_acquiring", nil
 	}
 	for _, p := range CheckoutMethodProviders {
 		if p == value {

@@ -79,6 +79,9 @@ interface UploadedMedia {
 const LIMIT_TEXT = 4096
 const LIMIT_CAPTION = 1024
 
+/** Что принимает вставка из буфера — те же типы, что и кнопка «Прикрепить». */
+const PASTE_MEDIA_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'video/mp4']
+
 const defaultButtons: BroadcastButtonsState = {
   buy: false,
   connect: false,
@@ -247,6 +250,26 @@ export default function AdminBroadcastPage() {
       setSendSuccess(null)
     },
   })
+
+  /*
+   * Картинка из буфера (Ctrl+V): снимок экрана файлом на диске не лежит, и через
+   * «Прикрепить» его было не отправить. Слушаем весь документ, а не только поле —
+   * вставлять можно, не ставя курсор в текст. Обычный текст идёт своим путём, а
+   * картинку в само поле не пускаем: contenteditable вставил бы <img>, которого
+   * в разметке Telegram нет.
+   */
+  const { mutate: uploadMedia, isPending: uploadPending } = uploadMutation
+  useEffect(() => {
+    if (view === 'history') return
+    const onPaste = (e: ClipboardEvent) => {
+      const file = Array.from(e.clipboardData?.files ?? []).find((f) => PASTE_MEDIA_TYPES.includes(f.type))
+      if (!file) return
+      e.preventDefault()
+      if (!uploadPending) uploadMedia(file)
+    }
+    document.addEventListener('paste', onPaste)
+    return () => document.removeEventListener('paste', onPaste)
+  }, [view, uploadMedia, uploadPending])
 
   const sendMutation = useMutation({
     mutationFn: () =>
@@ -631,6 +654,10 @@ export default function AdminBroadcastPage() {
                     ? t('admin.broadcast.uploadingMedia')
                     : t('admin.broadcast.attachMedia')}
                 </button>
+                {/* На телефоне Ctrl+V нет — подсказка только для ПК. */}
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {t('admin.broadcast.pasteHint')}
+                </span>
               </div>
 
               {/* Про MP4 сказано до отправки, а не после: WebM и MOV Telegram

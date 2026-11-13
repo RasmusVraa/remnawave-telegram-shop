@@ -13,8 +13,8 @@ import (
 const slowRequestLogThreshold = 300 * time.Millisecond
 
 var noisyAccessLogPaths = map[string]struct{}{
-	"/cabinet/sw.js":                             {},
-	"/cabinet/api/auth/bootstrap":                {},
+	"/cabinet/sw.js":                               {},
+	"/cabinet/api/auth/bootstrap":                  {},
 	"/cabinet/api/public/pwa-manifest.webmanifest": {},
 }
 

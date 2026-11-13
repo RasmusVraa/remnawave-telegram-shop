@@ -2,12 +2,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Check } from 'lucide-react'
 
-import { PlategaPaymentExpand, type PlategaMethodId } from '@/components/PlategaPaymentExpand'
 import { ProviderMethodButton } from '@/components/ProviderMethodButton'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { hapticSelection } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
-import type { Provider } from '@/features/checkout/checkoutShared'
 import {
   checkoutMethodMeta,
   type CheckoutMethodId,
@@ -30,7 +29,6 @@ export function PaymentMethodPicker({
   initialId,
   initialSource,
   loading,
-  providerEnabled,
   onSelect,
 }: {
   methods: CheckoutMethodId[]
@@ -38,10 +36,13 @@ export function PaymentMethodPicker({
   initialId: CheckoutMethodId | null
   initialSource: InitialMethodSource
   loading: boolean
-  providerEnabled: Record<Provider, boolean>
   onSelect: (id: CheckoutMethodId) => void
 }) {
   const { t } = useTranslation()
+  const select = (id: CheckoutMethodId) => {
+    if (id !== method) hapticSelection()
+    onSelect(id)
+  }
 
   let body
   if (loading) {
@@ -59,14 +60,13 @@ export function PaymentMethodPicker({
         methods={methods}
         method={method}
         lastId={initialId}
-        providerEnabled={providerEnabled}
-        onSelect={onSelect}
+        onSelect={select}
       />
     )
   } else if (initialSource === 'default' && initialId && methods.length > 1) {
-    body = <RecommendedPicker methods={methods} method={method} recommendedId={initialId} onSelect={onSelect} />
+    body = <RecommendedPicker methods={methods} method={method} recommendedId={initialId} onSelect={select} />
   } else {
-    body = <MethodList methods={methods} method={method} providerEnabled={providerEnabled} onSelect={onSelect} />
+    body = <MethodList methods={methods} method={method} onSelect={select} />
   }
 
   return (
@@ -79,37 +79,21 @@ export function PaymentMethodPicker({
   )
 }
 
-/** Полный список: строки, Platega — одной раскрывающейся группой. */
+/** Полный список способов оплаты. */
 function MethodList({
   methods,
   method,
-  providerEnabled,
   onSelect,
 }: {
   methods: CheckoutMethodId[]
   method: CheckoutMethodId | null
-  providerEnabled: Record<Provider, boolean>
   onSelect: (id: CheckoutMethodId) => void
 }) {
   const { t } = useTranslation()
-  let plategaShown = false
 
   return (
     <div className="space-y-2">
       {methods.map((id) => {
-        if (id.startsWith('platega_')) {
-          if (plategaShown) return null
-          plategaShown = true
-          return (
-            <PlategaPaymentExpand
-              key="platega"
-              enabled={providerEnabled}
-              selected={method}
-              onSelect={(p: PlategaMethodId) => onSelect(p)}
-              variant="checkout"
-            />
-          )
-        }
         const meta = checkoutMethodMeta(id, t)
         return (
           <ProviderMethodButton
@@ -131,13 +115,11 @@ function LastUsedPicker({
   methods,
   method,
   lastId,
-  providerEnabled,
   onSelect,
 }: {
   methods: CheckoutMethodId[]
   method: CheckoutMethodId | null
   lastId: CheckoutMethodId
-  providerEnabled: Record<Provider, boolean>
   onSelect: (id: CheckoutMethodId) => void
 }) {
   const { t } = useTranslation()
@@ -149,11 +131,8 @@ function LastUsedPicker({
       <MethodList
         methods={methods}
         method={method}
-        providerEnabled={providerEnabled}
         onSelect={(id) => {
           onSelect(id)
-          // Группа Platega раскрывается отдельным нажатием: выбор в ней
-          // сворачивает список так же, как выбор обычной строки.
           setOpen(false)
         }}
       />

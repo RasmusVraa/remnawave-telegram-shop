@@ -60,7 +60,7 @@ func TestSaveLatestKeepsCountriesNotMeasuredThisRun(t *testing.T) {
 func TestEnsureLoadedRestoresPingsBeforeNextProbe(t *testing.T) {
 	store := NewKVHistory(&memKV{data: map[string]string{
 		latestKey:  `{"pl\nPoland":{"world_ok":2,"world_total":3,"russia_ok":1,"russia_total":1,"measured_at":"2026-10-09T12:00:00Z"}}`,
-		historyKey: `{"pl\nPoland":{"2026-10-09":{"wOk":2,"wN":3,"rOk":1,"rN":1}}}`,
+		historyKey: `{"pl\nPoland":[{"at":"2026-10-09T12:00:00Z","wOk":2,"wN":3,"rOk":1,"rN":1}]}`,
 	}})
 	runner := NewRunner(store)
 	runner.EnsureLoaded(context.Background())
@@ -74,7 +74,7 @@ func TestEnsureLoadedRestoresPingsBeforeNextProbe(t *testing.T) {
 			saved = true
 		}
 	}
-	if len(history) != 30 || !saved {
+	if len(history) != historyRuns || !saved {
 		t.Fatal("saved day is missing from the window")
 	}
 }
@@ -86,7 +86,7 @@ func TestSchedulePingsDueNodeWithoutAPageView(t *testing.T) {
 
 	// Замер идёт в своей горутине, тест читает счётчик из другой: без atomic -race ругается.
 	var pinged atomic.Int32
-	pingTarget = func(context.Context, *http.Client, string, int, int, bool) (Sample, error) {
+	pingTarget = func(context.Context, *http.Client, string, int, int, int, bool) (Sample, error) {
 		pinged.Add(1)
 		return Sample{WorldOK: 1, WorldTotal: 1, MeasuredAt: time.Now()}, nil
 	}
@@ -114,7 +114,7 @@ func TestScheduleLeavesFreshNodeAlone(t *testing.T) {
 	t.Setenv("STATUS_PROBES_ENABLED", "true")
 	prevPing := pingTarget
 	t.Cleanup(func() { pingTarget = prevPing })
-	pingTarget = func(context.Context, *http.Client, string, int, int, bool) (Sample, error) {
+	pingTarget = func(context.Context, *http.Client, string, int, int, int, bool) (Sample, error) {
 		t.Fatal("ping started inside the interval")
 		return Sample{}, nil
 	}

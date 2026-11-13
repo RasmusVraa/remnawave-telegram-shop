@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { getTurnstileToken } from '@/lib/turnstile'
 import { useAuthStore } from '@/store/auth'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -59,6 +60,7 @@ export function EmailAuthTabs({
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginSecurityChecking, setLoginSecurityChecking] = useState(false)
   const [loginError, setLoginError] = useState<string | null>(null)
+  useErrorHaptic(loginError)
 
   // Register state
   const [registerEmail, setRegisterEmail] = useState('')
@@ -68,6 +70,7 @@ export function EmailAuthTabs({
   const [registerLoading, setRegisterLoading] = useState(false)
   const [registerSecurityChecking, setRegisterSecurityChecking] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
+  useErrorHaptic(registerError)
 
   // Поддерживаем прежнюю логику LoginPage: если пришли google_link pending данные, перенаправления и alert-и остаются на уровне страницы,
   // а здесь показываем сам alert по флагам.

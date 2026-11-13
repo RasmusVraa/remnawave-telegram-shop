@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { useErrorHaptic } from '@/lib/haptic'
 import { getTurnstileToken } from '@/lib/turnstile'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 
@@ -22,6 +23,7 @@ export default function ForgotPasswordPage() {
   const [securityChecking, setSecurityChecking] = useState(false)
   const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Cloud, Smartphone, Zap, type LucideIcon } from 'lucide-react'
+import type { TFunction } from 'i18next'
+import { Cloud, Smartphone, Star, Zap, type LucideIcon } from 'lucide-react'
 import { AppLayout } from '@/components/AppLayout'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
 import { TariffDescription } from '@/components/TariffDescription'
@@ -13,6 +14,8 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, type SubscriptionResponse, type TariffItem } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
+import { bypassLabelInline } from '@/lib/bypassLabel'
 import { useAuthStore } from '@/store/auth'
 import { formatDecimals, formatNumber } from '@/lib/format'
 import {
@@ -163,17 +166,17 @@ function buildCardPeriodsBySlug(tariffs: TariffItem[]): TariffItem[][] {
   })
 }
 
-/** Порядок «текущий тариф первым» — только для мобильной карусели (≤500px); сетка на ПК использует исходный порядок API. */
-function orderCardPeriodsCurrentFirst(periods: TariffItem[][], sub?: SubscriptionResponse): TariffItem[][] {
+/**
+ * Порядок мобильной карусели (≤500px): текущий тариф первым, популярный сразу за ним;
+ * без подписки первым идёт популярный. Сетка на ПК использует исходный порядок API.
+ */
+function orderCarouselPeriods(periods: TariffItem[][], sub?: SubscriptionResponse): TariffItem[][] {
   if (periods.length <= 1) return periods
-  const active = isSubscriptionActive(sub?.expire_at)
-  const slug = sub?.tariff?.slug
-  if (!active || !slug) return periods
-  const idx = periods.findIndex((p) => p[0]?.slug === slug)
-  if (idx <= 0) return periods
-  const next = [...periods]
-  const [item] = next.splice(idx, 1)
-  return [item, ...next]
+  const currentSlug = isSubscriptionActive(sub?.expire_at) ? sub?.tariff?.slug : undefined
+  const current = currentSlug ? periods.find((p) => p[0]?.slug === currentSlug) : undefined
+  const popular = periods.find((p) => p[0]?.is_popular && p !== current)
+  const head = [current, popular].filter((p): p is TariffItem[] => p != null)
+  return [...head, ...periods.filter((p) => !head.includes(p))]
 }
 
 function TariffsGrid({
@@ -192,7 +195,7 @@ function TariffsGrid({
   const showFootnote = showAnnualPriceFootnote(priceDisplay, cardPeriods)
 
   const carouselPeriods = useMemo(
-    () => orderCardPeriodsCurrentFirst([...cardPeriods], sub),
+    () => orderCarouselPeriods(cardPeriods, sub),
     [cardPeriods, sub],
   )
 
@@ -329,6 +332,7 @@ function TariffsMobileCarousel({
   }
 
   const n = cardPeriods.length
+  const hasPopular = cardPeriods.some((p) => p[0]?.is_popular)
 
   return (
     <div className="w-full">
@@ -336,6 +340,9 @@ function TariffsMobileCarousel({
         ref={scrollRef}
         className={cn(
           'flex min-w-0 w-full items-stretch gap-2 overflow-x-auto overscroll-x-contain pb-1 touch-pan-x',
+          // overflow-x режет и по вертикали: без отступов нашивка «Популярный» над рамкой
+          // и свечение под карточкой обрезались бы.
+          hasPopular && 'pb-4 pt-3',
           'scroll-pl-3 scroll-pr-3 snap-x snap-mandatory [-ms-overflow-style:none] [scrollbar-width:none]',
           '[&::-webkit-scrollbar]:hidden',
         )}
@@ -358,7 +365,7 @@ function TariffsMobileCarousel({
         ))}
       </div>
       <nav
-        className="mt-4 flex justify-center gap-2"
+        className={cn('flex justify-center gap-2', hasPopular ? 'mt-0' : 'mt-4')}
         aria-label={t('tariffs.carouselListLabel')}
       >
         {cardPeriods.map((periods, i) => (
@@ -369,9 +376,17 @@ function TariffsMobileCarousel({
             aria-current={i === active ? 'true' : undefined}
             className={cn(
               'h-2 rounded-full transition-[width,background-color] duration-200',
-              i === active ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/35 hover:bg-muted-foreground/55',
+              i === active
+                ? 'w-6 bg-primary'
+                : periods[0].is_popular
+                  // Популярный, пока на него не пролистали, — точка цвета темы, только тусклее.
+                  ? 'w-2 bg-primary/50 hover:bg-primary/70'
+                  : 'w-2 bg-muted-foreground/35 hover:bg-muted-foreground/55',
             )}
-            onClick={() => scrollToIndex(i)}
+            onClick={() => {
+              if (i !== active) hapticSelection()
+              scrollToIndex(i)
+            }}
           />
         ))}
       </nav>
@@ -402,12 +417,14 @@ function TariffPlanCard({
   const isCurrent = Boolean(active && sub?.tariff?.slug === head.slug)
   const ctaLabel = !active ? t('tariffs.select') : isCurrent ? t('tariffs.ctaRenew') : t('tariffs.ctaChange')
   const isCarousel = layout === 'carousel'
+  const isPopular = Boolean(head.is_popular)
 
   return (
     <Card
       role="button"
       tabIndex={0}
       data-tariff-card
+      data-popular={isPopular || undefined}
       onClick={() => onChoosePlan(head.slug)}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -416,24 +433,28 @@ function TariffPlanCard({
         }
       }}
       className={cn(
-        'relative flex flex-col transition-[border-color,box-shadow,transform,filter] duration-200 cursor-pointer',
+        'relative flex flex-col transition-[border-color,box-shadow,transform,filter] duration-200 cursor-pointer active:scale-[0.98]',
         isCarousel && 'min-h-0 w-full flex-1',
-        isCurrent
-          ? cn(tariffCurrentCardClassName, 'active:scale-[0.98]')
-          : cn(
-              tariffOtherCardHoverClassName,
-              'active:scale-[0.98] hover:brightness-[1.02]',
-            ),
-        head.is_popular && !isCurrent && 'border-primary/50',
+        /*
+         * Цветом выделен только популярный тариф (рамка и свечение — index.css,
+         * .tariff-card-popular). Текущий тариф отличается одной серой меткой:
+         * в зелёной теме зелёными были бы и текущий, и популярный.
+         */
+        isPopular
+          ? cn('tariff-card-popular', isCarousel ? 'tariff-card-popular--tight' : 'hover:-translate-y-0.5')
+          : cn(tariffOtherCardHoverClassName, 'hover:brightness-[1.02]'),
       )}
     >
-      {head.is_popular && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <Badge className="gap-1">
-            <Zap size={10} />
-            {t('tariffs.popular')}
-          </Badge>
-        </div>
+      {isPopular && (
+        <span
+          className={cn(
+            'tariff-popular-badge pointer-events-none absolute -top-3 z-10 inline-flex items-center gap-1 rounded-full py-[5px] pl-2 pr-2.5 text-xs font-bold leading-none',
+            isCarousel ? 'right-4' : 'right-5',
+          )}
+        >
+          <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
+          {t('tariffs.popular')}
+        </span>
       )}
 
       <CardHeader className="px-4 pb-2 pt-5">
@@ -447,8 +468,9 @@ function TariffPlanCard({
       </CardHeader>
 
       {isCurrent && (
-        <div className="absolute top-4 right-4">
-          <Badge variant="secondary" className={cn('w-fit text-xs font-normal', tariffCurrentBadgeClassName)}>
+        /* У популярного сверху нашивка: метка «Текущий» опускается, чтобы не прилипнуть к ней. */
+        <div className={cn('absolute right-4', isPopular ? 'top-[22px]' : 'top-4')}>
+          <Badge variant="secondary" className={cn('w-fit text-xs font-normal', tariffCurrentPlanBadgeClassName)}>
             {t('tariffs.currentBadge')}
           </Badge>
         </div>
@@ -471,9 +493,7 @@ function TariffPlanCard({
               ) : null}
               <ul className="space-y-1.5 text-sm shrink-0">
                 <FeatureLine icon={Cloud}>
-                  {head.traffic_gb
-                    ? t('tariffs.traffic', { n: head.traffic_gb })
-                    : t('tariffs.trafficUnlimited')}
+                  {trafficLineText(head, t)}
                 </FeatureLine>
                 <FeatureLine icon={Smartphone}>
                   {head.device_limit > 0
@@ -499,11 +519,10 @@ function TariffPlanCard({
               <TariffDescription text={head.description} className="text-[0.875rem] text-muted-foreground leading-relaxed" />
             ) : null}
 
-            <ul className="space-y-1.5 text-sm flex-1">
+            {/* mt-auto прижимает лимиты к кнопке: в соседних карточках ряда они на одной высоте. */}
+            <ul className="mt-auto space-y-1.5 text-sm">
               <FeatureLine icon={Cloud}>
-                {head.traffic_gb
-                  ? t('tariffs.traffic', { n: head.traffic_gb })
-                  : t('tariffs.trafficUnlimited')}
+                {trafficLineText(head, t)}
               </FeatureLine>
               <FeatureLine icon={Smartphone}>
                 {head.device_limit > 0
@@ -596,7 +615,10 @@ function TariffPeriodStep({
                 ? 'border-primary bg-primary/10 shadow-[0_10px_26px_-12px_hsl(var(--cabinet-accent)/0.5)] dark:bg-primary/15'
                 : 'border-border bg-card dark:bg-[hsl(var(--card))]',
             )}
+            // Внутри колонка, а правый верхний угол занят плашкой скидки.
+            overlaySpinnerClassName="absolute bottom-3 right-3"
             onClick={() => {
+              if (p.months !== selectedMonths) hapticSelection()
               setSelectedMonths(p.months)
               onSelect(p)
             }}
@@ -682,9 +704,7 @@ function ClassicIntro({
       <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
         <span className="flex items-center gap-1.5">
           <Cloud size={14} className="text-primary shrink-0" />
-          {head.traffic_gb
-            ? t('tariffs.traffic', { n: head.traffic_gb })
-            : t('tariffs.trafficUnlimited')}
+          {trafficLineText(head, t)}
         </span>
         <span className="flex items-center gap-1.5">
           <Smartphone size={14} className="text-primary shrink-0" />
@@ -853,6 +873,20 @@ function FeatureLine({
   )
 }
 
+/**
+ * Трафик на карточке тарифа. При отдельном лимите обхода «Безлимит трафика» — неправда:
+ * безлимитны только обычные серверы, а на обходе свой месячный лимит. Название обхода —
+ * как его задал админ (TRAFFIC_BYPASS_LABEL), без склонения и со строчной: оно внутри фразы.
+ */
+function trafficLineText(head: TariffItem, t: TFunction): string {
+  if (head.traffic_gb) return t('tariffs.traffic', { n: head.traffic_gb })
+  if (head.bypass_gb == null) return t('tariffs.trafficUnlimited')
+  return t('tariffs.trafficUnlimitedPlusBypass', {
+    n: formatNumber(head.bypass_gb),
+    label: bypassLabelInline(head.bypass_label),
+  })
+}
+
 function pluralizeMonths(n: number): string {
   if (n === 1) return '1 месяц'
   if (n >= 2 && n <= 4) return `${n} месяца`
@@ -878,6 +912,10 @@ function isSubscriptionActive(expireAt: string | null | undefined): boolean {
 /** Бейдж «Текущий»: бордер и фон от --primary пресета. */
 const tariffCurrentBadgeClassName =
   'border border-primary bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary shadow-none'
+
+/** «Текущий» на карточке тарифа — серая метка без цвета темы: цветом выделен только популярный. */
+const tariffCurrentPlanBadgeClassName =
+  'border border-border bg-muted/60 text-muted-foreground shadow-none dark:border-white/15 dark:bg-white/[0.06] dark:text-foreground/80'
 
 /**
  * Текущий тариф: inset primary + те же «плавающие» тени, что у Card (иначе в dark побеждает dark:shadow карточки).

@@ -1,3 +1,7 @@
 # Auto detect text files and perform LF normalization
 * text=auto
 *.sh text eol=lf
+# gofmt не принимает CRLF: Go-исходники в рабочей копии всегда с LF, даже при core.autocrlf=true
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf

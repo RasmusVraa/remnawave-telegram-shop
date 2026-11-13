@@ -6,7 +6,7 @@ import { ArrowRight, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { CountryFlag } from '@/features/admin/components/CountryFlag'
-import { displayState, type RowState } from '@/features/status/statusState'
+import { displayState, summarizeStatus, type RowState } from '@/features/status/statusState'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -58,18 +58,8 @@ export function ServerStatusSummary({ externalUrl }: { externalUrl?: string }) {
     )
   }
 
-  const known = nodes.filter((item) => item.state)
-  const down = known.filter((item) => item.state === 'down').length
-  const partial = known.filter((item) => item.state === 'partial').length
-  const tone: RowState = down > 0 ? 'down' : partial > 0 ? 'partial' : 'up'
-  const title =
-    known.length > 0 && down === known.length
-      ? t('infoStatus.allDown')
-      : down > 0
-        ? t('infoStatus.someDown')
-        : partial > 0
-          ? t('infoStatus.somePartial')
-          : t('infoStatus.allUp')
+  const { level, tone } = summarizeStatus((data?.nodes ?? []))
+  const title = t(`infoStatus.${level}`)
 
   const sorted = [...nodes].sort((a, b) => (ORDER[a.state ?? 'up'] ?? 2) - (ORDER[b.state ?? 'up'] ?? 2))
   const shown = sorted.slice(0, MAX_ROWS)

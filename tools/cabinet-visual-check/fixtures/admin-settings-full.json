@@ -1,0 +1,1084 @@
+{
+ "/admin/settings": {
+  "groups": [
+   {
+    "id": "cabinet",
+    "fields": [
+     {
+      "key": "CABINET_LIGHT_THEME_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_DECOR_THEME",
+      "type": "enum",
+      "value": "off",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "off",
+       "green",
+       "halloween_2",
+       "new_year"
+      ]
+     },
+     {
+      "key": "CABINET_DECOR_AUTO_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_DECOR_SCHEDULE",
+      "type": "text",
+      "value": "[]",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "CABINET_SUBSCRIPTION_SHOW_LOYALTY",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_HOME_QUICK_ACTIONS",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "status",
+    "fields": [
+     {
+      "key": "STATUS_PROBES_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "STATUS_WORLD_PROBES",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "STATUS_RUSSIA_PROBES",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "STATUS_PROBE_INTERVAL_MIN",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "STATUS_SHOW_MAP",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "STATUS_PAGE_TITLE",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "STATUS_PAGE_LEAD",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "cabinet_connect",
+    "fields": [
+     {
+      "key": "CABINET_DEEPLINK_HAPP_ENCRYPT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_DEEPLINK_HAPP_CRYPT_VERSION",
+      "type": "enum",
+      "value": "crypt5",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "crypt5",
+       "crypt4"
+      ]
+     },
+     {
+      "key": "CABINET_DEEPLINK_INCY_ENCRYPT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_TELEGRAM_SHOW_CHANNEL_BUTTON",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_TELEGRAM_SHOW_FEEDBACK_BUTTON",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     }
+    ]
+   },
+   {
+    "id": "tariffs",
+    "fields": [
+     {
+      "key": "CABINET_TARIFF_PRICE_DISPLAY",
+      "type": "enum",
+      "value": "monthly",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "monthly",
+       "marketing"
+      ]
+     },
+     {
+      "key": "CABINET_TARIFF_SAVINGS_BADGE",
+      "type": "enum",
+      "value": "none",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "none",
+       "corner",
+       "old_price"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "trial",
+    "fields": [
+     {
+      "key": "TRIAL_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRIAL_TRAFFIC_LIMIT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRIAL_TRAFFIC_LIMIT_RESET_STRATEGY",
+      "type": "enum",
+      "value": "day",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "day",
+       "week",
+       "month",
+       "month_rolling",
+       "never"
+      ]
+     },
+     {
+      "key": "TRIAL_ADD_TO_PAID",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "TRAFFIC_LIMIT_RESET_STRATEGY",
+      "type": "enum",
+      "value": "day",
+      "source": "default",
+      "instant": false,
+      "enum_values": [
+       "day",
+       "week",
+       "month",
+       "month_rolling",
+       "never"
+      ]
+     }
+    ]
+   },
+   {
+    "id": "hwid",
+    "fields": [
+     {
+      "key": "HWID_EXTRA_DEVICES_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "HWID_ADD_PRICE",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "HWID_ADD_STARS_PRICE",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "HWID_MAX_DEVICE",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRIAL_HWID_LIMIT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PAID_HWID_LIMIT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "HWID_FALLBACK_DEVICE_LIMIT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "traffic",
+    "fields": [
+     {
+      "key": "TRAFFIC_SPLIT_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "TRAFFIC_PACKS_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "TRAFFIC_BYPASS_LABEL",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRAFFIC_ALERT_PERCENT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRAFFIC_POLL_MINUTES",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "referral",
+    "fields": [
+     {
+      "key": "REFERRAL_FIRST_REFERRER_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "REFERRAL_FIRST_REFEREE_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "REFERRAL_REPEAT_REFERRER_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "REFERRAL_SCALE_BY_MONTHS",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     }
+    ]
+   },
+   {
+    "id": "partner",
+    "fields": [
+     {
+      "key": "PARTNER_PROGRAM_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PARTNER_APPLICATIONS_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PARTNER_AUTO_APPROVE",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PARTNER_FIRST_PERCENT",
+      "type": "float",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_RENEWAL_PERCENT",
+      "type": "float",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_HOLD_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_MIN_PAYOUT",
+      "type": "float",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_PAYOUT_COOLDOWN_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_MAX_LINKS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_COUNT_EXTRA_HWID",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PARTNER_NOTIFY_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PARTNER_NOTIFY_CHAT_ID",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PARTNER_NOTIFY_MESSAGE_THREAD_ID",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "stars",
+    "fields": [
+     {
+      "key": "RUB_PER_STAR",
+      "type": "float",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "loyalty",
+    "fields": [
+     {
+      "key": "LOYALTY_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "LOYALTY_MAX_TOTAL_DISCOUNT_PERCENT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "payments",
+    "fields": [
+     {
+      "key": "YOOKASA_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CRYPTO_PAY_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "TELEGRAM_STARS_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PLATEGA_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "HELEKET_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "YOOKASA_PAYMENT_METHODS",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PLATEGA_PAYMENT_METHODS",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "CABINET_CHECKOUT_DEFAULT_METHOD",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "payments_notify",
+    "fields": [
+     {
+      "key": "PAYMENTS_NOTIFY_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "PAYMENTS_NOTIFY_CHAT_ID",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PAYMENTS_NOTIFY_MESSAGE_THREAD_ID",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PAYMENTS_NOTIFY_EVENTS",
+      "type": "csv",
+      "value": "paid, cancel",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "moynalog",
+    "fields": [
+     {
+      "key": "MOYNALOG_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "MOYNALOG_RECEIPT_FOR",
+      "type": "csv",
+      "value": "yookassa, platega",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "MOYNALOG_RETRY_MAX_AGE_HOURS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "access",
+    "fields": [
+     {
+      "key": "FORWARD_USER_MESSAGES_TO_ADMIN",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "SUSPICIOUS_USER_FILTER_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "BLOCKED_TELEGRAM_IDS",
+      "type": "csv_int",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "WHITELISTED_TELEGRAM_IDS",
+      "type": "csv_int",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "links",
+    "fields": [
+     {
+      "key": "CHANNEL_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FEEDBACK_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TOS_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "SERVER_SELECTION_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PUBLIC_OFFER_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "PRIVACY_POLICY_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TERMS_OF_SERVICE_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "VIDEO_GUIDE_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "tags",
+    "fields": [
+     {
+      "key": "REMNAWAVE_TAG",
+      "type": "text",
+      "value": "MEOWS",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "TRIAL_REMNAWAVE_TAG",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "lifecycle",
+    "fields": [
+     {
+      "key": "LIFECYCLE_NO_CONNECT_PAID_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "LIFECYCLE_NO_CONNECT_TRIAL_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "LIFECYCLE_NO_CONNECT_DELAY_HOURS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_NO_CONNECT_MAX_AGE_HOURS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_WINBACK_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "LIFECYCLE_WINBACK_DAYS_AFTER_EXPIRY",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_WINBACK_DISCOUNT_PERCENT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_WINBACK_DISCOUNT_TTL_HOURS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_VIDEO_GUIDE_URL",
+      "type": "url",
+      "value": "",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "LIFECYCLE_SUPPORT_CONTACT",
+      "type": "text",
+      "value": "",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   },
+   {
+    "id": "notifications",
+    "fields": [
+     {
+      "key": "CABINET_PUSH_IMPORTANT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_SUPPORT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_TORRENT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_EXPIRING",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_TEST_BROADCAST",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_BROADCAST",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_PAYMENT",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_DEVICES",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_REFERRAL",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_LOYALTY",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "CABINET_PUSH_PARTNER",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     }
+    ]
+   },
+   {
+    "id": "fortune",
+    "fields": [
+     {
+      "key": "FORTUNE_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "FORTUNE_DAILY_FREE_SPIN",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "FORTUNE_WINNER_TICKER_ENABLED",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "FORTUNE_WINNER_TICKER_FAKE_FILL",
+      "type": "bool",
+      "value": "true",
+      "source": "default",
+      "instant": true
+     },
+     {
+      "key": "FORTUNE_MAX_SPINS_PER_DAY",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_MIN_SUBSCRIPTION_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_SPIN_COST_DAYS",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_MICRO",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_XP",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DISCOUNT_3",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_3",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DISCOUNT_5",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_5",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_7",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_15",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_30",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_WEIGHT_DAYS_180",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_XP_AMOUNT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_MICRO_XP_MIN",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_MICRO_XP_MAX",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DISCOUNT_3_PERCENT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DISCOUNT_5_PERCENT",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_3",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_5",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_7",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_15",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_30",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     },
+     {
+      "key": "FORTUNE_REWARD_DAYS_180",
+      "type": "int",
+      "value": "3",
+      "source": "default",
+      "instant": false
+     }
+    ]
+   }
+  ]
+ }
+}

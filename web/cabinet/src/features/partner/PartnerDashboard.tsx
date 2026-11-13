@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 import type { PartnerAccountDTO, PartnerStateResponse } from '@/lib/api'
 
 import { PartnerLinksTab } from './PartnerLinksTab'
@@ -65,7 +66,10 @@ export function PartnerDashboard({
                   role="tab"
                   type="button"
                   aria-selected={tab === item.id}
-                  onClick={() => setTab(item.id)}
+                  onClick={() => {
+                    if (tab !== item.id) hapticSelection()
+                    setTab(item.id)
+                  }}
                   className={cn(
                     'flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors',
                     tab === item.id

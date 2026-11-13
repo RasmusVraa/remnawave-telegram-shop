@@ -2,6 +2,7 @@
 export const ADMIN_BREADCRUMB_ROUTE_KEYS: Record<string, string> = {
   '': 'admin.nav.dashboard',
   stats: 'admin.nav.stats',
+  nodes: 'admin.nav.nodes',
   users: 'admin.nav.users',
   payments: 'admin.nav.payments',
   promos: 'admin.nav.promos',

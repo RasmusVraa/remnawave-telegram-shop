@@ -12,11 +12,11 @@ import (
 
 // LoyaltyTier строка уровня лояльности (порог XP и скидка %).
 type LoyaltyTier struct {
-	ID               int64   `db:"id"`
-	SortOrder        int     `db:"sort_order"`
-	XpMin            int64   `db:"xp_min"`
-	DiscountPercent  int     `db:"discount_percent"`
-	DisplayName      *string `db:"display_name"`
+	ID              int64   `db:"id"`
+	SortOrder       int     `db:"sort_order"`
+	XpMin           int64   `db:"xp_min"`
+	DiscountPercent int     `db:"discount_percent"`
+	DisplayName     *string `db:"display_name"`
 }
 
 type LoyaltyTierRepository struct {

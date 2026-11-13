@@ -1,14 +1,16 @@
 import { Infinity as InfinityIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { RING_THICKNESS_PX, RingArc } from '@/components/RingArc'
 import { cn } from '@/lib/utils'
 import type { ToneLevel } from '@/lib/subscriptionTone'
 
 /**
  * Кольцевой индикатор показателя подписки.
  *
- * Цвет задаётся уровнем тревоги через CSS-переменную, поэтому кольцо, полосы
- * и подписи красятся из одного места и не расходятся между собой.
+ * Цвет задаётся уровнем тревоги, поэтому кольцо, полосы и подписи красятся
+ * из одного места и не расходятся между собой. Дуга — SVG со скруглёнными
+ * концами и тенью у кончика (RingArc).
  */
 
 const TONE_COLOR: Record<ToneLevel, string> = {
@@ -33,16 +35,21 @@ export function StatRing({
   children: ReactNode
   className?: string
 }) {
+  // Единицы viewBox (100) на пиксель: толщина в пикселях одна и та же при любом размере плитки.
+  const w = RING_THICKNESS_PX * (100 / size)
   return (
     <div className={cn('flex flex-col items-center gap-2', className)}>
-      <div
-        className="cabinet-ring shrink-0"
-        style={{
-          width: size,
-          ['--cabinet-ring-value' as string]: Math.min(100, Math.max(0, value)),
-          ['--cabinet-ring-color' as string]: TONE_COLOR[tone],
-        }}
-      >
+      <div className="cabinet-ring shrink-0" style={{ width: size }}>
+        <svg viewBox="0 0 100 100" className="absolute inset-0 h-full w-full" aria-hidden>
+          <RingArc
+            r={50 - w / 2}
+            w={w}
+            value={value}
+            color={`hsl(${TONE_COLOR[tone]})`}
+            trackColor="hsl(var(--muted))"
+            trackOpacity={1}
+          />
+        </svg>
         <div className="text-center leading-none">{children}</div>
       </div>
       {label && (

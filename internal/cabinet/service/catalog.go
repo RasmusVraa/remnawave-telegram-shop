@@ -37,7 +37,12 @@ var supportedMonths = [4]int{1, 3, 6, 12}
 // из env (PRICE_*, TRAFFIC_LIMIT, PAID_HWID_LIMIT, ...).
 type Catalog struct {
 	tariffs *database.TariffRepository
+	// traffic — раздельный трафик: лимит обхода у тарифа для строки «Трафик» на оформлении. nil — без него.
+	traffic *database.TrafficSplitRepository
 }
+
+// SetTrafficRepo подключает раздельный трафик к витрине.
+func (c *Catalog) SetTrafficRepo(r *database.TrafficSplitRepository) { c.traffic = r }
 
 // NewCatalog — конструктор. tariffs может быть nil только в classic-режиме;
 // в tariffs-режиме при nil ответ списка тарифов будет пустой, и клиент поймёт,
@@ -77,8 +82,13 @@ type TariffView struct {
 	DeviceLimit               int            `json:"device_limit"`
 	TrafficLimitBytes         int64          `json:"traffic_limit_bytes"`
 	TrafficLimitResetStrategy string         `json:"traffic_limit_reset_strategy"`
-	Prices                    []Price        `json:"prices"`
-	Locations                 []LocationView `json:"locations,omitempty"`
+	// BypassTrafficLimitBytes — отдельный лимит обхода у тарифа (0 — нет); BypassLabel — как его называть.
+	BypassTrafficLimitBytes int64 `json:"bypass_traffic_limit_bytes,omitempty"`
+	BypassLabel             string `json:"bypass_label,omitempty"`
+	// IsPopular — админ отметил тариф как «Популярный» (нашивка на карточке).
+	IsPopular bool          `json:"is_popular,omitempty"`
+	Prices    []Price       `json:"prices"`
+	Locations []LocationView `json:"locations,omitempty"`
 }
 
 // Response — корневой объект `GET /cabinet/api/tariffs`.
@@ -122,7 +132,14 @@ func (c *Catalog) Get(ctx context.Context) (*Response, error) {
 			if lerr != nil {
 				return nil, fmt.Errorf("catalog: list locations for tariff %d: %w", t.ID, lerr)
 			}
-			resp.Tariffs = append(resp.Tariffs, buildTariffsModeView(t, prices, locs))
+			view := buildTariffsModeView(t, prices, locs)
+			if c.traffic != nil && config.TrafficSplitEnabled() {
+				if b, err := c.traffic.GetTariffBypass(ctx, t.ID); err == nil && b.Enabled() {
+					view.BypassTrafficLimitBytes = b.LimitBytes
+					view.BypassLabel = config.TrafficBypassLabel()
+				}
+			}
+			resp.Tariffs = append(resp.Tariffs, view)
 		}
 	default:
 		// classic — одна виртуальная карточка.
@@ -150,6 +167,7 @@ func buildTariffsModeView(t database.Tariff, prices []database.TariffPrice, locs
 		DeviceLimit:               t.DeviceLimit,
 		TrafficLimitBytes:         t.TrafficLimitBytes,
 		TrafficLimitResetStrategy: t.TrafficLimitResetStrategy,
+		IsPopular:                 t.IsPopular,
 		Prices:                    make([]Price, 0, len(prices)),
 	}
 	for _, p := range prices {

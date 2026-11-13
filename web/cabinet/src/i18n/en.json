@@ -181,6 +181,9 @@
       "settingsLanguage": "Language",
       "mb": "MB",
       "settingsTheme": "Theme",
+      "settingsHaptics": "Vibration",
+      "settingsHapticsOn": "On",
+      "settingsHapticsOff": "Off",
       "qaServers": "Server status"
     },
     "dashboard": {
@@ -386,7 +389,8 @@
         "partner": "Partners",
         "devices": "Devices",
         "loyalty": "Loyalty",
-        "torrent": "Restriction"
+        "torrent": "Restriction",
+        "traffic": "Traffic"
       },
       "showMore": "Show more",
       "showLess": "Show less"
@@ -468,7 +472,20 @@
       "unreadAria": "Unread: {{count}}",
       "today": "Today",
       "yesterday": "Yesterday",
-      "ticketClosed": "This ticket is closed. A new message will open a new ticket."
+      "ticketClosed": "This ticket is closed. A new message will open a new ticket.",
+      "attach": "Attach an image",
+      "removeAttachment": "Remove",
+      "attachCounter": "{{count}} of {{max}}",
+      "fileTooLarge": "The file is over {{mb}} MB — pick a smaller one",
+      "unsupportedType": "Only images can be attached: JPEG, PNG, WebP, HEIC and more",
+      "tooManyFiles": "Up to {{max}} files per message",
+      "dropHere": "Drop to attach",
+      "dropHint": "JPEG, PNG, WebP, HEIC · up to {{max}} files, {{mb}} MB each",
+      "sending": "Sending…",
+      "openImage": "Open image",
+      "imageUnavailable": "Couldn't load",
+      "download": "Download",
+      "photo": "Photo"
     },
     "profile": {
       "title": "Profile",
@@ -534,7 +551,9 @@
       "kindUpgrade": "Plan upgrade",
       "kindExtraHwid": "Extra devices",
       "kindExtraHwidSlots": "Extra devices (+{{n}})",
-      "kindSubscriptionWithHwid": "Subscription + extra devices ({{months}} mo., +{{n}})"
+      "kindSubscriptionWithHwid": "Subscription + extra devices ({{months}} mo., +{{n}})",
+      "methodPlatega": "Platega",
+      "kindExtraTraffic": "Traffic top-up"
     },
     "support": {
       "title": "Support",
@@ -1040,6 +1059,7 @@
       "devicesUnlimited": "Unlimited devices",
       "traffic": "{{n}} GB",
       "trafficUnlimited": "Unlimited traffic",
+      "trafficUnlimitedPlusBypass": "Unlimited + {{n}} GB {{label}}",
       "saving": "Save {{pct}}%",
       "moAbbr": "mo.",
       "choosePeriodHint": "Choose billing period",
@@ -1132,7 +1152,10 @@
       "extraHwidRenewToggle": "Renew extra devices",
       "extraHwidRenewToggleHint": "{{slots}} · +{{amount}} {{unit}}",
       "extraHwidRenewLabel": "Extra devices",
-      "extraHwidRenewValue": "+{{n}}"
+      "extraHwidRenewValue": "+{{n}}",
+      "plategaAll": "All methods",
+      "traffic": "Traffic",
+      "trafficUnlimited": "Unlimited"
     },
     "paymentStatus": {
       "title": "Payment",
@@ -1295,10 +1318,11 @@
         "broadcast": "Broadcast",
         "partners": "Partners",
         "status": "Status",
+        "nodes": "Nodes",
         "infra": "Infrastructure",
         "sync": "Sync",
         "settings": "Bot settings",
-        "status": "Status"
+        "monitoring": "Monitoring"
       },
       "backToCabinet": "Back to cabinet",
       "breadcrumb": {
@@ -1745,6 +1769,14 @@
           "sectionSubscription": "Subscription",
           "sectionSystem": "System",
           "idLine": "ID: {{id}} • {{lang}}",
+          "idLineWeb": "Web cabinet • {{lang}}",
+          "email": "Email",
+          "copyEmail": "Copy email",
+          "emailVerified": "Verified",
+          "emailUnverified": "Not verified",
+          "loginVia": "Sign-in via",
+          "loginEmail": "Email",
+          "loginBotOnly": "Bot only",
           "tariffWithPeriod": "{{name}} {{period}}",
           "unlimitedTraffic": "Unlimited (∞ used)",
           "trafficLabel": "Traffic: {{used}} of {{limit}}",
@@ -1927,7 +1959,27 @@
         "extendQuickYear": "+1 year",
         "extendPickDateShort": "Or pick a date",
         "changeTariff": "Change plan",
-        "referralsInvited": "Invited"
+        "referralsInvited": "Invited",
+        "trafficSplit": {
+          "title": "Split traffic: “{{label}}” and packs",
+          "bypassUsed": "“{{label}}” usage this month",
+          "squadRemoved": "Squad removed (limit reached)",
+          "squadActive": "Squad active",
+          "plan": "plan {{base}} GB + packs {{extra}} GB",
+          "checked": "checked",
+          "noBypass": "The client has no separate bypass limit: it is taken from the tariff on purchase or renewal of a tariff with bypass.",
+          "nodes": "Usage per node this month",
+          "extras": "Active packs",
+          "noExtras": "No packs",
+          "paid": "purchased",
+          "granted": "granted by admin",
+          "revoke": "Remove pack",
+          "revokeTitle": "Remove the traffic pack?",
+          "revokeBody": "The client's limit drops immediately. Money for a purchased pack is not refunded automatically.",
+          "grantTitle": "Grant a pack for free",
+          "grant": "Grant",
+          "grantHint": "Valid until the 1st of next month, like a purchased one. The bypass squad returns right away if the limit is no longer used up."
+        }
       },
       "payments": {
         "title": "Payments",
@@ -1967,7 +2019,8 @@
         "kind": {
           "subscription": "Subscription",
           "tariffUpgrade": "Tariff upgrade",
-          "extraHwid": "Extra devices"
+          "extraHwid": "Extra devices",
+          "extraTraffic": "Traffic top-up"
         }
       },
       "partners": {
@@ -2183,13 +2236,19 @@
         "trafficGB": "Traffic (GB)",
         "traffic": "Traffic (GB)",
         "trafficShort": "Traffic",
+        "trafficMainTip": "Regular servers: {{value}}",
+        "trafficBypassTip": "{{label}}: {{value}} per month",
+        "trafficPacksTip": "Extra traffic packs on sale: {{count}}",
+        "fromPrice": "from",
+        "perMonthShort": "/mo",
         "noPrices": "No prices set",
-        "settingsTitle": "Product settings",
-        "settingsSubtitle": "Trial, devices, star rate and price display",
+        "tabList": "Tariffs",
+        "tabConditions": "Sales terms",
+        "tabsAria": "Tariffs page sections",
         "isActive": "Active",
         "active": "Active",
-        "sortOrder": "Sort order",
-        "sortOrderHint": "Lower = higher in the list",
+        "reorderHint": "Drag the handle to reorder (or use arrow keys). This order is what users see",
+        "orderSaved": "Tariff order saved",
         "tierLevel": "Tier level",
         "strategy": "Traffic reset",
         "squads": "Servers (squads)",
@@ -2236,6 +2295,11 @@
         "slugPreview": "Slug:",
         "slugImmutable": "— fixed after creation",
         "activeHint": "An inactive tariff is hidden from checkout",
+        "popularLabel": "Popular plan",
+        "popularHint": "Customers will see a “Popular” badge on this plan card",
+        "popularMoves": "“{{name}}” is marked popular now. After saving, the mark moves to this plan.",
+        "popularInactive": "This plan is off — customers do not see it; the badge appears once you turn it on.",
+        "popularChip": "Popular",
         "trafficUnlimitedHint": "0 — unlimited traffic",
         "squadsAllSelected": "Nothing selected",
         "squadsSelected": "{{count}} of {{total}} selected",
@@ -2323,7 +2387,66 @@
         },
         "squadsUnknownDrop": "Drop them",
         "squadsUnknown_one": "{{count}} server from this tariff is missing in the panel — not shown in the list",
-        "squadsUnknown_other": "{{count}} servers from this tariff are missing in the panel — not shown in the list"
+        "squadsUnknown_other": "{{count}} servers from this tariff are missing in the panel — not shown in the list",
+        "trafficSplit": {
+          "title": "Separate traffic: “{{label}}” and top-up packs",
+          "futureOnly": "Saved with its own button and applies only to future purchases and renewals of this tariff. People already on the tariff keep what they got at their last payment.",
+          "masterOff": "The “Split traffic” master switch in bot settings is off — the bypass limit is not applied yet.",
+          "enable": "Separate “{{label}}” traffic limit",
+          "enableHint": "Its own limit for bypass servers; regular servers are still counted by the panel.",
+          "limit": "“{{label}}” limit per month",
+          "limitHint": "Counted by calendar months: resets on the 1st. When used up, the squad is removed until the 1st or until a top-up.",
+          "squads": "Squad",
+          "squadsHint": "This squad is removed from the client when the limit is used up and returns on the 1st or after a top-up. Pick from the tariff squads.",
+          "nodes": "“{{label}}” nodes",
+          "nodesError": "Could not load the node list from the panel.",
+          "trackingOn": "tracking on",
+          "trackingOff": "tracking off",
+          "trackingWarn": "Nodes ({{nodes}}) have “Traffic tracking” off in the panel (node → Accounting & billing): their traffic will not count, so usage is understated.",
+          "packs": "Top-up packs",
+          "priceRub": "Price, ₽",
+          "priceStars": "Stars",
+          "on": "On",
+          "addPack": "Add pack",
+          "packsHint": "Packs are valid until the 1st and are not renewed with the subscription. Make bigger packs cheaper per GB — they sell more. A kind without a limit needs no packs: clients will not see them.",
+          "save": "Save bypass and packs",
+          "saved": "Saved",
+          "saveError": "Could not save",
+          "loadError": "Could not load bypass settings",
+          "saveFirst": "The bypass limit and top-up packs can be set after the tariff is saved for the first time.",
+          "rubPerGb": "₽ per GB",
+          "regularTitle": "Regular servers",
+          "regularSub": "Tariff limit and devices",
+          "bypassTitle": "{{label}} — separate limit",
+          "bypassSub": "Its own limit for bypass servers; counted by the bot per node",
+          "limitPerMonth": "Monthly limit",
+          "limitHint2": "Calendar month, resets on the 1st",
+          "squadsHint2": "Removed when the limit is used up, returns on the 1st or after a top-up",
+          "nodesTitle": "Nodes — usage is counted from these",
+          "trackingWarn2": "Nodes ({{nodes}}) have “Traffic tracking” off in the panel: their traffic will not count.",
+          "packsSub": "Valid until the 1st; make bigger packs cheaper per GB",
+          "addPackShort": "pack",
+          "packsHint2": "Stars: empty — calculated from rubles by the rate automatically; a manual value is kept. A kind without a limit needs no packs: clients will not see them.",
+          "starsAutoHint": "Empty — Stars are calculated from rubles by the rate (the field shows the calculated value). A value you type is kept as is.",
+          "nodesPickSquad": "Pick a squad — its nodes will be shown here.",
+          "nodesEmpty": "The selected squad has no nodes in the panel.",
+          "footNote": "Bypass and pack settings are saved separately and apply only to future purchases and renewals.",
+          "lockedLimited": "A separate bypass limit is unavailable: this tariff has a regular-server limit ({{gb}} GB). The panel keeps one shared limit per client, so bypass can only be enabled with unlimited regular servers.",
+          "lockedGlobal": "The regular-server limit comes from the global TRAFFIC_LIMIT setting, not from the tariff. A separate bypass limit needs unlimited regular servers: remove the global limit in the bot settings.",
+          "makeUnlimited": "Make regular servers unlimited",
+          "needFields": "Set the limit, a squad and at least one node for bypass: the tariff cannot be saved until they are filled.",
+          "colSize": "Size",
+          "colRub": "Price",
+          "colStars": "Price in Stars",
+          "packActive": "On sale",
+          "lockedByBypass": "The regular-server limit is unavailable: a separate bypass limit is on, and regular servers are unlimited. Turn bypass off to set a regular-server limit.",
+          "saveTariffFirst": "The saved tariff still has a regular-server limit. Save the tariff with unlimited first (button at the bottom of the window), then save this tab.",
+          "packsUnlimited": "Regular servers are unlimited — nothing to top up. Packs appear when a regular-server limit is set or a separate bypass limit is enabled.",
+          "bypassPacksDropped": "The separate {{label}} limit is off: its packs will be deleted on save.",
+          "packSize": "Pack size, GB",
+          "packPriceRub": "Price, RUB",
+          "packPriceStars": "Price in Stars"
+        }
       },
       "loyalty": {
         "title": "Loyalty",
@@ -2463,6 +2586,7 @@
         "compose": "Message",
         "placeholder": "Enter broadcast message...",
         "attachMedia": "Attach photo or video",
+        "pasteHint": "or paste an image from the clipboard — Ctrl+V",
         "uploadingMedia": "Uploading…",
         "photoAttached": "Photo will be sent via Telegram",
         "videoAttached": "Video will be sent via Telegram",
@@ -2538,35 +2662,66 @@
         "recipientsCabinetWebOnly_one": "{{count}} of them without Telegram",
         "recipientsCabinetWebOnly_other": "{{count}} of them without Telegram"
       },
-      "statusPage": {
-        "title": "Status",
-        "subtitle": "Map, ping and copy on the public status page",
-        "open": "Open page",
-        "note": "Node addresses are not included in the page response and never reach the browser. Probes do not call private addresses. The 30-day bar fills only for days that were actually measured.",
-        "targetsTitle": "Countries to check",
-        "targetsHint": "The page shows only this list, in the order set here. Panel nodes are not added. The address is visible only here: a public IP or a domain. 0 probes means “use the shared setting”. Interval is minutes, from 5 to 180. “Whitelists” checks the address through Latency Lab, using operator modems that have whitelists on.",
-        "targetsEmpty": "No countries yet. While the list is empty, the status page has no locations.",
-        "targetsSaved": "Country list saved.",
-        "forceProbe": "Check now",
-        "forceProbeStarted": "Check started for the saved list. The status page updates when the probes reply.",
-        "addTarget": "Add country",
-        "removeTarget": "Remove country",
-        "moveUp": "Move up",
-        "moveDown": "Move down",
-        "fieldName": "Name",
-        "fieldCountry": "Country",
-        "fieldAddress": "IP or domain",
-        "fieldEnabled": "On",
-        "fieldInterval": "Interval, min",
-        "fieldIntervalPlaceholder": "shared",
-        "fieldWorld": "World probes",
-        "fieldRussia": "Russia probes",
-        "fieldWhitelist": "Whitelists",
-        "fieldRepeatCities": "Cities may repeat",
-        "fieldRepeatCitiesHint": "On: availability counts every probe, even several from one city. Off: each city once, probes from different cities.",
-        "fieldNote": "Caption",
-        "fieldNotePlaceholder": "+ whitelists",
-        "fieldCountPlaceholder": "shared"
+      "nodes": {
+        "title": "Nodes",
+        "summary": {
+          "users": "Users online",
+          "usersShort": "Users online",
+          "nodes": "Nodes online",
+          "of": "of {{total}}",
+          "down": "Download speed",
+          "downShort": "Download",
+          "up": "Upload speed",
+          "upShort": "Upload"
+        },
+        "search": "Search",
+        "searchPlaceholder": "Name, country, provider, IP",
+        "searchClose": "Close search",
+        "refresh": "Refresh",
+        "retry": "Retry",
+        "sortLabel": "Sort:",
+        "sortTitle": "Sort by",
+        "showTitle": "Show",
+        "sort": {
+          "users_desc": "Most users",
+          "users_asc": "Fewest users",
+          "name": "By name",
+          "memory": "By memory",
+          "traffic": "By traffic",
+          "uptime": "By uptime"
+        },
+        "filter": {
+          "all": "All",
+          "online": "Online",
+          "offline": "Not responding",
+          "connecting": "Connecting",
+          "disabled": "Disabled"
+        },
+        "state": {
+          "online": "Online",
+          "offline": "Not responding",
+          "connecting": "Connecting",
+          "disabled": "Disabled"
+        },
+        "stateText": {
+          "offline": "offline",
+          "connecting": "connecting…",
+          "disabled": "disabled"
+        },
+        "usersTitle": "Users on this node right now",
+        "memoryTitle": "Memory in use",
+        "loadTitle": "Load average over 1 / 5 / 15 minutes",
+        "rxTitle": "Node inbound speed",
+        "txTitle": "Node outbound speed",
+        "trafficOf": "of {{limit}}",
+        "resetTitle": "Node traffic resets on day {{day}} of the month",
+        "uptimeTitle": "Xray uptime",
+        "pluginTitle": "Node plugin",
+        "xrayTitle": "Xray version",
+        "nodeTitle": "Remnawave node version",
+        "empty": "The panel has no nodes yet",
+        "noMatch": "Nothing found",
+        "error": "Could not load nodes from the Remnawave panel"
       },
       "infra": {
         "title": "Infrastructure",
@@ -2629,12 +2784,11 @@
         "categoryEmpty": "No settings in this category",
         "categoryNav": "Settings categories",
         "categories": {
-          "design": "Appearance",
+          "design": "Cabinet",
           "product": "Product",
           "marketing": "Marketing",
-          "finance": "Finance",
-          "operations": "Operations",
-          "access": "Access",
+          "finance": "Payments",
+          "access": "Bot and access",
           "notifications": "Notifications"
         },
         "subsections": {
@@ -2656,7 +2810,7 @@
           },
           "payments": {
             "providers": "Payment methods",
-            "platega": "Platega",
+            "platega": "Platega buttons",
             "yookassa": "YooKassa buttons",
             "checkout": "Preselected in the cabinet"
           },
@@ -2705,6 +2859,7 @@
           "stars": "Telegram Stars",
           "payments": "Payment methods",
           "payments_notify": "Payment notifications",
+          "admin_alerts": "Admin alerts",
           "moynalog": "Moy Nalog",
           "trial": "Trial & traffic",
           "tags": "Remnawave tags",
@@ -2721,20 +2876,77 @@
           "cabinet_connect": "Connection and Telegram",
           "tariffs": "Price display",
           "notifications": "Browser push",
-          "status": "Status page"
+          "status": "Status page",
+          "traffic": "Traffic: bypass and top-up",
+          "monitoring": "Monitoring"
         },
         "groupIntros": {
+          "admin_alerts": "Where the bot tells you about problems and events: cabinet mail is not sending, a server is down, a server bill is due, a payment came in, a partner asks for a payout. Easiest: one group with topics set above, and a topic per kind.",
           "notifications": "This doesn't turn cabinet notifications on or off: they always appear under the bell for everyone. These toggles decide what is also sent as a system notification to the browser or phone of those who tapped \"Turn on\" in the notification feed. People who didn't subscribe get nothing."
         },
+        "alerts": {
+          "events": "What to send",
+          "event": {
+            "paid": "Payment received",
+            "cancel": "Invoice cancelled"
+          },
+          "eventCancelHint": "“Invoice cancelled” — the client did not pay in time or cancelled the payment",
+          "eventsNone": "Nothing selected — the bot will not report payments",
+          "sharedChat": "Alerts chat",
+          "sharedPlaceholder": "Empty — admin DM",
+          "sharedHint": "Id of a group the bot is in. Supergroup ids start with -100.",
+          "howTo": "How to find the group and topic id",
+          "howTo1": "Add the bot to the group and allow it to post. For topics, turn on “Topics” in the group settings.",
+          "howTo2": "Open the group in Telegram Web: the number after # in the address is the id. Supergroup ids start with -100.",
+          "howTo3": "The topic number is the middle number in a link to a message from it: t.me/c/1234567890/12/345 → topic 12.",
+          "kinds": {
+            "system": {
+              "title": "System",
+              "desc": "Cabinet mail stopped sending and is back"
+            },
+            "servers": {
+              "title": "Server status",
+              "desc": "A server is unreachable from Russia or the world, and back up"
+            },
+            "infra": {
+              "title": "Server billing",
+              "desc": "Payment reminders for nodes from the panel infrastructure"
+            },
+            "payments": {
+              "title": "Client payments",
+              "desc": "Payments and cancelled invoices"
+            },
+            "partner": {
+              "title": "Partner program",
+              "desc": "New partner application and payout request"
+            }
+          },
+          "chat": "Own chat",
+          "chatPlaceholder": "Shared",
+          "thread": "Topic",
+          "test": "Test",
+          "where": "Goes to",
+          "toOwnChat": "chat {{chat}}",
+          "toShared": "shared chat",
+          "toDirect": "admin DM",
+          "topic": "topic {{id}}",
+          "off": "off",
+          "threadIgnored": "topic is ignored in DM",
+          "sent": "Sent: {{where}}",
+          "tooFast": "Wait a couple of seconds and press again",
+          "badId": "Chat and topic ids are digits only; a chat id may start with a minus",
+          "testFailed": "Could not send the test",
+          "hints": {
+            "not_member": "The bot is not in the group or cannot post there",
+            "no_thread": "No such topic — check the number",
+            "topic_closed": "The topic is closed — reopen it or pick another"
+          }
+        },
         "yookassaMethods": {
-          "intro": "Each checked method is a separate button in the bot and cabinet, in this order. The buyer lands on the chosen YooKassa method right away but can't switch to another one on the form.",
           "all": "YooKassa form with all methods",
           "allHint": "Same as without the setting: one “Card / Bank transfer” button",
           "connectWarning": "Each method has to be enabled in your YooKassa account, or the payment won't be created.",
-          "noAllWarning": "No form with all methods: methods missing from the list aren't available via YooKassa.",
-          "moveUp": "Up",
-          "moveDown": "Down",
-          "reset": "Reset to default"
+          "noAllWarning": "No form with all methods: methods missing from the list aren't available via YooKassa."
         },
         "checkoutDefault": {
           "intro": "Returning buyers see the method they paid with last time. This one is preselected for first-time buyers: it's shown large with a “Recommended” badge, the rest as tiles below.",
@@ -2857,26 +3069,6 @@
           "TELEGRAM_STARS_ENABLED": {
             "label": "Telegram Stars",
             "hint": "Paid with Stars through the bot itself"
-          },
-          "PLATEGA_SBP_ENABLED": {
-            "label": "SBP",
-            "hint": "Russian instant payments"
-          },
-          "PLATEGA_CARDS_ENABLED": {
-            "label": "Cards",
-            "hint": "Cards via Platega"
-          },
-          "PLATEGA_ACQUIRING_ENABLED": {
-            "label": "Acquiring",
-            "hint": ""
-          },
-          "PLATEGA_WORLDWIDE_ENABLED": {
-            "label": "International cards",
-            "hint": ""
-          },
-          "PLATEGA_CRYPTO_ENABLED": {
-            "label": "Crypto",
-            "hint": "Crypto via Platega"
           },
           "HELEKET_ENABLED": {
             "label": "Other crypto",
@@ -3406,9 +3598,17 @@
             "label": "Russia probes",
             "hint": "From 1 to 30. Default is 20"
           },
+          "STATUS_RU_FAIL_THRESHOLD": {
+            "label": "Russia failures before “Partial”",
+            "hint": "How many probes in Russia must fail before the server turns “Partial”. From 1 to 30, default 2"
+          },
           "STATUS_PROBE_INTERVAL_MIN": {
             "label": "Check interval, min",
             "hint": "How often to ping when a country has no interval of its own. From 5 to 180, default 20"
+          },
+          "STATUS_ALERT_WORLD": {
+            "label": "“Unreachable from the world” alert",
+            "hint": "Notify the admin when a regular server fails two world checks in a row"
           },
           "STATUS_SHOW_MAP": {
             "label": "Map",
@@ -3421,7 +3621,64 @@
           "STATUS_PAGE_LEAD": {
             "label": "Subtitle",
             "hint": "Empty — cabinet translation"
+          },
+          "PLATEGA_ENABLED": {
+            "label": "Platega",
+            "hint": "Credentials are set in .env"
+          },
+          "PLATEGA_PAYMENT_METHODS": {
+            "label": "Platega buttons",
+            "hint": ""
+          },
+          "TRAFFIC_SPLIT_ENABLED": {
+            "label": "Split traffic (bypass) and top-up",
+            "hint": "Off — the worker does not run and the bypass limit is not applied. Turn on once a tariff has bypass nodes set."
+          },
+          "TRAFFIC_PACKS_ENABLED": {
+            "label": "Sell traffic top-ups",
+            "hint": "Off — “Buy” buttons are hidden."
+          },
+          "TRAFFIC_BYPASS_LABEL": {
+            "label": "Bypass name shown to clients",
+            "hint": "Used in the cabinet, bot and notifications. Payment providers dislike words like “bypass” — pick another name if needed."
+          },
+          "TRAFFIC_ALERT_PERCENT": {
+            "label": "Warning threshold, %",
+            "hint": "The second notification fires at 100%. Each is sent once a month."
+          },
+          "TRAFFIC_POLL_MINUTES": {
+            "label": "How often to check usage, min",
+            "hint": "Lower — a more exact limit, but more load on the panel."
+          },
+          "MONITORING_BOT_ACTIONS": {
+            "label": "Record bot taps",
+            "hint": "Every button and command customers use. Shown in the customer's history and in the feed with the «Bot taps» switch"
+          },
+          "MONITORING_SUPPORT_WAIT_MIN": {
+            "label": "Unanswered support, min",
+            "hint": "After how many minutes an unanswered support message shows in «Needs attention». 0 hides it; older than 7 days is ignored"
+          },
+          "MONITORING_RETENTION_DAYS": {
+            "label": "Keep events, days",
+            "hint": "Payments, sign-ups, promo codes and other important events. 0 — keep forever"
+          },
+          "MONITORING_RETENTION_NOISY_DAYS": {
+            "label": "Keep frequent events, days",
+            "hint": "Sign-ins, support chat, bot messages, torrent blocker. 0 — keep forever"
+          },
+          "MONITORING_BOT_ACTIONS_DAYS": {
+            "label": "Keep bot taps, days",
+            "hint": "0 — keep forever"
           }
+        },
+        "plategaMethods": {
+          "all": "Platega general form",
+          "allHint": "The payer picks the method on the Platega page",
+          "sbp": "SBP",
+          "acquiring": "Acquiring (cards)",
+          "worldwide": "Visa / international cards",
+          "crypto": "Crypto",
+          "connectWarning": "Every method except the general form must be enabled in your Platega account, otherwise the payment will not be created."
         }
       },
       "sync": {
@@ -3540,6 +3797,8 @@
         "fCountry": "Country",
         "fAddress": "Address",
         "fAddressHint": "A public IP or domain. Not shown to users.",
+        "fPort": "Port",
+        "fPortHint": "TCP port clients connect to. Empty — 443.",
         "fNode": "Panel server",
         "fNodeHint": "Used to know whether the server is connected",
         "fEntryNode": "Entry in the panel",
@@ -3580,14 +3839,20 @@
         "probesToggleHint": "Turn off to show only the panel state.",
         "mapToggle": "Show the map",
         "mapToggleHint": "On the public page, before sign-in.",
+        "alertWorldToggle": "Alert when a server is unreachable from the world",
+        "alertWorldToggleHint": "Regular servers only. Russia and bypass operator outages are always reported, after two checks in a row.",
+        "alertsRoute": "Where outage alerts go —",
+        "alertsRouteLink": "Bot settings → Notifications → Admin alerts",
         "moreSettings": "Advanced",
         "STATUS_PAGE_TITLE": "Public page title",
         "STATUS_PAGE_LEAD": "Public page subtitle",
         "STATUS_WORLD_PROBES": "World checks",
         "STATUS_RUSSIA_PROBES": "Russia checks",
         "STATUS_PROBE_INTERVAL_MIN": "Every, min",
+        "STATUS_RU_FAIL_THRESHOLD": "Russia failures before “Partial”",
+        "ruFailHint": "How many probes in Russia must fail before the server turns “Partial”. One failure out of ten is ordinary probe noise, so the default is 2. Half or fewer answering two checks in a row means “Down”.",
         "defaultText": "Default",
-        "moreSettingsHint": "Checks: world 1–10, Russia 1–30. Every: 5 to 180 minutes. Empty texts are the defaults.",
+        "moreSettingsHint": "Checks: world 1–10, Russia 1–30. Every: 5 to 180 minutes. Failures before “Partial”: 1–30. Empty texts are the defaults.",
         "fNoExternalNeedsNode": "Pick the panel server above, otherwise it has no status and the page shows \"No data\".",
         "countryPlaceholder": "Pick a country",
         "fCountryHint": "Users see the flag and the name",
@@ -3601,6 +3866,241 @@
         "addressIsNode": "This is the address of the panel node itself. For a bypass enter the whitelisted host, otherwise operators will not reach it.",
         "drag": "Drag to reorder (or use the up and down arrows)",
         "neverMeasured": "Not checked yet"
+      },
+      "monitoring": {
+        "title": "Monitoring",
+        "live": "Live",
+        "paused": "Paused",
+        "pause": "Pause the feed",
+        "resume": "Resume",
+        "attention": "Needs attention",
+        "allClear": "All quiet — nothing is on fire",
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "loading": "Loading",
+        "showMore": "Show more",
+        "error": "Couldn't load events",
+        "retry": "Retry",
+        "empty": "No events yet — they'll show up here as soon as something happens",
+        "emptyFiltered": "No events match this filter",
+        "lessMinute": "< 1 min",
+        "minutes": "{{count}} min",
+        "hours": "{{count}} h",
+        "days": "{{count}} d",
+        "monthsShort": "{{count}} mo",
+        "daysShort": "{{count}} d",
+        "discount": "{{count}}% off",
+        "incident": {
+          "node_down": "Node {{name}} is down",
+          "panel_down": "Remnawave panel isn't responding",
+          "support_waiting": "Unanswered in support: {{count}}",
+          "support_undelivered": "Not delivered to the support bot: {{count}}"
+        },
+        "stats": {
+          "payments": "Payments",
+          "unpaid": "Unpaid",
+          "registrations": "Sign-ups",
+          "regSplit": "{{bot}} bot · {{cabinet}} cabinet",
+          "nodes": "Nodes",
+          "allOnline": "all online",
+          "downNow_one": "{{count}} down",
+          "downNow_other": "{{count}} down",
+          "downs": "outages in period: {{count}}"
+        },
+        "period": {
+          "hour": "Last hour",
+          "day": "Last 24 hours",
+          "week": "Last week",
+          "month": "Last month",
+          "short": {
+            "hour": "Hour",
+            "day": "Day",
+            "week": "Week",
+            "month": "Month"
+          }
+        },
+        "filter": {
+          "title": "Event filter",
+          "all": "All events",
+          "plusBot": "+ bot taps",
+          "botActions": "Bot taps",
+          "botActionsOff": "Recording is off. Turn on: Bot settings → Notifications → Monitoring",
+          "reset": "Reset"
+        },
+        "category": {
+          "money": "Payments",
+          "users": "Users",
+          "subs": "Subscriptions",
+          "promo": "Promotions",
+          "support": "Support",
+          "nodes": "Nodes",
+          "admin": "Admins and system"
+        },
+        "search": {
+          "placeholder": "@username or ID",
+          "label": "Find a customer",
+          "empty": "No one found",
+          "clear": "Show everyone"
+        },
+        "history": {
+          "title": "History",
+          "empty": "This customer has no events yet",
+          "button": "History · {{count}}"
+        },
+        "fortune": {
+          "days": "+{{count}} d",
+          "discount": "{{count}}% off",
+          "xp": "+{{count}} XP"
+        },
+        "promo": {
+          "days": "+{{count}} d",
+          "trial": "{{count}}-day trial",
+          "devices": "+{{count}} devices",
+          "discount": "{{count}}% off"
+        },
+        "ev": {
+          "srcBot": "bot",
+          "srcCabinet": "cabinet",
+          "registered": "Signed up",
+          "login": "Signed in to the cabinet",
+          "via": "via {{method}}",
+          "linked": "Linked: {{provider}}",
+          "merged": "Accounts merged",
+          "deleted": "Account deleted",
+          "emailVerified": "Email confirmed",
+          "passwordReset": "Password reset",
+          "trial": "Trial started",
+          "buy": "Subscription bought",
+          "buyTariff": "Bought «{{tariff}}»",
+          "renew": "Subscription renewed",
+          "renewTariff": "Renewed «{{tariff}}»",
+          "upgrade": "Switched to «{{tariff}}»",
+          "downgrade": "Moved to «{{tariff}}»",
+          "extraHwid": "Extra devices: +{{count}}",
+          "extraTraffic": "Extra traffic: +{{gb}} GB",
+          "unpaid": "Invoice not paid",
+          "reason": {
+            "heleket_needs_attention": "Heleket: needs manual review"
+          },
+          "expired": "Subscription expired",
+          "expiredDigest": "Subscriptions expired in 24 h: {{count}}",
+          "notRenewed": "not renewed: {{count}}",
+          "list": "List",
+          "linkReset": "Subscription link reset",
+          "deviceRemoved": "Device removed",
+          "torrent": "Torrent blocker",
+          "promo": "Promo code {{code}}",
+          "promoInvalid": "Wrong promo code {{code}}",
+          "fortune": "Wheel of fortune",
+          "won": "won: {{reward}}",
+          "loyalty": "Loyalty level {{level}}",
+          "referral": "Referral bonus +{{count}} d",
+          "forInvite": "for an invited friend",
+          "forJoin": "for joining via a link",
+          "partnerApplied": "Partner application",
+          "autoApproved": "approved automatically",
+          "payoutRequested": "Partner payout requested",
+          "supportMessage": "Message to support",
+          "images": "photos: {{count}}",
+          "supportReply": "Support replied",
+          "supportClosed": "Ticket closed",
+          "botMessage": "Message to the bot",
+          "command": "command {{command}}",
+          "button": "button «{{label}}»",
+          "nodeDown": "Node {{name}} is down",
+          "nodeUp": "Node {{name}} is back online",
+          "panelLost": "panel lost connection",
+          "fromRussia": "from Russia {{ok}} of {{total}} answered",
+          "probe": {
+            "ru": "not reachable from Russia",
+            "world": "not reachable worldwide",
+            "operators": "whitelist operators don't answer",
+            "any": "status check"
+          },
+          "downFor": "outage lasted {{time}}",
+          "broadcast": "Broadcast: delivered {{sent}} of {{total}}",
+          "blocked": "blocked the bot: {{count}}",
+          "failedSends": "errors: {{count}}",
+          "sync": "Panel sync",
+          "syncDetails": "new {{created}} · updated {{updated}} · removed {{deleted}}",
+          "heleketReview": "Heleket: needs manual review"
+        },
+        "botButton": {
+          "start": "Main menu",
+          "buy": "Buy",
+          "sell": "Choose period",
+          "payment": "Payment",
+          "connect": "Connect",
+          "trial": "Trial",
+          "activate_trial": "Start trial",
+          "referral": "Referrals",
+          "referral_list": "Referral list",
+          "loyalty_root": "Loyalty",
+          "manage_devices": "Devices",
+          "devices": "Devices",
+          "delete_device": "Delete device",
+          "add_device": "Add device",
+          "add_device_confirm": "Add device",
+          "add_device_apply": "Add device",
+          "add_device_payment": "Pay for device",
+          "purchase_history": "Purchase history"
+        },
+        "adminAction": {
+          "any": {
+            "users": {
+              "id": {
+                "extend": "Subscription extended",
+                "disable": "Customer disabled",
+                "enable": "Customer enabled",
+                "delete": "Customer deleted",
+                "reset-traffic": "Traffic reset",
+                "expire": "Subscription end date changed",
+                "hwid-limit": "Device limit",
+                "hwid-pin": "Device limit pinned",
+                "squads": "Customer servers",
+                "traffic": "Traffic limit",
+                "strategy": "Traffic reset strategy",
+                "description": "Customer note",
+                "tariff": "Plan changed",
+                "extra-hwid": "Extra devices",
+                "traffic-split": "Split traffic",
+                "devices": {
+                  "id": "Device removed"
+                }
+              }
+            },
+            "promos": {
+              "id": "Promo code edited"
+            },
+            "tariffs": {
+              "id": "Plan edited"
+            },
+            "settings": "Bot settings changed",
+            "sync": "Sync started",
+            "broadcast": {
+              "send": "Broadcast started"
+            },
+            "status": {
+              "targets": "Status server list",
+              "probe": "Status check"
+            },
+            "loyalty": {
+              "recalc": "Loyalty recalculation"
+            }
+          },
+          "POST": {
+            "promos": "New promo code",
+            "tariffs": "New plan"
+          },
+          "DELETE": {
+            "promos": {
+              "id": "Promo code deleted"
+            },
+            "tariffs": {
+              "id": "Plan deleted"
+            }
+          }
+        }
       }
     },
     "landing": {
@@ -3887,7 +4387,9 @@
       "status": {
         "eyebrow": "Status",
         "allUp": "Every location is up",
-        "partial": "Some locations are down",
+        "somePartial": "Some locations are unstable",
+        "someDown": "Some locations are down",
+        "allDown": "All locations are down",
         "empty": "No locations yet",
         "unavailable": "Panel status is unavailable",
         "updated": "Updated {{time}}",
@@ -3945,21 +4447,22 @@
         "probesOff": "Probe ping is off. Countries from the list stay, and measurements are not updated.",
         "colWorld": "From the world",
         "colRussia": "From Russia",
-        "colHistory": "Last 30 days",
+        "colHistory": "Last 30 checks",
         "worldUp": "Up",
         "worldDown": "Down",
         "worldPending": "Still measuring",
         "worldPing": "ping {{ms}} ms",
         "russiaUp": "Reachable",
+        "russiaPartial": "Unstable",
         "inWhitelist": "On whitelists",
         "whitelistUp": "Reachable",
         "whitelistRatio": "{{ok}} of {{total}} operators",
         "russiaDown": "Unreachable",
         "russiaRatio": "{{ok}} of {{total}} providers",
         "historyEmpty": "No measurements yet",
-        "historyPct": "{{pct}}% over {{days}} days",
-        "historyPast": "30 days ago",
-        "historyNow": "Today",
+        "historyPct": "{{pct}}% over {{days}} checks",
+        "historyPast": "30 checks ago",
+        "historyNow": "Latest",
         "row": {
           "up": "Up",
           "partial": "Partial",
@@ -3989,6 +4492,46 @@
       "openExternal": "Open status",
       "title": "Server status",
       "description": "See which servers are up right now"
+    },
+    "trafficSplit": {
+      "bypassFallback": "Bypass",
+      "tabMain": "Regular",
+      "buy": "Buy traffic",
+      "buyTitle": "Buy traffic",
+      "buySubtitle": "until {{date}}",
+      "nowUsed": "Now: {{used}} of {{limit}} {{unit}}",
+      "nowBlocked": "“{{label}}” is off",
+      "popular": "Popular",
+      "perGb": "{{price}} ₽ per GB",
+      "buyCta": "Buy {{size}} · {{price}}",
+      "packNote": "Valid until {{date}}, then it expires — your plan limit returns.",
+      "stripBlocked": "“{{label}}” limit reached. “{{label}}” servers are off until {{date}}; regular servers still work.",
+      "chipBlocked": "Limit reached",
+      "exhausted": "Used up",
+      "almost": "Almost used up",
+      "blockedNote": "“{{label}}” servers are off until {{date}}",
+      "left": "{{left}} GB left · resets {{date}}",
+      "planPlusExtra": "Plan {{base}} GB + purchased",
+      "until": "until {{date}}",
+      "scenario": "Traffic pack",
+      "packLabel": "Pack",
+      "packTerm": "until {{date}}, then plan limit",
+      "backHome": "Back to home",
+      "mainTitle": "Regular servers",
+      "unlimitedTag": "Unlimited",
+      "forMonth": "in {{month}}",
+      "ofLimit": "of {{limit}} {{unit}}",
+      "buyMore": "Buy more",
+      "buyBypassDefault": "Buy bypass traffic",
+      "buyBypass": "Buy “{{label}}” traffic",
+      "bannerTitle": "“{{label}}” servers are off.",
+      "bannerBody": "Regular servers work. They return {{date}} or right after a top-up.",
+      "legendMain": "Regular",
+      "successHint": "Servers return in the app within 5 minutes — refresh your subscription.",
+      "successTitle": "+{{size}} · {{label}}",
+      "done": "Done",
+      "buyShort": "Buy",
+      "noStars": "This pack has no price in Stars — choose another payment method."
     }
   }
 }

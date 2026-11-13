@@ -20,7 +20,9 @@ const (
 	InvoiceTypeYookasa  InvoiceType = "yookasa"
 	InvoiceTypeTelegram InvoiceType = "telegram"
 	InvoiceTypeTribute  InvoiceType = "tribute"
-	// Platega (разные paymentMethod в одном шлюзе).
+	// Platega: одна кнопка, способ плательщик выбирает на странице Platega.
+	// plt_* — прежние счета по отдельным способам, остаются для истории и вебхуков.
+	InvoiceTypePlatega          InvoiceType = "platega"
 	InvoiceTypePlategaSBP       InvoiceType = "plt_sbp"
 	InvoiceTypePlategaCards     InvoiceType = "plt_cards"
 	InvoiceTypePlategaAcquiring InvoiceType = "plt_acq"
@@ -33,6 +35,7 @@ const (
 // PlategaInvoiceTypes перечисляет все invoice_type Platega (поллинг, статистика).
 func PlategaInvoiceTypes() []InvoiceType {
 	return []InvoiceType{
+		InvoiceTypePlatega,
 		InvoiceTypePlategaSBP,
 		InvoiceTypePlategaCards,
 		InvoiceTypePlategaAcquiring,
@@ -44,7 +47,7 @@ func PlategaInvoiceTypes() []InvoiceType {
 // InvoiceTypeIsPlatega — true для любого метода Platega.
 func InvoiceTypeIsPlatega(t InvoiceType) bool {
 	switch t {
-	case InvoiceTypePlategaSBP, InvoiceTypePlategaCards, InvoiceTypePlategaAcquiring,
+	case InvoiceTypePlatega, InvoiceTypePlategaSBP, InvoiceTypePlategaCards, InvoiceTypePlategaAcquiring,
 		InvoiceTypePlategaWorldwide, InvoiceTypePlategaCrypto:
 		return true
 	default:
@@ -73,6 +76,7 @@ const (
 	PurchaseKindSubscription  PurchaseKind = "subscription"
 	PurchaseKindTariffUpgrade PurchaseKind = "tariff_upgrade"
 	PurchaseKindExtraHwid     PurchaseKind = "extra_hwid"
+	PurchaseKindExtraTraffic  PurchaseKind = "extra_traffic"
 )
 
 type Purchase struct {
@@ -100,10 +104,14 @@ type Purchase struct {
 	TariffID               *int64         `db:"tariff_id"`
 	PurchaseKind           PurchaseKind   `db:"purchase_kind"`
 	IsEarlyDowngrade       bool           `db:"is_early_downgrade"`
-	// TariffLocationID / TariffLocationName — выбор площадки при покупке тарифа
+// TariffLocationID / TariffLocationName — выбор площадки при покупке тарифа
 	// со списком локаций. Имя хранится снимком: строку локации могут удалить.
 	TariffLocationID   *int64  `db:"tariff_location_id"`
 	TariffLocationName *string `db:"tariff_location_name"`
+	// Пакет докупки трафика (purchase_kind = extra_traffic): какой пакет, какой вид и сколько байт.
+	TrafficPackID    *int64  `db:"traffic_pack_id"`
+	TrafficPackKind  *string `db:"traffic_pack_kind"`
+	TrafficPackBytes int64   `db:"traffic_pack_bytes"`
 }
 
 type PurchaseRepository struct {
@@ -131,7 +139,8 @@ var purchaseColumns = []string{
 	"tariff_id", "purchase_kind", "is_early_downgrade",
 	"platega_id", "platega_url",
 	"heleket_id", "heleket_url",
-	"tariff_location_id", "tariff_location_name",
+"tariff_location_id", "tariff_location_name",
+	"traffic_pack_id", "traffic_pack_kind", "traffic_pack_bytes",
 }
 
 // purchaseScanArgs returns pointers for scanning a full purchase row (column order must match purchaseColumns).
@@ -145,7 +154,8 @@ func purchaseScanArgs(p *Purchase) []interface{} {
 		&p.TariffID, &p.PurchaseKind, &p.IsEarlyDowngrade,
 		&p.PlategaID, &p.PlategaURL,
 		&p.HeleketID, &p.HeleketURL,
-		&p.TariffLocationID, &p.TariffLocationName,
+&p.TariffLocationID, &p.TariffLocationName,
+		&p.TrafficPackID, &p.TrafficPackKind, &p.TrafficPackBytes,
 	}
 }
 
@@ -166,8 +176,8 @@ func (cr *PurchaseRepository) Create(ctx context.Context, purchase *Purchase) (i
 		purchase.PurchaseKind = PurchaseKindSubscription
 	}
 	buildInsert := sq.Insert("purchase").
-		Columns("amount", "customer_id", "month", "currency", "expire_at", "status", "invoice_type", "crypto_invoice_id", "crypto_invoice_url", "yookasa_url", "yookasa_id", "platega_id", "platega_url", "heleket_id", "heleket_url", "extra_hwid", "promo_code_id", "discount_percent_applied", "tariff_id", "purchase_kind", "is_early_downgrade").
-		Values(purchase.Amount, purchase.CustomerID, purchase.Month, purchase.Currency, purchase.ExpireAt, purchase.Status, purchase.InvoiceType, purchase.CryptoInvoiceID, purchase.CryptoInvoiceLink, purchase.YookasaURL, purchase.YookasaID, purchase.PlategaID, purchase.PlategaURL, purchase.HeleketID, purchase.HeleketURL, purchase.ExtraHwid, purchase.PromoCodeID, purchase.DiscountPercentApplied, purchase.TariffID, purchase.PurchaseKind, purchase.IsEarlyDowngrade).
+		Columns("amount", "customer_id", "month", "currency", "expire_at", "status", "invoice_type", "crypto_invoice_id", "crypto_invoice_url", "yookasa_url", "yookasa_id", "platega_id", "platega_url", "heleket_id", "heleket_url", "extra_hwid", "promo_code_id", "discount_percent_applied", "tariff_id", "purchase_kind", "is_early_downgrade", "traffic_pack_id", "traffic_pack_kind", "traffic_pack_bytes").
+		Values(purchase.Amount, purchase.CustomerID, purchase.Month, purchase.Currency, purchase.ExpireAt, purchase.Status, purchase.InvoiceType, purchase.CryptoInvoiceID, purchase.CryptoInvoiceLink, purchase.YookasaURL, purchase.YookasaID, purchase.PlategaID, purchase.PlategaURL, purchase.HeleketID, purchase.HeleketURL, purchase.ExtraHwid, purchase.PromoCodeID, purchase.DiscountPercentApplied, purchase.TariffID, purchase.PurchaseKind, purchase.IsEarlyDowngrade, purchase.TrafficPackID, purchase.TrafficPackKind, purchase.TrafficPackBytes).
 		Suffix("RETURNING id").
 		PlaceholderFormat(sq.Dollar)
 
@@ -453,6 +463,7 @@ func (pr *PurchaseRepository) FindSuccessfulPaidPurchaseByCustomer(ctx context.C
 			sq.Or{
 				sq.Eq{"invoice_type": InvoiceTypeCrypto},
 				sq.Eq{"invoice_type": InvoiceTypeYookasa},
+				sq.Eq{"invoice_type": InvoiceTypePlatega},
 				sq.Eq{"invoice_type": InvoiceTypePlategaSBP},
 				sq.Eq{"invoice_type": InvoiceTypePlategaCards},
 				sq.Eq{"invoice_type": InvoiceTypePlategaAcquiring},
@@ -673,6 +684,36 @@ func (pr *PurchaseRepository) HasPaidSubscription(ctx context.Context, customerI
 type AdminPurchaseFilter struct {
 	Status PurchaseStatus // "" = любой статус
 	Search string         // ID платежа / ID клиента / telegram_id / @username (подстрока)
+	// SortKey — колонка сортировки из adminPurchaseSortExprs; пусто или неизвестное — новые сверху.
+	SortKey  string
+	SortDesc bool
+}
+
+// adminPurchaseSortExprs — допустимые колонки сортировки списка платежей. Значения идут в SQL
+// как есть, поэтому ключ из запроса обязан пройти через эту карту.
+var adminPurchaseSortExprs = map[string]string{
+	"id":         "p.id",
+	"user":       "LOWER(c.telegram_username)",
+	"amount":     "p.amount",
+	"provider":   "p.invoice_type",
+	"status":     "p.status",
+	"created_at": "p.created_at",
+}
+
+func adminPurchaseOrderBy(filter AdminPurchaseFilter) string {
+	expr, ok := adminPurchaseSortExprs[filter.SortKey]
+	if !ok {
+		return "p.created_at DESC, p.id DESC"
+	}
+	dir := "ASC"
+	if filter.SortDesc {
+		dir = "DESC"
+	}
+	order := expr + " " + dir + " NULLS LAST"
+	if filter.SortKey != "id" {
+		order += ", p.id DESC"
+	}
+	return order
 }
 
 // AdminPurchaseRow — Purchase + краткие данные клиента одним JOIN-запросом
@@ -693,7 +734,8 @@ const adminPurchaseSelectCols = `p.id, p.amount, p.customer_id, p.created_at, p.
 	p.tariff_id, p.purchase_kind, p.is_early_downgrade,
 	p.platega_id, p.platega_url,
 	p.heleket_id, p.heleket_url,
-	p.tariff_location_id, p.tariff_location_name,
+p.tariff_location_id, p.tariff_location_name,
+	p.traffic_pack_id, p.traffic_pack_kind, p.traffic_pack_bytes,
 	c.telegram_id, c.telegram_username, c.is_web_only`
 
 func scanAdminPurchaseRow(row pgx.Row) (*AdminPurchaseRow, error) {
@@ -732,7 +774,7 @@ func (pr *PurchaseRepository) ListForAdmin(ctx context.Context, filter AdminPurc
 		From("purchase p").
 		Join("customer c ON c.id = p.customer_id").
 		Where(adminPurchaseWhereClause(filter)).
-		OrderBy("p.created_at DESC").
+		OrderBy(adminPurchaseOrderBy(filter)).
 		Limit(uint64(limit)).
 		Offset(uint64(offset)).
 		PlaceholderFormat(sq.Dollar).

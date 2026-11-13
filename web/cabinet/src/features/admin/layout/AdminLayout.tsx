@@ -10,6 +10,7 @@ import {
   Gem,
   Handshake,
   Megaphone,
+  Network,
   Server,
   Activity,
   RefreshCw,
@@ -18,17 +19,20 @@ import {
   ShieldCheck,
   X,
   SlidersHorizontal,
+  Radar,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { useAdminBootstrap } from '../hooks/useAdminBootstrap'
 import { useAdminPartnerPending } from '../hooks/useAdminPartners'
+import { useAdminAttention } from '../monitoring/useMonitoring'
 import { AdminChrome } from './AdminChrome'
 import { AdminBreadcrumbs } from './AdminBreadcrumbs'
 import { AdminPageMetaContext, type AdminPageMeta } from './useAdminPageMeta'
 import { AdminShellProvider, useAdminShell } from './AdminShellContext'
 import { useAdminLeftEdgeSwipe } from '../hooks/useAdminLeftEdgeSwipe'
+import { useAdminSelectionHaptics } from '../hooks/useAdminSelectionHaptics'
 import { useAdminMobileNavWidth } from '../hooks/useAdminMobileNavWidth'
 
 interface AdminLayoutProps {
@@ -52,6 +56,8 @@ interface AdminNavItem {
   condition?: boolean
   /** Счётчик несделанных дел: заявки партнёров плюс заявки на вывод. */
   badge?: number
+  /** Красный бейдж — то, что горит сейчас (инциденты «Мониторинга»). */
+  badgeAlert?: boolean
 }
 
 interface AdminNavGroup {
@@ -99,6 +105,7 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
   const effectiveMeta = meta ? { ...pageMeta, ...meta } : pageMeta
 
   useAdminLeftEdgeSwipe(true)
+  useAdminSelectionHaptics()
 
   const salesModeTariffs = bootstrap?.sales_mode === 'tariffs'
   const loyaltyEnabled = bootstrap?.loyalty_enabled ?? false
@@ -106,13 +113,24 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
   // Бейдж считает заявки вместе с выплатами: иначе выплаты висят
   // незамеченными по несколько дней.
   const partnerPending = useAdminPartnerPending()
+  // Инциденты «Мониторинга» видно с любой страницы админки.
+  const attention = useAdminAttention()
+  const incidentCount = attention.data?.items?.length ?? 0
 
   const navGroups: AdminNavGroup[] = [
     {
       labelKey: 'admin.nav.group.overview',
       items: [
         { to: '/admin', icon: LayoutDashboard, labelKey: 'admin.nav.dashboard' },
+        {
+          to: '/admin/monitoring',
+          icon: Radar,
+          labelKey: 'admin.nav.monitoring',
+          badge: incidentCount,
+          badgeAlert: true,
+        },
         { to: '/admin/stats', icon: BarChart3, labelKey: 'admin.nav.stats' },
+        { to: '/admin/nodes', icon: Network, labelKey: 'admin.nav.nodes' },
       ],
     },
     {
@@ -200,7 +218,12 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
                         <Icon className={cn('size-4 shrink-0', active && 'text-primary')} />
                         <span className="truncate">{t(item.labelKey)}</span>
                         {item.badge ? (
-                          <span className="ml-auto shrink-0 rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+                          <span
+                            className={cn(
+                              'ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold',
+                              item.badgeAlert ? 'bg-rose-500 text-white' : 'bg-primary text-primary-foreground',
+                            )}
+                          >
                             {item.badge}
                           </span>
                         ) : null}

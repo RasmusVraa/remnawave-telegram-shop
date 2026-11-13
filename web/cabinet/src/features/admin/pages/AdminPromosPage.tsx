@@ -43,6 +43,7 @@ import { formatAdminApiError } from '../utils/formatAdminApiError'
 import { truncatePreview } from '../utils/truncatePreview'
 import { formatAdminCustomerLabel } from '../utils/formatAdminCustomerLabel'
 import { resolvePromoDisplayStatus, type PromoDisplayStatus } from '../utils/promoStatus'
+import { AdminSelect } from '../components/AdminSelect'
 
 const PROMO_CODE_PREVIEW_LEN = 6
 
@@ -144,15 +145,13 @@ function CreatePromoModal({
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium">{t('admin.promos.type')}</label>
-            <select
-              className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-              value={form.type}
-              onChange={(e) => set('type', e.target.value)}
-            >
-              {PROMO_TYPES.map((pt) => (
-                <option key={pt} value={pt}>{promoTypeLabel(pt, t)}</option>
-              ))}
-            </select>
+            <AdminSelect
+              value={form.type as string}
+              options={PROMO_TYPES.map((pt) => ({ value: pt as string, label: promoTypeLabel(pt, t) }))}
+              onChange={(next) => set('type', next ?? form.type)}
+              placeholder={t('admin.promos.type')}
+              ariaLabel={t('admin.promos.type')}
+            />
           </div>
           {form.type === 'subscription_days' && (
             <div>
@@ -789,12 +788,15 @@ function EditPromoModal({
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium">{t('admin.promos.tariffId')}</label>
-                <select className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={tariffId} onChange={(e) => setTariffId(e.target.value)}>
-                  <option value="">{t('admin.promos.noTariff')}</option>
-                  {tariffs?.map((tariff) => (
-                    <option key={tariff.id} value={tariff.id}>{tariff.name ?? tariff.slug}</option>
-                  ))}
-                </select>
+                <AdminSelect
+                  value={tariffId || null}
+                  options={(tariffs ?? []).map((tariff) => ({ value: String(tariff.id), label: tariff.name ?? tariff.slug }))}
+                  onChange={(next) => setTariffId(next ?? '')}
+                  allowEmpty
+                  emptyLabel={t('admin.promos.noTariff')}
+                  placeholder={t('admin.promos.noTariff')}
+                  ariaLabel={t('admin.promos.tariffId')}
+                />
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium">{t('admin.promos.discountMaxPayments')}</label>

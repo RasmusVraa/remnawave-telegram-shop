@@ -11,6 +11,10 @@
 
 import { getCookie } from './utils'
 import type {
+  AdminAttentionItemDTO,
+  AdminEventsDTO,
+  AdminMonitoringPeriod,
+  AdminMonitoringSummaryDTO,
   AdminBootstrapDTO,
   AdminBroadcastAudienceDTO,
   AdminBroadcastMediaDTO,
@@ -52,6 +56,7 @@ import type {
   AdminUserPanelDTO,
   AdminUsersListDTO,
   AdminDeviceDTO,
+  AdminNodesDTO,
   AdminInfraNodesDTO,
   AdminInfraProvidersDTO,
   AdminInfraHistoryDTO,
@@ -92,6 +97,70 @@ export type TrafficUsageResponse = {
   /** Байты по дням. */
   points: number[]
   total_bytes: number
+  /** Часть расхода по дням, ушедшая на серверы обхода (та же длина, что `points`). Только при отдельном лимите обхода. */
+  bypass_points?: number[]
+}
+
+/** Раздельный трафик: сводка по обычным серверам и обходу, пакеты докупки. */
+export type TrafficKindInfo = {
+  /** Действующий лимит (тариф + докупленное); 0 — безлимит. */
+  limit_bytes: number
+  base_bytes: number
+  extra_bytes: number
+  used_bytes: number
+}
+
+export type TrafficPack = {
+  id: number
+  bytes: number
+  amount_rub: number
+  amount_stars?: number
+  kind: 'main' | 'bypass'
+}
+
+/** Настройки обхода и пакеты докупки тарифа (админка). */
+export type AdminTariffTraffic = {
+  bypass_limit_bytes: number
+  bypass_squad_uuids: string
+  bypass_node_uuids: string
+  packs: { kind: 'main' | 'bypass'; bytes: number; amount_rub: number; amount_stars?: number; is_active: boolean }[]
+  split_enabled: boolean
+  bypass_label: string
+  /** Действующий лимит обычных серверов тарифа в байтах (0 — безлимит). */
+  main_limit_bytes?: number
+  /** Лимит взят из общей настройки TRAFFIC_LIMIT, а не из тарифа. */
+  main_limit_global?: boolean
+}
+/** Раздельный трафик в карточке пользователя (админка). */
+export type AdminUserTrafficSplit = {
+  enabled: boolean
+  label: string
+  bypass?: {
+    limit_bytes: number
+    base_bytes: number
+    extra_bytes: number
+    used_bytes: number
+    squad_removed: boolean
+    period_start: string
+    checked_at?: string
+  }
+  main_extra_bytes: number
+  extras: { id: number; kind: 'main' | 'bypass'; bytes: number; valid_until: string; paid: boolean }[]
+  nodes: { name: string; bytes: number; bypass: boolean }[]
+}
+export type AdminTrafficNode = { uuid: string; name: string; country_code: string; connected: boolean; tracking_enabled: boolean }
+
+export type MyTrafficResponse = {
+  enabled: boolean
+  can_buy: boolean
+  /** Как называть серверы обхода (настраивает админ). */
+  label: string
+  reset_at: string
+  main: TrafficKindInfo
+  bypass?: TrafficKindInfo
+  bypass_blocked: boolean
+  extras: { kind: 'main' | 'bypass'; bytes: number; valid_until: string }[]
+  packs: TrafficPack[]
 }
 
 export class ApiError extends Error {
@@ -143,6 +212,10 @@ export interface AuthBootstrapResponse {
   partner_max_percent?: number
   /** true при SUPPORT_BOT_API=true — чат поддержки в кабинете вместо внешней ссылки. */
   support_chat_enabled?: boolean
+  /** Скрепка в чате поддержки (включена вместе с чатом) и её лимиты. */
+  support_attachments_enabled?: boolean
+  support_attachments_max_files?: number
+  support_attachments_max_mb?: number
   /** false — только тёмная тема, переключатель в шапке скрыт (CABINET_LIGHT_THEME_ENABLED). */
   light_theme_enabled?: boolean
   /** true — при подключении Happ отдавать зашифрованный deep link (happ://crypt5/…) вместо happ://add/ (CABINET_DEEPLINK_HAPP_ENCRYPT). */
@@ -201,8 +274,8 @@ export interface AuthBootstrapResponse {
     yookassa?: boolean
     cryptopay?: boolean
     telegram?: boolean
+    platega?: boolean
     platega_sbp?: boolean
-    platega_cards?: boolean
     platega_acquiring?: boolean
     platega_worldwide?: boolean
     platega_crypto?: boolean
@@ -210,6 +283,8 @@ export interface AuthBootstrapResponse {
   }
   /** Кнопки ЮKassa по способам (YOOKASA_PAYMENT_METHODS); ["all"] — одна кнопка с формой ЮKassa со всеми способами. */
   yookassa_methods?: string[]
+  /** Кнопки Platega по способам (PLATEGA_PAYMENT_METHODS), порядок как в настройке; ["all"] — общая форма. */
+  platega_methods?: string[]
   /** Способ, выбранный заранее для тех, кто ещё не платил (CABINET_CHECKOUT_DEFAULT_METHOD): «yookassa:sbp», «platega_sbp»…; пусто — не выбран. */
   checkout_default_method?: string
 }
@@ -231,6 +306,22 @@ export interface AdminStatusTargetDTO {
   node_uuid?: string
   exit_node_uuid?: string
   no_external?: boolean
+  /** Порт TCP-пинга — тот, на котором подключаются клиенты. 0 или пусто — 443. */
+  tcp_port?: number
+}
+
+/** Ответ кнопки «Тест» в «Оповещениях админу» (internal/adminalert.TestResult). */
+export interface AdminAlertTestResult {
+  ok: boolean
+  /** Ушло в личку админу: общий чат и чат вида не заданы. */
+  direct: boolean
+  chat_id?: number
+  thread_id?: number
+  chat_title?: string
+  /** Текст ошибки Telegram. */
+  error?: string
+  /** not_member | no_thread | topic_closed */
+  hint?: string
 }
 
 export interface AdminStatusNodeDTO {
@@ -279,6 +370,8 @@ export interface PublicStatusResponse {
   probe_world?: number
   probe_russia?: number
   probe_interval_min?: number
+  /** Сколько зондов из России должны не ответить, чтобы сервер стал «частично» (STATUS_RU_FAIL_THRESHOLD). */
+  ru_fail_threshold?: number
   title?: string
   lead?: string
   nodes: {
@@ -395,6 +488,9 @@ export interface TariffItem {
   months: number
   device_limit: number
   traffic_gb: number | null
+  /** Лимит обхода у тарифа, ГБ (раздельный трафик); нет — отдельного лимита нет. */
+  bypass_gb?: number | null
+  bypass_label?: string
   is_popular?: boolean
   /** Площадки «своего сервера». Пусто — выбор локации на оплате не нужен. */
   locations?: TariffLocationItem[]
@@ -432,6 +528,9 @@ interface TariffViewDTO {
   device_limit: number
   traffic_limit_bytes: number
   traffic_limit_reset_strategy?: string
+  bypass_traffic_limit_bytes?: number
+  bypass_label?: string
+  is_popular?: boolean
   prices: TariffPriceDTO[]
   locations?: TariffLocationItem[]
 }
@@ -467,6 +566,8 @@ export function normalizeTariffsResponse(raw: TariffsRawResponse): TariffsRespon
         t.name != null && String(t.name).trim() !== '' ? String(t.name) : slugStr
       const tid = typeof t.id === 'number' ? t.id : null
       const trafficGb = trafficBytesToGb(Number(t.traffic_limit_bytes) || 0)
+      const bypassBytes = Number((t as Partial<TariffViewDTO>).bypass_traffic_limit_bytes) || 0
+      const bypassGb = bypassBytes > 0 ? trafficBytesToGb(bypassBytes) : null
       const devLim = typeof t.device_limit === 'number' ? t.device_limit : 0
       const desc =
         t.description != null && String(t.description).trim() !== '' ? String(t.description).trim() : null
@@ -496,6 +597,9 @@ export function normalizeTariffsResponse(raw: TariffsRawResponse): TariffsRespon
           device_limit: devLim,
           traffic_gb: trafficGb,
           locations,
+          bypass_gb: bypassGb,
+          bypass_label: typeof t.bypass_label === 'string' ? t.bypass_label : undefined,
+          is_popular: t.is_popular === true,
         })
       }
       continue
@@ -582,6 +686,19 @@ export interface HwidExtraPreviewResponse {
   target_limit: number
   delta: number
   days_left: number
+  amount_rub: number
+  base_amount_rub: number
+  currency: string
+  loyalty_discount_pct?: number
+  promo_discount_pct?: number
+  total_discount_pct?: number
+}
+
+/** Цена пакета трафика с учётом скидок (лояльность, промокод). */
+export interface TrafficPackPreviewResponse {
+  pack_id: number
+  bytes: number
+  kind: 'main' | 'bypass'
   amount_rub: number
   base_amount_rub: number
   currency: string
@@ -738,6 +855,8 @@ export interface PaymentPreviewResponse {
 }
 
 export interface PaymentStatusResponse {
+  traffic_pack_kind?: string
+  traffic_pack_bytes?: number
   status: 'new' | 'pending' | 'paid' | 'failed' | 'expired'
   subscription_link: string | null
   /** paid: subscription | extra_hwid | tariff_upgrade — для текста успеха. */
@@ -931,13 +1050,26 @@ export interface PartnerPayoutDTO {
   processed_at?: string
 }
 
+/** Изображение в сообщении чата поддержки; байты — supportAttachmentBlob(id). */
+export interface SupportAttachmentDTO {
+  id: number
+  mime: string
+  width?: number
+  height?: number
+  size?: number
+  /** Есть у картинок, ушедших файлом (HEIC, TIFF, GIF…). */
+  name?: string
+}
+
 export interface SupportMessageDTO {
   id: number
   direction: 'in' | 'out'
+  /** Пустой у сообщения из одних картинок. */
   text: string
   author_label?: string
   delivery_status?: 'pending' | 'sent' | 'failed'
   created_at: string
+  attachments?: SupportAttachmentDTO[]
 }
 
 export interface SupportSummaryResponse {
@@ -1138,6 +1270,32 @@ async function request<T>(
   if (res.status === 204) return undefined as T
 
   return res.json() as Promise<T>
+}
+
+/**
+ * Запрос с произвольным телом (FormData) или ответом (Blob) — то, что не умеет
+ * JSON-шный request. Авторизация, CSRF и одно обновление токена — как у него.
+ */
+async function rawRequest(method: string, path: string, body?: BodyInit, retrying = false): Promise<Response> {
+  const headers: Record<string, string> = {}
+  const csrf = readCsrfCookie()
+  if (csrf) headers['X-CSRF-Token'] = csrf
+  const token = _authRef?.getAccessToken()
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(BASE + path, { method, headers, body, credentials: 'include' })
+
+  if (res.status === 401 && !retrying) {
+    const newToken = await doRefresh()
+    if (newToken) return rawRequest(method, path, body, true)
+    _authRef?.logout()
+    throw new ApiError(401, 'Session expired')
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new ApiError(res.status, text)
+  }
+  return res
 }
 
 /** Собирает ?limit=&offset= для листингов с пагинацией. */
@@ -1422,8 +1580,21 @@ export const api = {
 
   supportConversation: () => request<SupportConversationResponse>('GET', '/support/conversation'),
 
-  supportSendMessage: (text: string) =>
-    request<SupportMessageDTO>('POST', '/support/messages', { text }),
+  /** Сообщение в поддержку; с файлами — multipart (поле text + части files). */
+  supportSendMessage: async (text: string, files: File[] = []): Promise<SupportMessageDTO> => {
+    if (files.length === 0) return request<SupportMessageDTO>('POST', '/support/messages', { text })
+    const form = new FormData()
+    form.append('text', text)
+    for (const f of files) form.append('files', f, f.name)
+    const res = await rawRequest('POST', '/support/messages', form)
+    return res.json() as Promise<SupportMessageDTO>
+  },
+
+  /** Картинка из чата: <img> не шлёт Authorization, поэтому — fetch и Blob. */
+  supportAttachmentBlob: async (id: number): Promise<Blob> => {
+    const res = await rawRequest('GET', `/support/attachments/${id}`)
+    return res.blob()
+  },
 
   supportMarkRead: () => request<{ ok: boolean }>('POST', '/support/read'),
 
@@ -1456,6 +1627,23 @@ export const api = {
 
   trafficUsage: () =>
     request<TrafficUsageResponse>('GET', '/me/traffic-usage'),
+
+  myTraffic: () => request<MyTrafficResponse>('GET', '/me/traffic'),
+
+  trafficPackPreview: (packId: number, provider?: string) => {
+    const q = new URLSearchParams()
+    q.set('pack_id', String(packId))
+    if (provider) q.set('provider', provider)
+    return request<TrafficPackPreviewResponse>('GET', `/payments/traffic/preview?${q.toString()}`)
+  },
+
+  trafficPackCheckout: (packId: number, provider: string, idempotencyKey: string, yookassaMethod?: string) =>
+    request<CheckoutResponse>(
+      'POST',
+      '/payments/traffic/checkout',
+      { pack_id: packId, provider, ...(yookassaMethod ? { yookassa_method: yookassaMethod } : {}) },
+      { 'Idempotency-Key': idempotencyKey },
+    ),
 
   deleteDevice: (hwid: string) =>
     request<{ ok: boolean }>('POST', '/me/devices/delete', { hwid }),
@@ -1574,9 +1762,11 @@ export const api = {
   adminLoyaltyStats: () => request<AdminLoyaltyStatsDTO>('GET', '/admin/stats/loyalty'),
   adminPromoStats: () => request<AdminPromoStatsDTO>('GET', '/admin/stats/promos'),
 
-  adminUsers: (params?: { scope?: string; page?: number; limit?: number }) => {
+  adminUsers: (params?: { scope?: string; page?: number; limit?: number; sort?: string; dir?: string }) => {
     const q = new URLSearchParams()
     q.set('scope', params?.scope ?? 'all')
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.sort && params.dir) q.set('dir', params.dir)
     if (params?.page != null) q.set('page', String(params.page))
     if (params?.limit != null) q.set('limit', String(params.limit))
     const suffix = q.toString() ? `?${q.toString()}` : ''
@@ -1638,10 +1828,12 @@ export const api = {
 
   adminSquads: () => request<{ items: { uuid: string; name: string }[] }>('GET', '/admin/squads'),
 
-  adminPayments: (params?: { status?: string; q?: string; page?: number; limit?: number }) => {
+  adminPayments: (params?: { status?: string; q?: string; page?: number; limit?: number; sort?: string; dir?: string }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.q) q.set('q', params.q)
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.sort && params.dir) q.set('dir', params.dir)
     if (params?.page != null) q.set('page', String(params.page))
     if (params?.limit != null) q.set('limit', String(params.limit))
     const suffix = q.toString() ? `?${q.toString()}` : ''
@@ -1649,10 +1841,12 @@ export const api = {
   },
   adminPayment: (id: number) => request<AdminPaymentDetailDTO>('GET', `/admin/payments/${id}`),
   /** Скачивает CSV с учётом текущего фильтра и триггерит сохранение файла в браузере. */
-  adminPaymentsExportCsv: async (params?: { status?: string; q?: string }) => {
+  adminPaymentsExportCsv: async (params?: { status?: string; q?: string; sort?: string; dir?: string }) => {
     const q = new URLSearchParams()
     if (params?.status) q.set('status', params.status)
     if (params?.q) q.set('q', params.q)
+    if (params?.sort) q.set('sort', params.sort)
+    if (params?.sort && params.dir) q.set('dir', params.dir)
     const suffix = q.toString() ? `?${q.toString()}` : ''
 
     const headers: Record<string, string> = {}
@@ -1715,6 +1909,17 @@ export const api = {
   // Состав сквадов тарифа: сколько людей уже на тарифе и как идёт применение.
   adminTariffSquads: (id: number) =>
     request<AdminTariffSquadsPreviewDTO>('GET', `/admin/tariffs/${id}/squads`),
+  // Раздельный трафик: лимит обхода, ноды обхода, пакеты докупки.
+  adminUserTrafficSplit: (id: number) => request<AdminUserTrafficSplit>('GET', `/admin/users/${id}/traffic-split`),
+  adminUserTrafficGrant: (id: number, kind: 'main' | 'bypass', bytes: number) =>
+    request<AdminOkDTO>('POST', `/admin/users/${id}/traffic-split/grant`, { kind, bytes }),
+  adminUserTrafficRevoke: (id: number, extraId: number) =>
+    request<AdminOkDTO>('DELETE', `/admin/users/${id}/traffic-split/extras/${extraId}`),
+  adminTariffTraffic: (id: number) => request<AdminTariffTraffic>('GET', `/admin/tariffs/${id}/traffic`),
+  adminTariffTrafficSave: (id: number, body: AdminTariffTraffic) =>
+    request<AdminTariffTraffic>('PUT', `/admin/tariffs/${id}/traffic`, body),
+  adminTariffTrafficNodes: (id: number, squads: string[]) =>
+    request<AdminTrafficNode[]>('GET', `/admin/tariffs/${id}/traffic/nodes?squads=${encodeURIComponent(squads.join(','))}`),
   adminTariffSquadsApply: (id: number, body: { add: string[]; remove: string[] }) =>
     request<AdminTariffSquadsRunDTO>('POST', `/admin/tariffs/${id}/squads/apply`, body),
 
@@ -1863,6 +2068,31 @@ export const api = {
   adminBroadcastHistoryItem: (id: number) =>
     request<AdminBroadcastHistoryItemDTO>('GET', `/admin/broadcast/history/${id}`),
 
+  adminNodes: () => request<AdminNodesDTO>('GET', '/admin/nodes'),
+  adminMonitoringEvents: (params: {
+    afterId?: number
+    beforeId?: number
+    categories?: string[]
+    botActions?: boolean
+    customerId?: number
+    /** Не старше этого момента, мс от эпохи. */
+    sinceMs?: number
+    limit?: number
+  }) => {
+    const q = new URLSearchParams()
+    if (params.sinceMs) q.set('since', String(Math.floor(params.sinceMs / 1000)))
+    if (params.afterId) q.set('after_id', String(params.afterId))
+    if (params.beforeId) q.set('before_id', String(params.beforeId))
+    if (params.categories?.length) q.set('categories', params.categories.join(','))
+    if (params.botActions) q.set('bot_actions', '1')
+    if (params.customerId) q.set('customer_id', String(params.customerId))
+    if (params.limit) q.set('limit', String(params.limit))
+    const qs = q.toString()
+    return request<AdminEventsDTO>('GET', `/admin/monitoring/events${qs ? `?${qs}` : ''}`)
+  },
+  adminMonitoringSummary: (period: AdminMonitoringPeriod) =>
+    request<AdminMonitoringSummaryDTO>('GET', `/admin/monitoring/summary?period=${period}`),
+  adminAttention: () => request<{ items: AdminAttentionItemDTO[] }>('GET', '/admin/attention'),
   adminInfraNodes: () => request<AdminInfraNodesDTO>('GET', '/admin/infra/nodes'),
   adminInfraCreateNode: (body: { provider_uuid: string; node_uuid: string; next_billing_at?: string }) =>
     request<AdminInfraNodesDTO>('POST', '/admin/infra/nodes', body),
@@ -1894,6 +2124,10 @@ export const api = {
     request<{ targets: AdminStatusTargetDTO[] }>('PUT', '/admin/status/targets', { targets }),
 
   adminStatusProbe: () => request<{ ok: boolean }>('POST', '/admin/status/probe'),
+
+  /** Пробное оповещение админу. draft — чат и тема из формы, ещё не сохранённые. */
+  adminAlertTest: (body: { kind: string; draft?: { shared_chat_id: string; chat_id: string; thread_id: string } }) =>
+    request<AdminAlertTestResult>('POST', '/admin/alerts/test', body),
 
   adminStatusNodes: () => request<{ nodes: AdminStatusNodeDTO[] }>('GET', '/admin/status/nodes'),
 

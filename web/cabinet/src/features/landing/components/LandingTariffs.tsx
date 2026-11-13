@@ -7,7 +7,6 @@ import { api, type TariffItem, type TariffsResponse } from '@/lib/api'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { formatDecimals, formatInteger } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { LANDING_POPULAR_PLAN_PATTERNS } from '../landingContent'
 import { logLandingMockHint, readLandingTariffsMock } from '../landingTariffsMock'
 import type { LandingBrand } from '../useLandingBrand'
 import { useCardSpotlight } from './LandingMotion'
@@ -47,14 +46,13 @@ function cardFromItem(item: TariffItem, monthPrice: number): TariffCardData {
   const perMonth = item.months > 0 ? item.price_rub / item.months : item.price_rub
   const pct =
     monthPrice > 0 && perMonth < monthPrice ? Math.round((1 - perMonth / monthPrice) * 100) : 0
-  const haystack = `${item.slug} ${item.name}`.toLowerCase()
   return {
     key: item.slug,
     name: item.name,
     priceRub: item.price_rub,
     perMonthRub: perMonth,
     savingsPct: pct,
-    featured: LANDING_POPULAR_PLAN_PATTERNS.some((p) => haystack.includes(p)),
+    featured: item.is_popular === true,
   }
 }
 
@@ -64,7 +62,7 @@ function PaymentLine() {
   const providers = data?.payment_providers
   const labels = [
     providers?.platega_sbp ? t('landing.tariffs.pay.sbp') : null,
-    providers?.yookassa || providers?.platega_cards || providers?.platega_acquiring
+    providers?.yookassa || providers?.platega_acquiring
       ? t('landing.tariffs.pay.card')
       : null,
     providers?.cryptopay || providers?.platega_crypto || providers?.heleket
@@ -120,8 +118,7 @@ function buildPeriodCards(
 
 /**
  * tariffs-режим: карточки — тарифы, крупная цена за месяц.
- * Бэкенд флага «популярный» не отдаёт (в Go его нет), поэтому определяем
- * по названию/слагу — список шаблонов лежит в landingContent.ts.
+ * Нашивка «Популярный» — у тарифа, отмеченного в админке (is_popular).
  */
 function buildPlanCards(tariffs: TariffItem[]): TariffCardData[] {
   const bySlug = new Map<string, TariffItem[]>()
@@ -135,14 +132,13 @@ function buildPlanCards(tariffs: TariffItem[]): TariffCardData[] {
     list.sort((a, b) => a.months - b.months)
     const head = list[0]
     const monthly = head.monthly_base_rub || head.price_rub
-    const haystack = `${slug} ${head.name}`.toLowerCase()
     return {
       key: slug,
       name: head.name,
       priceRub: monthly,
       perMonthRub: monthly,
       savingsPct: 0,
-      featured: LANDING_POPULAR_PLAN_PATTERNS.some((p) => haystack.includes(p)),
+      featured: head.is_popular === true,
     }
   })
 }

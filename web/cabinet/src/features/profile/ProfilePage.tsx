@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAuthStore } from '@/store/auth'
 import { api } from '@/lib/api'
+import { hapticSelection } from '@/lib/haptic'
 import { cn, formatDate, maskEmail } from '@/lib/utils'
 import { shareLink } from '@/lib/share'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
@@ -138,7 +139,10 @@ export default function ProfilePage() {
                   ? 'bg-secondary text-primary shadow-sm'
                   : 'text-muted-foreground hover:text-foreground',
               )}
-              onClick={() => goTab(id)}
+              onClick={() => {
+                if (tab !== id) hapticSelection()
+                goTab(id)
+              }}
             >
               <Icon
                 className={cn('size-3.5 shrink-0', tab !== id && 'opacity-90')}

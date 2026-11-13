@@ -4,6 +4,7 @@ import { X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { hapticSelection } from '@/lib/haptic'
 import { AppTile, PlatformIcon, platformLabel } from './glyphs'
 import type { GuideText } from './guideText'
 import type { AppGuide, PlatformKey } from './types'
@@ -168,7 +169,10 @@ export function DevicePicker({ open, onClose, text, platforms, platform, onPlatf
             <button
               key={p}
               type="button"
-              onClick={() => onPlatform(p)}
+              onClick={() => {
+                if (p !== platform) hapticSelection()
+                onPlatform(p)
+              }}
               aria-pressed={p === platform}
               className={cn(
                 'flex flex-col items-center gap-1.5 rounded-2xl border px-1.5 py-3 text-[13px] font-semibold transition-colors',
@@ -189,7 +193,10 @@ export function DevicePicker({ open, onClose, text, platforms, platform, onPlatf
             <button
               key={app.id}
               type="button"
-              onClick={() => onApp(app.id)}
+              onClick={() => {
+                if (app.id !== appId) hapticSelection()
+                onApp(app.id)
+              }}
               aria-pressed={app.id === appId}
               className={cn(
                 'flex items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition-colors',

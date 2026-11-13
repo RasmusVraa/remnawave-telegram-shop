@@ -175,6 +175,67 @@ func (h *PaymentsHandler) HwidPreview(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, result)
 }
 
+type trafficCheckoutReq struct {
+	PackID         int64  `json:"pack_id"`
+	Provider       string `json:"provider"`
+	YookassaMethod string `json:"yookassa_method,omitempty"`
+}
+
+// TrafficPreview — GET /cabinet/api/payments/traffic/preview?pack_id=&provider=: цена пакета с учётом скидок.
+func (h *PaymentsHandler) TrafficPreview(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	packID, err := strconv.ParseInt(strings.TrimSpace(r.URL.Query().Get("pack_id")), 10, 64)
+	if err != nil || packID <= 0 {
+		http.Error(w, "bad pack_id", http.StatusBadRequest)
+		return
+	}
+	result, err := h.svc.PreviewTrafficPack(r.Context(), claims.AccountID, packID, strings.TrimSpace(r.URL.Query().Get("provider")))
+	if err != nil {
+		writePaymentsErr(w, err, "traffic_preview")
+		return
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, result)
+}
+
+// TrafficCheckout — POST /cabinet/api/payments/traffic/checkout.
+func (h *PaymentsHandler) TrafficCheckout(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req trafficCheckoutReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	result, err := h.svc.CreateTrafficPack(r.Context(), claims.AccountID, payments.TrafficPackCreateRequest{
+		PackID:         req.PackID,
+		Provider:       req.Provider,
+		YookassaMethod: strings.ToLower(strings.TrimSpace(req.YookassaMethod)),
+		IdempotencyKey: strings.TrimSpace(r.Header.Get("Idempotency-Key")),
+	})
+	if err != nil {
+		writePaymentsErr(w, err, "traffic_checkout")
+		return
+	}
+	status := http.StatusCreated
+	if result.Reused {
+		status = http.StatusOK
+	} else {
+		cabmetrics.RecordCheckoutStarted(result.Provider)
+	}
+	writeJSON(w, status, result)
+}
+
 // HwidCheckout — POST /cabinet/api/payments/hwid/checkout.
 func (h *PaymentsHandler) HwidCheckout(w http.ResponseWriter, r *http.Request) {
 	claims := middleware.AuthClaims(r)

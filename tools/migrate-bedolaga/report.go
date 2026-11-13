@@ -11,10 +11,10 @@ import (
 )
 
 type problemRow struct {
-	Code       string `json:"code"`
-	Entity     string `json:"entity"`
-	Ref        string `json:"ref"`
-	Message    string `json:"message"`
+	Code    string `json:"code"`
+	Entity  string `json:"entity"`
+	Ref     string `json:"ref"`
+	Message string `json:"message"`
 }
 
 type customerReportRow struct {
@@ -39,25 +39,25 @@ type tariffReportRow struct {
 }
 
 type summaryReport struct {
-	DryRun              bool     `json:"dry_run"`
-	Step                string   `json:"step"`
-	BedolagaGeneration  string   `json:"bedolaga_generation_hint"`
-	Warnings            []string `json:"warnings"`
-	TariffsOK           int      `json:"tariffs_ok"`
-	CustomersOK         int      `json:"customers_ok"`
-	CustomersCabinet    int      `json:"customers_cabinet"`
-	BalanceApplied      int      `json:"balance_applied"`
-	ReferralsOK         int      `json:"referrals_ok"`
-	Problems            int      `json:"problems"`
+	DryRun             bool     `json:"dry_run"`
+	Step               string   `json:"step"`
+	BedolagaGeneration string   `json:"bedolaga_generation_hint"`
+	Warnings           []string `json:"warnings"`
+	TariffsOK          int      `json:"tariffs_ok"`
+	CustomersOK        int      `json:"customers_ok"`
+	CustomersCabinet   int      `json:"customers_cabinet"`
+	BalanceApplied     int      `json:"balance_applied"`
+	ReferralsOK        int      `json:"referrals_ok"`
+	Problems           int      `json:"problems"`
 }
 
 type reporter struct {
-	dir      string
-	mu       sync.Mutex
-	problems []problemRow
+	dir       string
+	mu        sync.Mutex
+	problems  []problemRow
 	customers []customerReportRow
-	tariffs  []tariffReportRow
-	summary  summaryReport
+	tariffs   []tariffReportRow
+	summary   summaryReport
 }
 
 func newReporter(dir string) (*reporter, error) {

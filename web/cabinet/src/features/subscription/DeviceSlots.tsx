@@ -10,7 +10,9 @@ import { ConfirmModal } from '@/components/ConfirmModal'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { api, type HwidExtraPreviewResponse, type SubscriptionHwidExtraInfo } from '@/lib/api'
+import { hapticSuccess } from '@/lib/haptic'
 import { formatNumber } from '@/lib/format'
+import { hapticSelection } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useSheetDragDismiss } from '@/hooks/useSheetDragDismiss'
@@ -29,8 +31,8 @@ import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 
 const PRICE_PROVIDER_ORDER = [
   'yookassa',
+  'platega',
   'platega_sbp',
-  'platega_cards',
   'platega_acquiring',
   'platega_worldwide',
   'platega_crypto',
@@ -274,6 +276,7 @@ export function DeviceSlotsModal({
     mutationFn: (limit: number) => api.hwidExtraApply(limit),
     onSuccess: () => {
       setConfirmOpen(false)
+      hapticSuccess()
       toast.success(t('subscriptionPage.slotsDecreaseDone'))
       onUpdated()
       onClose()
@@ -345,7 +348,10 @@ export function DeviceSlotsModal({
               type="button"
               aria-label={t('subscriptionPage.slotsStepDown')}
               disabled={target <= min}
-              onClick={() => setTarget((v) => Math.max(min, v - 1))}
+              onClick={() => {
+                hapticSelection()
+                setTarget((v) => Math.max(min, v - 1))
+              }}
               className="inline-flex size-12 items-center justify-center rounded-full border border-border bg-muted/40 text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-35"
             >
               <Minus size={18} />
@@ -362,7 +368,10 @@ export function DeviceSlotsModal({
               type="button"
               aria-label={t('subscriptionPage.slotsStepUp')}
               disabled={target >= max}
-              onClick={() => setTarget((v) => Math.min(max, v + 1))}
+              onClick={() => {
+                hapticSelection()
+                setTarget((v) => Math.min(max, v + 1))
+              }}
               className="inline-flex size-12 items-center justify-center rounded-full border border-border bg-muted/40 text-foreground transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-35"
             >
               <Plus size={18} />

@@ -33,12 +33,12 @@ type AdminTariffTimeSeries struct {
 
 // AdminStatsTimeSeries — ответ timeseries для админ-графиков.
 type AdminStatsTimeSeries struct {
-	CapturedAt  time.Time
-	Period      string
-	Granularity string
-	From        string
-	To          string
-	Points      []AdminStatsTimeSeriesPoint
+	CapturedAt   time.Time
+	Period       string
+	Granularity  string
+	From         string
+	To           string
+	Points       []AdminStatsTimeSeriesPoint
 	TariffSeries []AdminTariffTimeSeries
 }
 

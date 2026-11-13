@@ -106,7 +106,7 @@ export function HistoryPagination({
 
 /**
  * Значок способа оплаты — тот же словарь, что в выборе метода на чекауте
- * (CheckoutPage / PlategaPaymentExpand): карта, СБП, крипта, Telegram.
+ * (CheckoutPage): карта, СБП, крипта, Telegram.
  */
 export function PaymentMethodIcon({ invoiceType, className }: { invoiceType: string; className?: string }) {
   const size = cn('size-4 shrink-0', className)
@@ -118,6 +118,8 @@ export function PaymentMethodIcon({ invoiceType, className }: { invoiceType: str
       return <CreditCard className={cn(size, 'text-violet-500')} aria-hidden />
     case 'plt_ww':
       return <CreditCard className={cn(size, 'text-indigo-500')} aria-hidden />
+    case 'platega':
+      return <CreditCard className={cn(size, 'text-primary')} aria-hidden />
     case 'plt_sbp':
       return <Wallet className={cn(size, 'text-primary')} aria-hidden />
     case 'crypto':
@@ -153,6 +155,8 @@ export function invoiceLabel(t: (k: string) => string, invoiceType: string): str
       return t('payments.methodTelegram')
     case 'tribute':
       return t('payments.methodTribute')
+    case 'platega':
+      return t('payments.methodPlatega')
     case 'plt_sbp':
       return t('payments.methodSbp')
     case 'plt_cards':
@@ -196,6 +200,8 @@ export function purchaseKindLabel(
       return t('payments.kindUpgrade')
     case 'extra_hwid':
       return extra > 0 ? t('payments.kindExtraHwidSlots', { n: extra }) : t('payments.kindExtraHwid')
+    case 'extra_traffic':
+      return t('payments.kindExtraTraffic')
     case 'subscription_with_hwid':
       return t('payments.kindSubscriptionWithHwid', { months: p.month, n: extra })
     default:

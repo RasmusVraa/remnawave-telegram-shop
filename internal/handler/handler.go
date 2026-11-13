@@ -89,6 +89,7 @@ func NewHandler(
 
 // ForwardUserMessageToAdmin пересылает все не-командные сообщения пользователей админу
 func (h Handler) ForwardUserMessageToAdmin(ctx context.Context, b *bot.Bot, update *models.Update) {
+	emitBotMessage(update)
 	if !config.ForwardUserMessagesToAdmin() {
 		return
 	}

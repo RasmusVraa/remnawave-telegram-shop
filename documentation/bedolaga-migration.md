@@ -110,6 +110,5 @@ go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step referrals
 ## Требования к целевому боту
 
 - Схема БД актуальна (миграции при старте бота)
-- Желательно `SALES_MODE=tariffs`
 - Remnawave **3.3.\*–3.4.\*** (та же панель, к которой ходит Meows)
 - Перед apply лучше остановить бота Bedolaga, чтобы не плодить новые оплаты в старую БД

@@ -51,6 +51,17 @@ export interface ButtonProps
    * Переход на другую страницу отслеживается сам (lib/navPending.ts).
    */
   loading?: boolean
+  /**
+   * Спиннер вне потока, с этими классами позиции (`absolute …`). Для кнопок-карточек
+   * с колонкой внутри (период тарифа): обычная обёртка-строка со спиннером
+   * перекладывает их содержимое в ряд.
+   */
+  overlaySpinnerClassName?: string
+  /**
+   * Спиннер встаёт прямо в раскладку кнопки на место первой иконки, без обёртки-строки.
+   * Для кнопок-колонок «значок над подписью» (вход через соцсети).
+   */
+  spinnerInFlow?: boolean
 }
 
 function isPromiseLike(v: unknown): v is PromiseLike<unknown> {
@@ -64,7 +75,7 @@ function isPromiseLike(v: unknown): v is PromiseLike<unknown> {
 const spinner = <Spinner />
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, children, disabled, onClick, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, overlaySpinnerClassName, spinnerInFlow = false, children, disabled, onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button'
     const innerRef = React.useRef<HTMLButtonElement | null>(null)
     const setRefs = React.useCallback(
@@ -108,6 +119,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {asChild && busy ? spinner : null}
         {asChild ? (
           <Slottable>{children}</Slottable>
+        ) : busy && overlaySpinnerClassName ? (
+          // Спиннер после детей: правило `.cabinet-btn-spinner + svg` не должно прятать их иконки.
+          <>
+            {children}
+            <Spinner className={overlaySpinnerClassName} />
+          </>
+        ) : busy && spinnerInFlow ? (
+          // contents: спиннер и дети — прямые участники флекса кнопки; иконку прячет `.cabinet-btn-spinner + svg`.
+          <span className="contents">
+            {spinner}
+            {children}
+          </span>
         ) : busy ? (
           <span className="inline-flex w-full min-w-0 items-center justify-center gap-2">
             {spinner}

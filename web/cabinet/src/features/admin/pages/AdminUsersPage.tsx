@@ -17,6 +17,8 @@ import type { LucideIcon } from 'lucide-react'
 
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
+import { HeaderFilter } from '../components/HeaderFilter'
+import { SortableTh, nextSort, type SortDir, type SortState } from '../components/SortableTh'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
@@ -47,6 +49,21 @@ const SCOPES = ['all', 'active', 'inactive', 'expiring', 'trial'] as const
 type Scope = (typeof SCOPES)[number]
 
 const PAGE_LIMIT = 20
+
+/** Колонки, по которым сортирует сервер, и направление первого клика по ним. */
+const SORT_FIRST_DIR: Record<string, SortDir> = {
+  id: 'desc',
+  telegram_id: 'asc',
+  username: 'asc',
+  expire_at: 'asc',
+  status: 'asc',
+  tariff: 'asc',
+}
+
+function parseSort(key: string | null, dir: string | null): SortState | null {
+  if (!key || !(key in SORT_FIRST_DIR)) return null
+  return { key, dir: dir === 'desc' ? 'desc' : 'asc' }
+}
 
 function statusBadge(status: string, t: (k: string) => string) {
   const map: Record<string, { labelKey: string; cls: string }> = {
@@ -168,6 +185,7 @@ interface ListState {
   scope: Scope
   page: number
   q: string
+  sort: SortState | null
 }
 
 function readStoredListState(): ListState | null {
@@ -177,7 +195,8 @@ function readStoredListState(): ListState | null {
     const parsed = JSON.parse(raw) as Partial<ListState>
     const scope = SCOPES.includes(parsed.scope as Scope) ? (parsed.scope as Scope) : 'all'
     const page = Number.isFinite(parsed.page) ? Math.max(1, Number(parsed.page)) : 1
-    return { scope, page, q: typeof parsed.q === 'string' ? parsed.q : '' }
+    const sort = parseSort(parsed.sort?.key ?? null, parsed.sort?.dir ?? null)
+    return { scope, page, q: typeof parsed.q === 'string' ? parsed.q : '', sort }
   } catch {
     // Приватный режим или переполненное хранилище — не повод ломать страницу.
     return null
@@ -193,6 +212,9 @@ export default function AdminUsersPage() {
   const scope: Scope = SCOPES.includes(paramScope as Scope) ? (paramScope as Scope) : 'all'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const urlQuery = searchParams.get('q') ?? ''
+  const sortKeyParam = searchParams.get('sort')
+  const sortDirParam = searchParams.get('dir')
+  const sort = useMemo(() => parseSort(sortKeyParam, sortDirParam), [sortKeyParam, sortDirParam])
 
   const [searchQuery, setSearchQuery] = useState(urlQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(urlQuery)
@@ -206,11 +228,16 @@ export default function AdminUsersPage() {
         scope: next.scope ?? scope,
         page: next.page ?? page,
         q: next.q ?? urlQuery,
+        sort: next.sort === undefined ? sort : next.sort,
       }
       const params: Record<string, string> = {}
       if (state.scope !== 'all') params.scope = state.scope
       if (state.page > 1) params.page = String(state.page)
       if (state.q.trim()) params.q = state.q
+      if (state.sort) {
+        params.sort = state.sort.key
+        params.dir = state.sort.dir
+      }
       setSearchParams(params, { replace: true })
       try {
         sessionStorage.setItem(LIST_STATE_KEY, JSON.stringify(state))
@@ -218,14 +245,14 @@ export default function AdminUsersPage() {
         /* ignore */
       }
     },
-    [page, scope, setSearchParams, urlQuery],
+    [page, scope, setSearchParams, sort, urlQuery],
   )
 
   // Возврат по крошкам или через меню: адрес чистый, восстанавливаем из памяти.
   useEffect(() => {
     if (searchParams.toString() !== '') return
     const stored = readStoredListState()
-    if (!stored || (stored.scope === 'all' && stored.page === 1 && !stored.q)) return
+    if (!stored || (stored.scope === 'all' && stored.page === 1 && !stored.q && !stored.sort)) return
     setSearchQuery(stored.q)
     setDebouncedSearch(stored.q)
     applyListState(stored)
@@ -241,7 +268,7 @@ export default function AdminUsersPage() {
 
   const isSearching = debouncedSearch.trim().length > 0
 
-  const listQuery = useAdminUsers({ scope, page, limit: PAGE_LIMIT })
+  const listQuery = useAdminUsers({ scope, page, limit: PAGE_LIMIT, sort: sort?.key, dir: sort?.dir })
   const searchResult = useAdminUserSearch(debouncedSearch)
   const { data: tariffs } = useAdminTariffList()
 
@@ -257,6 +284,12 @@ export default function AdminUsersPage() {
       }, 350)
     },
     [applyListState, debounceRef],
+  )
+
+  // Поиск отдаёт до 24 совпадений в порядке релевантности — сортировать там нечего.
+  const onSort = useCallback(
+    (key: string) => applyListState({ sort: nextSort(sort, key, SORT_FIRST_DIR[key] ?? 'asc'), page: 1 }),
+    [applyListState, sort],
   )
 
   const items = isSearching ? (searchResult.data?.items ?? []) : (listQuery.data?.items ?? [])
@@ -289,7 +322,7 @@ export default function AdminUsersPage() {
 
         {/* Scope tabs */}
         {!isSearching && (
-          <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 pb-0.5">
+          <div className="-mx-1 overflow-x-auto md:hidden overscroll-x-contain px-1 pb-0.5">
             <div className="inline-flex min-w-full gap-1 rounded-lg border border-border/50 bg-card/50 p-1 sm:min-w-0 sm:w-full">
               {SCOPES.map((s) => (
                 <button
@@ -340,24 +373,37 @@ export default function AdminUsersPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      <th className="w-[1%] whitespace-nowrap px-3 py-2">
+                      <SortableTh sortKey="id" sort={sort} onSort={onSort} disabled={isSearching} className="w-[1%] whitespace-nowrap">
                         <HeadCell icon={Hash} label={t('admin.users.id')} />
-                      </th>
-                      <th className="w-[9rem] max-w-[9rem] px-3 py-2">
+                      </SortableTh>
+                      <SortableTh sortKey="telegram_id" sort={sort} onSort={onSort} disabled={isSearching} className="w-[9rem] max-w-[9rem]">
                         <HeadCell icon={Send} label={t('admin.users.telegramId')} />
-                      </th>
-                      <th className="px-3 py-2">
+                      </SortableTh>
+                      <SortableTh sortKey="username" sort={sort} onSort={onSort} disabled={isSearching}>
                         <HeadCell icon={AtSign} label={t('admin.users.username')} />
-                      </th>
-                      <th className="hidden px-3 py-2 sm:table-cell">
+                      </SortableTh>
+                      <SortableTh sortKey="expire_at" sort={sort} onSort={onSort} disabled={isSearching} className="hidden sm:table-cell">
                         <HeadCell icon={CalendarClock} label={t('admin.users.expireAt')} />
-                      </th>
-                      <th className="px-3 py-2">
+                      </SortableTh>
+                      <SortableTh
+                        sortKey="status"
+                        sort={sort}
+                        onSort={onSort}
+                        disabled={isSearching}
+                        filter={
+                          <HeaderFilter
+                            value={scope}
+                            options={SCOPES.map((s) => ({ value: s, label: t(SCOPE_LABEL_KEYS[s]) }))}
+                            onChange={(s) => applyListState({ scope: s, page: 1 })}
+                            ariaLabel={t('admin.users.status')}
+                          />
+                        }
+                      >
                         <HeadCell icon={CircleDot} label={t('admin.users.status')} />
-                      </th>
-                      <th className="hidden px-3 py-2 md:table-cell">
+                      </SortableTh>
+                      <SortableTh sortKey="tariff" sort={sort} onSort={onSort} disabled={isSearching} className="hidden md:table-cell">
                         <HeadCell icon={Zap} label={t('admin.users.tariff')} />
-                      </th>
+                      </SortableTh>
                     </tr>
                   </thead>
                   <tbody>

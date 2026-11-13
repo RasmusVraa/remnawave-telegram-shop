@@ -112,4 +112,3 @@ func (h Handler) buildLoyaltyConnectSummaryHTML(lang string, customer *database.
 	b.WriteString(fmt.Sprintf(tm.GetText(lang, "loyalty_connect_discount"), cur.DiscountPercent))
 	return b.String()
 }
-

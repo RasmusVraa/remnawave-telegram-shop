@@ -131,7 +131,7 @@ export function playWheelLand(ctx: AudioContext): void {
   osc.stop(t0 + 0.36)
 }
 
-function winTier(rewardType: string): 'small' | 'medium' | 'large' {
+export function winTier(rewardType: string): 'small' | 'medium' | 'large' {
   if (rewardType === 'micro') return 'small'
   if (rewardType === 'days_180' || rewardType === 'days_30' || rewardType === 'days_15') return 'large'
   return 'medium'
@@ -190,20 +190,6 @@ export function playWinFanfare(ctx: AudioContext, rewardType: string): void {
     for (let k = 0; k < 6; k++) {
       const w = sh + k * 0.045
       playTick(ctx, w, false)
-    }
-  }
-
-  if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
-    try {
-      if (tier === 'large') {
-        navigator.vibrate([14, 28, 14, 45, 22])
-      } else if (tier === 'medium') {
-        navigator.vibrate([12, 22, 18])
-      } else {
-        navigator.vibrate([8, 14])
-      }
-    } catch {
-      /* ignore */
     }
   }
 }

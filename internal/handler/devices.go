@@ -11,6 +11,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
+	"remnawave-tg-shop-bot/internal/adminevents"
 	"remnawave-tg-shop-bot/internal/remnawave"
 )
 
@@ -196,6 +197,9 @@ func (h Handler) DeleteDeviceCallbackHandler(ctx context.Context, b *bot.Bot, up
 		return
 	}
 
+	adminevents.Emit(adminevents.Event{
+		Type: adminevents.DeviceRemoved, CustomerID: customer.ID, Source: adminevents.SourceBot,
+	})
 	// Успешное удаление - убираем алерт, просто обновляем список
 	_, err = b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
 		CallbackQueryID: callback.ID,

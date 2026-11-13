@@ -118,6 +118,7 @@ type CreateUserRequest struct {
 	Tag                  *string      `json:"tag,omitempty"`
 	TelegramID           *int64       `json:"telegramId,omitempty"`
 	Description          *string      `json:"description,omitempty"`
+	Email                *string      `json:"email,omitempty"`
 }
 
 // UpdateUserRequest is the request body for PATCH /api/users (UpdateUserBodyDto).
@@ -137,6 +138,7 @@ type UpdateUserRequest struct {
 	ExternalSquadUuid    *uuid.UUID   `json:"externalSquadUuid,omitempty"`
 	Tag                  *string      `json:"tag,omitempty"`
 	Description          *string      `json:"description,omitempty"`
+	Email                *string      `json:"email,omitempty"`
 }
 
 // deleteUserDeviceRequest — тело POST /api/hwid/devices/delete.

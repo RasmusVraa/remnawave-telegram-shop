@@ -1,0 +1,274 @@
+{
+  "/admin/nodes": {
+    "nodes": [
+      {
+        "state": "online",
+        "memory_used_pct": 43,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 1796250,
+        "tx_bytes_per_sec": 1808750,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 345600,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n1",
+        "name": "Швеция",
+        "country_code": "SE",
+        "address": "203.0.113.11",
+        "users_online": 24,
+        "provider": {
+          "name": "nordhost"
+        },
+        "plugin_name": "TBlocker",
+        "traffic_used_bytes": 700713176924.16
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 40,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 625000,
+        "tx_bytes_per_sec": 750000,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 345600,
+        "xray_version": "26.3.27",
+        "node_version": "2.7.0",
+        "uuid": "n2",
+        "name": "Германия",
+        "country_code": "DE",
+        "address": "203.0.113.24",
+        "users_online": 15,
+        "provider": {
+          "name": "alpha vps"
+        },
+        "plugin_name": "TBlocker",
+        "traffic_used_bytes": 844519419412.48
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 95,
+        "load_avg": [
+          2.41,
+          1.95,
+          1.2
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 156250,
+        "tx_bytes_per_sec": 2196250,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 345600,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n3",
+        "name": "Германия 2 премиум",
+        "country_code": "DE",
+        "address": "203.0.113.37",
+        "users_online": 15,
+        "provider": {
+          "name": "cloudline"
+        },
+        "traffic_used_bytes": 541047767695.36
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 88,
+        "load_avg": [
+          1.62,
+          1.31,
+          0.9
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 3516250,
+        "tx_bytes_per_sec": 7766250,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 172800,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n4",
+        "name": "Германия 3",
+        "country_code": "DE",
+        "address": "203.0.113.52",
+        "users_online": 12,
+        "provider": {
+          "name": "cloudline"
+        },
+        "traffic_used_bytes": 386922866278.4
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 20,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 5870,
+        "tx_bytes_per_sec": 3702.5,
+        "traffic_limit_bytes": 429496729600,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 46800,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n5",
+        "name": "Германия · обход",
+        "country_code": "DE",
+        "address": "bypass-de-node01.cdn-edge.example.com",
+        "users_online": 6,
+        "provider": {
+          "name": "eurovds"
+        },
+        "traffic_used_bytes": 109586090557.44
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 40,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 625000,
+        "tx_bytes_per_sec": 750000,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 0,
+        "xray_uptime_sec": 259200,
+        "xray_version": "26.7.28",
+        "node_version": "3.4.4",
+        "uuid": "n6",
+        "name": "Эстония",
+        "country_code": "EE",
+        "address": "198.51.100.14",
+        "users_online": 3,
+        "provider": {
+          "name": "balticnet"
+        },
+        "traffic_used_bytes": 45258217881.6
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 40,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 625000,
+        "tx_bytes_per_sec": 750000,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 259200,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n7",
+        "name": "Польша",
+        "country_code": "PL",
+        "address": "198.51.100.27",
+        "users_online": 4,
+        "provider": {
+          "name": "vistula"
+        },
+        "traffic_used_bytes": 121053653237.76
+      },
+      {
+        "state": "online",
+        "memory_used_pct": 40,
+        "load_avg": [
+          0.13,
+          0.21,
+          0.15
+        ],
+        "cpus": 2,
+        "rx_bytes_per_sec": 625000,
+        "tx_bytes_per_sec": 750000,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 0,
+        "xray_uptime_sec": 172800,
+        "xray_version": "26.7.28",
+        "node_version": "3.0.0",
+        "uuid": "n8",
+        "name": "Гонконг",
+        "country_code": "HK",
+        "address": "198.51.100.63",
+        "users_online": 0,
+        "provider": {
+          "name": "harbour"
+        },
+        "traffic_used_bytes": 182829711.36
+      },
+      {
+        "uuid": "n9",
+        "name": "Россия",
+        "country_code": "RU",
+        "address": "192.0.2.18",
+        "state": "offline",
+        "users_online": 0,
+        "provider": {
+          "name": "volga host"
+        },
+        "plugin_name": "TBlocker",
+        "memory_used_pct": null,
+        "load_avg": null,
+        "rx_bytes_per_sec": null,
+        "tx_bytes_per_sec": null,
+        "traffic_used_bytes": 76353781104.64,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 0
+      },
+      {
+        "uuid": "n10",
+        "name": "Нидерланды",
+        "country_code": "NL",
+        "address": "192.0.2.40",
+        "state": "connecting",
+        "users_online": 0,
+        "provider": {
+          "name": "dutchcloud"
+        },
+        "memory_used_pct": null,
+        "load_avg": null,
+        "rx_bytes_per_sec": null,
+        "tx_bytes_per_sec": null,
+        "traffic_used_bytes": 0,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 25,
+        "xray_uptime_sec": 0
+      },
+      {
+        "uuid": "n11",
+        "name": "Германия 4 · резерв",
+        "country_code": "DE",
+        "address": "192.0.2.77",
+        "state": "disabled",
+        "users_online": 0,
+        "provider": {
+          "name": "alpha vps"
+        },
+        "memory_used_pct": null,
+        "load_avg": null,
+        "rx_bytes_per_sec": null,
+        "tx_bytes_per_sec": null,
+        "traffic_used_bytes": 0,
+        "traffic_limit_bytes": 0,
+        "traffic_reset_day": 0,
+        "xray_uptime_sec": 0
+      }
+    ]
+  }
+}

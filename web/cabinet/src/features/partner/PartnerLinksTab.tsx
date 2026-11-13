@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { cn } from '@/lib/utils'
 import { api, ApiError, type PartnerAccountDTO, type PartnerLinkDTO } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import { shareLink } from '@/lib/share'
 
 import { PARTNER_STATE_KEY } from './partnerKeys'
@@ -33,6 +34,7 @@ export function PartnerLinksTab({ partner }: { partner: PartnerAccountDTO }) {
   const qc = useQueryClient()
   const [newName, setNewName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState('')
 
@@ -52,6 +54,7 @@ export function PartnerLinksTab({ partner }: { partner: PartnerAccountDTO }) {
   const create = useMutation({
     mutationFn: () => api.partnerCreateLink(newName.trim()),
     onSuccess: async () => {
+      hapticSuccess()
       setNewName('')
       setError(null)
       await invalidate()

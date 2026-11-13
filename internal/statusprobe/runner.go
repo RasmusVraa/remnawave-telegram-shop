@@ -28,6 +28,8 @@ type Target struct {
 	Disabled     bool
 	// NoExternal — адрес не уходит во внешние зонды, строка не меряется.
 	NoExternal bool
+	// TCPPort — порт TCP-пинга Globalping.
+	TCPPort int
 }
 
 // Runner держит последний замер и журнал. Страница статуса не ждёт зонды:
@@ -38,13 +40,14 @@ type Runner struct {
 
 	mu                sync.Mutex
 	samples           map[string]Sample
-	history           map[string]map[string]DayRecord
+	history           map[string][]RunRecord
 	lastRun           time.Time
 	cooldownUntil     time.Time
 	listCooldownUntil time.Time
 	pingBusy          bool
 	listBusy          bool
 	loaded            bool
+	onAlerts          func([]AlertEvent)
 }
 
 func NewRunner(store HistoryStore) *Runner {
@@ -52,7 +55,7 @@ func NewRunner(store HistoryStore) *Runner {
 		store:   store,
 		client:  &http.Client{Timeout: 30 * time.Second},
 		samples: map[string]Sample{},
-		history: map[string]map[string]DayRecord{},
+		history: map[string][]RunRecord{},
 	}
 }
 
@@ -75,7 +78,17 @@ func (r *Runner) Snapshot(key string) (Sample, []*float64, bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	sample, ok := r.samples[key]
-	return sample, Window(r.history[key], time.Now()), ok
+	return sample, Window(r.history[key]), ok
+}
+
+// HistoryWindow — окно истории для полоски; bypass включает правила сервера обхода.
+func (r *Runner) HistoryWindow(key string, bypass bool) []*float64 {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return WindowFor(r.history[key], bypass)
 }
 
 // ErrBusy — замер уже идёт, второй запуск ничего не добавит.
@@ -168,6 +181,13 @@ func (r *Runner) retainLocked(targets []Target) bool {
 			key = ProbeKey("", target.Country, target.Name, target.Address)
 		}
 		keep[key] = struct{}{}
+		if target.Disabled || target.NoExternal {
+			if sample, ok := r.samples[key]; ok && len(sample.Alerts) > 0 {
+				sample.Alerts = nil
+				r.samples[key] = sample
+				changed = true
+			}
+		}
 		legacy := NodeKey(target.Country, target.Name)
 		if _, ok := r.samples[key]; !ok && legacy != key && legacyUsers[legacy] == 1 {
 			if sample, ok := r.samples[legacy]; ok {
@@ -249,6 +269,9 @@ func stripWhitelist(sample Sample) Sample {
 	sample.WhitelistPingMs = nil
 	sample.WhitelistAt = time.Time{}
 	sample.WhitelistDone = false
+	sample.WhitelistLowStreak = 0
+	sample.WhitelistFailStreak = 0
+	sample.Alerts = forgetAlert(sample.Alerts, AlertOperators)
 	return sample
 }
 
@@ -539,6 +562,8 @@ func (r *Runner) execute(targets []Target, force bool) {
 
 func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 	measured := 0
+	var events []AlertEvent
+	defer func() { r.emitAlerts(events) }()
 	for _, target := range targets {
 		host, ok := PublicTarget(target.Address)
 		if !ok {
@@ -551,7 +576,7 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 			break
 		}
 		world, russia := probeCounts(target)
-		sample, err := pingTarget(ctx, r.client, host, world, russia, target.RepeatCities)
+		sample, err := pingTarget(ctx, r.client, host, TCPPortOrDefault(target.TCPPort), world, russia, target.RepeatCities)
 		if err != nil {
 			var limited *RateLimitError
 			if errors.As(err, &limited) {
@@ -575,6 +600,9 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 			sample.MeasuredAt = time.Now()
 		}
 		r.storeSample(target.Key, sample)
+		r.mu.Lock()
+		events = append(events, r.pingAlertsLocked(target, time.Now())...)
+		r.mu.Unlock()
 		r.persist()
 		measured++
 	}
@@ -585,6 +613,8 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 
 func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 	measured := 0
+	var events []AlertEvent
+	defer func() { r.emitAlerts(events) }()
 	for _, target := range targets {
 		host, ok := PublicTarget(target.Address)
 		if !ok {
@@ -613,6 +643,9 @@ func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 			continue
 		}
 		r.finishWhitelist(target.Key, wl.Hits, wl.PingMs, wlErr == nil && wl.Total > 0)
+		r.mu.Lock()
+		events = append(events, r.operatorAlertsLocked(target, time.Now())...)
+		r.mu.Unlock()
 		r.persist()
 		measured++
 		slog.Info("whitelist probe", "operators", wl.Total)
@@ -630,13 +663,31 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	sample.WhitelistPingMs = prev.WhitelistPingMs
 	sample.WhitelistAt = prev.WhitelistAt
 	sample.WhitelistDone = prev.WhitelistDone
+	sample.WhitelistLowStreak = prev.WhitelistLowStreak
+	sample.WhitelistFailStreak = prev.WhitelistFailStreak
+	sample.Alerts = prev.Alerts
+	if sample.RussiaTotal > 0 && sample.RussiaTotal-sample.RussiaOK >= RussiaFailThreshold() {
+		sample.RussiaFailStreak = prev.RussiaFailStreak + 1
+	} else {
+		sample.RussiaFailStreak = 0
+	}
+	if sample.WorldTotal > 0 && sample.WorldOK == 0 {
+		sample.WorldFailStreak = prev.WorldFailStreak + 1
+	} else {
+		sample.WorldFailStreak = 0
+	}
 	if sample.AllFailed() {
 		sample.FailStreak = prev.FailStreak + 1
 	} else {
 		sample.FailStreak = 0
 	}
+	if sample.RussiaLow() {
+		sample.RussiaLowStreak = prev.RussiaLowStreak + 1
+	} else {
+		sample.RussiaLowStreak = 0
+	}
 	r.samples[key] = sample
-	RecordDay(r.history, key, sample, time.Now())
+	RecordRun(r.history, key, sample, time.Now())
 	r.mu.Unlock()
 }
 
@@ -657,6 +708,20 @@ func (r *Runner) finishWhitelist(key string, hits []ProbeHit, pingMs *int, stamp
 	base.WhitelistOK, base.WhitelistTotal = whitelistCounts(base.Probes)
 	base.WhitelistAt = time.Now()
 	base.WhitelistDone = stamp && base.WhitelistTotal > 0
+	// Серию двигает только полный проход: оборванный набор операторов
+	// не говорит, что не ответил никто.
+	if base.WhitelistDone {
+		if base.WhitelistNone() {
+			base.WhitelistLowStreak++
+		} else {
+			base.WhitelistLowStreak = 0
+		}
+		if base.WhitelistOK < base.WhitelistTotal {
+			base.WhitelistFailStreak++
+		} else {
+			base.WhitelistFailStreak = 0
+		}
+	}
 	r.samples[key] = base
 	r.mu.Unlock()
 }
@@ -745,14 +810,10 @@ func (r *Runner) EnsureLoaded(ctx context.Context) {
 	}
 }
 
-func cloneHistory(src map[string]map[string]DayRecord) map[string]map[string]DayRecord {
-	out := make(map[string]map[string]DayRecord, len(src))
-	for key, days := range src {
-		cp := make(map[string]DayRecord, len(days))
-		for day, rec := range days {
-			cp[day] = rec
-		}
-		out[key] = cp
+func cloneHistory(src map[string][]RunRecord) map[string][]RunRecord {
+	out := make(map[string][]RunRecord, len(src))
+	for key, runs := range src {
+		out[key] = append([]RunRecord(nil), runs...)
 	}
 	return out
 }

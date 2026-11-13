@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { api, ApiError } from '@/lib/api'
+import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import { getTurnstileToken } from '@/lib/turnstile'
 import { maskEmail } from '@/lib/utils'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
@@ -43,6 +44,7 @@ export default function VerifyEmailPage() {
   const [resendSecurity, setResendSecurity] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  useErrorHaptic(error)
   const [code, setCode] = useState('')
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [changeLoading, setChangeLoading] = useState(false)
@@ -147,6 +149,7 @@ export default function VerifyEmailPage() {
       const data = await api.confirmEmail(code, emailFromState.trim() || undefined)
       setToken(data.access_token)
       await fetchMe()
+      hapticSuccess()
       navigate('/dashboard', { replace: true })
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {

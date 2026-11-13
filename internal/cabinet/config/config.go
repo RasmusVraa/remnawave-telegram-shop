@@ -36,7 +36,7 @@ const (
 
 // cabinet — набор всех параметров кабинета, заполняется в InitConfig().
 type cabinet struct {
-	enabled bool
+	enabled              bool
 	profileDeleteEnabled bool
 
 	publicURL      *url.URL
@@ -70,15 +70,15 @@ type cabinet struct {
 	vkRedirectURL      string
 
 	telegramLoginBotUsername string
-	telegramLoginBotToken  string // опционально: HMAC Login Widget / Mini App, если отличается от TELEGRAM_TOKEN
-	telegramOIDCClientID    string
+	telegramLoginBotToken    string // опционально: HMAC Login Widget / Mini App, если отличается от TELEGRAM_TOKEN
+	telegramOIDCClientID     string
 	telegramOIDCClientSecret string
-	telegramOIDCRedirectURL string
-	telegramWebAuthMode     string
+	telegramOIDCRedirectURL  string
+	telegramWebAuthMode      string
 
-	turnstileEnabled    bool
-	turnstileSiteKey    string
-	turnstileSecretKey  string
+	turnstileEnabled   bool
+	turnstileSiteKey   string
+	turnstileSecretKey string
 
 	metricsUser     string
 	metricsPassword string
@@ -109,7 +109,7 @@ type cabinet struct {
 var conf cabinet
 
 // IsEnabled возвращает значение CABINET_ENABLED. До InitConfig() — false.
-func IsEnabled() bool { return conf.enabled }
+func IsEnabled() bool            { return conf.enabled }
 func ProfileDeleteEnabled() bool { return conf.profileDeleteEnabled }
 
 // HTTPAccessLogMode — режим access-лога /cabinet (см. CABINET_HTTP_ACCESS_LOG). До InitConfig() — AccessLogMinimal.
@@ -185,11 +185,11 @@ func TelegramLoginBotUsername() string { return conf.telegramLoginBotUsername }
 
 // TelegramLoginBotToken — токен того же бота, что и CABINET_TELEGRAM_LOGIN_BOT_USERNAME,
 // для проверки HMAC виджета и initData. Если пусто — используется TELEGRAM_TOKEN процесса.
-func TelegramLoginBotToken() string { return conf.telegramLoginBotToken }
-func TelegramOIDCClientID() string { return conf.telegramOIDCClientID }
+func TelegramLoginBotToken() string    { return conf.telegramLoginBotToken }
+func TelegramOIDCClientID() string     { return conf.telegramOIDCClientID }
 func TelegramOIDCClientSecret() string { return conf.telegramOIDCClientSecret }
-func TelegramOIDCRedirectURL() string { return conf.telegramOIDCRedirectURL }
-func TelegramWebAuthMode() string { return conf.telegramWebAuthMode }
+func TelegramOIDCRedirectURL() string  { return conf.telegramOIDCRedirectURL }
+func TelegramWebAuthMode() string      { return conf.telegramWebAuthMode }
 func TelegramWidgetEnabled() bool {
 	return conf.telegramWebAuthMode == "widget"
 }

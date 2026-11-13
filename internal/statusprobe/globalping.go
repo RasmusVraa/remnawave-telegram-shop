@@ -100,6 +100,19 @@ type Sample struct {
 	Probes        []ProbeHit
 	// FailStreak — сколько замеров подряд не ответил никто: ни мир, ни Россия, ни операторы.
 	FailStreak int
+	// RussiaLowStreak — сколько замеров подряд из России ответила половина зондов или меньше.
+	RussiaLowStreak int
+	// WhitelistLowStreak — сколько полных проходов подряд не ответил ни один оператор.
+	WhitelistLowStreak int
+	// RussiaFailStreak — сколько замеров подряд из России не ответили STATUS_RU_FAIL_THRESHOLD зондов и больше.
+	RussiaFailStreak int
+	// WorldFailStreak — сколько замеров подряд не ответил ни один зонд из мира.
+	WorldFailStreak int
+	// WhitelistFailStreak — сколько полных проходов подряд не ответил хотя бы один оператор.
+	WhitelistFailStreak int
+	// Alerts — открытые тревоги админу: причина → с какого момента. Лежит в замере,
+	// чтобы после перезапуска не прийти второй раз. Меняется только копией.
+	Alerts map[string]time.Time
 }
 
 // AllFailed — в этом замере не ответил ни один зонд. Частичный провал не считается:
@@ -112,6 +125,33 @@ func (s Sample) AllFailed() bool {
 		return false
 	}
 	return s.WhitelistTotal == 0 || s.WhitelistOK == 0
+}
+
+// TCPPortOrDefault подставляет 443 вместо пустого или неверного порта.
+func TCPPortOrDefault(port int) int {
+	if port < 1 || port > 65535 {
+		return DefaultTCPPort
+	}
+	return port
+}
+
+// AddressPort — порт из адреса вида host:port, 0 если его нет.
+func AddressPort(address string) int {
+	host := strings.TrimSpace(address)
+	host = strings.TrimPrefix(host, "https://")
+	host = strings.TrimPrefix(host, "http://")
+	if i := strings.IndexAny(host, "/?#"); i >= 0 {
+		host = host[:i]
+	}
+	_, raw, err := net.SplitHostPort(host)
+	if err != nil {
+		return 0
+	}
+	port, err := strconv.Atoi(raw)
+	if err != nil || port < 1 || port > 65535 {
+		return 0
+	}
+	return port
 }
 
 // PublicTarget оставляет хост, который можно отдать внешнему зонду.
@@ -144,12 +184,23 @@ func PublicTarget(address string) (string, bool) {
 }
 
 type gpCreate struct {
-	Type               string         `json:"type"`
-	Target             string         `json:"target"`
-	Locations          []gpLocation   `json:"locations"`
-	InProgressUpdates  bool           `json:"inProgressUpdates"`
-	MeasurementOptions map[string]int `json:"measurementOptions"`
+	Type               string        `json:"type"`
+	Target             string        `json:"target"`
+	Locations          []gpLocation  `json:"locations"`
+	InProgressUpdates  bool          `json:"inProgressUpdates"`
+	MeasurementOptions gpPingOptions `json:"measurementOptions"`
 }
+
+// gpPingOptions — TCP-пинг на порт, где клиенты подключаются к серверу. ICMP не годится:
+// ТСПУ режет TCP до порта VPN и пропускает ICMP, и сервер выглядел бы живым.
+type gpPingOptions struct {
+	Packets  int    `json:"packets"`
+	Protocol string `json:"protocol"`
+	Port     int    `json:"port"`
+}
+
+// DefaultTCPPort — порт TCP-пинга, если у строки свой не задан.
+const DefaultTCPPort = 443
 
 type gpLocation struct {
 	Magic   string `json:"magic,omitempty"`
@@ -187,12 +238,12 @@ type gpResult struct {
 
 // MeasurePing запускает один замер Globalping: несколько зондов из мира и из России.
 func MeasurePing(ctx context.Context, client *http.Client, target string) (Sample, error) {
-	return MeasurePingCounts(ctx, client, target, 1, 5, true)
+	return MeasurePingCounts(ctx, client, target, DefaultTCPPort, 1, 5, true)
 }
 
-// MeasurePingCounts — то же, но число зондов задаёт админка.
+// MeasurePingCounts — то же, но порт и число зондов задаёт админка.
 // repeatCities оставляет все зонды города: доступность считается по каждому ответу.
-func MeasurePingCounts(ctx context.Context, client *http.Client, target string, world, russia int, repeatCities bool) (Sample, error) {
+func MeasurePingCounts(ctx context.Context, client *http.Client, target string, port, world, russia int, repeatCities bool) (Sample, error) {
 	if client == nil {
 		client = http.DefaultClient
 	}
@@ -207,8 +258,10 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		Target:            target,
 		Locations:         measurementLocations(ctx, client, world, russia, repeatCities),
 		InProgressUpdates: true,
-		MeasurementOptions: map[string]int{
-			"packets": 2,
+		MeasurementOptions: gpPingOptions{
+			Packets:  2,
+			Protocol: "TCP",
+			Port:     TCPPortOrDefault(port),
 		},
 	})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, globalpingURL, bytes.NewReader(body))

@@ -76,7 +76,8 @@ var remnaTagPattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 
 // RuntimeSettingsRegistry — Phase 1 whitelist (~50 ключей).
 func RuntimeSettingsRegistry() []SettingField {
-	return append(baseRuntimeSettings(), cabinetPushRegistry()...)
+	out := append(append(baseRuntimeSettings(), cabinetPushRegistry()...), adminAlertsRegistry()...)
+	return append(out, monitoringRegistry()...)
 }
 
 func baseRuntimeSettings() []SettingField {
@@ -142,34 +143,10 @@ func baseRuntimeSettings() []SettingField {
 			Current: func() string { return boolStr(conf.isTelegramStarsEnabled) },
 		},
 		{
-			Key: "PLATEGA_SBP_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
+			Key: "PLATEGA_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
 			Apply: applyPaymentToggle(PlategaHasCredentials, plategaCredentialsHint,
-				func(v bool) { conf.isPlategaSBPEnabled = v }),
-			Current: func() string { return boolStr(conf.isPlategaSBPEnabled) },
-		},
-		{
-			Key: "PLATEGA_CARDS_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
-			Apply: applyPaymentToggle(PlategaHasCredentials, plategaCredentialsHint,
-				func(v bool) { conf.isPlategaCardsEnabled = v }),
-			Current: func() string { return boolStr(conf.isPlategaCardsEnabled) },
-		},
-		{
-			Key: "PLATEGA_ACQUIRING_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
-			Apply: applyPaymentToggle(PlategaHasCredentials, plategaCredentialsHint,
-				func(v bool) { conf.isPlategaAcquiringEnabled = v }),
-			Current: func() string { return boolStr(conf.isPlategaAcquiringEnabled) },
-		},
-		{
-			Key: "PLATEGA_WORLDWIDE_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
-			Apply: applyPaymentToggle(PlategaHasCredentials, plategaCredentialsHint,
-				func(v bool) { conf.isPlategaWorldwideEnabled = v }),
-			Current: func() string { return boolStr(conf.isPlategaWorldwideEnabled) },
-		},
-		{
-			Key: "PLATEGA_CRYPTO_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
-			Apply: applyPaymentToggle(PlategaHasCredentials, plategaCredentialsHint,
-				func(v bool) { conf.isPlategaCryptoEnabled = v }),
-			Current: func() string { return boolStr(conf.isPlategaCryptoEnabled) },
+				func(v bool) { conf.isPlategaEnabled = v }),
+			Current: func() string { return boolStr(conf.isPlategaEnabled) },
 		},
 		{
 			Key: "HELEKET_ENABLED", Group: "payments", Type: SettingBool, Instant: true,
@@ -181,6 +158,11 @@ func baseRuntimeSettings() []SettingField {
 			Key: "YOOKASA_PAYMENT_METHODS", Group: "payments", Type: SettingText,
 			Apply:   applyYookasaPaymentMethods(),
 			Current: yookasaPaymentMethodsCurrent(),
+		},
+		{
+			Key: "PLATEGA_PAYMENT_METHODS", Group: "payments", Type: SettingText,
+			Apply:   applyPlategaPaymentMethods(),
+			Current: plategaPaymentMethodsCurrent(),
 		},
 		{
 			Key: "CABINET_CHECKOUT_DEFAULT_METHOD", Group: "payments", Type: SettingText,
@@ -235,7 +217,9 @@ func baseRuntimeSettings() []SettingField {
 
 		// --- payments_notify ---
 		{
-			Key: "PAYMENTS_NOTIFY_ENABLED", Group: "payments_notify", Type: SettingBool, Instant: true,
+			// Включено / чат / тема оплат — на экране «Оповещения админу»
+			// (вид payments), в своей группе остались только события.
+			Key: "PAYMENTS_NOTIFY_ENABLED", Group: "admin_alerts", Type: SettingBool, Instant: true,
 			Apply:   applyBoolField(func(v bool) { conf.paymentsNotifyEnabled = v }),
 			Current: func() string { return boolStr(conf.paymentsNotifyEnabled) },
 		},
@@ -244,7 +228,7 @@ func baseRuntimeSettings() []SettingField {
 			// (-1001234567890), и запрет на минус делал настройку из админки
 			// пригодной только для личных чатов — при том что из .env то же
 			// значение принималось.
-			Key: "PAYMENTS_NOTIFY_CHAT_ID", Group: "payments_notify", Type: SettingText,
+			Key: "PAYMENTS_NOTIFY_CHAT_ID", Group: "admin_alerts", Type: SettingText,
 			Apply: applyInt64Field(func(v int64) error {
 				conf.paymentsNotifyChatID = v
 				return nil
@@ -252,8 +236,8 @@ func baseRuntimeSettings() []SettingField {
 			Current: func() string { return strconv.FormatInt(conf.paymentsNotifyChatID, 10) },
 		},
 		{
-			Key: "PAYMENTS_NOTIFY_MESSAGE_THREAD_ID", Group: "payments_notify", Type: SettingInt,
-			Apply: applyIntField(func(v int) error {
+			Key: "PAYMENTS_NOTIFY_MESSAGE_THREAD_ID", Group: "admin_alerts", Type: SettingInt,
+			Apply: applyThreadIntField(func(v int) error {
 				if v < 0 {
 					return fmt.Errorf("must be >= 0")
 				}
@@ -263,7 +247,8 @@ func baseRuntimeSettings() []SettingField {
 			Current: func() string { return strconv.Itoa(conf.paymentsNotifyMessageThreadID) },
 		},
 		{
-			Key: "PAYMENTS_NOTIFY_EVENTS", Group: "payments_notify", Type: SettingCSV,
+			// Какие события оплат слать — галочки в карточке «Оплаты клиентов».
+			Key: "PAYMENTS_NOTIFY_EVENTS", Group: "admin_alerts", Type: SettingCSV,
 			Apply: func(value string) error {
 				applyPaymentsNotifyEvents(value)
 				return nil
@@ -312,6 +297,37 @@ func baseRuntimeSettings() []SettingField {
 			Key: "TRIAL_REMNAWAVE_TAG", Group: "tags", Type: SettingText,
 			Apply:   applyRemnaTagOptional(func(v string) { conf.trialRemnawaveTag = v }),
 			Current: func() string { return conf.trialRemnawaveTag },
+		},
+
+		// --- traffic (раздельный трафик и докупка) ---
+		{
+			Key: "TRAFFIC_SPLIT_ENABLED", Group: "traffic", Type: SettingBool, Instant: true,
+			Apply:   applyBoolField(func(v bool) { conf.trafficSplitEnabled = v }),
+			Current: func() string { return boolStr(conf.trafficSplitEnabled) },
+		},
+		{
+			Key: "TRAFFIC_PACKS_ENABLED", Group: "traffic", Type: SettingBool, Instant: true,
+			Apply:   applyBoolField(func(v bool) { conf.trafficPacksEnabled = v }),
+			Current: func() string { return boolStr(conf.trafficPacksEnabled) },
+		},
+		{
+			// Не Instant: в админке Instant — автосохранение переключателя, а текстовое
+			// поле с ним не уходило по «Сохранить секцию» и откатывалось к старому значению.
+			Key: "TRAFFIC_BYPASS_LABEL", Group: "traffic", Type: SettingText,
+			Apply:   applyStringField(func(v string) { conf.trafficBypassLabel = v }),
+			Current: func() string { return conf.trafficBypassLabel },
+		},
+		{
+			Key: "TRAFFIC_ALERT_PERCENT", Group: "traffic", Type: SettingInt,
+			MinInt: intPtr(1), MaxInt: intPtr(99),
+			Apply:   applyIntField(func(v int) error { conf.trafficAlertPercent = v; return nil }),
+			Current: func() string { return strconv.Itoa(conf.trafficAlertPercent) },
+		},
+		{
+			Key: "TRAFFIC_POLL_MINUTES", Group: "traffic", Type: SettingInt,
+			MinInt: intPtr(1), MaxInt: intPtr(60),
+			Apply:   applyIntField(func(v int) error { conf.trafficPollMinutes = v; return nil }),
+			Current: func() string { return strconv.Itoa(conf.trafficPollMinutes) },
 		},
 
 		// --- hwid ---
@@ -460,21 +476,25 @@ func baseRuntimeSettings() []SettingField {
 			Current: func() string { return boolStr(conf.partnerCountExtraHwid) },
 		},
 		{
-			Key: "PARTNER_NOTIFY_ENABLED", Group: "partner", Type: SettingBool, Instant: true,
+			// Включено / чат / тема партнёрки — на экране «Оповещения админу» (вид partner).
+			Key: "PARTNER_NOTIFY_ENABLED", Group: "admin_alerts", Type: SettingBool, Instant: true,
 			Apply:   applyBoolField(func(v bool) { conf.partnerNotifyEnabled = v }),
 			Current: func() string { return boolStr(conf.partnerNotifyEnabled) },
 		},
 		{
 			// Отрицательные значения допустимы и обязательны: у супергруппы
-			// chat id вида -1001234567890. Ноль — «в личку админу».
-			Key: "PARTNER_NOTIFY_CHAT_ID", Group: "partner", Type: SettingText,
+			// chat id вида -1001234567890. Ноль — общий чат оповещений, без него личка админу.
+			Key: "PARTNER_NOTIFY_CHAT_ID", Group: "admin_alerts", Type: SettingText,
 			Apply:   applyInt64Field(func(v int64) error { conf.partnerNotifyChatID = v; return nil }),
 			Current: func() string { return strconv.FormatInt(conf.partnerNotifyChatID, 10) },
 		},
 		{
-			Key: "PARTNER_NOTIFY_MESSAGE_THREAD_ID", Group: "partner", Type: SettingInt,
+			Key: "PARTNER_NOTIFY_MESSAGE_THREAD_ID", Group: "admin_alerts", Type: SettingInt,
 			MinInt: intPtr(0),
-			Apply: applyIntField(func(v int) error {
+			Apply: applyThreadIntField(func(v int) error {
+				if v < 0 {
+					return fmt.Errorf("must be >= 0")
+				}
 				conf.partnerNotifyThreadID = v
 				return nil
 			}),
@@ -630,6 +650,20 @@ func baseRuntimeSettings() []SettingField {
 			MinInt: intPtr(5), MaxInt: intPtr(180),
 			Apply:   applyBoundedInt("STATUS_PROBE_INTERVAL_MIN", 5, 180),
 			Current: cabinetIntCurrent("STATUS_PROBE_INTERVAL_MIN", 60),
+		},
+		{
+			// Сколько зондов из России должны не ответить, чтобы сервер стал «частично».
+			Key: "STATUS_RU_FAIL_THRESHOLD", Group: "status", Type: SettingInt, Instant: true,
+			MinInt: intPtr(1), MaxInt: intPtr(30),
+			Apply:   applyBoundedInt("STATUS_RU_FAIL_THRESHOLD", 1, 30),
+			Current: cabinetIntCurrent("STATUS_RU_FAIL_THRESHOLD", 2),
+		},
+		{
+			// Оповещать админа, когда обычный сервер не отвечает из мира. Куда — вид
+			// «Статус серверов» в «Оповещениях админу».
+			Key: "STATUS_ALERT_WORLD", Group: "status", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("STATUS_ALERT_WORLD"),
+			Current: cabinetBoolCurrent("STATUS_ALERT_WORLD", true),
 		},
 		{
 			Key: "STATUS_SHOW_MAP", Group: "status", Type: SettingBool, Instant: true,
@@ -859,6 +893,18 @@ func applyIntField(set func(int) error) func(string) error {
 	}
 }
 
+// applyThreadIntField — номер темы форума: пустое поле на экране оповещений
+// значит «без темы», то есть 0.
+func applyThreadIntField(set func(int) error) func(string) error {
+	inner := applyIntField(set)
+	return func(value string) error {
+		if strings.TrimSpace(value) == "" {
+			value = "0"
+		}
+		return inner(value)
+	}
+}
+
 func applyInt64Field(set func(int64) error) func(string) error {
 	return func(value string) error {
 		s := strings.TrimSpace(value)
@@ -934,10 +980,15 @@ func applyRemnaTagOptional(set func(string)) func(string) error {
 	}
 }
 
+// applyPaymentsNotifyEvents: пусто — оба события (как было всегда), none — ни одного,
+// иначе список paid, cancel через запятую.
 func applyPaymentsNotifyEvents(value string) {
 	conf.paymentsNotifySendPaid = false
 	conf.paymentsNotifySendCancel = false
 	s := strings.TrimSpace(value)
+	if strings.EqualFold(s, "none") {
+		return
+	}
 	if s == "" {
 		conf.paymentsNotifySendPaid = true
 		conf.paymentsNotifySendCancel = true
@@ -960,6 +1011,10 @@ func paymentsNotifyEventsCurrent() string {
 	}
 	if conf.paymentsNotifySendCancel {
 		parts = append(parts, "cancel")
+	}
+	// Пустая строка означала бы «оба»: сохранённое «ничего» должно им и остаться.
+	if len(parts) == 0 {
+		return "none"
 	}
 	return strings.Join(parts, ",")
 }

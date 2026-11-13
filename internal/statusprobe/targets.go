@@ -43,6 +43,8 @@ type ConfiguredTarget struct {
 	ExitNodeUUID string `json:"exit_node_uuid,omitempty"`
 	// NoExternal — не отдавать адрес внешним зондам; статус только из панели.
 	NoExternal bool `json:"no_external,omitempty"`
+	// TCPPort — порт TCP-пинга, тот, на котором клиенты подключаются. 0 — 443.
+	TCPPort int `json:"tcp_port,omitempty"`
 }
 
 const (
@@ -118,6 +120,7 @@ func TargetsFrom(list []ConfiguredTarget) []Target {
 			RepeatCities: item.AllowsRepeatCities(),
 			Disabled:     !item.Enabled,
 			NoExternal:   item.NoExternal,
+			TCPPort:      TCPPortOrDefault(item.TCPPort),
 		})
 	}
 	splitSharedProbeKeys(out)
@@ -216,6 +219,14 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 		if russia != 0 && (russia < 1 || russia > 30) {
 			return nil, fmt.Errorf("russia probes must be between 1 and 30")
 		}
+		port := item.TCPPort
+		if port == 0 {
+			// Адрес хранится без порта: если его вписали как host:port, порт уходит сюда.
+			port = AddressPort(item.Address)
+		}
+		if port < 0 || port > 65535 {
+			return nil, fmt.Errorf("tcp port must be between 1 and 65535")
+		}
 		note := strings.TrimSpace(item.Note)
 		if utf8.RuneCountInString(note) > 48 {
 			return nil, fmt.Errorf("note is too long")
@@ -264,6 +275,7 @@ func NormalizeTargets(in []ConfiguredTarget) ([]ConfiguredTarget, error) {
 			NodeUUID:     nodeUUID,
 			ExitNodeUUID: exitUUID,
 			NoExternal:   item.NoExternal,
+			TCPPort:      port,
 		})
 	}
 	return out, nil
