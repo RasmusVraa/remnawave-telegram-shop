@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -50,6 +51,27 @@ func TestSPAHandlerServesIndexForLandingRoutes(t *testing.T) {
 				t.Fatalf("тело %q, ожидался index.html", got)
 			}
 		})
+	}
+}
+
+// Пропавший hashed-ассет — 404, не index.html: иначе браузер/SW получают HTML
+// как module script и чеки/админка падают до hard refresh.
+func TestSPAHandlerMissingAssetIsNotFound(t *testing.T) {
+	spaFS := fstest.MapFS{
+		"index.html": {Data: []byte("<!doctype html>")},
+	}
+
+	rec := httptest.NewRecorder()
+	buildSPAHandler(spaFS).ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/cabinet/assets/PaymentStatusPage-missing.js", nil),
+	)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("статус %d, ожидался 404", rec.Code)
+	}
+	if body := rec.Body.String(); strings.Contains(body, "<!doctype html>") {
+		t.Fatalf("missing asset вернул index.html: %q", body)
 	}
 }
 

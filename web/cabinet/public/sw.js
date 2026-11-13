@@ -1,4 +1,7 @@
-const CACHE_NAME = 'cabinet-shell-v1'
+// Shell cache only. Hashed /cabinet/assets/* must NEVER be cached here:
+// after deploy old hashes 404, and the SPA used to answer them with index.html —
+// cache-first then poisoned the module graph until a hard refresh.
+const CACHE_NAME = 'cabinet-shell-v2'
 const APP_SHELL = ['/cabinet/', '/cabinet/index.html', '/cabinet/favicon.svg']
 
 self.addEventListener('install', (event) => {
@@ -21,6 +24,10 @@ self.addEventListener('message', (event) => {
   }
 })
 
+function isHashedAsset(pathname) {
+  return pathname.startsWith('/cabinet/assets/')
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
@@ -28,13 +35,20 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith('/cabinet/')) return
   if (url.pathname.startsWith('/cabinet/api/')) return
 
+  // Vite chunks: network only. Browser already keeps them via immutable Cache-Control.
+  if (isHashedAsset(url.pathname)) {
+    return
+  }
+
   // Always try network first for navigations, so users get fresh index/app shell.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put('/cabinet/index.html', copy))
+          if (res.ok) {
+            const copy = res.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put('/cabinet/index.html', copy))
+          }
           return res
         })
         .catch(() => caches.match('/cabinet/index.html')),
@@ -42,17 +56,18 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Icons/fonts/shell: network-first, cache only successful non-HTML responses.
   event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached
-      return fetch(req)
-        .then((res) => {
+    fetch(req)
+      .then((res) => {
+        const ctype = (res.headers.get('content-type') || '').toLowerCase()
+        if (res.ok && !ctype.includes('text/html')) {
           const copy = res.clone()
           caches.open(CACHE_NAME).then((cache) => cache.put(req, copy))
-          return res
-        })
-        .catch(() => caches.match('/cabinet/index.html'))
-    }),
+        }
+        return res
+      })
+      .catch(() => caches.match(req).then((cached) => cached || caches.match('/cabinet/index.html'))),
   )
 })
 

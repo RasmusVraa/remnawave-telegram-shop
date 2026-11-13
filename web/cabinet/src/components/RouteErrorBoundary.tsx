@@ -28,7 +28,19 @@ import { Button } from '@/components/ui/button'
 /** Ошибка загрузки lazy-чанка: формулировки Chrome, Safari, Firefox и прелоадера Vite. */
 function isChunkLoadError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /dynamically imported module|Importing a module script failed|Unable to preload CSS/i.test(message)
+  return /dynamically imported module|Importing a module script failed|Unable to preload CSS|Failed to fetch dynamically imported module|error loading dynamically imported module|Expected a JavaScript|MIME type of ["']?text\/html/i.test(
+    message,
+  )
+}
+
+/** Сбрасываем Cache Storage SW — иначе отравленный HTML-как-JS переживает обычный reload. */
+function clearCabinetCaches(): Promise<void> {
+  if (!('caches' in window)) return Promise.resolve()
+  return caches
+    .keys()
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('cabinet-')).map((k) => caches.delete(k))))
+    .then(() => undefined)
+    .catch(() => undefined)
 }
 
 const CHUNK_RELOAD_KEY = 'cabinet:chunk-reload-at'
@@ -46,7 +58,9 @@ function tryAutoReload(): boolean {
   } catch {
     return false
   }
-  window.location.reload()
+  void clearCabinetCaches().finally(() => {
+    window.location.reload()
+  })
   return true
 }
 
@@ -86,7 +100,9 @@ class ErrorBoundaryInner extends Component<Props, State> {
 
   private retry = () => {
     if (isChunkLoadError(this.state.error)) {
-      window.location.reload()
+      void clearCabinetCaches().finally(() => {
+        window.location.reload()
+      })
       return
     }
     this.props.onRetry()

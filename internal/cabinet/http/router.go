@@ -2056,6 +2056,13 @@ func buildSPAHandler(spaFS fs.FS) http.Handler {
 		}
 		filePath := strings.TrimPrefix(trimmed, "/")
 		if _, err := fs.Stat(spaFS, filePath); err != nil {
+			// Hashed Vite chunks must 404 — never SPA-fallback to index.html.
+			// Returning HTML as application/javascript poisons the module graph
+			// (and any service-worker cache) until a hard refresh.
+			if strings.HasPrefix(filePath, "assets/") {
+				http.NotFound(w, r)
+				return
+			}
 			serveIndex(w, r, spaFS)
 			return
 		}
