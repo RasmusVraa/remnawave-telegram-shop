@@ -572,37 +572,37 @@ func baseRuntimeSettings() []SettingField {
 
 		// --- landing (тексты и секции публичной витрины; пустой текст = перевод) ---
 		{
-			Key: "LANDING_HERO_TITLE", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_HERO_TITLE", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_HERO_TITLE", 160),
 			Current: fortuneCurrent("LANDING_HERO_TITLE"),
 		},
 		{
-			Key: "LANDING_HERO_SUBTITLE", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_HERO_SUBTITLE", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_HERO_SUBTITLE", 280),
 			Current: fortuneCurrent("LANDING_HERO_SUBTITLE"),
 		},
 		{
-			Key: "LANDING_NOTE", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_NOTE", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_NOTE", 200),
 			Current: fortuneCurrent("LANDING_NOTE"),
 		},
 		{
-			Key: "LANDING_STAT_TRAFFIC_VALUE", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_STAT_TRAFFIC_VALUE", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_STAT_TRAFFIC_VALUE", 40),
 			Current: fortuneCurrent("LANDING_STAT_TRAFFIC_VALUE"),
 		},
 		{
-			Key: "LANDING_STAT_TRAFFIC_LABEL", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_STAT_TRAFFIC_LABEL", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_STAT_TRAFFIC_LABEL", 60),
 			Current: fortuneCurrent("LANDING_STAT_TRAFFIC_LABEL"),
 		},
 		{
-			Key: "LANDING_STAT_DEVICES_VALUE", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_STAT_DEVICES_VALUE", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_STAT_DEVICES_VALUE", 40),
 			Current: fortuneCurrent("LANDING_STAT_DEVICES_VALUE"),
 		},
 		{
-			Key: "LANDING_STAT_DEVICES_LABEL", Group: "landing", Type: SettingText, Instant: true,
+			Key: "LANDING_STAT_DEVICES_LABEL", Group: "landing", Type: SettingText,
 			Apply:   applyLandingText("LANDING_STAT_DEVICES_LABEL", 60),
 			Current: fortuneCurrent("LANDING_STAT_DEVICES_LABEL"),
 		},
