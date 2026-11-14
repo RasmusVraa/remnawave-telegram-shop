@@ -467,6 +467,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
         'FORTUNE_WEIGHT_DAYS_15',
         'FORTUNE_WEIGHT_DAYS_30',
         'FORTUNE_WEIGHT_DAYS_180',
+        'FORTUNE_WEIGHT_FREE_SPIN',
       ],
     },
     {
@@ -485,6 +486,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
         'FORTUNE_REWARD_DAYS_15',
         'FORTUNE_REWARD_DAYS_30',
         'FORTUNE_REWARD_DAYS_180',
+        'FORTUNE_REWARD_FREE_SPINS',
       ],
     },
   ],

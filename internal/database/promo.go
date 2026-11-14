@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -14,6 +15,24 @@ import (
 
 // PendingDiscountUnlimitedPayments — значение subscription_payments_remaining: безлимит оплат до истечения TTL.
 const PendingDiscountUnlimitedPayments = -1
+
+// TechnicalPromoPrefix — коды, начинающиеся с «__», служебные: якоря для pending-скидок
+// (__CABINET_FORTUNE__ — колесо фортуны, __LIFECYCLE_WINBACK__ — win-back) и т. п.
+// Админ создать такой код не может (валидация), а видеть их в разделе промокодов не должен:
+// ни в списке, ни в счётчиках, ни в топе статистики. Любой новый служебный код называем
+// с этим префиксом, и он скрывается сам. См. documentation/technical-promo-codes.md.
+const TechnicalPromoPrefix = "__"
+
+// TechnicalPromoFortune — служебный промокод-якорь для скидок колеса фортуны (migration 000033).
+const TechnicalPromoFortune = "__CABINET_FORTUNE__"
+
+// IsTechnicalPromoCode — служебный ли код (скрывается от админа).
+func IsTechnicalPromoCode(code string) bool {
+	return strings.HasPrefix(code, TechnicalPromoPrefix)
+}
+
+// notTechnicalPromo — SQL-условие «код не служебный» для столбца code.
+const notTechnicalPromo = `code NOT LIKE '\_\_%'`
 
 const (
 	PromoTypeSubscriptionDays = "subscription_days"
@@ -175,7 +194,7 @@ func (r *PromoRepository) scanOne(ctx context.Context, builder sq.SelectBuilder)
 }
 
 func (r *PromoRepository) List(ctx context.Context, offset, limit int) ([]PromoCode, int, error) {
-	countQ := sq.Select("COUNT(*)").From("promo_code").PlaceholderFormat(sq.Dollar)
+	countQ := sq.Select("COUNT(*)").From("promo_code").Where(notTechnicalPromo).PlaceholderFormat(sq.Dollar)
 	csql, cargs, _ := countQ.ToSql()
 	var total int
 	if err := r.pool.QueryRow(ctx, csql, cargs...).Scan(&total); err != nil {
@@ -186,7 +205,7 @@ func (r *PromoRepository) List(ctx context.Context, offset, limit int) ([]PromoC
 		"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
 		"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment", "created_at",
 		"discount_max_subscription_payments_per_customer", "tariff_id",
-	).From("promo_code").OrderBy("id DESC").Offset(uint64(offset)).Limit(uint64(limit)).PlaceholderFormat(sq.Dollar)
+	).From("promo_code").Where(notTechnicalPromo).OrderBy("id DESC").Offset(uint64(offset)).Limit(uint64(limit)).PlaceholderFormat(sq.Dollar)
 	sqlStr, args, err := builder.ToSql()
 	if err != nil {
 		return nil, 0, err
@@ -218,7 +237,7 @@ func (r *PromoRepository) List(ctx context.Context, offset, limit int) ([]PromoC
 }
 
 func (r *PromoRepository) CountTotals(ctx context.Context) (total, active, inactive int, err error) {
-	err = r.pool.QueryRow(ctx, `SELECT COUNT(*)::int, COUNT(*) FILTER (WHERE active)::int, COUNT(*) FILTER (WHERE NOT active)::int FROM promo_code`).Scan(&total, &active, &inactive)
+	err = r.pool.QueryRow(ctx, `SELECT COUNT(*)::int, COUNT(*) FILTER (WHERE active)::int, COUNT(*) FILTER (WHERE NOT active)::int FROM promo_code WHERE `+notTechnicalPromo).Scan(&total, &active, &inactive)
 	return
 }
 
@@ -277,6 +296,7 @@ SELECT pc.id, pc.code, pc.active, pc.uses_count, COUNT(pr.id)::int AS redemption
        pc.type, pc.subscription_days, pc.trial_days, pc.extra_hwid_delta, pc.discount_percent
 FROM promo_code pc
 LEFT JOIN promo_redemption pr ON pr.promo_code_id = pc.id
+WHERE pc.code NOT LIKE '\_\_%'
 GROUP BY pc.id
 ORDER BY redemptions DESC, pc.code ASC
 LIMIT 12`)

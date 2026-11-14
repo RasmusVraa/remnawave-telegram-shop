@@ -19,6 +19,7 @@ function prizeTitle(t: TFunction, s: FortuneSectorDTO): string {
   const rt = s.reward_type
   if (rt === 'micro') return t('fortune.prizeCard.micro')
   if (rt === 'xp') return t('fortune.prizeCard.xp')
+  if (rt === 'free_spin') return t('fortune.prizeCard.freeSpin')
   if (rt === 'discount_3' || rt === 'discount_5') {
     const pct = s.display_percent ?? (rt === 'discount_3' ? 3 : 5)
     return t('fortune.prizeCard.discount', { pct })
@@ -34,6 +35,7 @@ function prizeSubtitle(t: TFunction, s: FortuneSectorDTO): string {
   if (s.reward_type.startsWith('days_')) return t('fortune.prizeCard.hintDays')
   if (s.reward_type === 'discount_3' || s.reward_type === 'discount_5') return t('fortune.prizeCard.hintDiscount')
   if (s.reward_type === 'micro' || s.reward_type === 'xp') return t('fortune.prizeCard.hintXp')
+  if (s.reward_type === 'free_spin') return t('fortune.prizeCard.hintFreeSpin')
   return ''
 }
 

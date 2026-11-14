@@ -14,6 +14,14 @@ go run ./tools/migrate-bedolaga -config migrate.yaml -dry-run -step all
 go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step tariffs
 ```
 
+Бекап из админки Bedolaga (`backup_*.tar.gz` с `database.json`) разворачивается во временный Postgres:
+
+```bash
+go run ./tools/migrate-bedolaga -load-backup backup_2026.tar.gz -load-dsn "postgres://postgres:pass@host:5432/restore"
+```
+
+Шаги: `tariffs`, `customers`, `balance`, `referrals`, `history` (оплаты подписок → история покупок).
+
 Тесты формулы срока:
 
 ```bash

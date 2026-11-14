@@ -144,6 +144,7 @@ function fortuneReward(type: string, value: number, t: TFunction): string {
   const m = /^(days|discount)_(\d+)$/.exec(type)
   if (m) return t(`admin.monitoring.fortune.${m[1]}`, { count: Number(m[2]) })
   if (type === 'xp' || type === 'micro') return t('admin.monitoring.fortune.xp', { count: value })
+  if (type === 'free_spin') return t('admin.monitoring.fortune.freeSpin', { count: value })
   return type
 }
 

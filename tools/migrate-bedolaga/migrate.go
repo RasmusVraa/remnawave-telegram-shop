@@ -126,6 +126,10 @@ func (m *Migrator) Run(ctx context.Context) error {
 			if err := m.stepReferrals(ctx); err != nil {
 				return err
 			}
+		case "history":
+			if err := m.stepHistory(ctx); err != nil {
+				return err
+			}
 		default:
 			return fmt.Errorf("unknown step %q", st)
 		}
@@ -136,7 +140,7 @@ func (m *Migrator) Run(ctx context.Context) error {
 func (m *Migrator) expandSteps() []string {
 	switch m.step {
 	case "", "all":
-		return []string{"tariffs", "customers", "balance", "referrals"}
+		return []string{"tariffs", "customers", "balance", "referrals", "history"}
 	default:
 		return []string{m.step}
 	}
@@ -467,6 +471,20 @@ func (m *Migrator) stepCustomers(ctx context.Context) error {
 		expire := now.Add(time.Duration(target) * 24 * time.Hour)
 		if rw != nil && rw.ExpireAt.After(expire) {
 			expire = rw.ExpireAt
+		}
+		// Панели нет под рукой (или юзер в ней не найден) — срок берём из подписки Bedolaga,
+		// иначе клиент с оплаченным годом остался бы только с днями от баланса.
+		if rw == nil && primary != nil && primary.EndDate != nil && primary.EndDate.After(expire) {
+			expire = *primary.EndDate
+		}
+		// Подписка давно закончилась и баланса нет: сохраняем настоящую дату окончания. С «сейчас»
+		// вместо неё бот посчитал бы тысячу клиентов только что истёкшими и разослал им напоминания.
+		if target == 0 && !expire.After(now) {
+			if rw != nil && !rw.ExpireAt.IsZero() && rw.ExpireAt.Before(now) {
+				expire = rw.ExpireAt
+			} else if rw == nil && primary != nil && primary.EndDate != nil && primary.EndDate.Before(now) {
+				expire = *primary.EndDate
+			}
 		}
 		if balDays > 0 {
 			balExpire := now.Add(time.Duration(balDays) * 24 * time.Hour)

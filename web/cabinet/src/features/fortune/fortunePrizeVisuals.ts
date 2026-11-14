@@ -18,6 +18,7 @@ export const FORTUNE_PRIZE_SORT_ORDER: readonly string[] = [
   'days_3',
   'discount_5',
   'discount_3',
+  'free_spin',
   'xp',
   'micro',
 ]
@@ -45,6 +46,7 @@ export function wheelSectorFill(rewardType: string, index: number): string {
     days_15: 'hsl(24 95% 58% / 0.94)',
     days_30: 'hsl(350 85% 58% / 0.94)',
     days_180: 'hsl(318 80% 58% / 0.94)',
+    free_spin: 'hsl(188 85% 44% / 0.94)',
   }
   if (map[rewardType]) return map[rewardType]
   const h = (index * 47 + 180) % 360
@@ -64,6 +66,7 @@ export function wheelSectorRimSolid(rewardType: string, index: number): string {
     days_15: 'hsl(24 90% 50%)',
     days_30: 'hsl(350 78% 52%)',
     days_180: 'hsl(318 72% 55%)',
+    free_spin: 'hsl(188 80% 38%)',
   }
   if (map[rewardType]) return map[rewardType]
   const h = (index * 47 + 180) % 360
@@ -83,6 +86,7 @@ function wheelSectorBentoFill(rewardType: string, index: number): string {
     days_15: 'hsl(28 42% 91%)',
     days_30: 'hsl(350 38% 91%)',
     days_180: 'hsl(318 40% 91%)',
+    free_spin: 'hsl(188 36% 90%)',
   }
   if (map[rewardType]) return map[rewardType]
   const h = (index * 47 + 180) % 360
@@ -163,6 +167,7 @@ export function sectorIconClassWheel(rewardType: string, variant: FortuneDesignV
       days_15: 'text-orange-800 dark:text-orange-300',
       days_30: 'text-rose-800 dark:text-rose-300',
       days_180: 'text-pink-800 dark:text-pink-300',
+      free_spin: 'text-cyan-800 dark:text-cyan-300',
     }
     return map[rewardType] ?? 'text-primary'
   }
@@ -182,6 +187,7 @@ export function sectorIconClass(rewardType: string): string {
     days_15: 'text-orange-300 drop-shadow-[0_0_6px_rgb(253_186_116_/_0.45)]',
     days_30: 'text-rose-300 drop-shadow-[0_0_6px_rgb(253_164_175_/_0.45)]',
     days_180: 'text-pink-300 drop-shadow-[0_0_6px_rgb(249_168_212_/_0.45)]',
+    free_spin: 'text-cyan-300 drop-shadow-[0_0_6px_rgb(103_232_249_/_0.45)]',
   }
   return map[rewardType] ?? 'text-primary drop-shadow-sm'
 }
@@ -199,6 +205,7 @@ export function sectorAccentBarClass(rewardType: string): string {
     days_15: 'bg-orange-500',
     days_30: 'bg-rose-500',
     days_180: 'bg-pink-500',
+    free_spin: 'bg-cyan-500',
   }
   return map[rewardType] ?? 'bg-primary'
 }

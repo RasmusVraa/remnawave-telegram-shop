@@ -24,6 +24,10 @@ var probesURL = "https://api.globalping.io/v1/probes"
 // RateLimitError — Globalping ответил 429. RetryAfter берётся из заголовка, не из попытки обойти лимит.
 type RateLimitError struct {
 	RetryAfter time.Duration
+	// HasRetryAfter — сервис сам назвал время; иначе пауза взята по умолчанию.
+	HasRetryAfter bool
+	// Message — что сервис написал в теле ответа.
+	Message string
 }
 
 func (e *RateLimitError) Error() string { return "globalping rate limit" }
@@ -113,6 +117,15 @@ type Sample struct {
 	// Alerts — открытые тревоги админу: причина → с какого момента. Лежит в замере,
 	// чтобы после перезапуска не прийти второй раз. Меняется только копией.
 	Alerts map[string]time.Time
+	// Проверка по спискам блокировок (cheburcheck). Живёт по своему расписанию, как белые списки.
+	// RegistryAt — последний полученный ответ, RegistryTryAt — последняя попытка (в том числе неудачная).
+	RegistryAt      time.Time
+	RegistryTryAt   time.Time
+	RegistryOK      bool
+	RegistryBlocked bool
+	RegistryKind    string
+	// RegistryStreak — сколько ответов подряд адрес числится в списках.
+	RegistryStreak int
 }
 
 // AllFailed — в этом замере не ответил ни один зонд. Частичный провал не считается:
@@ -278,7 +291,7 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	_ = res.Body.Close()
 	if res.StatusCode == http.StatusTooManyRequests {
-		return Sample{}, &RateLimitError{RetryAfter: retryAfter(res.Header)}
+		return Sample{}, rateLimitFrom(res, raw)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return Sample{}, fmt.Errorf("globalping create: %d", res.StatusCode)
@@ -540,7 +553,7 @@ func fetchMeasurement(ctx context.Context, client *http.Client, id string) (gpMe
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if res.StatusCode == http.StatusTooManyRequests {
-		return gpMeasurement{}, &RateLimitError{RetryAfter: retryAfter(res.Header)}
+		return gpMeasurement{}, rateLimitFrom(res, raw)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return gpMeasurement{}, fmt.Errorf("globalping get: %d", res.StatusCode)

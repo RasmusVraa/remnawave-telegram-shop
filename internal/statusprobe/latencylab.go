@@ -286,7 +286,7 @@ func latencyLabDo(client *http.Client, token string, req *http.Request) ([]byte,
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(res.Body, 1<<20))
 	if res.StatusCode == http.StatusTooManyRequests {
-		return nil, &RateLimitError{RetryAfter: retryAfter(res.Header)}
+		return nil, rateLimitFrom(res, raw)
 	}
 	if res.StatusCode == http.StatusConflict {
 		return nil, errWhitelistPartial

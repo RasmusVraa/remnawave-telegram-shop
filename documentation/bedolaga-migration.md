@@ -39,29 +39,30 @@
 | Юзеры без TG (email/OAuth) | `customer` web-only + `cabinet_account` | Synthetic telegram_id; пароль только если `$argon2id$` |
 | Баланс (кошелёк) | Срок подписки | Дни = `баланс_₽ × 30 / цена_1м_тарифа_юзера`; итог `max(дни_RW, дни_баланса)` |
 | Реф.граф | `referral` | По telegram_id |
+| История оплат | `purchase` (`invoice_type = bedolaga`) | Транзакции `subscription_payment` с настоящими датами и суммами; доп. устройства не переносятся. Без этого бот считает платного клиента «триалом» |
+
+**Срок подписки:** берётся из Remnawave; если клиента в панели не нашли — из подписки Bedolaga (`end_date`). Закончившаяся давно подписка сохраняет настоящую дату окончания.
 
 **Remnawave (same-panel 3.3.\*–3.4.\*):** по умолчанию только чтение. На шаге balance — только удлинение `expireAt`, если он короче целевого. Сквады, трафик, теги не меняются. Новые VPN-юзеры не создаются.
 
-**Не переносится:** wallet как сущность, autopay, daily-биллинг, история платежей, withdrawals.
+**Не переносится:** wallet как сущность, autopay, daily-биллинг, пополнения баланса, withdrawals.
 
 ## Быстрый старт (рекомендуется)
 
-На Linux-сервере с клоном репозитория и Docker:
+На Linux-сервере, где уже стоит бот (см. [установщик](../readme.md)), с Docker:
 
 ```bash
 cd /opt/remnawave-telegram-shop   # или ваш путь
-chmod +x scripts/meows-bedolaga-migrate.sh
 ./scripts/meows-bedolaga-migrate.sh
 ```
 
 Меню проведёт по шагам:
 
-1. Источник (файл `pg_dump` → temp Postgres, или готовый DSN)
-2. Подтверждение Remnawave **3.3.\*–3.4.\*** + запись `migrate.yaml`
-3. Dry-run → CSV в `migrate-out/` (смотрите `compat_warning`)
-4. Apply: тарифы → клиенты → баланс (RW) → рефералы
+1. **`1`** — источник: файл `backup_*.tar.gz` из админки Bedolaga (проще всего), `pg_dump` или готовый DSN; подтверждение Remnawave **3.3.\*–3.4.\*** и запись `migrate.yaml`
+2. **`2`** — «Перенести всё сразу»: пробный прогон → копия БД бота (`migrate-out/shop-db-before-migrate-*.sql.gz`) → apply: тарифы → клиенты → баланс → рефералы → история оплат → итог
+3. Отчёты — в `migrate-out/` (смотрите `problems.csv`)
 
-Нужен **Go** на машине (`go run ./tools/migrate-bedolaga`), либо заранее собранный бинарь в `MEOWS_MIGRATE_BIN`.
+Go на сервере **не нужен**: движок собирается и запускается в контейнере `golang` в docker-сети бота (первый запуск 1–3 минуты, нужен интернет). Готовый linux-бинарь можно подложить через `MEOWS_MIGRATE_BIN`. Шаги можно запускать и по одному (пункты 4–8 меню).
 
 ## Бэкап Bedolaga
 
@@ -76,9 +77,9 @@ docker compose exec -T postgres pg_dump -U bedolaga -d bedolaga --no-owner \
 
 Скопируйте файл на сервер с Meows и укажите путь в пункте 1 меню.
 
-### Вариант B — бекап из админки Bedolaga
+### Вариант B — бекап из админки Bedolaga (проще всего)
 
-У Bedolaga есть свой «Создать бекап» в админ-меню бота (их формат). Восстановите его их инструментом «Восстановить» в temp-инстанс / Postgres, затем в меню мигратора выберите «уже есть DSN».
+В админ-меню Bedolaga: «Создать бекап» → файл `backup_*.tar.gz` (внутри `database.json`). Мигратор разворачивает его сам: в пункте 1 меню выберите «Бекап из админки Bedolaga» и укажите путь. Восстанавливать их инструментом не нужно.
 
 ## Прямой вызов движка
 
@@ -91,6 +92,7 @@ go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step tariffs
 go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step customers
 go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step balance
 go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step referrals
+go run ./tools/migrate-bedolaga -config migrate.yaml -apply -step history
 ```
 
 Отчёты: `migrate-out/summary.json`, `customers.csv`, `tariffs.csv`, `balances.csv`, `problems.csv`.

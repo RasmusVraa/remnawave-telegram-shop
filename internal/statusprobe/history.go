@@ -88,6 +88,12 @@ type persistedSample struct {
 	WorldFailStreak     int                  `json:"world_fail_streak,omitempty"`
 	WhitelistFailStreak int                  `json:"whitelist_fail_streak,omitempty"`
 	Alerts              map[string]time.Time `json:"alerts,omitempty"`
+	RegistryAt          time.Time            `json:"registry_at,omitempty"`
+	RegistryTryAt       time.Time            `json:"registry_try_at,omitempty"`
+	RegistryOK          bool                 `json:"registry_ok,omitempty"`
+	RegistryBlocked     bool                 `json:"registry_blocked,omitempty"`
+	RegistryKind        string               `json:"registry_kind,omitempty"`
+	RegistryStreak      int                  `json:"registry_streak,omitempty"`
 }
 
 func (h *KVHistory) LoadLatest(ctx context.Context) (map[string]Sample, error) {

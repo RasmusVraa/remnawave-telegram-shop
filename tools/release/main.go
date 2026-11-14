@@ -107,6 +107,28 @@ func run(args []string) error {
 			return err
 		}
 		return announceTelegram(root, notes, cfg)
+	case "edit":
+		// Правка уже отправленного поста: текст берётся из RELEASE_NOTES.md.
+		if len(args) < 2 {
+			return fmt.Errorf("usage: go run ./tools/release edit <message_id of the release post>")
+		}
+		messageID, err := strconv.Atoi(args[1])
+		if err != nil || messageID <= 0 {
+			return fmt.Errorf("invalid message_id %q", args[1])
+		}
+		cfg, err := loadTelegramConfig()
+		if err != nil {
+			return err
+		}
+		parts := FormatTelegramParts(notes, cfg.Footer)
+		if len(parts) != 1 {
+			return fmt.Errorf("edit works with a single-message post, got %d parts", len(parts))
+		}
+		if err := editTelegramHTML(cfg, messageID, parts[0]); err != nil {
+			return err
+		}
+		fmt.Printf("telegram: message %d edited\n", messageID)
+		return nil
 	case "photos":
 		// Повтор одного альбома, если пост ушёл, а картинки нет: второй
 		// `telegram` отправил бы дубликат поста.
@@ -222,6 +244,7 @@ func printUsage() {
   go run ./tools/release preview    # print parsed GitHub + Telegram HTML
   go run ./tools/release github     # gh release create from RELEASE_NOTES.md
   go run ./tools/release telegram   # send Telegram HTML (+ screenshots album) to forum topic
+  go run ./tools/release edit ID        # replace the text of an already sent post
   go run ./tools/release photos ID [N]  # resend only album N as a reply to message ID
   go run ./tools/release publish    # github + telegram
 

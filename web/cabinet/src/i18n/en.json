@@ -591,6 +591,7 @@
       "moduleOff": "The fortune wheel is disabled on this server.",
       "noPanel": "Remnawave panel is not configured — spins are unavailable.",
       "dailyFreeHint": "You have 1 free spin today.",
+      "bonusSpinsHint": "Free spins won: {{count}}",
       "spinButtonFree": "Spin for FREE",
       "spinButtonPaid": "Spin the wheel",
       "spin": "Spin",
@@ -615,13 +616,16 @@
         "plusDays": "+{{d}} days",
         "hintDays": "Added to subscription",
         "hintDiscount": "On your next payment",
-        "hintXp": "Loyalty program"
+        "hintXp": "Loyalty program",
+        "freeSpin": "Free spin",
+        "hintFreeSpin": "One more try"
       },
       "wheelShort": {
         "micro": "Micro XP",
         "xp": "XP",
         "discount": "−{{pct}}%",
-        "plusDays": "+{{d}} d"
+        "plusDays": "+{{d}} d",
+        "freeSpin": "+{{n}} spin"
       },
       "soundEnableHint": "Enable wheel sounds",
       "soundDisableHint": "Disable wheel sounds",
@@ -645,7 +649,8 @@
         "days_7": "+7 days",
         "days_15": "+15 days",
         "days_30": "+30 days",
-        "days_180": "+180 days"
+        "days_180": "+180 days",
+        "free_spin": "Free spin"
       },
       "result": {
         "micro": "Loyalty bonus: +{{value}} XP",
@@ -657,7 +662,8 @@
         "days_7": "+{{value}} days to subscription",
         "days_15": "+{{value}} days to subscription",
         "days_30": "+{{value}} days to subscription",
-        "days_180": "+{{value}} days to subscription"
+        "days_180": "+{{value}} days to subscription",
+        "free_spin": "+{{value}} free spin"
       },
       "winnerFeedEmpty": "No wins to show yet — be the first to spin.",
       "ticker": {
@@ -665,7 +671,8 @@
         "knocked": "got",
         "discount": "{{pct}}% off",
         "daysPrize": "+{{d}} d",
-        "xpPrize": "+{{value}} XP"
+        "xpPrize": "+{{value}} XP",
+        "freeSpin": "a free spin"
       },
       "relative": {
         "justNow": "just now",
@@ -2467,7 +2474,7 @@
       },
       "broadcast": {
         "title": "Broadcast",
-        "subtitle": "Mass messaging to Telegram and the cabinet",
+        "subtitle": "Mass messaging",
         "audienceTitle": "Audience",
         "audienceNone": "none selected",
         "draftSaved": "Draft saved",
@@ -3498,6 +3505,10 @@
             "label": "Sector «+180 days»",
             "hint": ""
           },
+          "FORTUNE_WEIGHT_FREE_SPIN": {
+            "label": "Sector «Free spin»",
+            "hint": ""
+          },
           "FORTUNE_REWARD_XP_AMOUNT": {
             "label": "XP for large bonus",
             "hint": ""
@@ -3540,6 +3551,10 @@
           },
           "FORTUNE_REWARD_DAYS_180": {
             "label": "Days for +180 prize",
+            "hint": ""
+          },
+          "FORTUNE_REWARD_FREE_SPINS": {
+            "label": "Spins per «Free spin» prize",
             "hint": ""
           },
           "CABINET_PUSH_IMPORTANT": {
@@ -3609,6 +3624,10 @@
           "STATUS_ALERT_WORLD": {
             "label": "“Unreachable from the world” alert",
             "hint": "Notify the admin when a regular server fails two world checks in a row"
+          },
+          "STATUS_ALERT_REGISTRY": {
+            "label": "“Server in the RKN registry” alert",
+            "hint": "Notify the admin when a regular server address is found in the block lists twice in a row"
           },
           "STATUS_SHOW_MAP": {
             "label": "Map",
@@ -3754,8 +3773,8 @@
         "subtitle": "What users see in the \"Servers\" section",
         "open": "Open page",
         "serversTitle": "Servers",
-        "serversHint": "Shown on the status page in this order.",
         "add": "Add server",
+        "addShort": "Add",
         "checkNow": "Check now",
         "checkStarted": "Check started. Results appear in a couple of minutes.",
         "saveFirst": "Save your changes first",
@@ -3859,7 +3878,45 @@
         "howGp": "Globalping: a free key in your account at",
         "howLl": "Latency Lab: an ll_… key in your profile at",
         "llQuota": "The service does not report the remaining limit; see it in the console at",
-        "pausedUntil": "Limit reached, checks are paused until {{time}}",
+        "pausedUntil": "Checks are paused until {{time}}",
+        "pauseNote": "Service replied: \"{{note}}\"",
+        "pauseNoteEmpty": "The service answered 429 with no explanation",
+        "pauseNotCredits": "Globalping limit is not used up — a problem on their side",
+        "gpReal": "{{remaining}} of {{limit}} checks left this hour",
+        "gpRealReset": "resets in {{min}} min",
+        "gpCredits": "Extra credits: {{n}}",
+        "gpRealFail": "Could not fetch the remaining limit from Globalping",
+        "gpEstimate": "Our usage for this list: ≈ {{used}} per hour",
+        "chkWorld": "World",
+        "chkRu": "Russia",
+        "chkOps": "Russian operators",
+        "chkWorldHint": "Probes around the world reached the server.",
+        "chkRuHint": "Probes in Russia: data centers and home ISPs.",
+        "chkOpsHint": "Mobile operators with whitelists — how a bypass server is checked.",
+        "chkOk": "responding",
+        "chkPartial": "partly responding",
+        "chkBad": "not responding",
+        "chkNone": "no data",
+        "chkCount": "{{ok}} of {{total}} answered.",
+        "chkNoneHint": "No measurement yet, or the server is hidden from the page.",
+        "chkRkn": "RKN registry",
+        "chkRknOk": "not listed",
+        "chkRknBad": "listed",
+        "chkRknNone": "no data",
+        "chkRknHint": "Address is in the RKN registry. May not open from Russia.",
+        "chkRknCdnHint": "Address is in a blocked CDN range. May not open from Russia.",
+        "chkRknOkHint": "Not found in the block lists.",
+        "chkRknNoneHint": "No check yet, or the service did not answer.",
+        "rknTitle": "RKN registry",
+        "rknNoKey": "No key needed",
+        "rknText": "Cheburcheck tells whether the server address is in the Roskomnadzor registry or in blocked CDN ranges. It is not a ping: it shows blocking by list, not a live outage.",
+        "rknUpdated": "Service lists updated {{ago}} ago",
+        "rknListed": "In the lists: {{listed}} of {{checked}} servers",
+        "rknAgoMin": "{{n}} min",
+        "rknAgoHour": "{{n}} h",
+        "alertRegistryToggle": "Alert when a server gets into the RKN registry",
+        "alertRegistryToggleHint": "The address was found in the block lists twice in a row. Comes with the other server alerts.",
+        "chkAria": "Server checks",
         "titleHint": "Only for the /status page opened without signing in. The \"Servers\" section inside the cabinet has its own title.",
         "fAddressBypass": "Host to check",
         "fAddressBypassHint": "The address users open through the whitelists (for example a Yandex domain). Not the node address.",
@@ -3950,7 +4007,8 @@
         "fortune": {
           "days": "+{{count}} d",
           "discount": "{{count}}% off",
-          "xp": "+{{count}} XP"
+          "xp": "+{{count}} XP",
+          "freeSpin": "+{{count}} free spin"
         },
         "promo": {
           "days": "+{{count}} d",
@@ -4015,6 +4073,7 @@
             "ru": "not reachable from Russia",
             "world": "not reachable worldwide",
             "operators": "whitelist operators don't answer",
+            "registry": "address is in the RKN block lists",
             "any": "status check"
           },
           "downFor": "outage lasted {{time}}",

@@ -85,6 +85,29 @@ func sendTelegramHTML(cfg telegramConfig, html string) (int, error) {
 	return msg.MessageID, nil
 }
 
+// editTelegramHTML заменяет текст уже отправленного поста: поправить опечатку
+// или дописать шаг без второго сообщения в канале.
+func editTelegramHTML(cfg telegramConfig, messageID int, html string) error {
+	if strings.TrimSpace(cfg.Token) == "" || strings.TrimSpace(cfg.ChatID) == "" {
+		return fmt.Errorf("RELEASE_TG_BOT_TOKEN and RELEASE_TG_CHAT_ID must be set")
+	}
+	if n := telegramTextRunes(html); n > telegramMaxMessageRunes {
+		return fmt.Errorf("telegram message is %d runes (limit %d); shorten Telegram section in RELEASE_NOTES.md", n, telegramMaxMessageRunes)
+	}
+	payload, err := json.Marshal(map[string]any{
+		"chat_id":                  cfg.ChatID,
+		"message_id":               messageID,
+		"text":                     html,
+		"parse_mode":               "HTML",
+		"disable_web_page_preview": true,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal telegram request: %w", err)
+	}
+	_, err = callTelegram(cfg, "editMessageText", "application/json", payload)
+	return err
+}
+
 // callTelegram вызывает метод Bot API и возвращает поле result ответа.
 func callTelegram(cfg telegramConfig, method, contentType string, payload []byte) (json.RawMessage, error) {
 	resp, err := postTelegram(cfg, method, contentType, payload)

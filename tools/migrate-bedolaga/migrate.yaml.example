@@ -25,5 +25,7 @@ customers:
   import_cabinet: true
 referrals:
   import_graph: true
+history:
+  import_payments: true        # оплаты подписок из Bedolaga → история покупок (клиенты не станут «триалом»)
 reporting:
   dir: ./migrate-out

@@ -21,11 +21,29 @@ import (
 
 func main() {
 	configPath := flag.String("config", "migrate.yaml", "path to migrate.yaml")
-	step := flag.String("step", "all", "tariffs|customers|balance|referrals|all")
+	step := flag.String("step", "all", "tariffs|customers|balance|referrals|history|all")
 	dryRun := flag.Bool("dry-run", true, "plan only (default true)")
 	apply := flag.Bool("apply", false, "write changes (overrides -dry-run)")
 	writeExample := flag.Bool("write-example-config", false, "write migrate.yaml.example to stdout or -config path")
+	loadBackupPath := flag.String("load-backup", "", "развернуть бекап из админки Bedolaga (.tar.gz / database.json) во временный Postgres и выйти")
+	loadDSN := flag.String("load-dsn", "", "DSN временной базы для -load-backup (таблицы пересоздаются!)")
 	flag.Parse()
+
+	if *loadBackupPath != "" {
+		if *loadDSN == "" {
+			fmt.Fprintln(os.Stderr, "migrate-bedolaga: для -load-backup нужен -load-dsn")
+			os.Exit(1)
+		}
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})))
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if err := loadBackup(ctx, *loadBackupPath, *loadDSN); err != nil {
+			fmt.Fprintf(os.Stderr, "migrate-bedolaga: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Бекап развёрнут во временную базу.")
+		return
+	}
 
 	if *writeExample {
 		path := *configPath

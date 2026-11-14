@@ -18,6 +18,8 @@ const (
 	AlertWorld = "world"
 	// AlertOperators — у обхода не ответил хотя бы один оператор с белыми списками.
 	AlertOperators = "operators"
+	// AlertRegistry — адрес сервера числится в реестре РКН или в заблокированных диапазонах CDN.
+	AlertRegistry = "registry"
 )
 
 // alertStreak — столько замеров подряд должна держаться проблема.
@@ -45,6 +47,8 @@ type AlertEvent struct {
 	Failed []string
 	// FailedMore — сколько ещё не ответило сверх списка.
 	FailedMore int
+	// Note — уточнение причины. У AlertRegistry: RegistryKindRegistry или RegistryKindCDN.
+	Note string
 }
 
 // OnAlerts задаёт, кому отдавать события тревог. Вызывается до Watch.

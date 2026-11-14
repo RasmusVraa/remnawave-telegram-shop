@@ -34,6 +34,7 @@ function sectorIdxForType(rt: string): number {
     'days_15',
     'days_30',
     'days_180',
+    'free_spin',
   ]
   const i = order.indexOf(rt)
   return i === -1 ? 0 : i
@@ -77,6 +78,17 @@ function TickerEntryText({ w, t }: { w: FortuneRecentWinItem; t: TFunction }) {
     )
   }
   const rim = wheelSectorRimSolid(rt, sectorIdxForType(rt))
+  if (rt === 'free_spin') {
+    return (
+      <>
+        <span className="font-semibold text-[#0c1222] dark:text-white">{name}</span>
+        <span className="text-slate-600 dark:text-slate-400"> {t('fortune.ticker.won')} </span>
+        <span className="font-semibold" style={{ color: rim }}>
+          {t('fortune.ticker.freeSpin')}
+        </span>
+      </>
+    )
+  }
   return (
     <>
       <span className="font-semibold text-[#0c1222] dark:text-white">{name}</span>

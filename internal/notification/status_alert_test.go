@@ -41,3 +41,24 @@ func TestStatusAlertText(t *testing.T) {
 		t.Errorf("en: %s", en)
 	}
 }
+
+func TestStatusAlertTextRegistry(t *testing.T) {
+	at := time.Date(2026, 11, 14, 10, 0, 0, 0, time.UTC)
+	got := StatusAlertText([]statusprobe.AlertEvent{
+		{Name: "Германия", Country: "DE", Reason: statusprobe.AlertRegistry, Open: true, Note: statusprobe.RegistryKindRegistry},
+		{Name: "Швеция", Country: "SE", Reason: statusprobe.AlertRegistry, Open: true, Note: statusprobe.RegistryKindCDN},
+		{Name: "Эстония", Country: "EE", Reason: statusprobe.AlertRegistry, Since: at.Add(-3 * time.Hour), At: at},
+	}, "ru", "")
+	for _, want := range []string{
+		"🇩🇪 <b>Германия</b> — адрес найден в реестре РКН, из России может не открываться",
+		"🇸🇪 <b>Швеция</b> — адрес в диапазонах заблокированного CDN, из России может не открываться",
+		"🇪🇪 <b>Эстония</b> — больше не в списках блокировок, был в списках 3 ч",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in:\n%s", want, got)
+		}
+	}
+	if strings.Contains(got, "сбой длился") {
+		t.Errorf("registry recovery must not say «сбой длился»:\n%s", got)
+	}
+}

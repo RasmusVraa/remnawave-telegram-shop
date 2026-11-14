@@ -56,6 +56,7 @@ func emitStatusEvents(events []statusprobe.AlertEvent) {
 type statusAlertWords struct {
 	down, up, russia, world, operators, noAnswer, more, lasted, open string
 	russiaRatio, worldSilent, operatorsSilent                        string
+	registryListed, registryCDN, registryClear, registryWas          string
 	lessMinute, minutes, hours                                       string
 }
 
@@ -72,6 +73,10 @@ var statusAlertRU = statusAlertWords{
 	russiaRatio:     "из России %d из %d",
 	worldSilent:     "из мира не отвечает",
 	operatorsSilent: "операторы: не отвечают %s",
+	registryListed:  "адрес найден в реестре РКН, из России может не открываться",
+	registryCDN:     "адрес в диапазонах заблокированного CDN, из России может не открываться",
+	registryClear:   "больше не в списках блокировок",
+	registryWas:     "был в списках %s",
 	lessMinute:      "меньше минуты",
 	minutes:         "%d мин",
 	hours:           "%d ч",
@@ -90,6 +95,10 @@ var statusAlertEN = statusAlertWords{
 	russiaRatio:     "from Russia %d of %d",
 	worldSilent:     "unreachable from the world",
 	operatorsSilent: "operators: no answer from %s",
+	registryListed:  "address is in the Roskomnadzor registry, may not open from Russia",
+	registryCDN:     "address is in a blocked CDN range, may not open from Russia",
+	registryClear:   "no longer in the block lists",
+	registryWas:     "was listed for %s",
 	lessMinute:      "under a minute",
 	minutes:         "%d min",
 	hours:           "%d h",
@@ -109,6 +118,10 @@ func StatusAlertText(events []statusprobe.AlertEvent, lang, publicURL string) st
 	for _, ev := range events {
 		head := strings.TrimSpace(countryFlag(ev.Country)+" <b>"+html.EscapeString(ev.Name)+"</b>") + " — "
 		if !ev.Open {
+			if ev.Reason == statusprobe.AlertRegistry {
+				up = append(up, head+w.registryClear+", "+fmt.Sprintf(w.registryWas, outage(w, ev.At.Sub(ev.Since))))
+				continue
+			}
 			up = append(up, head+reasonWord(w, ev.Reason)+", "+fmt.Sprintf(w.lasted, outage(w, ev.At.Sub(ev.Since))))
 			continue
 		}
@@ -124,6 +137,12 @@ func StatusAlertText(events []statusprobe.AlertEvent, lang, publicURL string) st
 			down = append(down, head+w.worldSilent)
 		case statusprobe.AlertOperators:
 			down = append(down, head+fmt.Sprintf(w.operatorsSilent, names))
+		case statusprobe.AlertRegistry:
+			if ev.Note == statusprobe.RegistryKindCDN {
+				down = append(down, head+w.registryCDN)
+			} else {
+				down = append(down, head+w.registryListed)
+			}
 		}
 	}
 	var b strings.Builder

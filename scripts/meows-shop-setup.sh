@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Meows Remnawave Telegram Shop — интерактивный установщик (Linux + Docker).
-# Меню: bot only | bot+cabinet | cabinet only | proxy/SSL | smoke.
+# Меню: бот + web-кабинет (рекомендуется) | только бот | только кабинет | proxy/SSL | smoke | управление.
 #
 # Быстрый старт с GitHub (одна команда на чистой VDS):
 #   bash <(curl -fsSL https://raw.githubusercontent.com/MrMe0ws/remnawave-telegram-shop/main/scripts/meows-shop-setup.sh)
 #
 # Опционально:
 #   MEOWS_DIR=/opt/remnawave-telegram-shop   — куда клонировать (если репо ещё нет)
-#   MEOWS_CHOICE=2                          — сразу пункт меню (1..5), без первого вопроса
+#   MEOWS_CHOICE=1                          — сразу пункт меню (0..6), без первого вопроса
 #   MEOWS_IMAGE_TAG=latest|4.12.1           — тег Docker-образа бота (без вопроса)
 #
 # Что скачивается:
@@ -18,7 +18,7 @@
 #
 set -euo pipefail
 
-SCRIPT_VERSION="1.1.0"
+SCRIPT_VERSION="2.0.0"
 DEFAULT_IMAGE_REPO="ghcr.io/mrme0ws/remnawave-telegram-shop-bot"
 DEFAULT_IMAGE="${DEFAULT_IMAGE_REPO}:latest"
 DEFAULT_NETWORK="remnawave-network"
@@ -736,6 +736,15 @@ ensure_docker_network() {
     docker network create --driver bridge "$name" >/dev/null
     ok "Создана Docker-сеть: $name"
   fi
+}
+
+# Username бота из TELEGRAM_TOKEN (getMe) — подставляем в Login Widget по умолчанию.
+detect_bot_username() {
+  local token resp
+  token="$(get_env TELEGRAM_TOKEN)"
+  [[ -n "$token" && "$token" != "token" ]] || return 0
+  resp="$(curl -fsS --max-time 8 "https://api.telegram.org/bot${token}/getMe" 2>/dev/null || true)"
+  printf '%s' "$resp" | sed -n 's/.*"username":"\([^"]*\)".*/\1/p' | head -n1
 }
 
 detect_public_ip() {
@@ -1657,6 +1666,7 @@ setup_cabinet() {
   # Telegram widget (default)
   set_env CABINET_TELEGRAM_WEB_AUTH_MODE "widget"
   bot_user="$(get_env CABINET_TELEGRAM_LOGIN_BOT_USERNAME)"
+  [[ -n "$bot_user" ]] || bot_user="$(detect_bot_username)"
   ask bot_user "Username бота для Login Widget (без @)" "$bot_user"
   [[ -n "$bot_user" ]] || die "CABINET_TELEGRAM_LOGIN_BOT_USERNAME обязателен для widget"
   bot_user="${bot_user#@}"
@@ -1666,7 +1676,10 @@ setup_cabinet() {
   [[ -n "$smtp_host" ]] || die "SMTP обязателен для рабочего email-auth"
   ask smtp_port "CABINET_SMTP_PORT" "$(get_env CABINET_SMTP_PORT)"
   smtp_port="${smtp_port:-465}"
-  ask smtp_user "CABINET_SMTP_USER" "$(get_env CABINET_SMTP_USER)"
+  local smtp_user_def
+  smtp_user_def="$(get_env CABINET_SMTP_USER)"
+  [[ "$smtp_user_def" != *domen.com* ]] || smtp_user_def=""   # плейсхолдер из .env.sample
+  ask smtp_user "CABINET_SMTP_USER" "$smtp_user_def"
   smtp_pass="$(get_env CABINET_SMTP_PASSWORD)"
   if [[ -z "$smtp_pass" ]]; then
     ask_secret smtp_pass "CABINET_SMTP_PASSWORD"
@@ -1677,10 +1690,24 @@ setup_cabinet() {
   fi
   ask smtp_tls "CABINET_SMTP_TLS (true/false)" "$(get_env CABINET_SMTP_TLS)"
   smtp_tls="${smtp_tls:-true}"
-  ask mail_from "CABINET_MAIL_FROM" "$(get_env CABINET_MAIL_FROM)"
+  local mail_from_def
+  mail_from_def="$(get_env CABINET_MAIL_FROM)"
+  [[ "$mail_from_def" != *domen.com* ]] || mail_from_def=""
+  ask mail_from "CABINET_MAIL_FROM" "$mail_from_def"
   [[ -n "$mail_from" ]] || mail_from="VPN <noreply@${domain}>"
 
+  # Кабинет — основной интерфейс: меню бота сводится к кнопкам, открывающим кабинет (Mini App).
+  local ui_mode ui_default
+  ui_default="$(get_env CABINET_TELEGRAM_UI_MODE)"
+  # В .env.sample до первой настройки кабинета стоит classic — для новой установки предлагаем minimalism.
+  [[ "$(get_env CABINET_ENABLED)" == "true" ]] || ui_default="minimalism"
+  [[ "$ui_default" == "classic" ]] || ui_default="minimalism"
+  info "Режим меню бота: minimalism — все кнопки ведут в кабинет (рекомендуется); classic — полный набор кнопок в чате."
+  ask ui_mode "CABINET_TELEGRAM_UI_MODE (minimalism|classic)" "$ui_default"
+  [[ "$ui_mode" == "classic" ]] || ui_mode="minimalism"
+
   set_env CABINET_ENABLED "true"
+  set_env CABINET_TELEGRAM_UI_MODE "$ui_mode"
   set_env CABINET_PUBLIC_URL "$public"
   set_env CABINET_ALLOWED_ORIGINS "$origins"
   set_env CABINET_JWT_SECRET "$jwt"
@@ -2027,8 +2054,8 @@ show_menu() {
   meta "Версия: ${SCRIPT_VERSION}"
   meta "Документация: documentation/cabinet/SETUP-GUIDE-RU.md"
   printf '\n'
-  menu "1) Установить Telegram bot — ТОЛЬКО бот"
-  menu "2) Установить Telegram bot + Web-кабинет"
+  menu "1) Установить бота + Web-кабинет  ← рекомендуется (кнопки бота ведут в кабинет)"
+  menu "2) Установить ТОЛЬКО Telegram-бота (без кабинета, устаревший режим)"
   menu "3) Только Web-кабинет (бот уже установлен)"
   printf '\n'
   menu "4) Только reverse-proxy / SSL для кабинета"
@@ -2045,8 +2072,8 @@ show_menu() {
 run_choice() {
   local choice="$1"
   case "$choice" in
-    1) setup_bot ;;
-    2) setup_bot; setup_cabinet ;;
+    1) setup_bot; setup_cabinet ;;
+    2) setup_bot ;;
     3) setup_cabinet ;;
     4) setup_proxy ;;
     5) run_smoke; return $? ;;

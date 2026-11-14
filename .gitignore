@@ -372,6 +372,7 @@ remnawave-telegram-shop-4.3.6/
 # Bedolaga migrator local artifacts
 /migrate.yaml
 /migrate-out/
+/.migrate-bin/
 
 # Настройки редактора (локально)
 .vscode/

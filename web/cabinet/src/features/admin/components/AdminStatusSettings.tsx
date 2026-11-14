@@ -74,6 +74,13 @@ export function AdminStatusSettings() {
           busy={togglingKey === 'STATUS_ALERT_WORLD'}
           onChange={(v) => void handleToggle('STATUS_ALERT_WORLD', v)}
         />
+        <AdminToggleRow
+          label={t('admin.statusPage.alertRegistryToggle')}
+          hint={t('admin.statusPage.alertRegistryToggleHint')}
+          checked={on('STATUS_ALERT_REGISTRY')}
+          busy={togglingKey === 'STATUS_ALERT_REGISTRY'}
+          onChange={(v) => void handleToggle('STATUS_ALERT_REGISTRY', v)}
+        />
         <p className="pb-1 pt-2 text-xs text-muted-foreground">
           {t('admin.statusPage.alertsRoute')}{' '}
           <Link to="/admin/settings" className="font-medium text-primary hover:underline">

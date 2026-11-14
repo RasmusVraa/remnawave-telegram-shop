@@ -340,6 +340,48 @@ export interface AdminStatusQuotaDTO {
   /** Сервис ответил 429: проверки стоят до этого времени (ISO). */
   globalping_paused_until?: string
   latencylab_paused_until?: string
+  /** Что сервис написал в ответе 429. */
+  globalping_pause_note?: string
+  latencylab_pause_note?: string
+  /** Настоящий остаток у Globalping (GET /v1/limits). Нет — спросить не вышло. */
+  real?: AdminGlobalpingLimitsDTO
+  /** Проверка по спискам блокировок (cheburcheck). */
+  registry?: {
+    info?: { updated_at?: string; domains?: number }
+    /** Сервис ответил 429: проверка стоит до этого времени (ISO). */
+    paused_until?: string
+    /** У скольких серверов есть ответ и сколько из них числятся в списках. */
+    checked: number
+    listed: number
+  }
+}
+
+export interface AdminGlobalpingLimitsDTO {
+  type?: string
+  /** -1 — сервис не сказал. */
+  limit: number
+  remaining: number
+  reset_sec: number
+  credits?: number
+}
+
+export type AdminCheckState = 'ok' | 'partial' | 'bad' | 'none'
+
+export interface AdminCheckResult {
+  state: AdminCheckState
+  ok: number
+  total: number
+}
+
+/** Значки «мир / РФ» у строки списка серверов. */
+export interface AdminRowChecksDTO {
+  world: AdminCheckResult
+  russia: AdminCheckResult
+  /** «РФ» посчитано по операторам с белыми списками. */
+  operators?: boolean
+  measured_at?: string
+  /** Значок «РКН»: числится ли адрес в списках блокировок. ok — нет, bad — числится. */
+  registry?: { state: AdminCheckState; kind?: 'registry' | 'cdn'; checked_at?: string }
 }
 
 export interface PublicStatusHit {
@@ -1089,6 +1131,7 @@ export interface FortuneSectorDTO {
   reward_type: string
   display_days?: number
   display_percent?: number
+  display_spins?: number
 }
 
 export interface FortuneStatusResponse {
@@ -1102,6 +1145,8 @@ export interface FortuneStatusResponse {
   daily_free_enabled?: boolean
   /** Сегодня по UTC ещё не использован ежедневный бесплатный спин */
   daily_free_available?: boolean
+  /** Выигранные на колесе бесплатные спины, ещё не потраченные */
+  bonus_spins?: number
   min_subscription_days: number
   /** FORTUNE_SPIN_COST_DAYS: платный спин списывает столько дней подписки. */
   spin_cost_days?: number
@@ -2118,7 +2163,8 @@ export const api = {
   adminInfraDeleteHistory: (uuid: string) =>
     request<AdminInfraHistoryDTO>('DELETE', `/admin/infra/history/${uuid}`),
   adminInfraSettings: () => request<AdminInfraSettingsDTO>('GET', '/admin/infra/settings'),
-  adminStatusTargets: () => request<{ targets: AdminStatusTargetDTO[] }>('GET', '/admin/status/targets'),
+  adminStatusTargets: () =>
+    request<{ targets: AdminStatusTargetDTO[]; checks?: Record<string, AdminRowChecksDTO> }>('GET', '/admin/status/targets'),
 
   saveAdminStatusTargets: (targets: AdminStatusTargetDTO[]) =>
     request<{ targets: AdminStatusTargetDTO[] }>('PUT', '/admin/status/targets', { targets }),

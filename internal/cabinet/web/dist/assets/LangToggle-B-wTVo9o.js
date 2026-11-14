@@ -1,1 +1,0 @@
-import{j as o}from"./query-D6ZsvjX7.js";import{u as e,B as i,t as r,au as u,aS as c}from"./index-CdMqfHMf.js";function x({className:a}){const{i18n:n}=e(),t=n.language==="ru",s=()=>{c(t?"en":"ru")};return o.jsx(i,{variant:"ghost",size:"sm",onClick:()=>{u(),s()},className:r("font-mono text-xs",a),"aria-label":"Switch language",children:t?"EN":"RU"})}export{x as L};

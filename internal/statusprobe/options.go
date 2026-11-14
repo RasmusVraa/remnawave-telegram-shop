@@ -50,6 +50,17 @@ func AlertWorldEnabled() bool {
 	}
 }
 
+// AlertRegistryEnabled — писать админу, когда адрес сервера попал в списки блокировок.
+// Пустое значение значит «да».
+func AlertRegistryEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(config.EffectiveEnv("STATUS_ALERT_REGISTRY"))) {
+	case "false", "0":
+		return false
+	default:
+		return true
+	}
+}
+
 // ProbeIntervalMinutes — как часто пинговать, если у страны не задан свой интервал.
 func ProbeIntervalMinutes() int {
 	return clampEnvInt("STATUS_PROBE_INTERVAL_MIN", 60, 5, 180)

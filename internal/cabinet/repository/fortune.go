@@ -84,10 +84,26 @@ LIMIT $2`
 	return out, rows.Err()
 }
 
-func (r *FortuneRepo) InsertSpin(ctx context.Context, customerID int64, rewardType string, rewardValue, costDays int, isFree, isDailyFree bool) error {
-	const q = `INSERT INTO fortune_spins (customer_id, reward_type, reward_value, cost_days, is_free_spin, is_daily_free)
-VALUES ($1, $2, $3, $4, $5, $6)`
-	if _, err := r.pool.Exec(ctx, q, customerID, rewardType, rewardValue, costDays, isFree, isDailyFree); err != nil {
+// CountBonusSpinsAvailable — бесплатные спины, выигранные на колесе и ещё не потраченные:
+// сумма наград «free_spin» минус спины, сыгранные как бонусные. Отдельной таблицы нет — баланс считается по журналу.
+func (r *FortuneRepo) CountBonusSpinsAvailable(ctx context.Context, customerID int64) (int, error) {
+	const q = `SELECT COALESCE(SUM(reward_value) FILTER (WHERE reward_type = 'free_spin'), 0)
+     - COUNT(*) FILTER (WHERE is_bonus_spin)
+FROM fortune_spins WHERE customer_id = $1`
+	var n int
+	if err := r.pool.QueryRow(ctx, q, customerID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("fortune: count bonus spins: %w", err)
+	}
+	if n < 0 {
+		n = 0
+	}
+	return n, nil
+}
+
+func (r *FortuneRepo) InsertSpin(ctx context.Context, customerID int64, rewardType string, rewardValue, costDays int, isFree, isDailyFree, isBonus bool) error {
+	const q = `INSERT INTO fortune_spins (customer_id, reward_type, reward_value, cost_days, is_free_spin, is_daily_free, is_bonus_spin)
+VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	if _, err := r.pool.Exec(ctx, q, customerID, rewardType, rewardValue, costDays, isFree, isDailyFree, isBonus); err != nil {
 		return fmt.Errorf("fortune: insert spin: %w", err)
 	}
 	return nil

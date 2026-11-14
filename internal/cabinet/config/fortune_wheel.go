@@ -28,6 +28,8 @@ type FortuneWheelConfig struct {
 	WeightDays15    int
 	WeightDays30    int
 	WeightDays180   int
+	// WeightFreeSpin — шанс приза «бесплатный спин» (FORTUNE_WEIGHT_FREE_SPIN); 0 — сектор скрыт и не выпадает.
+	WeightFreeSpin int
 
 	RewardXPAmount         int
 	RewardMicroXPMin       int
@@ -40,6 +42,8 @@ type FortuneWheelConfig struct {
 	RewardDays15           int
 	RewardDays30           int
 	RewardDays180          int
+	// RewardFreeSpins — сколько бесплатных спинов даёт приз (FORTUNE_REWARD_FREE_SPINS).
+	RewardFreeSpins int
 
 	// WinnerTickerEnabled — бегущая строка / блок «кто выиграл» на странице колеса (FORTUNE_WINNER_TICKER_ENABLED).
 	WinnerTickerEnabled bool
@@ -97,30 +101,31 @@ func initFortuneWheel() {
 	if !fortuneWheel.Enabled {
 		return
 	}
-	fortuneWheel.MaxSpinsPerDay = fortuneInt("FORTUNE_MAX_SPINS_PER_DAY", 30)
+	fortuneWheel.MaxSpinsPerDay = fortuneInt("FORTUNE_MAX_SPINS_PER_DAY", 4)
 	if fortuneWheel.MaxSpinsPerDay < 1 {
-		fortuneWheel.MaxSpinsPerDay = 30
+		fortuneWheel.MaxSpinsPerDay = 4
 	}
-	fortuneWheel.DailyFreeSpin = fortuneBool("FORTUNE_DAILY_FREE_SPIN", false)
-	fortuneWheel.MinSubscriptionDays = fortuneInt("FORTUNE_MIN_SUBSCRIPTION_DAYS", 3)
+	fortuneWheel.DailyFreeSpin = fortuneBool("FORTUNE_DAILY_FREE_SPIN", true)
+	fortuneWheel.MinSubscriptionDays = fortuneInt("FORTUNE_MIN_SUBSCRIPTION_DAYS", 2)
 	if fortuneWheel.MinSubscriptionDays < 1 {
-		fortuneWheel.MinSubscriptionDays = 3
+		fortuneWheel.MinSubscriptionDays = 2
 	}
 
-	fortuneWheel.WeightMicro = fortuneInt("FORTUNE_WEIGHT_MICRO", 33)
-	fortuneWheel.WeightXP = fortuneInt("FORTUNE_WEIGHT_XP", 30)
-	fortuneWheel.WeightDiscount3 = fortuneInt("FORTUNE_WEIGHT_DISCOUNT_3", 13)
-	fortuneWheel.WeightDays3 = fortuneInt("FORTUNE_WEIGHT_DAYS_3", 8)
-	fortuneWheel.WeightDiscount5 = fortuneInt("FORTUNE_WEIGHT_DISCOUNT_5", 6)
-	fortuneWheel.WeightDays5 = fortuneInt("FORTUNE_WEIGHT_DAYS_5", 2)
-	fortuneWheel.WeightDays7 = fortuneInt("FORTUNE_WEIGHT_DAYS_7", 5)
-	fortuneWheel.WeightDays15 = fortuneInt("FORTUNE_WEIGHT_DAYS_15", 2)
-	fortuneWheel.WeightDays30 = fortuneInt("FORTUNE_WEIGHT_DAYS_30", 1)
+	fortuneWheel.WeightMicro = fortuneInt("FORTUNE_WEIGHT_MICRO", 478)
+	fortuneWheel.WeightXP = fortuneInt("FORTUNE_WEIGHT_XP", 355)
+	fortuneWheel.WeightDiscount3 = fortuneInt("FORTUNE_WEIGHT_DISCOUNT_3", 60)
+	fortuneWheel.WeightDays3 = fortuneInt("FORTUNE_WEIGHT_DAYS_3", 25)
+	fortuneWheel.WeightDiscount5 = fortuneInt("FORTUNE_WEIGHT_DISCOUNT_5", 40)
+	fortuneWheel.WeightDays5 = fortuneInt("FORTUNE_WEIGHT_DAYS_5", 15)
+	fortuneWheel.WeightDays7 = fortuneInt("FORTUNE_WEIGHT_DAYS_7", 10)
+	fortuneWheel.WeightDays15 = fortuneInt("FORTUNE_WEIGHT_DAYS_15", 5)
+	fortuneWheel.WeightDays30 = fortuneInt("FORTUNE_WEIGHT_DAYS_30", 2)
 	fortuneWheel.WeightDays180 = fortuneInt("FORTUNE_WEIGHT_DAYS_180", 0)
+	fortuneWheel.WeightFreeSpin = fortuneInt("FORTUNE_WEIGHT_FREE_SPIN", 10)
 
-	fortuneWheel.RewardXPAmount = fortuneInt("FORTUNE_REWARD_XP_AMOUNT", 50)
-	fortuneWheel.RewardMicroXPMin = fortuneInt("FORTUNE_REWARD_MICRO_XP_MIN", 10)
-	fortuneWheel.RewardMicroXPMax = fortuneInt("FORTUNE_REWARD_MICRO_XP_MAX", 25)
+	fortuneWheel.RewardXPAmount = fortuneInt("FORTUNE_REWARD_XP_AMOUNT", 35)
+	fortuneWheel.RewardMicroXPMin = fortuneInt("FORTUNE_REWARD_MICRO_XP_MIN", 5)
+	fortuneWheel.RewardMicroXPMax = fortuneInt("FORTUNE_REWARD_MICRO_XP_MAX", 15)
 	if fortuneWheel.RewardMicroXPMax < fortuneWheel.RewardMicroXPMin {
 		fortuneWheel.RewardMicroXPMax = fortuneWheel.RewardMicroXPMin
 	}
@@ -132,22 +137,27 @@ func initFortuneWheel() {
 	fortuneWheel.RewardDays15 = fortuneInt("FORTUNE_REWARD_DAYS_15", 15)
 	fortuneWheel.RewardDays30 = fortuneInt("FORTUNE_REWARD_DAYS_30", 30)
 	fortuneWheel.RewardDays180 = fortuneInt("FORTUNE_REWARD_DAYS_180", 180)
+	fortuneWheel.RewardFreeSpins = fortuneInt("FORTUNE_REWARD_FREE_SPINS", 1)
+	if fortuneWheel.RewardFreeSpins < 1 {
+		fortuneWheel.RewardFreeSpins = 1
+	}
 
 	sumW := fortuneWheel.WeightMicro + fortuneWheel.WeightXP + fortuneWheel.WeightDiscount3 +
 		fortuneWheel.WeightDays3 + fortuneWheel.WeightDiscount5 + fortuneWheel.WeightDays5 +
-		fortuneWheel.WeightDays7 + fortuneWheel.WeightDays15 + fortuneWheel.WeightDays30 + fortuneWheel.WeightDays180
+		fortuneWheel.WeightDays7 + fortuneWheel.WeightDays15 + fortuneWheel.WeightDays30 + fortuneWheel.WeightDays180 + fortuneWheel.WeightFreeSpin
 	if sumW <= 0 {
 		slog.Warn("cabinet fortune: sum of weights is 0, restoring defaults")
-		fortuneWheel.WeightMicro = 33
-		fortuneWheel.WeightXP = 30
-		fortuneWheel.WeightDiscount3 = 13
-		fortuneWheel.WeightDays3 = 8
-		fortuneWheel.WeightDiscount5 = 6
-		fortuneWheel.WeightDays5 = 2
-		fortuneWheel.WeightDays7 = 5
-		fortuneWheel.WeightDays15 = 2
-		fortuneWheel.WeightDays30 = 1
+		fortuneWheel.WeightMicro = 478
+		fortuneWheel.WeightXP = 355
+		fortuneWheel.WeightDiscount3 = 60
+		fortuneWheel.WeightDays3 = 25
+		fortuneWheel.WeightDiscount5 = 40
+		fortuneWheel.WeightDays5 = 15
+		fortuneWheel.WeightDays7 = 10
+		fortuneWheel.WeightDays15 = 5
+		fortuneWheel.WeightDays30 = 2
 		fortuneWheel.WeightDays180 = 0
+		fortuneWheel.WeightFreeSpin = 10
 	}
 
 	slog.Info("cabinet fortune wheel config",

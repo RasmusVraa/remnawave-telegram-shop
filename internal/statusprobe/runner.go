@@ -44,10 +44,15 @@ type Runner struct {
 	lastRun           time.Time
 	cooldownUntil     time.Time
 	listCooldownUntil time.Time
+	cooldownNote      string
+	listCooldownNote  string
 	pingBusy          bool
 	listBusy          bool
-	loaded            bool
-	onAlerts          func([]AlertEvent)
+	// Проверка по спискам блокировок идёт отдельным проходом: у неё свой сервис, свои лимиты.
+	registryBusy          bool
+	registryCooldownUntil time.Time
+	loaded                bool
+	onAlerts              func([]AlertEvent)
 }
 
 func NewRunner(store HistoryStore) *Runner {
@@ -188,6 +193,12 @@ func (r *Runner) retainLocked(targets []Target) bool {
 				changed = true
 			}
 		}
+		if target.NoExternal {
+			if sample, ok := r.samples[key]; ok && (!sample.RegistryAt.IsZero() || !sample.RegistryTryAt.IsZero()) {
+				r.samples[key] = stripRegistry(sample)
+				changed = true
+			}
+		}
 		legacy := NodeKey(target.Country, target.Name)
 		if _, ok := r.samples[key]; !ok && legacy != key && legacyUsers[legacy] == 1 {
 			if sample, ok := r.samples[legacy]; ok {
@@ -295,6 +306,7 @@ func (r *Runner) Kick(targets []Target) {
 	}
 	r.mu.Unlock()
 	r.launch(pingTargets, listTargets)
+	r.kickRegistry(targets, false)
 }
 
 // Force измеряет все переданные страны сразу, не дожидаясь интервала.
@@ -323,8 +335,10 @@ func (r *Runner) Force(targets []Target) error {
 	if len(listTargets) > 0 {
 		r.listBusy = true
 	}
+	r.registryCooldownUntil = time.Time{}
 	r.mu.Unlock()
 	r.launch(pingTargets, listTargets)
+	r.kickRegistry(targets, true)
 	return nil
 }
 
@@ -586,6 +600,7 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 				}
 				r.mu.Lock()
 				r.cooldownUntil = time.Now().Add(wait)
+				r.cooldownNote = limited.Note()
 				r.mu.Unlock()
 				slog.Warn("status probe paused", "error", err, "retry_in", wait.String())
 				break
@@ -629,6 +644,7 @@ func (r *Runner) whitelistPass(ctx context.Context, targets []Target) {
 			}
 			r.mu.Lock()
 			r.listCooldownUntil = time.Now().Add(wait)
+			r.listCooldownNote = limited.Note()
 			r.mu.Unlock()
 			slog.Warn("whitelist probe paused", "error", wlErr, "retry_in", wait.String())
 			break
@@ -666,6 +682,8 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	sample.WhitelistLowStreak = prev.WhitelistLowStreak
 	sample.WhitelistFailStreak = prev.WhitelistFailStreak
 	sample.Alerts = prev.Alerts
+	sample.RegistryAt, sample.RegistryTryAt, sample.RegistryOK = prev.RegistryAt, prev.RegistryTryAt, prev.RegistryOK
+	sample.RegistryBlocked, sample.RegistryKind, sample.RegistryStreak = prev.RegistryBlocked, prev.RegistryKind, prev.RegistryStreak
 	if sample.RussiaTotal > 0 && sample.RussiaTotal-sample.RussiaOK >= RussiaFailThreshold() {
 		sample.RussiaFailStreak = prev.RussiaFailStreak + 1
 	} else {

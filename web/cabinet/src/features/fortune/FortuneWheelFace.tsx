@@ -19,6 +19,7 @@ function sectorShortLabel(t: TFunction, s: FortuneSectorDTO): string {
   const rt = s.reward_type
   if (rt === 'micro') return t('fortune.wheelShort.micro')
   if (rt === 'xp') return t('fortune.wheelShort.xp')
+  if (rt === 'free_spin') return t('fortune.wheelShort.freeSpin', { n: s.display_spins ?? 1 })
   if (rt === 'discount_3' || rt === 'discount_5') {
     const pct = s.display_percent ?? (rt === 'discount_3' ? 3 : 5)
     return t('fortune.wheelShort.discount', { pct })

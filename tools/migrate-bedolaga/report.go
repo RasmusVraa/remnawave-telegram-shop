@@ -48,6 +48,8 @@ type summaryReport struct {
 	CustomersCabinet   int      `json:"customers_cabinet"`
 	BalanceApplied     int      `json:"balance_applied"`
 	ReferralsOK        int      `json:"referrals_ok"`
+	PaymentsOK         int      `json:"payments_ok"`
+	PaymentsSkipped    int      `json:"payments_skipped"`
 	Problems           int      `json:"problems"`
 }
 

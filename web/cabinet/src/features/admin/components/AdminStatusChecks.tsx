@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, CircleHelp, ExternalLink, KeyRound } from 'lucide-react'
 
-import { api } from '@/lib/api'
+import { api, type AdminStatusQuotaDTO } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { AdminModal } from './AdminModal'
 
@@ -16,8 +16,12 @@ export function AdminStatusChecks() {
     queryFn: () => api.adminStatusQuota(),
   })
   const data = quota.data
-  const tight = data ? data.per_hour > data.limit * 0.8 : false
-  const percent = data ? Math.min(100, Math.round((data.per_hour / data.limit) * 100)) : 0
+  // Настоящий остаток у Globalping, если он ответил; иначе наша прикидка расхода.
+  const real = data?.real && data.real.limit > 0 && data.real.remaining >= 0 ? data.real : null
+  const used = real ? real.limit - real.remaining : (data?.per_hour ?? 0)
+  const cap = real ? real.limit : (data?.limit ?? 1)
+  const tight = data ? (real ? real.remaining < real.limit * 0.2 : data.per_hour > data.limit * 0.8) : false
+  const percent = data ? Math.min(100, Math.round((used / cap) * 100)) : 0
 
   return (
     <section className="rounded-2xl border border-border/60 bg-card/50 p-4 sm:p-5">
@@ -37,7 +41,7 @@ export function AdminStatusChecks() {
       </div>
 
       {data && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
             <div className="flex items-center justify-between gap-2">
               <span className="font-medium">Globalping</span>
@@ -51,12 +55,35 @@ export function AdminStatusChecks() {
               />
             </div>
             <p className={cn('mt-1.5 text-xs', tight ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-              {t('admin.statusPage.gpUsage', { used: data.per_hour, limit: data.limit })}
+              {real
+                ? `${t('admin.statusPage.gpReal', { remaining: real.remaining, limit: real.limit })}${
+                    real.reset_sec > 0
+                      ? `, ${t('admin.statusPage.gpRealReset', { min: Math.max(1, Math.round(real.reset_sec / 60)) })}`
+                      : ''
+                  }`
+                : t('admin.statusPage.gpUsage', { used: data.per_hour, limit: data.limit })}
             </p>
+            {real && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {t('admin.statusPage.gpEstimate', { used: data.per_hour })}
+                {real.credits != null && <> · {t('admin.statusPage.gpCredits', { n: real.credits })}</>}
+              </p>
+            )}
+            {!real && (
+              <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.gpRealFail')}</p>
+            )}
             {data.globalping_paused_until && (
               <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                {t('admin.statusPage.pausedUntil', { time: clock(data.globalping_paused_until) })}
+                <span>
+                  {t('admin.statusPage.pausedUntil', { time: clock(data.globalping_paused_until) })}
+                  <span className="mt-0.5 block text-muted-foreground">
+                    {data.globalping_pause_note && data.globalping_pause_note !== 'HTTP 429'
+                      ? t('admin.statusPage.pauseNote', { note: data.globalping_pause_note })
+                      : t('admin.statusPage.pauseNoteEmpty')}
+                    {real && real.remaining > 0 && <> · {t('admin.statusPage.pauseNotCredits')}</>}
+                  </span>
+                </span>
               </p>
             )}
             {tight && (
@@ -82,10 +109,19 @@ export function AdminStatusChecks() {
             {data.latencylab_paused_until && (
               <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
                 <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                {t('admin.statusPage.pausedUntil', { time: clock(data.latencylab_paused_until) })}
+                <span>
+                  {t('admin.statusPage.pausedUntil', { time: clock(data.latencylab_paused_until) })}
+                  {data.latencylab_pause_note && (
+                    <span className="mt-0.5 block text-muted-foreground">
+                      {t('admin.statusPage.pauseNote', { note: data.latencylab_pause_note })}
+                    </span>
+                  )}
+                </span>
               </p>
             )}
           </div>
+
+          <RegistryCard data={data.registry} />
         </div>
       )}
 
@@ -126,6 +162,45 @@ export function AdminStatusChecks() {
       </AdminModal>
     </section>
   )
+}
+
+/** «Реестр РКН»: числится ли адрес сервера в списках блокировок. Ключа не нужно. */
+function RegistryCard({ data }: { data?: AdminStatusQuotaDTO['registry'] }) {
+  const { t } = useTranslation()
+  const updated = data?.info?.updated_at ? ago(data.info.updated_at, t) : ''
+  const listed = (data?.listed ?? 0) > 0
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="whitespace-nowrap font-medium">{t('admin.statusPage.rknTitle')}</span>
+        <Status on onText={t('admin.statusPage.rknNoKey')} offText="" />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.rknText')}</p>
+      {updated && <p className="mt-3 text-xs text-muted-foreground">{t('admin.statusPage.rknUpdated', { ago: updated })}</p>}
+      {data && data.checked > 0 && (
+        <p className={cn('mt-1.5 text-xs', listed ? 'font-medium text-rose-500' : 'text-muted-foreground')}>
+          {t('admin.statusPage.rknListed', { listed: data.listed, checked: data.checked })}
+        </p>
+      )}
+      {data?.paused_until && (
+        <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+          {t('admin.statusPage.pausedUntil', { time: clock(data.paused_until) })}
+        </p>
+      )}
+      <p className="mt-1.5 text-xs">
+        <ExtLink href="https://cheburcheck.ru">cheburcheck.ru</ExtLink>
+      </p>
+    </div>
+  )
+}
+
+/** «12 мин», «3 ч»: сколько прошло с момента iso. */
+function ago(iso: string, t: (key: string, o?: Record<string, unknown>) => string): string {
+  const at = new Date(iso).getTime()
+  if (Number.isNaN(at)) return ''
+  const min = Math.max(0, Math.round((Date.now() - at) / 60000))
+  return min < 90 ? t('admin.statusPage.rknAgoMin', { n: Math.max(1, min) }) : t('admin.statusPage.rknAgoHour', { n: Math.round(min / 60) })
 }
 
 function ExtLink({ href, children }: { href: string; children: string }) {

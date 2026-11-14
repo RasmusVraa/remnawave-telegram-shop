@@ -16,6 +16,7 @@ type Config struct {
 	Balance   BalanceConfig   `yaml:"balance"`
 	Customers CustomersConfig `yaml:"customers"`
 	Referrals ReferralsConfig `yaml:"referrals"`
+	History   HistoryConfig   `yaml:"history"`
 	Reporting ReportingConfig `yaml:"reporting"`
 }
 
@@ -57,6 +58,11 @@ type ReferralsConfig struct {
 	ImportGraph bool `yaml:"import_graph"`
 }
 
+// HistoryConfig — перенос истории оплат подписок (transactions → purchase).
+type HistoryConfig struct {
+	ImportPayments bool `yaml:"import_payments"`
+}
+
 type ReportingConfig struct {
 	Dir string `yaml:"dir"`
 }
@@ -66,7 +72,7 @@ func LoadConfig(path string) (*Config, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read config: %w", err)
 	}
-	var cfg Config
+	cfg := Config{History: HistoryConfig{ImportPayments: true}}
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
@@ -135,6 +141,8 @@ customers:
   import_cabinet: true
 referrals:
   import_graph: true
+history:
+  import_payments: true        # оплаты подписок из Bedolaga → история покупок (клиенты не станут «триалом»)
 reporting:
   dir: ./migrate-out
 `

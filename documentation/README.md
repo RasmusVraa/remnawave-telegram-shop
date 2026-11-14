@@ -22,6 +22,7 @@
 | [payments.md](./payments.md) | Платёжные системы, вебхуки и поллинг |
 | [notifications.md](./notifications.md) | Уведомления: истечение, lifecycle, лента и push в кабинете, torrent blocker (Remnawave webhook) |
 | [traffic-split.md](./traffic-split.md) | Раздельный трафик (обычные серверы и обход) и докупка пакетов трафика |
+| [technical-promo-codes.md](./technical-promo-codes.md) | Служебные промокоды с префиксом `__`: якоря для скидок колеса и win-back, правило «админ их не видит» |
 | [squads.md](./squads.md) | Squads Remnawave (платные и триал, применение состава тарифа к подписчикам) |
 | [partner-program.md](./partner-program.md) | Партнёрская программа: проценты, потоки, холд, выплаты |
 | [customization.md](./customization.md) | Тексты бота/кабинета, кнопки, emoji |

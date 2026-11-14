@@ -25,7 +25,7 @@ import (
 // FortuneRewardTypesOrder — стабильный порядок секторов на UI (индекс = sector_index в API).
 var FortuneRewardTypesOrder = []string{
 	"micro", "xp", "discount_3", "days_3", "discount_5", "days_5",
-	"days_7", "days_15", "days_30", "days_180",
+	"days_7", "days_15", "days_30", "days_180", "free_spin",
 }
 
 func fortuneSectorIndex(rewardType string) int {
@@ -54,6 +54,7 @@ type FortuneStatusResponse struct {
 	MaxSpinsPerDay         int                    `json:"max_spins_per_day"` // лимит платных спинов за UTC-сутки (для UI)
 	DailyFreeEnabled       bool                   `json:"daily_free_enabled"`
 	DailyFreeAvailable     bool                   `json:"daily_free_available"` // FORTUNE_DAILY_FREE_SPIN, сегодня ещё не крутили бесплатно
+	BonusSpins             int                    `json:"bonus_spins"`          // выигранные на колесе бесплатные спины, ещё не потраченные
 	MinSubscriptionDays    int                    `json:"min_subscription_days"`
 	SpinCostDays           int                    `json:"spin_cost_days"`
 	SubscriptionRemainHrs  float64                `json:"subscription_remain_hours,omitempty"`
@@ -65,11 +66,12 @@ type FortuneStatusResponse struct {
 
 // FortuneSectorDTO — описание сектора для отрисовки колеса (веса RNG не сериализуем).
 type FortuneSectorDTO struct {
-	Index       int    `json:"index"`
-	RewardType  string `json:"reward_type"`
-	Weight      int    `json:"-"`
-	DisplayDays int    `json:"display_days,omitempty"`
-	DisplayPct  int    `json:"display_percent,omitempty"`
+	Index        int    `json:"index"`
+	RewardType   string `json:"reward_type"`
+	Weight       int    `json:"-"`
+	DisplayDays  int    `json:"display_days,omitempty"`
+	DisplayPct   int    `json:"display_percent,omitempty"`
+	DisplaySpins int    `json:"display_spins,omitempty"`
 }
 
 // FortuneSpinResponse — POST /cabinet/api/fortune/spin.
@@ -173,6 +175,8 @@ func weightForType(c cabcfg.FortuneWheelConfig, rt string) int {
 		return c.WeightDays30
 	case "days_180":
 		return c.WeightDays180
+	case "free_spin":
+		return c.WeightFreeSpin
 	default:
 		return 0
 	}
@@ -182,6 +186,11 @@ func (s *FortuneService) buildSectors(c cabcfg.FortuneWheelConfig) []FortuneSect
 	out := make([]FortuneSectorDTO, 0, len(FortuneRewardTypesOrder))
 	for i, rt := range FortuneRewardTypesOrder {
 		w := weightForType(c, rt)
+		// Сектор с нулевым шансом убирается с колеса: приз выключен. Исключение — «+180 дней»:
+		// он остаётся на колесе по задумке владельца, хотя не выпадает.
+		if w <= 0 && rt != "days_180" {
+			continue
+		}
 		dto := FortuneSectorDTO{Index: i, RewardType: rt, Weight: w}
 		switch rt {
 		case "days_3":
@@ -196,6 +205,8 @@ func (s *FortuneService) buildSectors(c cabcfg.FortuneWheelConfig) []FortuneSect
 			dto.DisplayDays = c.RewardDays30
 		case "days_180":
 			dto.DisplayDays = c.RewardDays180
+		case "free_spin":
+			dto.DisplaySpins = c.RewardFreeSpins
 		case "discount_3":
 			dto.DisplayPct = c.RewardDiscount3Percent
 		case "discount_5":
@@ -307,7 +318,13 @@ func (s *FortuneService) Status(ctx context.Context, accountID int64) (*FortuneS
 	}
 	out.DailyFreeAvailable = dailyAvail
 
-	if n >= cfg.MaxSpinsPerDay && !dailyAvail {
+	bonus, err := s.fortRepo.CountBonusSpinsAvailable(ctx, cust.ID)
+	if err != nil {
+		return nil, err
+	}
+	out.BonusSpins = bonus
+
+	if n >= cfg.MaxSpinsPerDay && !dailyAvail && bonus == 0 {
 		out.ReasonCode = "daily_limit"
 		return out, nil
 	}
@@ -334,7 +351,9 @@ func randIntn(n int) (int, error) {
 	return int(u % uint64(n)), nil
 }
 
-func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig) (string, error) {
+// pickRewardType — выбор сектора по весам. noFreeSpin исключает приз «бесплатный спин»: спин, сыгранный
+// за выигранную попытку, не может выбить новую (иначе попытки размножались бы цепочкой).
+func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig, noFreeSpin bool) (string, error) {
 	type pair struct {
 		t string
 		w int
@@ -343,7 +362,7 @@ func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig) (string, 
 	sum := 0
 	for _, rt := range FortuneRewardTypesOrder {
 		w := weightForType(cfg, rt)
-		if w <= 0 {
+		if w <= 0 || (noFreeSpin && rt == "free_spin") {
 			continue
 		}
 		pairs = append(pairs, pair{t: rt, w: w})
@@ -397,6 +416,8 @@ func rewardValueFor(cfg cabcfg.FortuneWheelConfig, rewardType string) (int, erro
 		return cfg.RewardDays30, nil
 	case "days_180":
 		return cfg.RewardDays180, nil
+	case "free_spin":
+		return cfg.RewardFreeSpins, nil
 	default:
 		return 0, fmt.Errorf("unknown reward %q", rewardType)
 	}
@@ -446,7 +467,7 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		return nil, err
 	}
 
-	var isFree, isDailyFree bool
+	var isFree, isDailyFree, isBonus bool
 	if cfg.DailyFreeSpin {
 		dailyUsed, derr := s.fortRepo.HasDailyFreeSpinToday(ctx, cust.ID, dayStart, dayEnd)
 		if derr != nil {
@@ -454,6 +475,16 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		}
 		if !dailyUsed {
 			isFree, isDailyFree = true, true
+		}
+	}
+	if !isFree {
+		// Выигранная попытка тратится после ежедневной бесплатной (та сгорает в полночь) и до платных.
+		bonus, berr := s.fortRepo.CountBonusSpinsAvailable(ctx, cust.ID)
+		if berr != nil {
+			return nil, berr
+		}
+		if bonus > 0 {
+			isFree, isBonus = true, true
 		}
 	}
 	if !isFree && paidToday >= cfg.MaxSpinsPerDay {
@@ -466,7 +497,7 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		}
 	}
 
-	rewardType, err := s.pickRewardType(cfg)
+	rewardType, err := s.pickRewardType(cfg, isBonus)
 	if err != nil {
 		return nil, err
 	}
@@ -526,7 +557,7 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 			apply = false
 		}
 		if apply {
-			if err := s.promo.UpsertPendingDiscount(ctx, tx, cust.ID, promoID, rewardVal, nil, true, database.PendingDiscountUnlimitedPayments); err != nil {
+			if err := s.promo.UpsertPendingDiscount(ctx, tx, cust.ID, promoID, rewardVal, nil, true, 1); err != nil {
 				return nil, err
 			}
 		}
@@ -562,8 +593,12 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 	}
 
 	spinLogVal := rewardVal
-	if err := s.fortRepo.InsertSpin(ctx, cust.ID, rewardType, spinLogVal, costDays, isFree, isDailyFree); err != nil {
+	if err := s.fortRepo.InsertSpin(ctx, cust.ID, rewardType, spinLogVal, costDays, isFree, isDailyFree, isBonus); err != nil {
 		slog.Error("fortune: insert spin log failed", "customer_id", utils.MaskHalfInt64(cust.ID), "error", err)
+		// Для «бесплатного спина» журнал и есть сам приз: без записи он пропадёт молча.
+		if rewardType == "free_spin" {
+			return nil, fmt.Errorf("fortune: record free spin prize: %w", err)
+		}
 	}
 
 	resp := &FortuneSpinResponse{

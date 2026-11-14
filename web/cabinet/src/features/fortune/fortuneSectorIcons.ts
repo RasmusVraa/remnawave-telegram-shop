@@ -4,6 +4,7 @@ import {
   Gem,
   Gift,
   Sparkles,
+  Ticket,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -19,4 +20,5 @@ export const FORTUNE_SECTOR_ICONS: Record<string, LucideIcon> = {
   days_15: Gift,
   days_30: Gift,
   days_180: Gift,
+  free_spin: Ticket,
 }
