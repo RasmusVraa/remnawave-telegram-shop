@@ -567,6 +567,22 @@ func (pr *PurchaseRepository) ListAllPaidForLoyaltyBackfill(ctx context.Context)
 	return purchases, nil
 }
 
+// Правило «рубли / Stars» для оплаченной покупки. Условия написаны для строки
+// purchase с алиасом p и общие для всех мест, где выручку делят по валютам
+// (SumPaidSpendBreakdown, отдача промокодов): Stars — счёт Telegram или валюта
+// STARS/XTR; рубли — всё остальное в RUB/RUR или без валюты. Прочие валюты
+// (например, крипта в USD) не попадают ни туда, ни туда.
+const (
+	purchaseStarsCond = `(
+    p.invoice_type = 'telegram'
+    OR UPPER(TRIM(COALESCE(p.currency, ''))) IN ('STARS', 'XTR')
+  )`
+	purchaseRubCond = `(NOT ` + purchaseStarsCond + ` AND (
+    UPPER(TRIM(COALESCE(p.currency, ''))) IN ('RUB', 'RUR', '')
+    OR COALESCE(p.currency, '') = ''
+  ))`
+)
+
 // SumPaidSpendBreakdown возвращает по успешным оплатам клиента: счёт и сумму в рублях (RUB/RUR/пустая валюта,
 // без строк Telegram Stars) и отдельно счёт и сумму amount по Stars (invoice_type telegram или валюта STARS/XTR).
 func (pr *PurchaseRepository) SumPaidSpendBreakdown(ctx context.Context, customerID int64) (
@@ -574,28 +590,10 @@ func (pr *PurchaseRepository) SumPaidSpendBreakdown(ctx context.Context, custome
 ) {
 	q := `
 SELECT
-  COUNT(*) FILTER (WHERE p.status = 'paid' AND NOT (
-    p.invoice_type = 'telegram'
-    OR UPPER(TRIM(COALESCE(p.currency, ''))) IN ('STARS', 'XTR')
-  ) AND (
-    UPPER(TRIM(COALESCE(p.currency, ''))) IN ('RUB', 'RUR', '')
-    OR COALESCE(p.currency, '') = ''
-  )),
-  COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'paid' AND NOT (
-    p.invoice_type = 'telegram'
-    OR UPPER(TRIM(COALESCE(p.currency, ''))) IN ('STARS', 'XTR')
-  ) AND (
-    UPPER(TRIM(COALESCE(p.currency, ''))) IN ('RUB', 'RUR', '')
-    OR COALESCE(p.currency, '') = ''
-  )), 0),
-  COUNT(*) FILTER (WHERE p.status = 'paid' AND (
-    p.invoice_type = 'telegram'
-    OR UPPER(TRIM(COALESCE(p.currency, ''))) IN ('STARS', 'XTR')
-  )),
-  COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'paid' AND (
-    p.invoice_type = 'telegram'
-    OR UPPER(TRIM(COALESCE(p.currency, ''))) IN ('STARS', 'XTR')
-  )), 0)
+  COUNT(*) FILTER (WHERE p.status = 'paid' AND ` + purchaseRubCond + `),
+  COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'paid' AND ` + purchaseRubCond + `), 0),
+  COUNT(*) FILTER (WHERE p.status = 'paid' AND ` + purchaseStarsCond + `),
+  COALESCE(SUM(p.amount) FILTER (WHERE p.status = 'paid' AND ` + purchaseStarsCond + `), 0)
 FROM purchase p
 WHERE p.customer_id = $1
 `

@@ -1,16 +1,12 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, CalendarClock, Gauge, Globe } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
-import { PageReveal, RevealItem } from '@/components/PageReveal'
-import { PageTitleWithBack } from '@/components/PageTitleWithBack'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError, SUBSCRIPTION_STALE_MS } from '@/lib/api'
 import { useErrorHaptic } from '@/lib/haptic'
 import { formatNumber } from '@/lib/format'
@@ -18,9 +14,18 @@ import { newIdempotencyKey } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 import { formatUtcDayMonth as formatDayMonth } from '@/lib/splitDates'
-import { bypassLabel } from '@/lib/bypassLabel'
-import { packSizeLabel } from '@/features/home/trafficSplit'
-import { CheckoutPayButton, SummaryRow } from '@/features/checkout/checkoutShared'
+import { bypassServersTitle } from '@/lib/bypassLabel'
+import { packSizeGb, packSizeLabel } from '@/features/home/trafficSplit'
+import {
+  CheckoutLayout,
+  IncludedList,
+  IncludedRow,
+  OrderHeader,
+  OrderReceipt,
+  OrderSkeleton,
+  discountLines,
+  type ReceiptMode,
+} from '@/features/checkout/orderSummary'
 import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
@@ -28,7 +33,6 @@ import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
  * Оформление докупки трафика: та же страница, что при оплате подписки и мест
  * для устройств (сводка → способ оплаты → «Оплатить»). Пакет приходит из окна
  * докупки в `?pack=`; цену сервер берёт из пакета тарифа, а не из запроса.
- * Скидка (лояльность, промокод) считается при создании счёта — здесь показана цена пакета.
  */
 export default function TrafficCheckoutPage() {
   const { t } = useTranslation()
@@ -46,11 +50,6 @@ export default function TrafficCheckoutPage() {
     queryFn: () => api.myTraffic(),
     staleTime: SUBSCRIPTION_STALE_MS,
   })
-  const { data: sub } = useQuery({
-    queryKey: ['subscription'],
-    queryFn: () => api.subscription(),
-    staleTime: SUBSCRIPTION_STALE_MS,
-  })
   const pack = split?.packs.find((p) => p.id === packId)
   const valid = Boolean(split?.can_buy && pack)
 
@@ -60,20 +59,26 @@ export default function TrafficCheckoutPage() {
   // Цена с учётом скидок (лояльность, промокод) считается на сервере тем же кодом, что и счёт: иначе здесь
   // была бы цена без скидки, а к оплате выставлялась бы со скидкой.
   const previewProvider = selectedProvider ?? 'yookassa'
-  const { data: preview, isError: previewError } = useQuery({
+  const {
+    data: preview,
+    isError: previewError,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: ['trafficPackPreview', packId, previewProvider],
     queryFn: () => api.trafficPackPreview(packId, previewProvider),
     enabled: valid && !Number.isNaN(packId),
     staleTime: 0,
     retry: 1,
+    placeholderData: keepPreviousData,
   })
+  const recalculating = isFetching && isPlaceholderData
   // Если пересчёт не удался, показываем цену из каталога (как и сказано в подсказке): спишется фактическая сумма со скидкой.
   const catalogPrice = pack ? (stars && pack.amount_stars != null ? pack.amount_stars : pack.amount_rub) : 0
   const priceReady = Boolean(preview) || previewError
   const amount = preview?.amount_rub ?? (previewError ? catalogPrice : 0)
-  const hasDiscount = preview != null && preview.base_amount_rub > preview.amount_rub
-  const amountSuffix = stars ? t('checkout.stars') : t('checkout.rub')
-  const kindName = pack?.kind === 'bypass' ? bypassLabel(split?.label) : t('trafficSplit.tabMain')
+  // Валюта — из ответа (при пересчёте он прошлый, вместе со своей суммой), до ответа — по выбранному способу.
+  const amountSuffix = (preview ? preview.currency === 'STARS' : stars) ? t('checkout.stars') : t('checkout.rub')
   // Для звёзд у пакета может не быть цены (курс не задан): рубли с пометкой «⭐» были бы враньём.
   const starsMissing = stars && Boolean(pack) && pack?.amount_stars == null
 
@@ -101,79 +106,80 @@ export default function TrafficCheckoutPage() {
     }
   }
 
-  const tariffName = sub?.tariff?.name?.trim() || t('dashboard.basicPlan')
+  const size = pack ? packSizeLabel(pack.bytes, t('dashboard.gigabytes')) : ''
+
+  let order
+  if (isLoading) {
+    order = <OrderSkeleton />
+  } else if (!valid || !pack || !split) {
+    // Ссылку открыли повторно, пакет выключили или тариф сменился.
+    order = (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/dashboard">{t('trafficSplit.backHome')}</Link>
+        </Button>
+      </div>
+    )
+  } else {
+    order = (
+      <>
+        <OrderHeader scenario="addon" title={t('checkout.trafficTitle')} />
+        <IncludedList>
+          {pack.kind === 'bypass' ? (
+            <IncludedRow
+              icon={<Globe size={17} />}
+              title={bypassServersTitle(packSizeGb(pack.bytes), split.label)}
+              hint={t('checkout.bypassHint')}
+            />
+          ) : (
+            <IncludedRow icon={<Gauge size={17} />} title={t('checkout.trafficPackMain', { size })} />
+          )}
+          <IncludedRow
+            icon={<CalendarClock size={17} />}
+            title={t('trafficSplit.packTerm', { date: formatDayMonth(split.reset_at, lang) })}
+          />
+        </IncludedList>
+      </>
+    )
+  }
+
+  const renderReceipt = (mode: ReceiptMode) => {
+    if (!priceReady) return <OrderReceipt mode={mode} lines={[]} total={null} unit={amountSuffix} />
+    const base = preview ? (preview.base_amount_rub > 0 ? preview.base_amount_rub : preview.amount_rub) : catalogPrice
+    return (
+      <OrderReceipt
+        mode={mode}
+        lines={[
+          { key: 'pack', label: t('checkout.trafficPackReceipt', { size }), amount: base },
+          ...(preview
+            ? discountLines(t, {
+                base,
+                amount: preview.amount_rub,
+                loyaltyPct: preview.loyalty_discount_pct,
+                promoPct: preview.promo_discount_pct,
+                totalPct: preview.total_discount_pct,
+              })
+            : []),
+        ]}
+        total={amount}
+        strike={base}
+        unit={amountSuffix}
+        busy={recalculating}
+        note={previewError && !preview ? t('checkout.previewError') : undefined}
+      />
+    )
+  }
 
   return (
     <AppLayout>
-      <PageReveal className="max-w-lg mx-auto space-y-6">
-        <RevealItem>
-          <PageTitleWithBack title={t('checkout.title')} />
-        </RevealItem>
-
-        <RevealItem>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium text-muted-foreground">{t('checkout.summary')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="space-y-2.5">
-                  <Skeleton className="h-3.5 w-full" />
-                  <Skeleton className="h-3.5 w-4/5" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ) : !valid || !pack || !split ? (
-                // Ссылку открыли повторно, пакет выключили или тариф сменился.
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to="/dashboard">{t('trafficSplit.backHome')}</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <SummaryRow label={t('checkout.scenario')} value={t('trafficSplit.scenario')} />
-                  <SummaryRow label={t('checkout.plan')} value={tariffName} />
-                  <SummaryRow label={t('trafficSplit.packLabel')} value={`${kindName}: +${packSizeLabel(pack.bytes, t('dashboard.gigabytes'))}`} />
-                  <SummaryRow
-                    label={t('checkout.period')}
-                    value={t('trafficSplit.packTerm', { date: formatDayMonth(split.reset_at, lang) })}
-                  />
-                  {previewError && <p className="text-xs text-muted-foreground">{t('checkout.previewError')}</p>}
-                  {preview && hasDiscount && (preview.total_discount_pct ?? 0) > 0 && (
-                    <div className="space-y-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
-                      <SummaryRow
-                        label={t('checkout.discountLabel')}
-                        value={t('checkout.discountValueWithAmount', {
-                          pct: preview.total_discount_pct,
-                          amount: formatNumber(preview.base_amount_rub - preview.amount_rub),
-                          unit: amountSuffix,
-                        })}
-                      />
-                    </div>
-                  )}
-                  <div className="border-t border-border pt-2 mt-2">
-                    <SummaryRow
-                      label={t('checkout.total')}
-                      value={
-                        priceReady ? (
-                          <span className="text-lg font-bold">
-                            {formatNumber(amount)} {amountSuffix}
-                          </span>
-                        ) : (
-                          <Skeleton className="h-6 w-20" />
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </RevealItem>
-
-        {valid && (
-          <RevealItem>
+      <CheckoutLayout
+        title={t('checkout.title')}
+        order={order}
+        receipt={isLoading || valid ? renderReceipt : null}
+        equalHeights
+        payment={
+          valid ? (
             <PaymentMethodPicker
               methods={checkoutMethod.methods}
               method={checkoutMethod.method}
@@ -182,36 +188,29 @@ export default function TrafficCheckoutPage() {
               loading={checkoutMethod.loading}
               onSelect={checkoutMethod.setMethod}
             />
-          </RevealItem>
-        )}
-
-        {starsMissing && (
-          <RevealItem>
+          ) : undefined
+        }
+        notices={
+          starsMissing ? (
             <Alert variant="destructive">
               <AlertCircle size={14} />
               <AlertDescription>{t('trafficSplit.noStars')}</AlertDescription>
             </Alert>
-          </RevealItem>
-        )}
-
-        {error && (
-          <RevealItem>
-            <Alert variant="destructive">
-              <AlertCircle size={14} />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </RevealItem>
-        )}
-
-        {valid && (
-          <CheckoutPayButton
-            label={`${t('checkout.pay')}${priceReady ? ` ${formatNumber(amount)} ${amountSuffix}` : ''}`}
-            disabled={!selectedProvider || loading || starsMissing || !priceReady}
-            loading={loading}
-            onPay={handlePay}
-          />
-        )}
-      </PageReveal>
+          ) : undefined
+        }
+        error={error}
+        pay={
+          valid
+            ? {
+                label: `${t('checkout.pay')}${priceReady ? ` ${formatNumber(amount)} ${amountSuffix}` : ''}`,
+                // isPlaceholderData, а не recalculating: без сети запрос встаёт на паузу, а сумма остаётся прошлой.
+                disabled: !selectedProvider || loading || starsMissing || !priceReady || isPlaceholderData,
+                loading,
+                onPay: handlePay,
+              }
+            : null
+        }
+      />
     </AppLayout>
   )
 }

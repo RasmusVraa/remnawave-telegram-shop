@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { X, type LucideIcon } from 'lucide-react'
@@ -23,6 +23,9 @@ import {
  * Без `size` окно остаётся прежней ширины (448 px) — так старые вызовы не
  * меняют вид сами по себе; новым лучше указывать ступень явно.
  */
+/** Появление и уход окна; из него же — задержка размонтирования (как у ResponsiveSheet). */
+const ANIM_MS = 220
+
 const SIZE_CLASS = {
   sm: 'sm:max-w-sm',
   md: 'sm:max-w-lg',
@@ -50,6 +53,10 @@ interface AdminModalProps {
   headerAction?: ReactNode
   /** Без крестика: окно закрывается тапом вне его. Только вместе с headerAction. */
   hideClose?: boolean
+  /** Своя разметка вместо текста заголовка (title остаётся для доступности). */
+  titleSlot?: ReactNode
+  /** В окне несохранённые изменения: свайп вниз не уносит шторку, а только вызывает onClose. */
+  dismissGuarded?: boolean
 }
 
 export function AdminModal({
@@ -68,9 +75,34 @@ export function AdminModal({
   iconAccent,
   headerAction,
   hideClose,
+  titleSlot,
+  dismissGuarded,
 }: AdminModalProps) {
   const { t } = useTranslation()
-  const { sheetRef, handlers: dragHandlers } = useSheetDragDismiss({ open, onDismiss: onClose })
+  const { sheetRef, handlers: dragHandlers } = useSheetDragDismiss({ open, onDismiss: onClose, snapBack: dismissGuarded })
+
+  // На телефоне шторка выезжает снизу, на ПК окно проявляется из центра; уходит
+  // так же. mounted держит разметку на время ухода, visible переключает классы.
+  const [mounted, setMounted] = useState(open)
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    if (open) {
+      setMounted(true)
+      // Два кадра: в первом разметка только вставляется — переключи классы сразу,
+      // и браузер увидит лишь конечное состояние, без выезда.
+      let inner = 0
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setVisible(true))
+      })
+      return () => {
+        cancelAnimationFrame(outer)
+        cancelAnimationFrame(inner)
+      }
+    }
+    setVisible(false)
+    const id = window.setTimeout(() => setMounted(false), ANIM_MS + 30)
+    return () => window.clearTimeout(id)
+  }, [open])
 
   const iconStyles =
     iconTone !== 'default'
@@ -93,16 +125,27 @@ export function AdminModal({
     }
   }, [open, onClose])
 
-  if (!open) return null
+  // Пока окно уезжает, родитель обычно уже сбросил данные (промокод, партнёр,
+  // редактируемая нода) — показываем то, что было на экране в момент закрытия,
+  // а не пустое тело или скелетон.
+  const live = { title, description, children, footer, headerAction, titleSlot, Icon }
+  const frozenRef = useRef(live)
+  if (open) frozenRef.current = live
+  const view = open ? live : frozenRef.current
+
+  if (!mounted) return null
 
   return createPortal(
     <div
       className={cn(
         'fixed inset-0 z-[200] flex items-end justify-center bg-black/50 backdrop-blur-sm',
         'sm:items-center sm:p-4',
+        'transition-opacity duration-[220ms] ease-out motion-reduce:transition-none',
+        visible ? 'opacity-100' : 'opacity-0',
+        !open && 'pointer-events-none',
         className,
       )}
-      onClick={onClose}
+      onClick={open ? onClose : undefined}
     >
         <div
           ref={sheetRef}
@@ -113,6 +156,10 @@ export function AdminModal({
             // ближе, чем до центра экрана.
             'rounded-b-none rounded-t-2xl sm:rounded-xl',
             size ? SIZE_CLASS[size] : 'sm:max-w-md',
+            'transition-[opacity,transform] duration-[220ms] ease-out motion-reduce:transition-none',
+            visible
+              ? 'translate-y-0 opacity-100 sm:scale-100'
+              : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-[0.97]',
             panelClassName,
           )}
         >
@@ -125,33 +172,33 @@ export function AdminModal({
             {...dragHandlers}
           >
             <div className="flex min-w-0 items-center gap-3">
-              {Icon && (
+              {view.Icon && (
                 <div
                   className={cn(
                     'flex size-9 shrink-0 items-center justify-center rounded-lg',
                     iconStyles.boxClassName,
                   )}
                 >
-                  <Icon className={cn('size-4', iconStyles.iconClassName)} />
+                  <view.Icon className={cn('size-4', iconStyles.iconClassName)} />
                 </div>
               )}
               <div className="min-w-0">
-                <h3 className="truncate text-lg font-semibold leading-tight">{title}</h3>
-                {description && (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{description}</p>
+                {view.titleSlot ?? <h3 className="truncate text-lg font-semibold leading-tight">{view.title}</h3>}
+                {view.description && (
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{view.description}</p>
                 )}
               </div>
             </div>
-            {headerAction && (
+            {view.headerAction && (
               <div
                 className="shrink-0"
                 onPointerDown={(e) => e.stopPropagation()}
                 onTouchStart={(e) => e.stopPropagation()}
               >
-                {headerAction}
+                {view.headerAction}
               </div>
             )}
-            {!(hideClose && headerAction) && (
+            {!(hideClose && view.headerAction) && (
               <button
                 type="button"
                 onClick={onClose}
@@ -167,15 +214,15 @@ export function AdminModal({
           <div
             className={cn(
               'min-h-0 flex-1 overflow-y-auto p-5',
-              !footer && 'pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] sm:pb-5',
+              !view.footer && 'pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] sm:pb-5',
               bodyClassName,
             )}
           >
-            {children}
+            {view.children}
           </div>
-          {footer && (
+          {view.footer && (
             <div className="shrink-0 border-t border-border/70 bg-muted/25 px-5 py-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] dark:bg-secondary/25 sm:pb-4">
-              {footer}
+              {view.footer}
             </div>
           )}
         </div>

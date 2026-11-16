@@ -18,6 +18,7 @@ var hotIndexes = []string{
 	"idx_purchase_paid_at",
 	"idx_purchase_created_at",
 	"idx_customer_created_at",
+	"idx_purchase_promo_code_id",
 }
 
 func validIndexes(t *testing.T, pool *pgxpool.Pool) map[string]bool {

@@ -2,13 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, useAnimation } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { CalendarDays, Ticket, Volume2, VolumeX } from 'lucide-react'
+import { CalendarDays, CalendarMinus, Ticket, Volume2, VolumeX } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import { api, ApiError, type FortuneStatusResponse } from '@/lib/api'
 import { hapticImpact, hapticSelection, hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import {
@@ -19,7 +21,7 @@ import {
   scheduleSpinWheelSounds,
   winTier,
 } from '@/features/fortune/fortuneWheelAudio'
-import { FortunePossiblePrizes } from '@/features/fortune/FortunePossiblePrizes'
+import { FortunePossiblePrizes, FortunePrizeList } from '@/features/fortune/FortunePossiblePrizes'
 import { FortunePrizeModal } from '@/features/fortune/FortunePrizeModal'
 import { FortuneWinnersMarquee } from '@/features/fortune/fortuneWinnersFeed'
 import {
@@ -354,14 +356,97 @@ export default function FortunePage() {
   )
   const nextFreeCountdownMs = useUtcMidnightCountdown(showNextFreeTimer)
 
-  // Колесо ограничено ещё и высотой окна: 430px / 380px — всё остальное на странице (шапка, заголовок,
-  // лента, кнопка, отступы; на телефоне ещё нижняя панель). Так кнопка «Крутить» видна без прокрутки.
+  const bonusSpins = status?.bonus_spins ?? 0
+  const hasFreeSpin = Boolean(status?.daily_free_available) || bonusSpins > 0
+
+  // Колесо ограничено ещё и высотой окна, чтобы целиком (с кнопкой в центре) помещаться без прокрутки:
+  // 370px — шапка, заголовок, лента, отступы и нижняя панель на телефоне; на ПК нижней панели нет — 300px.
   // max(12rem, …) — на совсем низком окне колесо не схлопывается, страница просто прокручивается.
   const wheelWrapClassName =
-    'relative mx-auto flex w-full max-w-[min(calc(100vw-1.5rem),500px,max(12rem,calc(100dvh-430px)))] flex-col items-center gap-4 sm:max-w-[min(100%,520px,max(12rem,calc(100dvh-430px)))] md:max-w-[min(100%,560px,max(12rem,calc(100dvh-380px)))]'
+    'relative mx-auto w-full max-w-[min(calc(100vw-1.5rem),500px,max(12rem,calc(100dvh-370px)))] sm:max-w-[min(100%,520px,max(12rem,calc(100dvh-370px)))] md:max-w-[min(100%,540px,max(16rem,calc(100dvh-300px)))]'
+
+  // Плашка в самой кнопке: при бесплатных — билетик с числом выигранных попыток, при платных — цена
+  // крутки в днях подписки (сколько платных осталось, видно в шапке).
+  const showSpinPill = !spinning && !spinMut.isPending && (hasFreeSpin ? bonusSpins > 0 : paidSpinsLeft > 0)
+  const spinPillHint = hasFreeSpin
+    ? t('fortune.bonusSpinsHint', { count: bonusSpins })
+    : t('fortune.subtitle', { count: spinCostDays })
+  const spinPill = showSpinPill ? (
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold normal-case tabular-nums"
+      title={spinPillHint}
+      aria-label={spinPillHint}
+    >
+      {hasFreeSpin ? (
+        <>
+          <Ticket className="size-3.5" aria-hidden />
+          {bonusSpins}
+        </>
+      ) : (
+        <>
+          <CalendarMinus className="size-3.5" aria-hidden />
+          {t('fortune.spinCostPill', { count: spinCostDays })}
+        </>
+      )}
+    </span>
+  ) : null
+
+  const startSpin = () => {
+    setSpinError(null)
+    setShowPrizeModal(false)
+    if (!soundMutedRef.current) {
+      void ensureFortuneAudio().then((ctx) => {
+        if (ctx) playSpinAnticipation(ctx)
+      })
+    }
+    spinMut.mutate()
+  }
+
+  // Кнопка в центре колеса (и ПК, и телефон). Лежит поверх вращающегося диска, а не внутри него, чтобы надпись не
+  // крутилась вместе с колесом. Пока колесо крутится, кнопки нет — в центре видна иконка приза под стрелкой.
+  // Нельзя крутить и есть таймер — кнопка гаснет и показывает, через сколько бесплатная попытка.
+  const hubIdle = canPress || spinMut.isPending
+  const hubButton = spinning ? null : (
+    <button
+      type="button"
+      disabled={!canPress}
+      onClick={startSpin}
+      aria-label={spinButtonLabel}
+      className={cn(
+        'absolute left-1/2 top-1/2 z-30 flex aspect-square w-[31%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-1 rounded-full text-center outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:gap-1.5',
+        hubIdle
+          ? 'fortune-hub-btn text-base font-bold uppercase tracking-wide text-primary-foreground sm:text-lg'
+          : 'cursor-default bg-muted text-[11px] font-semibold leading-snug text-muted-foreground shadow-inner sm:text-xs',
+        spinMut.isPending && 'fortune-hub-btn--busy',
+      )}
+    >
+      {spinMut.isPending ? (
+        <Spinner className="size-6" />
+      ) : hubIdle ? (
+        <>
+          <span className="leading-none">{t('fortune.hubSpin')}</span>
+          {hasFreeSpin && (
+            <span className="-mt-0.5 text-[10px] font-bold leading-none tracking-wider text-primary-foreground/90 sm:text-xs">
+              {t('fortune.hubFree')}
+            </span>
+          )}
+          {spinPill}
+        </>
+      ) : showNextFreeTimer ? (
+        <>
+          <span className="px-3">{t('fortune.nextFreeIn')}</span>
+          <span className="text-sm font-bold tabular-nums text-foreground sm:text-base">
+            {formatCountdownHms(nextFreeCountdownMs, t)}
+          </span>
+        </>
+      ) : (
+        t('fortune.hubSpin')
+      )}
+    </button>
+  )
 
   const wheelColumn = (
-    <>
+    <div className={wheelWrapClassName}>
       <div
         className="pointer-events-none absolute -top-1 left-1/2 z-20 -translate-x-1/2 drop-shadow-md"
         aria-hidden
@@ -388,44 +473,35 @@ export default function FortunePage() {
           designVariant={designVariant}
         />
       </motion.div>
+      {hubButton}
+    </div>
+  )
 
-      <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-center">
-        <Button
-          type="button"
-          size="lg"
-          className="w-full sm:w-auto min-w-[200px]"
-          loading={spinMut.isPending}
-          disabled={!canPress}
-          onClick={() => {
-            setSpinError(null)
-            setShowPrizeModal(false)
-            if (!soundMutedRef.current) {
-              void ensureFortuneAudio().then((ctx) => {
-                if (ctx) playSpinAnticipation(ctx)
-              })
-            }
-            spinMut.mutate()
-          }}
-        >
-          {spinButtonLabel}
-          {(status?.bonus_spins ?? 0) > 0 && !spinning && !spinMut.isPending && (
-            <span
-              className="ml-2 inline-flex items-center gap-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs font-semibold tabular-nums"
-              title={t('fortune.bonusSpinsHint', { count: status?.bonus_spins ?? 0 })}
-              aria-label={t('fortune.bonusSpinsHint', { count: status?.bonus_spins ?? 0 })}
-            >
-              <Ticket className="size-3.5" aria-hidden />
-              {status?.bonus_spins}
-            </span>
-          )}
-        </Button>
-      </div>
-
+  // Телефон: под колесом только причина, почему крутить нельзя, и ошибка; таймер — в шапке.
+  const spinPanel = (reasonText && !status?.can_spin) || spinError ? (
+    <div className="mt-4 flex w-full flex-col items-center gap-2 md:hidden">
       {reasonText && !status?.can_spin && (
         <p className="text-center text-sm text-muted-foreground">{reasonText}</p>
       )}
       {spinError && <p className="text-center text-sm text-destructive">{spinError}</p>}
-    </>
+    </div>
+  ) : null
+
+
+  // ПК: справа от колеса — призы столбиком, под ними таймер до бесплатной (когда крутить всё же можно
+  // платно; если нельзя совсем, таймер в центре колеса) и причины, почему крутить нельзя.
+  const sideColumn = (
+    <div className="hidden min-w-0 flex-col gap-3 md:flex">
+      <FortunePrizeList sectors={slotSectors} t={t} />
+      {showNextFreeTimer && canPress && (
+        <p className="text-sm text-muted-foreground">
+          <span className="mr-1.5">{t('fortune.nextFreeIn')}</span>
+          <span className="font-semibold tabular-nums text-foreground">{formatCountdownHms(nextFreeCountdownMs, t)}</span>
+        </p>
+      )}
+      {reasonText && !status?.can_spin && <p className="text-sm text-muted-foreground">{reasonText}</p>}
+      {spinError && <p className="text-sm text-destructive">{spinError}</p>}
+    </div>
   )
 
   return (
@@ -504,8 +580,8 @@ export default function FortunePage() {
                     {soundMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
                   </Button>
                 </div>
-                {showNextFreeTimer && (
-                  <p className="max-w-[11rem] text-right text-[11px] leading-snug text-muted-foreground sm:max-w-none sm:text-xs">
+                {showNextFreeTimer && status?.can_spin && (
+                  <p className="max-w-[11rem] text-right text-[11px] leading-snug text-muted-foreground sm:max-w-none sm:text-xs md:hidden">
                     <span className="mr-1.5 align-middle">{t('fortune.nextFreeIn')}</span>
                     <span className="inline-block align-middle font-semibold tabular-nums text-foreground">
                       {formatCountdownHms(nextFreeCountdownMs, t)}
@@ -552,9 +628,13 @@ export default function FortunePage() {
               </RevealItem>
             )}
 
-            <RevealItem className={wheelWrapClassName}>{wheelColumn}</RevealItem>
+            <RevealItem className="md:grid md:grid-cols-[minmax(0,1.5fr)_minmax(18rem,1fr)] md:items-center md:gap-8">
+              {wheelColumn}
+              {spinPanel}
+              {sideColumn}
+            </RevealItem>
 
-            <RevealItem>
+            <RevealItem className="md:hidden">
               <FortunePossiblePrizes sectors={slotSectors} t={t} />
             </RevealItem>
           </>

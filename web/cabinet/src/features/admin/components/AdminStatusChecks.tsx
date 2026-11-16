@@ -1,11 +1,13 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, CircleHelp, ExternalLink, KeyRound } from 'lucide-react'
 
-import { api, type AdminStatusQuotaDTO } from '@/lib/api'
+import { api, type AdminCheburcheckDTO, type AdminStatusQuotaDTO } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 import { AdminModal } from './AdminModal'
+import { formatAdminApiError } from '../utils/formatAdminApiError'
 
 /** «Откуда берутся данные»: два внешних сервиса, подключены они или нет и сколько лимита уходит. */
 export function AdminStatusChecks() {
@@ -41,88 +43,100 @@ export function AdminStatusChecks() {
       </div>
 
       {data && (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">Globalping</span>
-              <Status on={data.token_set} onText={t('admin.statusPage.keyOn')} offText={t('admin.statusPage.gpOff')} />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.gpText')}</p>
-            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className={cn('h-full rounded-full', tight ? 'bg-amber-500' : 'bg-primary')}
-                style={{ width: `${percent}%` }}
-              />
-            </div>
-            <p className={cn('mt-1.5 text-xs', tight ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-              {real
-                ? `${t('admin.statusPage.gpReal', { remaining: real.remaining, limit: real.limit })}${
-                    real.reset_sec > 0
-                      ? `, ${t('admin.statusPage.gpRealReset', { min: Math.max(1, Math.round(real.reset_sec / 60)) })}`
-                      : ''
-                  }`
-                : t('admin.statusPage.gpUsage', { used: data.per_hour, limit: data.limit })}
-            </p>
-            {real && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                {t('admin.statusPage.gpEstimate', { used: data.per_hour })}
-                {real.credits != null && <> · {t('admin.statusPage.gpCredits', { n: real.credits })}</>}
-              </p>
-            )}
-            {!real && (
-              <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.gpRealFail')}</p>
-            )}
-            {data.globalping_paused_until && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  {t('admin.statusPage.pausedUntil', { time: clock(data.globalping_paused_until) })}
-                  <span className="mt-0.5 block text-muted-foreground">
-                    {data.globalping_pause_note && data.globalping_pause_note !== 'HTTP 429'
-                      ? t('admin.statusPage.pauseNote', { note: data.globalping_pause_note })
-                      : t('admin.statusPage.pauseNoteEmpty')}
-                    {real && real.remaining > 0 && <> · {t('admin.statusPage.pauseNotCredits')}</>}
-                  </span>
+        <>
+          {data.cheburcheck && <SourcePicker cheb={data.cheburcheck} />}
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">
+                  Globalping
+                  <RoleTag role={sourceRole(data.cheburcheck, 'globalping')} />
                 </span>
+                <Status on={data.token_set} onText={t('admin.statusPage.keyOn')} offText={t('admin.statusPage.gpOff')} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.gpText')}</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={cn('h-full rounded-full', tight ? 'bg-amber-500' : 'bg-primary')}
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+              <p className={cn('mt-1.5 text-xs', tight ? 'font-medium text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+                {real
+                  ? `${t('admin.statusPage.gpReal', { remaining: real.remaining, limit: real.limit })}${
+                      real.reset_sec > 0
+                        ? `, ${t('admin.statusPage.gpRealReset', { min: Math.max(1, Math.round(real.reset_sec / 60)) })}`
+                        : ''
+                    }`
+                  : t('admin.statusPage.gpUsage', { used: data.per_hour, limit: data.limit })}
               </p>
-            )}
-            {tight && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                {t('admin.statusPage.gpTight')}
-              </p>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="font-medium">Latency Lab</span>
-              <Status on={data.latencylab_set} onText={t('admin.statusPage.keyOn')} offText={t('admin.statusPage.llOff')} />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.llText')}</p>
-            {data.latencylab_set && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                {t('admin.statusPage.llQuota')}{' '}
-                <ExtLink href="https://console.latencylab.ru">console.latencylab.ru</ExtLink>
-              </p>
-            )}
-            {data.latencylab_paused_until && (
-              <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
-                <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-                <span>
-                  {t('admin.statusPage.pausedUntil', { time: clock(data.latencylab_paused_until) })}
-                  {data.latencylab_pause_note && (
+              {real && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t('admin.statusPage.gpEstimate', { used: data.per_hour })}
+                  {real.credits != null && <> · {t('admin.statusPage.gpCredits', { n: real.credits })}</>}
+                </p>
+              )}
+              {!real && (
+                <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.gpRealFail')}</p>
+              )}
+              {data.globalping_paused_until && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    {t('admin.statusPage.pausedUntil', { time: clock(data.globalping_paused_until) })}
                     <span className="mt-0.5 block text-muted-foreground">
-                      {t('admin.statusPage.pauseNote', { note: data.latencylab_pause_note })}
+                      {data.globalping_pause_note && data.globalping_pause_note !== 'HTTP 429'
+                        ? t('admin.statusPage.pauseNote', { note: data.globalping_pause_note })
+                        : t('admin.statusPage.pauseNoteEmpty')}
+                      {real && real.remaining >= Math.max(1, data.max_cost) && (
+                        <> · {t('admin.statusPage.pauseNotCredits')}</>
+                      )}
+                      {real && data.max_cost > 0 && real.remaining < data.max_cost && (
+                        <> · {t('admin.statusPage.pauseShortCredits', { cost: data.max_cost, remaining: real.remaining })}</>
+                      )}
                     </span>
-                  )}
-                </span>
-              </p>
-            )}
-          </div>
+                  </span>
+                </p>
+              )}
+              {tight && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-600 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  {t('admin.statusPage.gpTight')}
+                </p>
+              )}
+            </div>
 
-          <RegistryCard data={data.registry} />
-        </div>
+            <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">Latency Lab</span>
+                <Status on={data.latencylab_set} onText={t('admin.statusPage.keyOn')} offText={t('admin.statusPage.llOff')} />
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.llText')}</p>
+              {data.latencylab_set && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {t('admin.statusPage.llQuota')}{' '}
+                  <ExtLink href="https://console.latencylab.ru">console.latencylab.ru</ExtLink>
+                </p>
+              )}
+              {data.latencylab_paused_until && (
+                <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
+                  <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    {t('admin.statusPage.pausedUntil', { time: clock(data.latencylab_paused_until) })}
+                    {data.latencylab_pause_note && (
+                      <span className="mt-0.5 block text-muted-foreground">
+                        {t('admin.statusPage.pauseNote', { note: data.latencylab_pause_note })}
+                      </span>
+                    )}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            <CheburcheckCard cheb={data.cheburcheck} />
+            <RegistryCard data={data.registry} />
+          </div>
+        </>
       )}
 
       <AdminModal
@@ -146,12 +160,16 @@ export function AdminStatusChecks() {
                 {t('admin.statusPage.howLl')}{' '}
                 <ExtLink href="https://console.latencylab.ru">console.latencylab.ru</ExtLink>
               </li>
+              <li>
+                {t('admin.statusPage.howCheb')}{' '}
+                <ExtLink href="https://cheburcheck.ru/kb/api">cheburcheck.ru/kb/api</ExtLink>
+              </li>
             </ul>
           </li>
           <li>
             <p className="font-medium">2. {t('admin.statusPage.howStep2')}</p>
             <pre className="mt-2 overflow-x-auto rounded-lg bg-muted px-3 py-2.5 text-xs leading-relaxed">
-              {'GLOBALPING_TOKEN=<token>\nLATENCYLAB_TOKEN=<token>'}
+              {'GLOBALPING_TOKEN=<token>\nLATENCYLAB_TOKEN=<token>\nCHEBURCHECK_TOKEN=<token>'}
             </pre>
           </li>
           <li>
@@ -161,6 +179,150 @@ export function AdminStatusChecks() {
         </ol>
       </AdminModal>
     </section>
+  )
+}
+
+type Role = '' | 'active' | 'reserve' | 'paused'
+
+/** Роль источника «России»: кто работает сейчас, кто запасной. Без ключа Cheburcheck роли нет. */
+function sourceRole(cheb: AdminCheburcheckDTO | undefined, which: 'globalping' | 'cheburcheck'): Role {
+  if (!cheb || !cheb.configured) return ''
+  if (which === 'cheburcheck' && cheb.paused_until) return 'paused'
+  if (cheb.active === which) return 'active'
+  return cheb.mode === 'auto' ? 'reserve' : ''
+}
+
+function RoleTag({ role }: { role: Role }) {
+  const { t } = useTranslation()
+  if (!role) return null
+  return (
+    <span
+      className={cn(
+        'ml-2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold',
+        role === 'active' && 'bg-primary/15 text-primary',
+        role === 'paused' && 'bg-rose-500/15 text-rose-500',
+        role === 'reserve' && 'bg-muted text-muted-foreground',
+      )}
+    >
+      {t(`admin.statusPage.role${role[0].toUpperCase()}${role.slice(1)}`)}
+    </span>
+  )
+}
+
+/** Выбор источника «России»: Globalping, Cheburcheck или автоматически (с резервом). */
+function SourcePicker({ cheb }: { cheb: AdminCheburcheckDTO }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState('')
+  const pick = useMutation({
+    mutationFn: (value: string) => api.adminBotSettingsPatch({ settings: { STATUS_RU_SOURCE: value } }),
+    onSuccess: async () => {
+      setError('')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['admin-status-quota'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-status-targets'] }),
+        queryClient.invalidateQueries({ queryKey: ['admin-bot-settings'] }),
+      ])
+    },
+    onError: (err) => setError(formatAdminApiError(err, t)),
+  })
+  const options: { value: AdminCheburcheckDTO['mode']; label: string; short?: string; needsKey: boolean }[] = [
+    { value: 'globalping', label: 'Globalping', needsKey: false },
+    { value: 'cheburcheck', label: 'Cheburcheck', needsKey: true },
+    { value: 'auto', label: t('admin.statusPage.pickerAuto'), short: t('admin.statusPage.pickerAutoShort'), needsKey: true },
+  ]
+  // Без ключа выбор «Автоматически» и «Cheburcheck» ничего не меняет: работает Globalping.
+  const current = cheb.configured ? cheb.mode : 'globalping'
+  const hint = !cheb.configured
+    ? t('admin.statusPage.pickerHintNoKey')
+    : t(`admin.statusPage.pickerHint${cheb.mode === 'auto' ? 'Auto' : cheb.mode === 'globalping' ? 'Gp' : 'Cheb'}`)
+  return (
+    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/60 bg-background/40 p-3.5">
+      <div className="min-w-0 sm:max-w-[34rem]">
+        <p className="font-medium">{t('admin.statusPage.pickerTitle')}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+        {error && <p className="mt-1 text-xs text-rose-500">{error}</p>}
+      </div>
+      <div className="inline-flex max-w-full flex-wrap rounded-lg border border-border bg-card p-0.5" role="radiogroup" aria-label={t('admin.statusPage.pickerTitle')}>
+        {options.map((o) => {
+          const active = current === o.value
+          const busy = pick.isPending && pick.variables === o.value
+          return (
+            <button
+              key={o.value}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              disabled={pick.isPending || (o.needsKey && !cheb.configured)}
+              title={o.needsKey && !cheb.configured ? t('admin.statusPage.pickerHintNoKey') : undefined}
+              onClick={() => !active && pick.mutate(o.value)}
+              className={cn(
+                'inline-flex min-h-9 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium transition-colors sm:px-3',
+                active ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-muted',
+                o.needsKey && !cheb.configured && 'opacity-45',
+              )}
+            >
+              {busy && <Spinner />}
+              {o.short ? (
+                <>
+                  <span className="sm:hidden">{o.short}</span>
+                  <span className="max-sm:hidden">{o.label}</span>
+                </>
+              ) : (
+                o.label
+              )}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** Cheburcheck: живые сканеры в российских сетях. Видит блокировку, а не только пинг. */
+function CheburcheckCard({ cheb }: { cheb?: AdminCheburcheckDTO }) {
+  const { t } = useTranslation()
+  const configured = Boolean(cheb?.configured)
+  const last = cheb?.last_at ? ago(cheb.last_at, t) : ''
+  const note = cheb?.pause_note === 'token rejected' ? t('admin.statusPage.chebTokenRejected') : cheb?.pause_note && cheb.pause_note !== 'HTTP 429' ? t('admin.statusPage.pauseNote', { note: cheb.pause_note }) : t('admin.statusPage.pauseNoteEmpty')
+  return (
+    <div className="rounded-xl border border-border/60 bg-background/40 p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5">
+        <span className="font-medium">
+          Cheburcheck
+          <RoleTag role={sourceRole(cheb, 'cheburcheck')} />
+        </span>
+        <Status on={configured} onText={t('admin.statusPage.keyOn')} offText={t('admin.statusPage.chebOff')} />
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{t('admin.statusPage.chebText')}</p>
+      <p className="mt-1.5 text-xs text-muted-foreground">{t('admin.statusPage.chebDomain')}</p>
+      {configured ? (
+        <>
+          {cheb?.credits != null && (
+            <p className="mt-3 text-xs text-muted-foreground">{t('admin.statusPage.chebCredits', { n: cheb.credits })}</p>
+          )}
+          {last && (
+            <p className={cn('text-xs text-muted-foreground', cheb?.credits != null ? 'mt-1' : 'mt-3')}>
+              {t('admin.statusPage.chebLast', { ago: last, pass: cheb?.pass ?? 0, total: cheb?.total ?? 0 })}
+            </p>
+          )}
+          {cheb?.paused_until && (
+            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-rose-500">
+              <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+              <span>
+                {t('admin.statusPage.pausedUntil', { time: clock(cheb.paused_until) })}
+                <span className="mt-0.5 block text-muted-foreground">
+                  {note}
+                  {cheb.mode === 'auto' && <> · {t('admin.statusPage.chebFallback')}</>}
+                </span>
+              </span>
+            </p>
+          )}
+        </>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">{t('admin.statusPage.chebNoKey')}</p>
+      )}
+    </div>
   )
 }
 
@@ -226,7 +388,7 @@ function Status({ on, onText, offText }: { on: boolean; onText: string; offText:
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium',
         on ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground',
       )}
     >

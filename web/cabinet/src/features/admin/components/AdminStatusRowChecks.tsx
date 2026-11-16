@@ -49,7 +49,13 @@ export function AdminStatusRowChecks({
       <CheckBadge
         result={russia}
         title={checks?.operators ? t('admin.statusPage.chkOps') : t('admin.statusPage.chkRu')}
-        hint={checks?.operators ? t('admin.statusPage.chkOpsHint') : t('admin.statusPage.chkRuHint')}
+        hint={
+          checks?.operators
+            ? t('admin.statusPage.chkOpsHint')
+            : t(checks?.russia_source === 'cheburcheck' ? 'admin.statusPage.chkRuHintCheb' : 'admin.statusPage.chkRuHint')
+        }
+        source={!checks?.operators ? checks?.russia_source : undefined}
+        failed={!checks?.operators ? checks?.russia_failed : undefined}
         icon={<span className="text-[10px] font-extrabold leading-none">РФ</span>}
       />
       {showRegistry && (
@@ -71,6 +77,8 @@ function CheckBadge({
   hint,
   icon,
   verdict: verdictText,
+  source,
+  failed,
 }: {
   result: AdminCheckResult
   title: string
@@ -78,6 +86,9 @@ function CheckBadge({
   icon: React.ReactNode
   /** Свой вердикт вместо «отвечает / не отвечает»: у «РКН» смысл другой. */
   verdict?: string
+  /** Откуда взят результат «РФ» и кто не открыл сервер. */
+  source?: string
+  failed?: string[]
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -132,6 +143,12 @@ function CheckBadge({
           {result.state === 'none' ? (verdictText ? t('admin.statusPage.chkRknNoneHint') : t('admin.statusPage.chkNoneHint')) : hint}
           {result.total > 0 && <> {t('admin.statusPage.chkCount', { ok: result.ok, total: result.total })}</>}
         </p>
+        {source && result.state !== 'none' && (
+          <p className="mt-1 text-muted-foreground">
+            {t('admin.statusPage.chkSource', { name: source === 'cheburcheck' ? 'Cheburcheck' : 'Globalping' })}
+            {failed && failed.length > 0 && <> {t('admin.statusPage.chkFailed', { list: failed.join(', ') })}</>}
+          </p>
+        )}
       </div>
     </div>
   )

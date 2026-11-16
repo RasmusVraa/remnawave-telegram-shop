@@ -47,6 +47,28 @@ function normalizeRoute(raw) {
   return route.startsWith('/') ? route : `/${route}`
 }
 
+/** Самый точный ключ фикстуры для пути и параметров запроса (см. обработчик маршрутов). */
+function matchFixtureKey(map, path, params) {
+  let best = null
+  let bestScore = -1
+  for (const key of Object.keys(map)) {
+    const [kp, kq] = key.split('?')
+    if (kp !== path) continue
+    const want = new URLSearchParams(kq ?? '')
+    let ok = true
+    let score = 0
+    for (const [k, v] of want) {
+      if (params.get(k) !== v) ok = false
+      score++
+    }
+    if (ok && score > bestScore) {
+      best = key
+      bestScore = score
+    }
+  }
+  return best
+}
+
 function parseArgs(argv) {
   const out = {
     dist: 'internal/cabinet/web/dist',
@@ -57,6 +79,7 @@ function parseArgs(argv) {
     steps: [],
     hover: null,
     element: null,
+    scroll: null,
     themes: ['dark'],
     locale: 'ru-RU',
     timezone: 'Europe/Moscow',
@@ -74,6 +97,7 @@ function parseArgs(argv) {
       case '--viewport': out.viewports.push(val); i++; break
       case '--step': out.steps.push(val); i++; break
       case '--element': out.element = val; i++; break
+      case '--scroll': out.scroll = Number(val); i++; break
       case '--theme': out.themes = val.split(','); i++; break
       case '--locale': out.locale = val; i++; break
       case '--timezone': out.timezone = val; i++; break
@@ -198,15 +222,22 @@ async function main() {
         // Всё под /cabinet/api отвечает из фикстуры. Неизвестный путь — пустой
         // объект, а не 404: экран не должен падать из-за метрики, которой в
         // фикстуре просто нет.
-        await ctx.route('**/cabinet/api/**', (route) => {
-          const p = new URL(route.request().url()).pathname
-            .replace('/cabinet/api', '')
-            .split('?')[0]
-          route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(fixtures[p] ?? {}),
-          })
+        // Ключ фикстуры может уточнять параметры запроса: «/payments/preview?renew_extra_hwid=false»
+        // побеждает голый «/payments/preview», если все его параметры совпали. «__delay» — та же
+        // схема ключей → задержка ответа в мс: так снимается состояние «идёт пересчёт».
+        await ctx.route('**/cabinet/api/**', async (route) => {
+          const url = new URL(route.request().url())
+          const p = url.pathname.replace('/cabinet/api', '')
+          const key = matchFixtureKey(fixtures, p, url.searchParams)
+          const delay = matchFixtureKey(fixtures.__delay ?? {}, p, url.searchParams)
+          if (delay != null) await new Promise((r) => setTimeout(r, fixtures.__delay[delay]))
+          route
+            .fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify(key != null ? fixtures[key] : {}),
+            })
+            .catch(() => {})
         })
 
         const page = await ctx.newPage()
@@ -259,7 +290,13 @@ async function main() {
           }
           await page.waitForTimeout(250)
           const file = path.join(outDir, `${tag}-${shot.name}.png`)
-          if (args.element) {
+          if (args.scroll != null) {
+            // Кадр окна после прокрутки — проверка липких блоков (sticky); fullPage их не покажет.
+            // -1 — не крутить самим: кадр окна там, куда страницу привели шаги.
+            if (args.scroll >= 0) await page.evaluate((y) => window.scrollTo(0, y), args.scroll)
+            await page.waitForTimeout(800)
+            await page.screenshot({ path: file })
+          } else if (args.element) {
             await page.locator(args.element).first().screenshot({ path: file })
           } else {
             await page.screenshot({ path: file, fullPage: true })

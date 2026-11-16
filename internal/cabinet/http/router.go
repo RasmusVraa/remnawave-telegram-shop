@@ -399,7 +399,7 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	// не зависит от того, собран ли checkoutSvc (PaymentService может быть nil).
 	adminPaymentsCheckoutRepo := repository.NewCheckoutRepo(pool)
 	adminPaymentsHandler := handlers.NewAdminPayments(purchaseRepo, tariffRepo, promoRepo, adminPaymentsCheckoutRepo, customerRepo)
-	adminPromosHandler := handlers.NewAdminPromos(promoRepo)
+	adminPromosHandler := handlers.NewAdminPromos(promoRepo, tariffRepo, avatarSecret)
 	// Применение состава сквадов к действующим подписчикам тарифа.
 	// rw может быть nil (панель не сконфигурирована) — сервис это переживает,
 	// массовое применение просто отвечает 503.

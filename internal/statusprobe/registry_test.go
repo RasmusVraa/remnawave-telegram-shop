@@ -32,8 +32,8 @@ func TestCheckRegistryVerdicts(t *testing.T) {
 	}{
 		{"clean", `{"blocked":false,"blocked_subnets":[],"cdn_providers":{}}`, registryResult{}},
 		{"registry", `{"blocked":true,"blocked_subnets":["203.0.113.0/24"],"cdn_providers":{}}`, registryResult{Blocked: true, Kind: RegistryKindRegistry}},
-		{"cdn only", `{"blocked":true,"blocked_subnets":[],"cdn_providers":{"cloudflare":[{"cidr":"1.1.1.0/24"}]}}`, registryResult{Blocked: true, Kind: RegistryKindCDN}},
-		{"registry wins over cdn", `{"blocked":true,"blocked_subnets":["x"],"cdn_providers":{"a":[1]}}`, registryResult{Blocked: true, Kind: RegistryKindRegistry}},
+		{"cdn only", `{"blocked":true,"blocked_subnets":[],"cdn_providers":{"cloudflare":[{"cidr":"1.1.1.0/24"}]}}`, registryResult{Blocked: true, Kind: RegistryKindCDN, InCDN: true}},
+		{"registry wins over cdn", `{"blocked":true,"blocked_subnets":["x"],"cdn_providers":{"a":[1]}}`, registryResult{Blocked: true, Kind: RegistryKindRegistry, InCDN: true}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

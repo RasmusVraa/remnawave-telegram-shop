@@ -666,6 +666,14 @@ func baseRuntimeSettings() []SettingField {
 			Current: cabinetBoolCurrent("STATUS_ALERT_WORLD", true),
 		},
 		{
+			// Откуда брать проверку «из России»: globalping, cheburcheck (живые сканеры в российских сетях)
+			// или auto — основной Cheburcheck, а при его паузе или без ключа подхватывает Globalping.
+			Key: "STATUS_RU_SOURCE", Group: "status", Type: SettingEnum, Instant: true,
+			EnumValues: []string{"auto", "globalping", "cheburcheck"},
+			Apply:      applyStatusRuSource(),
+			Current:    statusRuSourceCurrent(),
+		},
+		{
 			// Оповещать админа, когда адрес сервера попал в списки блокировок РКН.
 			// Приходит тем же видом «Статус серверов».
 			Key: "STATUS_ALERT_REGISTRY", Group: "status", Type: SettingBool, Instant: true,
@@ -1195,6 +1203,27 @@ func cabinetDecorThemeCurrent() func() string {
 			return v
 		}
 		return "off"
+	}
+}
+
+func applyStatusRuSource() func(string) error {
+	return func(value string) error {
+		v := strings.TrimSpace(strings.ToLower(value))
+		if v != "auto" && v != "globalping" && v != "cheburcheck" {
+			return fmt.Errorf("invalid status ru source %q", value)
+		}
+		setRuntimeOverride("STATUS_RU_SOURCE", v)
+		return nil
+	}
+}
+
+func statusRuSourceCurrent() func() string {
+	return func() string {
+		v := strings.TrimSpace(strings.ToLower(effectiveEnvUnderRLock("STATUS_RU_SOURCE")))
+		if v == "globalping" || v == "cheburcheck" {
+			return v
+		}
+		return "auto"
 	}
 }
 

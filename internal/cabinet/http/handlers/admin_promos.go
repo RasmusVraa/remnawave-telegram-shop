@@ -4,14 +4,17 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
+	"remnawave-tg-shop-bot/internal/cabinet/avatartoken"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/pgerr"
+	"remnawave-tg-shop-bot/utils"
 )
 
 func extractPromoID(path string) (int64, bool) {
@@ -27,10 +30,29 @@ func extractPromoID(path string) (int64, bool) {
 
 type AdminPromosHandler struct {
 	promos *database.PromoRepository
+	// tariffs — проверка, что tariff_id у промокода «Дни подписки» существует.
+	tariffs *database.TariffRepository
+	// avatarSecret — тот же секрет, что у карточки пользователя: им подписываются
+	// ссылки на аватарки в окне «Кто использовал».
+	avatarSecret []byte
 }
 
-func NewAdminPromos(promos *database.PromoRepository) *AdminPromosHandler {
-	return &AdminPromosHandler{promos: promos}
+func NewAdminPromos(promos *database.PromoRepository, tariffs *database.TariffRepository, avatarSecret []byte) *AdminPromosHandler {
+	return &AdminPromosHandler{promos: promos, tariffs: tariffs, avatarSecret: avatarSecret}
+}
+
+// redemptionAvatarURL — ссылка на аватарку активировавшего, как в карточке
+// пользователя (AdminUsersHandler.avatarURL): существование фото не проверяем,
+// <img> сам падает в инициалы.
+func (h *AdminPromosHandler) redemptionAvatarURL(row database.PromoRedemptionDetailRow) string {
+	if len(h.avatarSecret) == 0 || row.IsWebOnly || utils.IsSyntheticTelegramID(row.TelegramID) {
+		return ""
+	}
+	token, err := avatartoken.IssueTelegram(h.avatarSecret, row.TelegramID, adminAvatarTTL, time.Now())
+	if err != nil {
+		return ""
+	}
+	return "/cabinet/api/avatar?t=" + url.QueryEscape(token)
 }
 
 type promoDTO struct {
@@ -52,6 +74,7 @@ type promoDTO struct {
 	CreatedAt                                  time.Time  `json:"created_at"`
 	DiscountMaxSubscriptionPaymentsPerCustomer int        `json:"discount_max_subscription_payments_per_customer"`
 	TariffID                                   *int64     `json:"tariff_id"`
+	Note                                       *string    `json:"note"`
 }
 
 func promoToDTO(p *database.PromoCode) promoDTO {
@@ -63,16 +86,123 @@ func promoToDTO(p *database.PromoCode) promoDTO {
 		UsesCount: p.UsesCount, ValidUntil: p.ValidUntil,
 		Active: p.Active, FirstPurchaseOnly: p.FirstPurchaseOnly,
 		RequireCustomerInDB: p.RequireCustomerInDB, AllowTrialWithoutPayment: p.AllowTrialWithoutPayment,
-		CreatedAt: p.CreatedAt, TariffID: p.TariffID,
+		CreatedAt: p.CreatedAt, TariffID: p.TariffID, Note: p.Note,
 		DiscountMaxSubscriptionPaymentsPerCustomer: p.DiscountMaxSubscriptionPaymentsPerCustomer,
 	}
 }
 
+type promoStatusCountsDTO struct {
+	All    int `json:"all"`
+	Active int `json:"active"`
+	Ended  int `json:"ended"`
+	Off    int `json:"off"`
+}
+
+type promoTypeCountsDTO struct {
+	All              int `json:"all"`
+	SubscriptionDays int `json:"subscription_days"`
+	Discount         int `json:"discount"`
+	Trial            int `json:"trial"`
+	ExtraHwid        int `json:"extra_hwid"`
+}
+
+type promoListCountsDTO struct {
+	Status promoStatusCountsDTO `json:"status"`
+	Type   promoTypeCountsDTO   `json:"type"`
+}
+
+type promoListSummaryDTO struct {
+	Redemptions24h   int `json:"redemptions_24h"`
+	RedemptionsTotal int `json:"redemptions_total"`
+}
+
 type promoListResp struct {
-	Items []promoDTO `json:"items"`
-	Total int        `json:"total"`
-	Page  int        `json:"page"`
-	Limit int        `json:"limit"`
+	Items   []promoDTO          `json:"items"`
+	Total   int                 `json:"total"`
+	Page    int                 `json:"page"`
+	Limit   int                 `json:"limit"`
+	Counts  promoListCountsDTO  `json:"counts"`
+	Summary promoListSummaryDTO `json:"summary"`
+}
+
+// promoSearchMaxRunes — поиск длиннее кода (64 символа) смысла не имеет.
+const promoSearchMaxRunes = 64
+
+// promoListParams — разобранные параметры GET /cabinet/api/admin/promos.
+type promoListParams struct {
+	Page   int
+	Limit  int
+	Filter database.PromoListFilter
+}
+
+// parsePromoListParams разбирает page/limit/status/type/q/sort. Неизвестные
+// status/type/sort — ошибка (текст для 400), пустые — значения по умолчанию.
+func parsePromoListParams(q url.Values) (promoListParams, string) {
+	var p promoListParams
+	p.Page, _ = strconv.Atoi(q.Get("page"))
+	if p.Page < 1 {
+		p.Page = 1
+	}
+	p.Limit, _ = strconv.Atoi(q.Get("limit"))
+	if p.Limit < 1 || p.Limit > 100 {
+		p.Limit = 20
+	}
+
+	switch status := strings.TrimSpace(q.Get("status")); status {
+	case "", database.PromoStatusAll:
+		p.Filter.Status = database.PromoStatusAll
+	case database.PromoStatusActive, database.PromoStatusEnded, database.PromoStatusOff:
+		p.Filter.Status = status
+	default:
+		return p, "invalid status"
+	}
+
+	switch typ := strings.TrimSpace(q.Get("type")); typ {
+	case "", "all":
+		p.Filter.Type = ""
+	case database.PromoTypeSubscriptionDays, database.PromoTypeTrial, database.PromoTypeExtraHwid, database.PromoTypeDiscount:
+		p.Filter.Type = typ
+	default:
+		return p, "invalid type"
+	}
+
+	switch sort := strings.TrimSpace(q.Get("sort")); sort {
+	case "", database.PromoSortNew:
+		p.Filter.Sort = database.PromoSortNew
+	case database.PromoSortUses, database.PromoSortExpiring, database.PromoSortCode:
+		p.Filter.Sort = sort
+	default:
+		return p, "invalid sort"
+	}
+
+	switch dir := strings.TrimSpace(q.Get("dir")); dir {
+	case "", database.PromoSortAsc, database.PromoSortDesc:
+		p.Filter.Dir = dir
+	default:
+		return p, "invalid dir"
+	}
+
+	query := strings.TrimSpace(q.Get("q"))
+	if utf8.RuneCountInString(query) > promoSearchMaxRunes {
+		query = strings.TrimSpace(string([]rune(query)[:promoSearchMaxRunes]))
+	}
+	p.Filter.Query = query
+	return p, ""
+}
+
+// promoTotalForStatus — строк под фильтрами: счётчик выбранной вкладки уже
+// посчитан с учётом типа и поиска.
+func promoTotalForStatus(c database.PromoStatusCounts, status string) int {
+	switch status {
+	case database.PromoStatusActive:
+		return c.Active
+	case database.PromoStatusEnded:
+		return c.Ended
+	case database.PromoStatusOff:
+		return c.Off
+	default:
+		return c.All
+	}
 }
 
 // List — GET /cabinet/api/admin/promos
@@ -82,19 +212,22 @@ func (h *AdminPromosHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
+	params, msg := parsePromoListParams(r.URL.Query())
+	if msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
 	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 100 {
-		limit = 20
-	}
-	offset := (page - 1) * limit
+	offset := (params.Page - 1) * params.Limit
 
-	items, total, err := h.promos.List(r.Context(), offset, limit)
+	items, counts, err := h.promos.ListFiltered(r.Context(), params.Filter, offset, params.Limit)
 	if err != nil {
 		slog.Error("admin promos list", "error", err.Error())
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	summary, err := h.promos.RedemptionsSummary(r.Context())
+	if err != nil {
+		slog.Error("admin promos summary", "error", err.Error())
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -105,9 +238,23 @@ func (h *AdminPromosHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, promoListResp{
 		Items: dtos,
-		Total: total,
-		Page:  page,
-		Limit: limit,
+		Total: promoTotalForStatus(counts.Status, params.Filter.Status),
+		Page:  params.Page,
+		Limit: params.Limit,
+		Counts: promoListCountsDTO{
+			Status: promoStatusCountsDTO{
+				All: counts.Status.All, Active: counts.Status.Active,
+				Ended: counts.Status.Ended, Off: counts.Status.Off,
+			},
+			Type: promoTypeCountsDTO{
+				All: counts.Type.All, SubscriptionDays: counts.Type.SubscriptionDays,
+				Discount: counts.Type.Discount, Trial: counts.Type.Trial, ExtraHwid: counts.Type.ExtraHwid,
+			},
+		},
+		Summary: promoListSummaryDTO{
+			Redemptions24h:   summary.Last24h,
+			RedemptionsTotal: summary.Total,
+		},
 	})
 }
 
@@ -124,6 +271,7 @@ type createPromoReq struct {
 	FirstPurchaseOnly                          bool       `json:"first_purchase_only"`
 	TariffID                                   *int64     `json:"tariff_id"`
 	DiscountMaxSubscriptionPaymentsPerCustomer int        `json:"discount_max_subscription_payments_per_customer"`
+	Note                                       *string    `json:"note"`
 }
 
 // validateCreatePromo проверяет параметры нового промокода и возвращает
@@ -167,6 +315,14 @@ func validateCreatePromo(req *createPromoReq, now time.Time) string {
 	default:
 		return "invalid promo type"
 	}
+	if msg := promoTariffAllowed(req.Type, req.TariffID != nil); msg != "" {
+		return msg
+	}
+	if req.Note != nil {
+		if _, ok := normalizePromoNote(*req.Note); !ok {
+			return "note too long"
+		}
+	}
 	if req.MaxUses != nil && *req.MaxUses <= 0 {
 		return "max uses must be positive"
 	}
@@ -195,6 +351,13 @@ func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, msg, http.StatusBadRequest)
 		return
 	}
+	if req.TariffID != nil && !h.tariffExists(w, r, *req.TariffID) {
+		return
+	}
+	var note *string
+	if req.Note != nil {
+		note, _ = normalizePromoNote(*req.Note)
+	}
 
 	p := database.PromoCode{
 		Code:                     strings.ToUpper(strings.TrimSpace(req.Code)),
@@ -210,6 +373,7 @@ func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 		FirstPurchaseOnly:        req.FirstPurchaseOnly,
 		AllowTrialWithoutPayment: true,
 		TariffID:                 req.TariffID,
+		Note:                     note,
 		DiscountMaxSubscriptionPaymentsPerCustomer: req.DiscountMaxSubscriptionPaymentsPerCustomer,
 	}
 
@@ -229,10 +393,37 @@ func (h *AdminPromosHandler) Create(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, promoToDTO(&p))
 }
 
+// tariffExists проверяет tariff_id из запроса. Пишет ответ и возвращает false,
+// если тарифа нет или база не ответила.
+func (h *AdminPromosHandler) tariffExists(w http.ResponseWriter, r *http.Request, id int64) bool {
+	t, err := h.tariffs.GetByID(r.Context(), id)
+	if err != nil {
+		slog.Error("admin promos tariff lookup", "error", err.Error(), "tariff_id", id)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return false
+	}
+	if t == nil {
+		http.Error(w, "tariff not found", http.StatusBadRequest)
+		return false
+	}
+	return true
+}
+
+type promoPaybackDTO struct {
+	PaidCustomers int     `json:"paid_customers"`
+	Payments      int     `json:"payments"`
+	RevenueRub    float64 `json:"revenue_rub"`
+	RevenueStars  float64 `json:"revenue_stars"`
+}
+
 type promoGetResp struct {
-	Promo            promoDTO `json:"promo"`
-	Redemptions      int      `json:"redemptions"`
-	RedemptionsToday int      `json:"redemptions_today"`
+	Promo       promoDTO `json:"promo"`
+	Redemptions int      `json:"redemptions"`
+	// RedemptionsToday — с 00:00 UTC; оставлено для совместимости, новое окно — Redemptions24h.
+	RedemptionsToday int             `json:"redemptions_today"`
+	Redemptions24h   int             `json:"redemptions_24h"`
+	PendingDiscounts int             `json:"pending_discounts"`
+	Payback          promoPaybackDTO `json:"payback"`
 }
 
 // Get — GET /cabinet/api/admin/promos/{id}
@@ -254,14 +445,32 @@ func (h *AdminPromosHandler) Get(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	if p == nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
 
 	redemptions, _ := h.promos.CountRedemptions(r.Context(), id)
 	redemptionsToday, _ := h.promos.CountRedemptionsToday(r.Context(), id)
+	stats, err := h.promos.DetailStats(r.Context(), p)
+	if err != nil {
+		slog.Error("admin promos detail stats", "error", err.Error(), "promo_id", id)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
 	writeJSON(w, http.StatusOK, promoGetResp{
 		Promo:            promoToDTO(p),
 		Redemptions:      redemptions,
 		RedemptionsToday: redemptionsToday,
+		Redemptions24h:   stats.Redemptions24h,
+		PendingDiscounts: stats.PendingDiscounts,
+		Payback: promoPaybackDTO{
+			PaidCustomers: stats.Payback.PaidCustomers,
+			Payments:      stats.Payback.Payments,
+			RevenueRub:    stats.Payback.RevenueRub,
+			RevenueStars:  stats.Payback.RevenueStars,
+		},
 	})
 }
 
@@ -294,6 +503,7 @@ func (h *AdminPromosHandler) Update(w http.ResponseWriter, r *http.Request) {
 		"first_purchase_only": true, "subscription_days": true, "trial_days": true,
 		"extra_hwid_delta": true, "discount_percent": true, "discount_ttl_hours": true,
 		"discount_max_subscription_payments_per_customer": true, "tariff_id": true,
+		"note": true,
 	}
 
 	fields, err := parsePromoPatchFields(raw, allowed)
@@ -309,6 +519,9 @@ func (h *AdminPromosHandler) Update(w http.ResponseWriter, r *http.Request) {
 
 	if err := validatePromoUpdateFields(existing.Type, fields); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if tid, ok := fields["tariff_id"].(int64); ok && !h.tariffExists(w, r, tid) {
 		return
 	}
 
@@ -353,6 +566,12 @@ type promoRedemptionItemDTO struct {
 	CustomerID       int64   `json:"customer_id"`
 	TelegramUsername *string `json:"telegram_username"`
 	Nickname         *string `json:"nickname"`
+	// AvatarURL — подписанная ссылка на фото из Telegram; пусто — инициалы.
+	AvatarURL string `json:"avatar_url,omitempty"`
+	// Оплаты человека, засчитанные промокоду (как payback в GET /promos/{id}).
+	PaidCount int     `json:"paid_count"`
+	PaidRub   float64 `json:"paid_rub"`
+	PaidStars float64 `json:"paid_stars"`
 }
 
 type promoRedemptionsResp struct {
@@ -375,7 +594,7 @@ func (h *AdminPromosHandler) Redemptions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if _, err := h.promos.FindByID(r.Context(), id); err != nil {
+	if p, err := h.promos.FindByID(r.Context(), id); err != nil || p == nil {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
@@ -411,6 +630,10 @@ func (h *AdminPromosHandler) Redemptions(w http.ResponseWriter, r *http.Request)
 			CustomerID:       row.CustomerID,
 			TelegramUsername: row.TelegramUsername,
 			Nickname:         row.Nickname,
+			AvatarURL:        h.redemptionAvatarURL(row),
+			PaidCount:        row.PaidCount,
+			PaidRub:          row.PaidRub,
+			PaidStars:        row.PaidStars,
 		})
 	}
 

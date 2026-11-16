@@ -43,7 +43,12 @@ export function isBypassBlocked(split: MyTrafficResponse): boolean {
 
 /** Размер пакета в ГБ без лишних нулей: «5», «20», «0,5». */
 export function packSizeLabel(bytes: number, unit: string): string {
-  return `${formatGbValue(bytes / GB)} ${unit}`
+  return `${packSizeGb(bytes)} ${unit}`
+}
+
+/** Размер пакета числом без единицы — для фраз, где «ГБ» стоит в самом тексте. */
+export function packSizeGb(bytes: number): string {
+  return formatGbValue(bytes / GB)
 }
 
 export function TrafficBuyProvider({ data, children }: { data: HomeData; children: ReactNode }) {

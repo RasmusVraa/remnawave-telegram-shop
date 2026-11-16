@@ -1,16 +1,11 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { AlertCircle } from 'lucide-react'
+import { CalendarClock, Smartphone } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
-import { PageReveal, RevealItem } from '@/components/PageReveal'
-import { PageTitleWithBack } from '@/components/PageTitleWithBack'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError, SUBSCRIPTION_STALE_MS } from '@/lib/api'
 import { useErrorHaptic } from '@/lib/haptic'
 import { formatNumber } from '@/lib/format'
@@ -18,7 +13,17 @@ import { newIdempotencyKey } from '@/lib/utils'
 import { reservePaymentWindow } from '@/lib/payment-window'
 import { useTranslationWithLang } from '@/hooks/useTranslationWithLang'
 import { formatDayMonth } from '@/features/subscription/DeviceSlots'
-import { CheckoutPayButton, PROVIDER_ORDER, SummaryRow, type Provider } from '@/features/checkout/checkoutShared'
+import { PROVIDER_ORDER, type Provider } from '@/features/checkout/checkoutShared'
+import {
+  CheckoutLayout,
+  IncludedList,
+  IncludedRow,
+  OrderHeader,
+  OrderReceipt,
+  OrderSkeleton,
+  discountLines,
+  type ReceiptMode,
+} from '@/features/checkout/orderSummary'
 import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
@@ -58,14 +63,20 @@ export default function DeviceSlotsCheckoutPage() {
   const availableProviders = PROVIDER_ORDER.filter((p) => providerEnabled[p])
   const previewProvider: Provider = selectedProvider ?? availableProviders[0] ?? 'yookassa'
 
-  const { data: preview, isError: previewError } = useQuery({
+  const {
+    data: preview,
+    isError: previewError,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
     queryKey: ['hwidExtraPreview', target, previewProvider],
     queryFn: () => api.hwidExtraPreview(target, previewProvider),
     enabled: valid,
     staleTime: 20_000,
+    placeholderData: keepPreviousData,
   })
+  const recalculating = isFetching && isPlaceholderData
   const amountSuffix = preview?.currency === 'STARS' ? t('checkout.stars') : t('checkout.rub')
-  const hasDiscount = preview != null && preview.base_amount_rub > preview.amount_rub
 
   async function handlePay() {
     if (!selectedProvider || !valid) return
@@ -91,83 +102,89 @@ export default function DeviceSlotsCheckoutPage() {
     }
   }
 
-  const tariffName = sub?.tariff?.name?.trim() || t('dashboard.basicPlan')
-  const payDisabled = !selectedProvider || !valid || !preview || loading
+  // isPlaceholderData, а не recalculating: без сети запрос встаёт на паузу, а сумма на кнопке остаётся прошлой.
+  const payDisabled = !selectedProvider || !valid || !preview || loading || isPlaceholderData
+
+  let order
+  if (subLoading) {
+    order = <OrderSkeleton />
+  } else if (!valid || !hwid) {
+    // Ссылку открыли повторно после оплаты или руками поменяли число.
+    order = (
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
+        <Button asChild variant="outline" size="sm">
+          <Link to="/dashboard#devices">{t('home.myDevices')}</Link>
+        </Button>
+      </div>
+    )
+  } else {
+    const delta = target - hwid.current_limit
+    order = (
+      <>
+        <OrderHeader scenario="addon" title={t('checkout.slotsTitle')} />
+        <IncludedList>
+          <IncludedRow
+            icon={<Smartphone size={17} />}
+            title={t('checkout.slotsAdd', { count: delta })}
+            hint={t('checkout.slotsChange', { from: hwid.current_limit, to: target })}
+          />
+          {/* Место живёт до конца текущей подписки — от числа дней зависит цена. */}
+          <IncludedRow
+            icon={<CalendarClock size={17} />}
+            title={t('checkout.deviceSlotsTerm', {
+              date: formatDayMonth(sub?.expire_at, lang),
+              days: t('subscriptionPage.slotsDays', { count: preview?.days_left ?? hwid.days_left }),
+            })}
+          />
+        </IncludedList>
+      </>
+    )
+  }
+
+  const renderReceipt = (mode: ReceiptMode) => {
+    if (!preview) {
+      return (
+        <OrderReceipt
+          mode={mode}
+          lines={[]}
+          total={null}
+          unit={amountSuffix}
+          note={previewError ? t('checkout.previewFailed') : undefined}
+        />
+      )
+    }
+    const base = preview.base_amount_rub > 0 ? preview.base_amount_rub : preview.amount_rub
+    return (
+      <OrderReceipt
+        mode={mode}
+        lines={[
+          { key: 'slots', label: t('checkout.slotsReceipt', { count: preview.delta }), amount: base },
+          ...discountLines(t, {
+            base,
+            amount: preview.amount_rub,
+            loyaltyPct: preview.loyalty_discount_pct,
+            promoPct: preview.promo_discount_pct,
+            totalPct: preview.total_discount_pct,
+          }),
+        ]}
+        total={preview.amount_rub}
+        strike={base}
+        unit={amountSuffix}
+        busy={recalculating}
+      />
+    )
+  }
 
   return (
     <AppLayout>
-      <PageReveal className="max-w-lg mx-auto space-y-6">
-        <RevealItem>
-          <PageTitleWithBack title={t('checkout.title')} />
-        </RevealItem>
-
-        <RevealItem>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-medium text-muted-foreground">{t('checkout.summary')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {subLoading ? (
-                <div className="space-y-2.5">
-                  <Skeleton className="h-3.5 w-full" />
-                  <Skeleton className="h-3.5 w-4/5" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ) : !valid || !hwid ? (
-                // Ссылку открыли повторно после оплаты или руками поменяли число.
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
-                  <Button asChild variant="outline" size="sm">
-                    <Link to="/dashboard#devices">{t('home.myDevices')}</Link>
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2 text-sm">
-                  <SummaryRow label={t('checkout.scenario')} value={t('checkout.scenarioDeviceSlots')} />
-                  <SummaryRow label={t('checkout.plan')} value={tariffName} />
-                  <SummaryRow label={t('checkout.devices')} value={`${hwid.current_limit} → ${target}`} />
-                  <SummaryRow
-                    label={t('checkout.period')}
-                    value={t('checkout.deviceSlotsTerm', {
-                      date: formatDayMonth(sub?.expire_at, lang),
-                      days: t('subscriptionPage.slotsDays', { count: preview?.days_left ?? hwid.days_left }),
-                    })}
-                  />
-                  {previewError && <p className="text-xs text-muted-foreground">{t('checkout.previewError')}</p>}
-                  {preview && hasDiscount && (preview.total_discount_pct ?? 0) > 0 && (
-                    <div className="space-y-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
-                      <SummaryRow
-                        label={t('checkout.discountLabel')}
-                        value={t('checkout.discountValueWithAmount', {
-                          pct: preview.total_discount_pct,
-                          amount: formatNumber(preview.base_amount_rub - preview.amount_rub),
-                          unit: amountSuffix,
-                        })}
-                      />
-                    </div>
-                  )}
-                  <div className="border-t border-border pt-2 mt-2">
-                    <SummaryRow
-                      label={t('checkout.total')}
-                      value={
-                        preview ? (
-                          <span className="text-lg font-bold">
-                            {formatNumber(preview.amount_rub)} {amountSuffix}
-                          </span>
-                        ) : (
-                          <Skeleton className="h-6 w-20" />
-                        )
-                      }
-                    />
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </RevealItem>
-
-        {valid && (
-          <RevealItem>
+      <CheckoutLayout
+        title={t('checkout.title')}
+        order={order}
+        receipt={subLoading || valid ? renderReceipt : null}
+        equalHeights
+        payment={
+          valid ? (
             <PaymentMethodPicker
               methods={checkoutMethod.methods}
               method={checkoutMethod.method}
@@ -176,27 +193,20 @@ export default function DeviceSlotsCheckoutPage() {
               loading={checkoutMethod.loading}
               onSelect={checkoutMethod.setMethod}
             />
-          </RevealItem>
-        )}
-
-        {error && (
-          <RevealItem>
-            <Alert variant="destructive">
-              <AlertCircle size={14} />
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          </RevealItem>
-        )}
-
-        {valid && (
-          <CheckoutPayButton
-            label={`${t('checkout.pay')}${preview ? ` ${formatNumber(preview.amount_rub)} ${amountSuffix}` : ''}`}
-            disabled={payDisabled}
-            loading={loading}
-            onPay={handlePay}
-          />
-        )}
-      </PageReveal>
+          ) : undefined
+        }
+        error={error}
+        pay={
+          valid
+            ? {
+                label: `${t('checkout.pay')}${preview ? ` ${formatNumber(preview.amount_rub)} ${amountSuffix}` : ''}`,
+                disabled: payDisabled,
+                loading,
+                onPay: handlePay,
+              }
+            : null
+        }
+      />
     </AppLayout>
   )
 }

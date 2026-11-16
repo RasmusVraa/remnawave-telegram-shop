@@ -566,8 +566,9 @@ func (s PaymentService) applyExtraAfterSubscription(ctx context.Context, custome
 		newLimit = maxLimit
 	}
 	if carriedExtra > 0 && newExtra == 0 {
-		// Продление подписки без новой докупки HWID: база = лимит тарифа (или env), не fallback из конфига.
-		newLimit = paidBaseLimit + carriedExtra
+		// Продление подписки без продления доп. HWID: места не оплачены — лимит = база тарифа (или env),
+		// как в tariffs выше. extra_hwid ниже обнуляется, иначе места остались бы в панели без срока.
+		newLimit = paidBaseLimit
 		if newLimit < 1 {
 			newLimit = 1
 		}

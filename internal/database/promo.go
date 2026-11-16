@@ -60,6 +60,38 @@ type PromoCode struct {
 	CreatedAt                                  time.Time  `db:"created_at"`
 	DiscountMaxSubscriptionPaymentsPerCustomer int        `db:"discount_max_subscription_payments_per_customer"`
 	TariffID                                   *int64     `db:"tariff_id"`
+	// Note — подпись админа «для кого и зачем» (до 200 символов, миграция 000069).
+	// Видна только в web-админке; бот её не читает и не пишет.
+	Note *string `db:"note"`
+}
+
+// promoColumns — столбцы promo_code в порядке scanPromoRow. Один список на все
+// SELECT репозитория, чтобы новая колонка не терялась в одном из них.
+var promoColumns = []string{
+	"id", "code", "type", "subscription_days", "trial_days", "extra_hwid_delta",
+	"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
+	"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment", "created_at",
+	"discount_max_subscription_payments_per_customer", "tariff_id", "note",
+}
+
+var promoColumnsSQL = strings.Join(promoColumns, ", ")
+
+// scanPromoRow читает строку, выбранную по promoColumns.
+func scanPromoRow(row pgx.Row, p *PromoCode) error {
+	var tid sql.NullInt64
+	if err := row.Scan(
+		&p.ID, &p.Code, &p.Type, &p.SubscriptionDays, &p.TrialDays, &p.ExtraHwidDelta,
+		&p.DiscountPercent, &p.DiscountTTLHours, &p.MaxUses, &p.UsesCount, &p.ValidUntil,
+		&p.Active, &p.FirstPurchaseOnly, &p.RequireCustomerInDB, &p.AllowTrialWithoutPayment, &p.CreatedAt,
+		&p.DiscountMaxSubscriptionPaymentsPerCustomer, &tid, &p.Note,
+	); err != nil {
+		return err
+	}
+	if tid.Valid {
+		v := tid.Int64
+		p.TariffID = &v
+	}
+	return nil
 }
 
 type PromoRedemption struct {
@@ -129,13 +161,13 @@ func (r *PromoRepository) Create(ctx context.Context, p *PromoCode) (int64, erro
 			"code", "type", "subscription_days", "trial_days", "extra_hwid_delta",
 			"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
 			"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment",
-			"discount_max_subscription_payments_per_customer", "tariff_id",
+			"discount_max_subscription_payments_per_customer", "tariff_id", "note",
 		).
 		Values(
 			p.Code, p.Type, p.SubscriptionDays, p.TrialDays, p.ExtraHwidDelta,
 			p.DiscountPercent, p.DiscountTTLHours, p.MaxUses, p.UsesCount, p.ValidUntil,
 			p.Active, p.FirstPurchaseOnly, p.RequireCustomerInDB, p.AllowTrialWithoutPayment,
-			p.DiscountMaxSubscriptionPaymentsPerCustomer, p.TariffID,
+			p.DiscountMaxSubscriptionPaymentsPerCustomer, p.TariffID, p.Note,
 		).
 		Suffix("RETURNING id").
 		PlaceholderFormat(sq.Dollar)
@@ -149,21 +181,11 @@ func (r *PromoRepository) Create(ctx context.Context, p *PromoCode) (int64, erro
 }
 
 func (r *PromoRepository) FindByID(ctx context.Context, id int64) (*PromoCode, error) {
-	return r.scanOne(ctx, sq.Select(
-		"id", "code", "type", "subscription_days", "trial_days", "extra_hwid_delta",
-		"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
-		"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment", "created_at",
-		"discount_max_subscription_payments_per_customer", "tariff_id",
-	).From("promo_code").Where(sq.Eq{"id": id}).PlaceholderFormat(sq.Dollar))
+	return r.scanOne(ctx, sq.Select(promoColumns...).From("promo_code").Where(sq.Eq{"id": id}).PlaceholderFormat(sq.Dollar))
 }
 
 func (r *PromoRepository) FindByCode(ctx context.Context, codeUpper string) (*PromoCode, error) {
-	return r.scanOne(ctx, sq.Select(
-		"id", "code", "type", "subscription_days", "trial_days", "extra_hwid_delta",
-		"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
-		"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment", "created_at",
-		"discount_max_subscription_payments_per_customer", "tariff_id",
-	).From("promo_code").Where(sq.Eq{"code": codeUpper}).PlaceholderFormat(sq.Dollar))
+	return r.scanOne(ctx, sq.Select(promoColumns...).From("promo_code").Where(sq.Eq{"code": codeUpper}).PlaceholderFormat(sq.Dollar))
 }
 
 func (r *PromoRepository) scanOne(ctx context.Context, builder sq.SelectBuilder) (*PromoCode, error) {
@@ -171,69 +193,282 @@ func (r *PromoRepository) scanOne(ctx context.Context, builder sq.SelectBuilder)
 	if err != nil {
 		return nil, err
 	}
-	row := r.pool.QueryRow(ctx, sqlStr, args...)
 	var p PromoCode
-	var tid sql.NullInt64
-	err = row.Scan(
-		&p.ID, &p.Code, &p.Type, &p.SubscriptionDays, &p.TrialDays, &p.ExtraHwidDelta,
-		&p.DiscountPercent, &p.DiscountTTLHours, &p.MaxUses, &p.UsesCount, &p.ValidUntil,
-		&p.Active, &p.FirstPurchaseOnly, &p.RequireCustomerInDB, &p.AllowTrialWithoutPayment, &p.CreatedAt,
-		&p.DiscountMaxSubscriptionPaymentsPerCustomer, &tid,
-	)
-	if err != nil {
+	if err := scanPromoRow(r.pool.QueryRow(ctx, sqlStr, args...), &p); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
 	}
-	if tid.Valid {
-		v := tid.Int64
-		p.TariffID = &v
-	}
 	return &p, nil
 }
 
+// List — нетехнические промокоды, новые сверху, без фильтров.
 func (r *PromoRepository) List(ctx context.Context, offset, limit int) ([]PromoCode, int, error) {
-	countQ := sq.Select("COUNT(*)").From("promo_code").Where(notTechnicalPromo).PlaceholderFormat(sq.Dollar)
-	csql, cargs, _ := countQ.ToSql()
-	var total int
-	if err := r.pool.QueryRow(ctx, csql, cargs...).Scan(&total); err != nil {
-		return nil, 0, err
-	}
-	builder := sq.Select(
-		"id", "code", "type", "subscription_days", "trial_days", "extra_hwid_delta",
-		"discount_percent", "discount_ttl_hours", "max_uses", "uses_count", "valid_until",
-		"active", "first_purchase_only", "require_customer_in_db", "allow_trial_without_payment", "created_at",
-		"discount_max_subscription_payments_per_customer", "tariff_id",
-	).From("promo_code").Where(notTechnicalPromo).OrderBy("id DESC").Offset(uint64(offset)).Limit(uint64(limit)).PlaceholderFormat(sq.Dollar)
-	sqlStr, args, err := builder.ToSql()
+	list, counts, err := r.ListFiltered(ctx, PromoListFilter{}, offset, limit)
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := r.pool.Query(ctx, sqlStr, args...)
+	return list, counts.Status.All, nil
+}
+
+// Статусы промокода для фильтра списка админки. Порядок проверки — как на
+// клиенте (promoStatus.ts): истёк → выключен → исчерпан → активен; каждая
+// строка попадает ровно в один из четырёх. «Есть лимит» — max_uses > 0: ноль
+// promo/service.go считает безлимитом. Время — now() базы.
+const (
+	PromoStatusAll    = "all"
+	PromoStatusActive = "active"
+	PromoStatusEnded  = "ended" // истёк или исчерпан
+	PromoStatusOff    = "off"   // выключен и не истёк
+
+	promoExpiredCond   = `(valid_until IS NOT NULL AND valid_until < now())`
+	promoExhaustedCond = `(max_uses IS NOT NULL AND max_uses > 0 AND uses_count >= max_uses)`
+
+	promoStatusActiveCond = `(active AND NOT ` + promoExpiredCond + ` AND NOT ` + promoExhaustedCond + `)`
+	promoStatusOffCond    = `(NOT ` + promoExpiredCond + ` AND NOT active)`
+	promoStatusEndedCond  = `(` + promoExpiredCond + ` OR (active AND ` + promoExhaustedCond + `))`
+)
+
+// Сортировки списка промокодов в админке.
+const (
+	PromoSortNew      = "new"
+	PromoSortUses     = "uses"
+	PromoSortExpiring = "expiring"
+	PromoSortCode     = "code"
+)
+
+// Направление сортировки; пусто — естественное для ключа (код — по алфавиту,
+// новые и активации — по убыванию, срок — ближайшие первыми).
+const (
+	PromoSortAsc  = "asc"
+	PromoSortDesc = "desc"
+)
+
+// PromoListFilter — фильтры списка промокодов. Пустые поля — без фильтра;
+// значения проверяет handler, сюда неизвестное не доходит.
+type PromoListFilter struct {
+	Status string // all | active | ended | off
+	Type   string // subscription_days | trial | extra_hwid | discount
+	Query  string // подстрока кода или заметки, без учёта регистра
+	Sort   string // new | uses | expiring | code
+	Dir    string // asc | desc | "" — см. promoSortOrder
+}
+
+// PromoStatusCounts — сколько промокодов в каждой вкладке статуса.
+type PromoStatusCounts struct {
+	All, Active, Ended, Off int
+}
+
+// PromoTypeCounts — сколько промокодов каждого типа.
+type PromoTypeCounts struct {
+	All, SubscriptionDays, Discount, Trial, ExtraHwid int
+}
+
+// PromoListCounts — счётчики вкладок и фильтра типа. Status считается с учётом
+// типа и поиска, но без статуса; Type — с учётом статуса и поиска, но без
+// типа: число на вкладке совпадает с тем, что покажет клик по ней.
+type PromoListCounts struct {
+	Status PromoStatusCounts
+	Type   PromoTypeCounts
+}
+
+func promoStatusCond(status string) string {
+	switch status {
+	case PromoStatusActive:
+		return promoStatusActiveCond
+	case PromoStatusEnded:
+		return promoStatusEndedCond
+	case PromoStatusOff:
+		return promoStatusOffCond
+	default:
+		return "TRUE"
+	}
+}
+
+// promoSortOrder — ORDER BY списка. Значения только из констант выше, ввод
+// пользователя сюда не попадает (handler отклоняет неизвестное).
+func promoSortOrder(sort, dir string) string {
+	switch sort {
+	case PromoSortUses:
+		if dir == PromoSortAsc {
+			return "uses_count ASC, id DESC"
+		}
+		return "uses_count DESC, id DESC"
+	case PromoSortExpiring:
+		if dir == PromoSortDesc {
+			// Самые дальние сроки первыми, бессрочные — в конце.
+			return "CASE WHEN valid_until IS NULL THEN 1 ELSE 0 END, valid_until DESC, id DESC"
+		}
+		return "CASE WHEN valid_until > now() THEN 0 WHEN valid_until IS NULL THEN 1 ELSE 2 END, valid_until ASC, id DESC"
+	case PromoSortCode:
+		if dir == PromoSortDesc {
+			return "code DESC, id DESC"
+		}
+		return "code ASC, id DESC"
+	default:
+		if dir == PromoSortAsc {
+			return "id ASC"
+		}
+		return "id DESC"
+	}
+}
+
+// escapeLikePattern экранирует спецсимволы LIKE (`\`, `%`, `_`) для ESCAPE '\'.
+func escapeLikePattern(s string) string {
+	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
+}
+
+// promoListBaseWhere — условия, общие для списка и счётчиков: не служебный код и
+// поиск. Возвращает SQL-фрагмент и аргументы, начиная с $1.
+func promoListBaseWhere(query string) (string, []any) {
+	where := notTechnicalPromo
+	var args []any
+	if query != "" {
+		args = append(args, "%"+escapeLikePattern(query)+"%")
+		where += ` AND (code ILIKE $1 ESCAPE '\' OR note ILIKE $1 ESCAPE '\')`
+	}
+	return where, args
+}
+
+// ListFiltered — страница промокодов админки с фильтрами и счётчики вкладок.
+// Служебные коды (`__…`) не попадают ни в список, ни в счётчики. Общее число
+// строк под фильтрами — counts.Status по выбранному статусу.
+func (r *PromoRepository) ListFiltered(ctx context.Context, f PromoListFilter, offset, limit int) ([]PromoCode, PromoListCounts, error) {
+	var counts PromoListCounts
+	if offset < 0 {
+		offset = 0
+	}
+	baseWhere, args := promoListBaseWhere(f.Query)
+
+	typeCond := "TRUE"
+	if f.Type != "" {
+		args = append(args, f.Type)
+		typeCond = fmt.Sprintf("type = $%d", len(args))
+	}
+	statusCond := promoStatusCond(f.Status)
+
+	countsSQL := `
+SELECT
+  COUNT(*) FILTER (WHERE ` + typeCond + `)::int,
+  COUNT(*) FILTER (WHERE ` + typeCond + ` AND ` + promoStatusActiveCond + `)::int,
+  COUNT(*) FILTER (WHERE ` + typeCond + ` AND ` + promoStatusEndedCond + `)::int,
+  COUNT(*) FILTER (WHERE ` + typeCond + ` AND ` + promoStatusOffCond + `)::int,
+  COUNT(*) FILTER (WHERE ` + statusCond + `)::int,
+  COUNT(*) FILTER (WHERE ` + statusCond + ` AND type = 'subscription_days')::int,
+  COUNT(*) FILTER (WHERE ` + statusCond + ` AND type = 'discount')::int,
+  COUNT(*) FILTER (WHERE ` + statusCond + ` AND type = 'trial')::int,
+  COUNT(*) FILTER (WHERE ` + statusCond + ` AND type = 'extra_hwid')::int
+FROM promo_code
+WHERE ` + baseWhere
+	if err := r.pool.QueryRow(ctx, countsSQL, args...).Scan(
+		&counts.Status.All, &counts.Status.Active, &counts.Status.Ended, &counts.Status.Off,
+		&counts.Type.All, &counts.Type.SubscriptionDays, &counts.Type.Discount, &counts.Type.Trial, &counts.Type.ExtraHwid,
+	); err != nil {
+		return nil, counts, fmt.Errorf("promo list counts: %w", err)
+	}
+
+	args = append(args, limit, offset)
+	listSQL := `SELECT ` + promoColumnsSQL + `
+FROM promo_code
+WHERE ` + baseWhere + ` AND ` + typeCond + ` AND ` + statusCond + `
+ORDER BY ` + promoSortOrder(f.Sort, f.Dir) + fmt.Sprintf(`
+LIMIT $%d OFFSET $%d`, len(args)-1, len(args))
+	rows, err := r.pool.Query(ctx, listSQL, args...)
 	if err != nil {
-		return nil, 0, err
+		return nil, counts, fmt.Errorf("promo list: %w", err)
 	}
 	defer rows.Close()
 	var list []PromoCode
 	for rows.Next() {
 		var p PromoCode
-		var tid sql.NullInt64
-		if err := rows.Scan(
-			&p.ID, &p.Code, &p.Type, &p.SubscriptionDays, &p.TrialDays, &p.ExtraHwidDelta,
-			&p.DiscountPercent, &p.DiscountTTLHours, &p.MaxUses, &p.UsesCount, &p.ValidUntil,
-			&p.Active, &p.FirstPurchaseOnly, &p.RequireCustomerInDB, &p.AllowTrialWithoutPayment, &p.CreatedAt,
-			&p.DiscountMaxSubscriptionPaymentsPerCustomer, &tid,
-		); err != nil {
-			return nil, 0, err
-		}
-		if tid.Valid {
-			v := tid.Int64
-			p.TariffID = &v
+		if err := scanPromoRow(rows, &p); err != nil {
+			return nil, counts, err
 		}
 		list = append(list, p)
 	}
-	return list, total, rows.Err()
+	return list, counts, rows.Err()
+}
+
+// PromoRedemptionsSummary — активации нетехнических промокодов: за скользящие
+// 24 часа и за всё время.
+type PromoRedemptionsSummary struct {
+	Last24h int
+	Total   int
+}
+
+// RedemptionsSummary — сводка активаций для шапки списка. «За 24 ч» —
+// скользящее окно от now() базы, не «сегодня»: так число не зависит от пояса.
+func (r *PromoRepository) RedemptionsSummary(ctx context.Context) (PromoRedemptionsSummary, error) {
+	var s PromoRedemptionsSummary
+	err := r.pool.QueryRow(ctx, `
+SELECT COUNT(*) FILTER (WHERE pr.used_at >= now() - interval '24 hours')::int, COUNT(*)::int
+FROM promo_redemption pr
+JOIN promo_code pc ON pc.id = pr.promo_code_id
+WHERE pc.code NOT LIKE '\_\_%'`).Scan(&s.Last24h, &s.Total)
+	return s, err
+}
+
+// PromoPayback — оплаты, связанные с промокодом. Для скидки — покупки, оплаченные
+// с этой скидкой (purchase.promo_code_id). Для остальных типов — оплаты
+// активировавших после их активации (корреляция, не «заслуга» кода). Рубли и
+// Stars — по правилу SumPaidSpendBreakdown, прочие валюты в выручку не входят.
+type PromoPayback struct {
+	PaidCustomers int
+	Payments      int
+	RevenueRub    float64
+	RevenueStars  float64
+}
+
+// PromoDetailStats — цифры карточки промокода в админке.
+type PromoDetailStats struct {
+	Redemptions24h   int
+	PendingDiscounts int
+	Payback          PromoPayback
+}
+
+// promoPaymentMatchCond — оплаченная покупка p засчитывается промокоду pc,
+// активированному в pr: у скидки — покупка с этой скидкой, у остальных — оплата
+// не раньше активации (paid_at, а у старых строк без него — created_at).
+const promoPaymentMatchCond = `p.status = 'paid' AND CASE
+    WHEN pc.type = 'discount' THEN p.promo_code_id = pc.id
+    ELSE COALESCE(p.paid_at, p.created_at) >= pr.used_at
+  END`
+
+// DetailStats — активации за 24 ч, невыкупленные скидки и отдача промокода.
+func (r *PromoRepository) DetailStats(ctx context.Context, promo *PromoCode) (PromoDetailStats, error) {
+	var s PromoDetailStats
+	if err := r.pool.QueryRow(ctx, `
+SELECT
+  (SELECT COUNT(*)::int FROM promo_redemption WHERE promo_code_id = $1 AND used_at >= now() - interval '24 hours'),
+  (SELECT COUNT(*)::int FROM customer_pending_discount WHERE promo_code_id = $1)`,
+		promo.ID).Scan(&s.Redemptions24h, &s.PendingDiscounts); err != nil {
+		return s, fmt.Errorf("promo detail counters: %w", err)
+	}
+
+	sums := `
+  COUNT(DISTINCT p.customer_id)::int,
+  COUNT(*)::int,
+  COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseRubCond + `), 0)::float8,
+  COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseStarsCond + `), 0)::float8`
+	var q string
+	if promo.Type == PromoTypeDiscount {
+		// Точная связь: скидка записана в покупку. Активация для этого не нужна.
+		q = `SELECT` + sums + `
+FROM purchase p
+WHERE p.status = 'paid' AND p.promo_code_id = $1`
+	} else {
+		q = `SELECT` + sums + `
+FROM promo_redemption pr
+JOIN promo_code pc ON pc.id = pr.promo_code_id
+JOIN purchase p ON p.customer_id = pr.customer_id AND ` + promoPaymentMatchCond + `
+WHERE pr.promo_code_id = $1`
+	}
+	pb := &s.Payback
+	if err := r.pool.QueryRow(ctx, q, promo.ID).Scan(&pb.PaidCustomers, &pb.Payments, &pb.RevenueRub, &pb.RevenueStars); err != nil {
+		return s, fmt.Errorf("promo payback: %w", err)
+	}
+	return s, nil
 }
 
 func (r *PromoRepository) CountTotals(ctx context.Context) (total, active, inactive int, err error) {
@@ -385,6 +620,14 @@ type PromoRedemptionDetailRow struct {
 	CustomerID       int64     `db:"customer_id"`
 	TelegramUsername *string   `db:"telegram_username"`
 	Nickname         *string   `db:"nickname"`
+	// Для аватарки: ссылку подписывает handler, web-only и синтетическим id её не дают.
+	TelegramID int64 `db:"telegram_id"`
+	IsWebOnly  bool  `db:"is_web_only"`
+	// Оплаты этого человека, засчитанные промокоду (правило PromoPayback):
+	// у скидки — покупки с этой скидкой, у остальных — после активации.
+	PaidCount int     `db:"paid_count"`
+	PaidRub   float64 `db:"paid_rub"`
+	PaidStars float64 `db:"paid_stars"`
 }
 
 func (r *PromoRepository) ListRecentRedemptions(ctx context.Context, promoID int64, limit int) ([]PromoRedemptionRow, error) {
@@ -419,17 +662,26 @@ func (r *PromoRepository) ListRedemptionsPage(ctx context.Context, promoID int64
 		offset = 0
 	}
 	q := `
-SELECT pr.used_at, c.id, c.telegram_username,
+SELECT pr.used_at, c.id, c.telegram_username, c.telegram_id, c.is_web_only,
   (SELECT NULLIF(TRIM(ii.raw_profile_json->>'first_name'), '')
    FROM cabinet_account_customer_link l
    JOIN cabinet_identity ii ON ii.account_id = l.account_id AND ii.unlinked_at IS NULL
    WHERE l.customer_id = c.id AND l.link_status = 'linked'
    ORDER BY ii.created_at DESC
-   LIMIT 1) AS nickname
+   LIMIT 1) AS nickname,
+  pay.paid_count, pay.paid_rub, pay.paid_stars
 FROM promo_redemption pr
+JOIN promo_code pc ON pc.id = pr.promo_code_id
 JOIN customer c ON c.id = pr.customer_id
+LEFT JOIN LATERAL (
+  SELECT COUNT(*)::int AS paid_count,
+    COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseRubCond + `), 0)::float8 AS paid_rub,
+    COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseStarsCond + `), 0)::float8 AS paid_stars
+  FROM purchase p
+  WHERE p.customer_id = pr.customer_id AND ` + promoPaymentMatchCond + `
+) pay ON TRUE
 WHERE pr.promo_code_id = $1
-ORDER BY pr.used_at DESC
+ORDER BY pr.used_at DESC, pr.id DESC
 LIMIT $2 OFFSET $3`
 	rows, err := r.pool.Query(ctx, q, promoID, limit, offset)
 	if err != nil {
@@ -439,7 +691,8 @@ LIMIT $2 OFFSET $3`
 	var out []PromoRedemptionDetailRow
 	for rows.Next() {
 		var row PromoRedemptionDetailRow
-		if err := rows.Scan(&row.UsedAt, &row.CustomerID, &row.TelegramUsername, &row.Nickname); err != nil {
+		if err := rows.Scan(&row.UsedAt, &row.CustomerID, &row.TelegramUsername, &row.TelegramID, &row.IsWebOnly, &row.Nickname,
+			&row.PaidCount, &row.PaidRub, &row.PaidStars); err != nil {
 			return nil, err
 		}
 		out = append(out, row)
@@ -449,58 +702,26 @@ LIMIT $2 OFFSET $3`
 
 // FindByCodeForUpdate locks promo row by normalized code.
 func (r *PromoRepository) FindByCodeForUpdate(ctx context.Context, tx pgx.Tx, codeUpper string) (*PromoCode, error) {
-	q := `SELECT id, code, type, subscription_days, trial_days, extra_hwid_delta,
-		discount_percent, discount_ttl_hours, max_uses, uses_count, valid_until,
-		active, first_purchase_only, require_customer_in_db, allow_trial_without_payment, created_at,
-		discount_max_subscription_payments_per_customer, tariff_id
-		FROM promo_code WHERE code = $1 FOR UPDATE`
-	row := tx.QueryRow(ctx, q, codeUpper)
+	q := `SELECT ` + promoColumnsSQL + ` FROM promo_code WHERE code = $1 FOR UPDATE`
 	var p PromoCode
-	var tid sql.NullInt64
-	err := row.Scan(
-		&p.ID, &p.Code, &p.Type, &p.SubscriptionDays, &p.TrialDays, &p.ExtraHwidDelta,
-		&p.DiscountPercent, &p.DiscountTTLHours, &p.MaxUses, &p.UsesCount, &p.ValidUntil,
-		&p.Active, &p.FirstPurchaseOnly, &p.RequireCustomerInDB, &p.AllowTrialWithoutPayment, &p.CreatedAt,
-		&p.DiscountMaxSubscriptionPaymentsPerCustomer, &tid,
-	)
-	if err != nil {
+	if err := scanPromoRow(tx.QueryRow(ctx, q, codeUpper), &p); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
-	}
-	if tid.Valid {
-		v := tid.Int64
-		p.TariffID = &v
 	}
 	return &p, nil
 }
 
 // FindByIDForUpdate loads promo row inside transaction with FOR UPDATE lock.
 func (r *PromoRepository) FindByIDForUpdate(ctx context.Context, tx pgx.Tx, id int64) (*PromoCode, error) {
-	q := `SELECT id, code, type, subscription_days, trial_days, extra_hwid_delta,
-		discount_percent, discount_ttl_hours, max_uses, uses_count, valid_until,
-		active, first_purchase_only, require_customer_in_db, allow_trial_without_payment, created_at,
-		discount_max_subscription_payments_per_customer, tariff_id
-		FROM promo_code WHERE id = $1 FOR UPDATE`
-	row := tx.QueryRow(ctx, q, id)
+	q := `SELECT ` + promoColumnsSQL + ` FROM promo_code WHERE id = $1 FOR UPDATE`
 	var p PromoCode
-	var tid sql.NullInt64
-	err := row.Scan(
-		&p.ID, &p.Code, &p.Type, &p.SubscriptionDays, &p.TrialDays, &p.ExtraHwidDelta,
-		&p.DiscountPercent, &p.DiscountTTLHours, &p.MaxUses, &p.UsesCount, &p.ValidUntil,
-		&p.Active, &p.FirstPurchaseOnly, &p.RequireCustomerInDB, &p.AllowTrialWithoutPayment, &p.CreatedAt,
-		&p.DiscountMaxSubscriptionPaymentsPerCustomer, &tid,
-	)
-	if err != nil {
+	if err := scanPromoRow(tx.QueryRow(ctx, q, id), &p); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err
-	}
-	if tid.Valid {
-		v := tid.Int64
-		p.TariffID = &v
 	}
 	return &p, nil
 }

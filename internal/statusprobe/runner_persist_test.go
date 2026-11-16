@@ -176,7 +176,7 @@ func TestFreshPingWaitsForTheConfiguredInterval(t *testing.T) {
 func TestFailedPingRetriesInTenMinutes(t *testing.T) {
 	now := time.Now()
 	target := Target{Key: "pl", Interval: 30 * time.Minute}
-	failed := Sample{MeasuredAt: now.Add(-11 * time.Minute), WorldOK: 1, WorldTotal: 3}
+	failed := Sample{MeasuredAt: now.Add(-11 * time.Minute), WorldTotal: 1, RussiaOK: 7, RussiaTotal: 10, RussiaFailStreak: 1}
 	if !pingDue(target, failed, true, now) {
 		t.Fatal("failed ping should be due after 10 minutes")
 	}
@@ -190,6 +190,20 @@ func TestFailedPingRetriesInTenMinutes(t *testing.T) {
 	}
 	if NextPingMinutes(30, failed) != 10 || NextPingMinutes(30, okSample) != 30 {
 		t.Fatalf("next %d %d", NextPingMinutes(30, failed), NextPingMinutes(30, okSample))
+	}
+	// Один молчащий город — шум ниже порога «частично», повторять раньше не нужно.
+	noise := Sample{WorldOK: 1, WorldTotal: 1, RussiaOK: 9, RussiaTotal: 10}
+	if NextPingMinutes(60, noise) != 60 {
+		t.Fatalf("noise next %d", NextPingMinutes(60, noise))
+	}
+	// Повтор подтвердил сбой — дальше обычный интервал, а не раз в 10 минут.
+	confirmed := Sample{WorldOK: 1, WorldTotal: 1, RussiaOK: 2, RussiaTotal: 10, RussiaFailStreak: 2}
+	if NextPingMinutes(60, confirmed) != 60 {
+		t.Fatalf("confirmed next %d", NextPingMinutes(60, confirmed))
+	}
+	worldDown := Sample{WorldTotal: 1, RussiaOK: 10, RussiaTotal: 10, WorldFailStreak: 1}
+	if NextPingMinutes(60, worldDown) != 10 {
+		t.Fatalf("world next %d", NextPingMinutes(60, worldDown))
 	}
 }
 

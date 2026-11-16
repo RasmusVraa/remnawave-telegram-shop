@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { Spinner } from '@/components/ui/spinner'
 
 export type SortDir = 'asc' | 'desc'
 
@@ -45,7 +46,6 @@ export function SortableTh({
   filter?: ReactNode
 }) {
   const active = !disabled && sort?.key === sortKey
-  const Icon = !active ? ArrowUpDown : sort?.dir === 'asc' ? ArrowUp : ArrowDown
 
   return (
     <th
@@ -56,20 +56,51 @@ export function SortableTh({
         children
       ) : (
         <span className="inline-flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => onSort(sortKey)}
-          className={cn(
-            '-mx-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 uppercase tracking-wider transition-colors hover:bg-accent/15 hover:text-foreground',
-            active && 'text-foreground',
-          )}
-        >
-          {children}
-          <Icon className={cn('size-3.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground/50')} aria-hidden />
-        </button>
-        {filter}
+          <SortHeaderButton sortKey={sortKey} sort={sort} onSort={onSort}>
+            {children}
+          </SortHeaderButton>
+          {filter}
         </span>
       )}
     </th>
+  )
+}
+
+/**
+ * Сама кнопка сортировки из заголовка — для шапок, собранных не на <table>
+ * (сетка «Промокодов»): вид и поведение те же, что у SortableTh.
+ */
+export function SortHeaderButton({
+  sortKey,
+  sort,
+  onSort,
+  children,
+  busy,
+}: {
+  sortKey: string
+  sort: SortState | null
+  onSort: (key: string) => void
+  children: ReactNode
+  /** Список перезапрашивается после клика по этому заголовку. */
+  busy?: boolean
+}) {
+  const active = sort?.key === sortKey
+  const Icon = !active ? ArrowUpDown : sort?.dir === 'asc' ? ArrowUp : ArrowDown
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(sortKey)}
+      className={cn(
+        '-mx-1.5 inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 uppercase tracking-wider transition-colors hover:bg-accent/15 hover:text-foreground',
+        active && 'text-foreground',
+      )}
+    >
+      {children}
+      {busy ? (
+        <Spinner className="h-3.5 w-3.5 text-primary" />
+      ) : (
+        <Icon className={cn('size-3.5 shrink-0', active ? 'text-primary' : 'text-muted-foreground/50')} aria-hidden />
+      )}
+    </button>
   )
 }

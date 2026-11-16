@@ -522,19 +522,43 @@ export interface AdminPromoCodeDTO {
   created_at: string
   discount_max_subscription_payments_per_customer: number
   tariff_id?: number | null
+  /** Подпись админа «для кого и зачем», видна только в админке. */
+  note?: string | null
 }
+
+export type AdminPromoStatusFilter = 'all' | 'active' | 'ended' | 'off'
+export type AdminPromoTypeFilter = 'subscription_days' | 'trial' | 'extra_hwid' | 'discount'
+export type AdminPromoSort = 'new' | 'uses' | 'expiring' | 'code'
 
 export interface AdminPromoListDTO {
   items: AdminPromoCodeDTO[]
   total: number
   page: number
   limit: number
+  /** Счётчики вкладок и типов: status — без учёта status, type — без учёта type. */
+  counts?: {
+    status: Record<AdminPromoStatusFilter, number>
+    type: { all: number } & Record<AdminPromoTypeFilter, number>
+  }
+  summary?: { redemptions_24h: number; redemptions_total: number }
+}
+
+/** Отдача кода: у скидки — оплаты с этим кодом, у остальных — оплаты после активации. */
+export interface AdminPromoPaybackDTO {
+  paid_customers: number
+  payments: number
+  revenue_rub: number
+  revenue_stars: number
 }
 
 export interface AdminPromoGetDTO {
   promo: AdminPromoCodeDTO
   redemptions: number
   redemptions_today: number
+  redemptions_24h?: number
+  /** Сколько людей ввели скидку и ещё не оплатили — пропадут при удалении кода. */
+  pending_discounts?: number
+  payback?: AdminPromoPaybackDTO
 }
 
 export interface AdminPromoRedemptionDTO {
@@ -542,6 +566,11 @@ export interface AdminPromoRedemptionDTO {
   customer_id: number
   telegram_username?: string | null
   nickname?: string | null
+  /** Подписанная ссылка на фото из Telegram; нет — инициалы. */
+  avatar_url?: string | null
+  paid_count?: number
+  paid_rub?: number
+  paid_stars?: number
 }
 
 export interface AdminPromoRedemptionsListDTO {

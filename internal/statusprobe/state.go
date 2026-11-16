@@ -132,6 +132,9 @@ func LatencyLabConfigured() bool {
 type QuotaEstimate struct {
 	PerHour int `json:"per_hour"`
 	Limit   int `json:"limit"`
+	// MaxCost — сколько единиц стоит самая дорогая проверка из списка. Globalping не запускает
+	// замер, если остаток меньше его цены, поэтому «осталось 5» при цене 16 — это исчерпанный лимит.
+	MaxCost int `json:"max_cost"`
 	// TokenSet — задан GLOBALPING_TOKEN (лимит выше).
 	TokenSet bool `json:"token_set"`
 	// LatencyLabSet — задан LATENCYLAB_TOKEN, проверка обхода возможна.
@@ -146,6 +149,26 @@ type QuotaEstimate struct {
 	Real *GlobalpingLimits `json:"real,omitempty"`
 	// Registry — состояние проверки по спискам блокировок (cheburcheck).
 	Registry *RegistryQuota `json:"registry,omitempty"`
+	// Cheburcheck — живые сканеры в российских сетях и выбор источника «России».
+	Cheburcheck *CheburcheckQuota `json:"cheburcheck,omitempty"`
+}
+
+// CheburcheckQuota — что показать в карточке Cheburcheck и в переключателе источника.
+type CheburcheckQuota struct {
+	// Configured — задан CHEBURCHECK_TOKEN.
+	Configured bool `json:"configured"`
+	// Mode — выбор админа (auto, globalping, cheburcheck); Active — кто даёт «Россию» сейчас.
+	Mode   string `json:"mode"`
+	Active string `json:"active"`
+	// PausedUntil — сервис ответил 429 или не принял ключ.
+	PausedUntil *time.Time `json:"paused_until,omitempty"`
+	PauseNote   string     `json:"pause_note,omitempty"`
+	// Credits — остаток кредитов; ноль и пусто не показываем: проверки идут и при нуле.
+	Credits *int `json:"credits,omitempty"`
+	// LastAt — последний ответ по любому серверу, Pass из Total сканеров открыли его.
+	LastAt *time.Time `json:"last_at,omitempty"`
+	Pass   int        `json:"pass,omitempty"`
+	Total  int        `json:"total,omitempty"`
 }
 
 // RegistryQuota — что показать в карточке «Реестр РКН»: свежесть списков сервиса,
@@ -163,6 +186,7 @@ type RegistryQuota struct {
 func EstimateQuota(list []ConfiguredTarget) QuotaEstimate {
 	defWorld, defRussia := ProbeLimits()
 	total := 0.0
+	maxCost := 0
 	for _, item := range list {
 		if !item.Enabled || item.NoExternal || strings.TrimSpace(item.Address) == "" {
 			continue
@@ -183,6 +207,9 @@ func EstimateQuota(list []ConfiguredTarget) QuotaEstimate {
 			}
 			cost = world + extra
 		}
+		if cost > maxCost {
+			maxCost = cost
+		}
 		minutes := item.IntervalMin
 		if minutes <= 0 {
 			minutes = ProbeIntervalMinutes()
@@ -197,6 +224,7 @@ func EstimateQuota(list []ConfiguredTarget) QuotaEstimate {
 	return QuotaEstimate{
 		PerHour:       int(total + 0.5),
 		Limit:         limit,
+		MaxCost:       maxCost,
 		TokenSet:      token,
 		LatencyLabSet: LatencyLabConfigured(),
 	}

@@ -40,6 +40,9 @@ function sectorIdxForType(rt: string): number {
   return i === -1 ? 0 : i
 }
 
+/** Секунд на одну запись ленты: скорость не зависит от того, сколько побед пришло с сервера. */
+const MARQUEE_SEC_PER_ITEM = 5
+
 function buildMarqueeStrip(items: FortuneRecentWinItem[]): FortuneRecentWinItem[] {
   if (items.length === 0) return []
   const minLen = 12
@@ -119,16 +122,16 @@ function MarqueeStrip({
           <Fragment key={`${stripKey}-${w.spin_at}-${w.masked_name}-${w.reward_type}-${i}`}>
             {i > 0 ? (
               <span
-                className="inline-flex h-7 w-7 shrink-0 items-center justify-center self-center text-[10px] leading-none text-slate-400 dark:text-slate-500"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center self-center text-[9px] leading-none text-slate-400 dark:text-slate-500"
                 aria-hidden
               >
                 ●
               </span>
             ) : null}
             <span className="inline-flex items-center gap-1.5 text-[13px] leading-tight sm:text-sm">
-              <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-slate-300/80 bg-white/90 shadow-inner dark:border-white/10 dark:bg-white/5">
+              <span className="inline-flex size-6 shrink-0 items-center justify-center rounded-full border border-border/70 bg-card/80 shadow-inner dark:border-white/10 dark:bg-white/5">
                 <Icon
-                  className={cn('size-3.5 shrink-0', iconCls, w.reward_type.startsWith('days_') && 'scale-105')}
+                  className={cn('size-3 shrink-0', iconCls, w.reward_type.startsWith('days_') && 'scale-105')}
                   strokeWidth={2.4}
                   aria-hidden
                 />
@@ -153,18 +156,20 @@ export function FortuneWinnersMarquee({ items, t }: FeedProps) {
   const strip = useMemo(() => buildMarqueeStrip(items), [items])
   if (strip.length === 0) {
     return (
-      <div className="rounded-xl border border-slate-300/80 bg-[hsl(228_56%_97%)] px-4 py-2.5 text-center text-xs text-slate-600 dark:border-white/10 dark:bg-[#0a0e27] dark:text-slate-400">
+      <div className="rounded-[14px] border border-border/70 bg-card/60 px-3.5 py-2 text-center text-xs text-muted-foreground dark:border-white/[0.08] dark:bg-background/60">
         {t('fortune.winnerFeedEmpty')}
       </div>
     )
   }
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-slate-300/90 bg-[hsl(228_56%_97%)] shadow-sm dark:border-white/[0.08] dark:bg-[#0a0e27] dark:shadow-none">
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-gradient-to-r from-[hsl(228_56%_97%)] to-transparent dark:from-[#0a0e27]" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-[hsl(228_56%_97%)] to-transparent dark:from-[#0a0e27]" />
-      <div className="overflow-hidden py-2.5 px-4 sm:px-5">
-        <div className="flex w-max min-w-full animate-fortune-winners-marquee items-center motion-reduce:animate-none">
+    // Края ленты растворяются целиком, вместе с рамкой и фоном. Фон и рамка — из токенов темы (декор-темы).
+    <div className="relative overflow-hidden rounded-[14px] border border-border/70 bg-card/60 [mask-image:linear-gradient(90deg,transparent,#000_5%,#000_95%,transparent)] dark:border-white/[0.08] dark:bg-background/60">
+      <div className="overflow-hidden px-3.5 py-2">
+        <div
+          className="flex w-max min-w-full animate-fortune-winners-marquee items-center motion-reduce:animate-none"
+          style={{ animationDuration: `${strip.length * MARQUEE_SEC_PER_ITEM}s` }}
+        >
           <div className="inline-flex shrink-0 items-center whitespace-nowrap">
             <MarqueeStrip strip={strip} t={t} stripKey="a" />
           </div>

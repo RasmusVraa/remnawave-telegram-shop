@@ -15,6 +15,12 @@ type Options = {
   desktopQuery?: string
   /** Временный запрет: например, пока отправляется форма. */
   disabled?: boolean
+  /**
+   * Закрытие сейчас под вопросом (в форме несохранённые изменения): дотянутая
+   * шторка возвращается на место, а onDismiss вызывается сразу — окно само
+   * спросит «Закрыть без сохранения?».
+   */
+  snapBack?: boolean
 }
 
 /**
@@ -32,7 +38,7 @@ type Options = {
 export function useSheetDragDismiss<
   S extends HTMLElement = HTMLDivElement,
   B extends HTMLElement = HTMLElement,
->({ open, onDismiss, desktopQuery = '(min-width: 640px)', disabled }: Options) {
+>({ open, onDismiss, desktopQuery = '(min-width: 640px)', disabled, snapBack }: Options) {
   const sheetRef = useRef<S>(null)
   /** Необязательный отдельный фон: он гаснет по мере того, как шторку тянут. */
   const backdropRef = useRef<B>(null)
@@ -91,6 +97,13 @@ export function useSheetDragDismiss<
     sheet.style.transition = `transform ${ease}`
     if (backdropRef.current) backdropRef.current.style.transition = `opacity ${ease}`
 
+    if ((dy > sheet.offsetHeight / 3 || d.v > 0.6) && snapBack) {
+      sheet.style.transform = 'translateY(0px)'
+      if (backdropRef.current) backdropRef.current.style.opacity = ''
+      timer.current = window.setTimeout(() => resetInline(sheetRef.current, backdropRef.current), DISMISS_MS)
+      onDismissRef.current()
+      return
+    }
     if (dy > sheet.offsetHeight / 3 || d.v > 0.6) {
       sheet.style.transform = 'translateY(105%)'
       if (backdropRef.current) backdropRef.current.style.opacity = '0'

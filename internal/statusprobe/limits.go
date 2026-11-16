@@ -197,6 +197,10 @@ type RowChecks struct {
 	MeasuredAt *time.Time `json:"measured_at,omitempty"`
 	// Registry — значок «РКН»: числится ли адрес в списках блокировок.
 	Registry RegistryCheck `json:"registry"`
+	// RussiaSource — кто дал «Россию»: globalping или cheburcheck. RussiaFailed — кто не открыл сервер
+	// (до четырёх, «провайдер (регион)»), только у Cheburcheck.
+	RussiaSource string   `json:"russia_source,omitempty"`
+	RussiaFailed []string `json:"russia_failed,omitempty"`
 }
 
 func checkOf(ok, total int) CheckResult {
@@ -222,6 +226,13 @@ func ChecksOf(sample *Sample, bypass bool) RowChecks {
 		out.Operators = true
 	} else {
 		out.Russia = checkOf(sample.RussiaOK, sample.RussiaTotal)
+		if sample.RussiaTotal > 0 {
+			out.RussiaSource = SourceGlobalping
+			if sample.RuSource == SourceCheburcheck {
+				out.RussiaSource = SourceCheburcheck
+				out.RussiaFailed = failedScanners(sample, 4)
+			}
+		}
 	}
 	if !sample.MeasuredAt.IsZero() {
 		at := sample.MeasuredAt

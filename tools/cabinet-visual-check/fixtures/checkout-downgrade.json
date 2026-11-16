@@ -1,0 +1,155 @@
+{
+  "/tariffs": {
+    "sales_mode": "tariffs",
+    "currency": "RUB",
+    "price_display": "monthly",
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "basic",
+        "name": "Базовый",
+        "device_limit": 2,
+        "traffic_limit_bytes": 214748364800,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 150
+          },
+          {
+            "months": 3,
+            "amount_rub": 420
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "slug": "premium",
+        "name": "Премиум",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "bypass_traffic_limit_bytes": 16106127360,
+        "bypass_label": "обход",
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 250
+          },
+          {
+            "months": 3,
+            "amount_rub": 700
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "slug": "ultra",
+        "name": "Ультра",
+        "device_limit": 5,
+        "traffic_limit_bytes": 0,
+        "bypass_traffic_limit_bytes": 26843545600,
+        "bypass_label": "LTE",
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 350
+          }
+        ]
+      }
+    ]
+  },
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "platega_sbp": true,
+      "platega_crypto": true
+    },
+    "yookassa_methods": [
+      "sbp",
+      "bank_card"
+    ],
+    "platega_methods": [
+      "sbp",
+      "crypto"
+    ],
+    "checkout_default_method": "yookassa:sbp",
+    "site_links": {
+      "privacy_policy": "https://example.com/privacy",
+      "terms_of_service": "https://example.com/terms"
+    }
+  },
+  "/me/subscription": {
+    "expire_at": "2026-12-15T12:00:00Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "is_trial": false,
+    "tariff": {
+      "id": 2,
+      "slug": "premium",
+      "name": "Премиум",
+      "traffic_gb": null,
+      "device_limit": 3
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": {
+      "enabled": true,
+      "ui_visible": true,
+      "current_limit": 7,
+      "base_limit": 3,
+      "max_limit": 10,
+      "extra_active": 4,
+      "can_increase": true,
+      "can_decrease": true,
+      "price_rub_month": 75,
+      "stars_price_month": 40,
+      "days_left": 30
+    }
+  },
+  "/payments/last-method": {
+    "method": "yookassa:sbp"
+  },
+  "/payments/preview": {
+    "amount": 138,
+    "amount_rub": 138,
+    "currency": "RUB",
+    "sales_mode": "tariffs",
+    "scenario": "downgrade",
+    "base_amount_rub": 150,
+    "loyalty_discount_pct": 8,
+    "total_discount_pct": 8,
+    "tariff_switch_remaining_days": 39,
+    "tariff_switch_bonus_days": 64,
+    "tariff_switch_period_days": 30,
+    "tariff_switch_total_days": 94
+  },
+  "/payments/preview?renew_extra_hwid=true": {
+    "amount": 414,
+    "amount_rub": 414,
+    "currency": "RUB",
+    "sales_mode": "tariffs",
+    "scenario": "downgrade",
+    "base_amount_rub": 450,
+    "loyalty_discount_pct": 8,
+    "total_discount_pct": 8,
+    "extra_hwid_active": 4,
+    "extra_hwid_included": true,
+    "extra_hwid_amount_rub": 300,
+    "tariff_switch_remaining_days": 39,
+    "tariff_switch_bonus_days": 64,
+    "tariff_switch_period_days": 30,
+    "tariff_switch_total_days": 94
+  },
+  "/payments/preview?renew_extra_hwid=false": {
+    "amount": 138,
+    "amount_rub": 138,
+    "currency": "RUB",
+    "sales_mode": "tariffs",
+    "scenario": "downgrade",
+    "base_amount_rub": 150,
+    "loyalty_discount_pct": 8,
+    "total_discount_pct": 8,
+    "tariff_switch_remaining_days": 39,
+    "tariff_switch_bonus_days": 64,
+    "tariff_switch_period_days": 30,
+    "tariff_switch_total_days": 94
+  }
+}

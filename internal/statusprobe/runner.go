@@ -51,8 +51,13 @@ type Runner struct {
 	// Проверка по спискам блокировок идёт отдельным проходом: у неё свой сервис, свои лимиты.
 	registryBusy          bool
 	registryCooldownUntil time.Time
-	loaded                bool
-	onAlerts              func([]AlertEvent)
+	// Проход Cheburcheck («Россия» из живых сканеров) тоже отдельный: свой сервис и свои лимиты.
+	chebBusy          bool
+	chebCooldownUntil time.Time
+	chebPauseNote     string
+	chebLastStart     time.Time
+	loaded            bool
+	onAlerts          func([]AlertEvent)
 }
 
 func NewRunner(store HistoryStore) *Runner {
@@ -307,6 +312,7 @@ func (r *Runner) Kick(targets []Target) {
 	r.mu.Unlock()
 	r.launch(pingTargets, listTargets)
 	r.kickRegistry(targets, false)
+	r.kickCheburcheck(targets, false)
 }
 
 // Force измеряет все переданные страны сразу, не дожидаясь интервала.
@@ -336,9 +342,11 @@ func (r *Runner) Force(targets []Target) error {
 		r.listBusy = true
 	}
 	r.registryCooldownUntil = time.Time{}
+	r.chebCooldownUntil = time.Time{}
 	r.mu.Unlock()
 	r.launch(pingTargets, listTargets)
 	r.kickRegistry(targets, true)
+	r.kickCheburcheck(targets, true)
 	return nil
 }
 
@@ -452,8 +460,9 @@ func pingDue(target Target, sample Sample, ok bool, now time.Time) bool {
 }
 
 // NextPingMinutes — через сколько минут снова мерить сервер.
-// Если часть зондов не достучалась, следующий замер через 10 минут,
-// пока не будет замера без провалов.
+// Новый сбой перепроверяется через 10 минут один раз: повтор либо снимает его,
+// либо подтверждает, и дальше сервер идёт по обычному интервалу. Иначе сервер,
+// который из России режут постоянно, мерился бы раз в 10 минут и съедал лимит Globalping.
 func NextPingMinutes(configuredMin int, sample Sample) int {
 	if configuredMin <= 0 {
 		configuredMin = ProbeIntervalMinutes()
@@ -461,7 +470,7 @@ func NextPingMinutes(configuredMin int, sample Sample) int {
 	if configuredMin < 5 {
 		configuredMin = 5
 	}
-	if configuredMin > 10 && probeFailed(sample) {
+	if configuredMin > 10 && freshFailure(sample) {
 		return 10
 	}
 	return configuredMin
@@ -475,17 +484,10 @@ func pingInterval(target Target, sample Sample) time.Duration {
 	return time.Duration(NextPingMinutes(minutes, sample)) * time.Minute
 }
 
-func probeFailed(sample Sample) bool {
-	if sample.WorldTotal > sample.WorldOK || sample.RussiaTotal > sample.RussiaOK {
-		return true
-	}
-	for _, hit := range sample.Probes {
-		if hit.Kind == "whitelist" || hit.OK {
-			continue
-		}
-		return true
-	}
-	return false
+// freshFailure — в этом замере сбой впервые: из России не ответили STATUS_RU_FAIL_THRESHOLD
+// зондов и больше или из мира не ответил никто. Один молчащий город из десяти — шум, не сбой.
+func freshFailure(sample Sample) bool {
+	return sample.RussiaFailStreak == 1 || sample.WorldFailStreak == 1
 }
 
 func whitelistDue(target Target, sample Sample, ok bool, now time.Time) bool {
@@ -590,7 +592,15 @@ func (r *Runner) pingPass(ctx context.Context, targets []Target) {
 			break
 		}
 		world, russia := probeCounts(target)
-		sample, err := pingTarget(ctx, r.client, host, TCPPortOrDefault(target.TCPPort), world, russia, target.RepeatCities)
+		repeat := target.RepeatCities
+		r.mu.Lock()
+		fromCheb := r.ruFromCheburLocked(r.samples[target.Key], time.Now())
+		r.mu.Unlock()
+		if fromCheb {
+			// «Россию» даёт Cheburcheck: Globalping меряет мир и берёт один зонд из России про запас.
+			russia, repeat = 1, true
+		}
+		sample, err := pingTarget(ctx, r.client, host, TCPPortOrDefault(target.TCPPort), world, russia, repeat)
 		if err != nil {
 			var limited *RateLimitError
 			if errors.As(err, &limited) {
@@ -684,9 +694,21 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	sample.Alerts = prev.Alerts
 	sample.RegistryAt, sample.RegistryTryAt, sample.RegistryOK = prev.RegistryAt, prev.RegistryTryAt, prev.RegistryOK
 	sample.RegistryBlocked, sample.RegistryKind, sample.RegistryStreak = prev.RegistryBlocked, prev.RegistryKind, prev.RegistryStreak
-	if sample.RussiaTotal > 0 && sample.RussiaTotal-sample.RussiaOK >= RussiaFailThreshold() {
-		sample.RussiaFailStreak = prev.RussiaFailStreak + 1
+	sample.ChebAt, sample.ChebTryAt, sample.ChebOK = prev.ChebAt, prev.ChebTryAt, prev.ChebOK
+	sample.ChebPass, sample.ChebTotal, sample.ChebHits = prev.ChebPass, prev.ChebTotal, prev.ChebHits
+	ruCheb := r.ruFromCheburLocked(sample, time.Now())
+	if ruCheb {
+		sample = applyCheburRU(sample)
 	} else {
+		sample.RuSource = SourceGlobalping
+	}
+	switch {
+	case ruCheb:
+		// Серии сбоев из России ведёт проход Cheburcheck: здесь «Россия» не менялась.
+		sample.RussiaFailStreak = prev.RussiaFailStreak
+	case sample.RussiaTotal > 0 && sample.RussiaTotal-sample.RussiaOK >= RussiaFailThreshold():
+		sample.RussiaFailStreak = prev.RussiaFailStreak + 1
+	default:
 		sample.RussiaFailStreak = 0
 	}
 	if sample.WorldTotal > 0 && sample.WorldOK == 0 {
@@ -699,9 +721,12 @@ func (r *Runner) storeSample(key string, sample Sample) {
 	} else {
 		sample.FailStreak = 0
 	}
-	if sample.RussiaLow() {
+	switch {
+	case ruCheb:
+		sample.RussiaLowStreak = prev.RussiaLowStreak
+	case sample.RussiaLow():
 		sample.RussiaLowStreak = prev.RussiaLowStreak + 1
-	} else {
+	default:
 		sample.RussiaLowStreak = 0
 	}
 	r.samples[key] = sample

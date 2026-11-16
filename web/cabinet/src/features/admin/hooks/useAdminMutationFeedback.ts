@@ -21,6 +21,10 @@ export function useAdminMutationFeedback() {
     setFeedback({ type: 'success', message })
   }, [])
 
+  const showInfo = useCallback((message: string) => {
+    setFeedback({ type: 'info', message })
+  }, [])
+
   const handlers = useCallback(
     (successMessage?: string) => ({
       onSuccess: () => {
@@ -31,5 +35,5 @@ export function useAdminMutationFeedback() {
     [showError, showSuccess],
   )
 
-  return { feedback, clear, showError, showSuccess, handlers }
+  return { feedback, clear, showError, showSuccess, showInfo, handlers }
 }

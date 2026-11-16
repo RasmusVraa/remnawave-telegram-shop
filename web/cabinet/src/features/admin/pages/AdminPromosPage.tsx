@@ -1,945 +1,438 @@
-import { useState, useCallback, useEffect, type MouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
-import {
-  TicketPercent,
-  Plus,
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  Trash2,
-  ToggleLeft,
-  ToggleRight,
-  ChevronDown,
-  ChevronUp,
-  Save,
-  Loader2,
-  Users,
-} from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Plus, RotateCcw, SearchX, TicketPercent } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+import { Skeleton } from '@/components/ui/skeleton'
+import type { AdminPromoCodeDTO, AdminPromoStatusFilter, AdminPromoTypeFilter } from '@/lib/types/admin'
+import { nextSort, type SortDir, type SortState } from '../components/SortableTh'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
-import { Card } from '@/components/ui/card'
-import { ApiError } from '@/lib/api'
-import { cn } from '@/lib/utils'
-import { Spinner } from '@/components/ui/spinner'
-import {
-  useAdminPromoList,
-  useAdminPromoGet,
-  useAdminPromoCreate,
-  useAdminPromoUpdate,
-  useAdminPromoDelete,
-  useAdminPromoRedemptions,
-  type AdminPromoCode,
-  type CreatePromoInput,
-} from '../hooks/useAdminPromos'
-import { useAdminTariffList } from '../hooks/useAdminTariffs'
 import { AdminFeedback } from '../components/AdminFeedback'
-import { AdminModal } from '../components/AdminModal'
-import { AdminConfirmModal } from '../components/AdminConfirmModal'
-import { AdminCheckboxField } from '../components/AdminCheckbox'
 import { useAdminMutationFeedback } from '../hooks/useAdminMutationFeedback'
-import { formatAdminApiError } from '../utils/formatAdminApiError'
-import { truncatePreview } from '../utils/truncatePreview'
-import { formatAdminCustomerLabel } from '../utils/formatAdminCustomerLabel'
-import { resolvePromoDisplayStatus, type PromoDisplayStatus } from '../utils/promoStatus'
-import { AdminSelect } from '../components/AdminSelect'
+import { useAdminPromoList } from '../hooks/useAdminPromos'
+import { useAdminTariffList } from '../hooks/useAdminTariffs'
+import { useAdminBootstrap } from '../hooks/useAdminBootstrap'
+import { resolvePromoDisplayStatus } from '../utils/promoStatus'
+import { usePromoListLayout } from '../promos/PromoBits'
+import { PromoCard, PromoRow, PromoTableHeader, PROMO_TABLE_COLUMNS, type PromoItemActions } from '../promos/PromoRow'
+import { PromoFilterMenu, PromoSearchInput, PromoStatusTabs } from '../promos/PromoFilters'
+import { PromoFormModal, type PromoFormMode } from '../promos/PromoFormModal'
+import { PromoUsedByModal } from '../promos/PromoUsedByModal'
+import { PromoDetailSheet } from '../promos/PromoDetailSheet'
+import { PromoDeleteModal } from '../promos/PromoDeleteModal'
+import { isPromoType } from '../promos/promoPresentation'
 
-const PROMO_CODE_PREVIEW_LEN = 6
+const LIMIT = 20
+const STATUSES: AdminPromoStatusFilter[] = ['all', 'active', 'ended', 'off']
+const SORT_KEYS = ['new', 'uses', 'expiring', 'code'] as const
+/** Первое направление при клике по заголовку (как SORT_FIRST_DIR у «Пользователей»). */
+const SORT_FIRST_DIR: Record<string, SortDir> = { code: 'asc', uses: 'desc', expiring: 'asc' }
 
-const PROMO_TYPES = ['subscription_days', 'trial', 'extra_hwid', 'discount'] as const
-
-const PROMO_TYPE_KEYS: Record<string, string> = {
-  subscription_days: 'admin.promos.typeSubscriptionDays',
-  trial: 'admin.promos.typeTrial',
-  extra_hwid: 'admin.promos.typeExtraHwid',
-  discount: 'admin.promos.typeDiscount',
+/** Сортировка из адреса; старые ссылки ?sort=uses без dir тоже понимаем. */
+function parseSort(key: string | null, dir: string | null): SortState | null {
+  if (!key || key === 'new') return dir === 'asc' ? { key: 'new', dir: 'asc' } : null
+  if (!(SORT_KEYS as readonly string[]).includes(key)) return null
+  const d: SortDir = dir === 'asc' || dir === 'desc' ? dir : (SORT_FIRST_DIR[key] ?? 'asc')
+  return { key, dir: d }
 }
 
-function promoTypeLabel(type: string, t: TFunction) {
-  const key = PROMO_TYPE_KEYS[type]
-  return key ? t(key) : type
+/** Последнее непустое значение: окно уезжает со своим содержимым, а не пустым. */
+function useLast<T>(value: T | null): T | null {
+  const ref = useRef<T | null>(value)
+  if (value != null) ref.current = value
+  return ref.current
 }
 
-function typeBadge(type: string, t: TFunction) {
-  const colors: Record<string, string> = {
-    subscription_days: 'bg-blue-500/15 text-blue-600 dark:text-blue-400',
-    trial: 'bg-green-500/15 text-green-600 dark:text-green-400',
-    extra_hwid: 'bg-purple-500/15 text-purple-600 dark:text-purple-400',
-    discount: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
-  }
-  return (
-    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium', colors[type] ?? 'bg-muted text-muted-foreground')}>
-      {promoTypeLabel(type, t)}
-    </span>
-  )
-}
+/** Вкладка, тип, сортировка, поиск и страница живут в адресе: перезагрузка и «назад» их сохраняют. */
+function usePromoUrlState() {
+  const [params, setParams] = useSearchParams()
+  const rawStatus = params.get('status')
+  const status: AdminPromoStatusFilter = STATUSES.includes(rawStatus as AdminPromoStatusFilter) ? (rawStatus as AdminPromoStatusFilter) : 'all'
+  const rawType = params.get('type')
+  const type: AdminPromoTypeFilter | null = isPromoType(rawType) ? rawType : null
+  const sortParam = params.get('sort')
+  const dirParam = params.get('dir')
+  const sort = useMemo(() => parseSort(sortParam, dirParam), [sortParam, dirParam])
+  const q = params.get('q') ?? ''
+  const page = Math.max(1, Number(params.get('page')) || 1)
 
-function statusBadge(promo: Pick<AdminPromoCode, 'active' | 'valid_until'>, t: TFunction) {
-  const status: PromoDisplayStatus = resolvePromoDisplayStatus(promo)
-  const styles: Record<PromoDisplayStatus, string> = {
-    active: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-    inactive: 'bg-red-500/15 text-red-500 dark:text-red-400',
-    expired: 'bg-amber-500/15 text-amber-700 dark:text-amber-400',
-  }
-  const labelKeys: Record<PromoDisplayStatus, string> = {
-    active: 'admin.promos.statusActive',
-    inactive: 'admin.promos.statusInactive',
-    expired: 'admin.promos.statusExpired',
-  }
-  return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium', styles[status])}>
-      {t(labelKeys[status])}
-    </span>
-  )
-}
-
-function CreatePromoModal({
-  onClose,
-  onCreate,
-  error,
-  codeTaken,
-  pending,
-  onEdit,
-}: {
-  onClose: () => void
-  onCreate: (d: CreatePromoInput) => void
-  /** Ошибка создания — показывается в самом окне: под ним сообщение страницы не видно. */
-  error: string | null
-  /** Код уже занят — подсвечиваем поле кода. */
-  codeTaken: boolean
-  pending: boolean
-  /** Пользователь изменил форму — старая ошибка больше не актуальна. */
-  onEdit: () => void
-}) {
-  const { t } = useTranslation()
-  const [form, setForm] = useState<CreatePromoInput>({
-    code: '',
-    type: 'subscription_days',
-    // Скидка по умолчанию — на одну оплату: 0 означает «без ограничения» и
-    // раньше молча ставился любому созданному здесь скидочному промокоду.
-    discount_max_subscription_payments_per_customer: 1,
-  })
-
-  const set = <K extends keyof CreatePromoInput>(k: K, v: CreatePromoInput[K]) => {
-    onEdit()
-    setForm((p) => ({ ...p, [k]: v }))
-  }
-
-  return (
-    <AdminModal open onClose={onClose} title={t('admin.promos.createTitle')} panelClassName="sm:max-w-lg" icon={TicketPercent} iconAccent="violet">
-      <div className="space-y-3">
-          <div>
-            <label className="mb-1 block text-sm font-medium">{t('admin.promos.code')}</label>
-            <input
-              className={cn(
-                'admin-input w-full rounded-lg border bg-background px-3 py-2 text-sm',
-                codeTaken ? 'border-destructive ring-1 ring-destructive' : 'border-border',
-              )}
-              aria-invalid={codeTaken}
-              value={form.code}
-              onChange={(e) => set('code', e.target.value.toUpperCase())}
-              placeholder="PROMO2024"
-            />
-            {codeTaken && <p className="mt-1 text-xs text-destructive">{t('admin.promos.codeTaken')}</p>}
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">{t('admin.promos.type')}</label>
-            <AdminSelect
-              value={form.type as string}
-              options={PROMO_TYPES.map((pt) => ({ value: pt as string, label: promoTypeLabel(pt, t) }))}
-              onChange={(next) => set('type', next ?? form.type)}
-              placeholder={t('admin.promos.type')}
-              ariaLabel={t('admin.promos.type')}
-            />
-          </div>
-          {form.type === 'subscription_days' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium">{t('admin.promos.subscriptionDays')}</label>
-              <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.subscription_days ?? ''} onChange={(e) => set('subscription_days', e.target.value ? Number(e.target.value) : null)} />
-            </div>
-          )}
-          {form.type === 'trial' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium">{t('admin.promos.trialDays')}</label>
-              <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.trial_days ?? ''} onChange={(e) => set('trial_days', e.target.value ? Number(e.target.value) : null)} />
-            </div>
-          )}
-          {form.type === 'extra_hwid' && (
-            <div>
-              <label className="mb-1 block text-sm font-medium">{t('admin.promos.extraHwidDelta')}</label>
-              <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.extra_hwid_delta ?? ''} onChange={(e) => set('extra_hwid_delta', e.target.value ? Number(e.target.value) : null)} />
-            </div>
-          )}
-          {form.type === 'discount' && (
-            <>
-              <div>
-                <label className="mb-1 block text-sm font-medium">{t('admin.promos.discountPercent')}</label>
-                <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.discount_percent ?? ''} onChange={(e) => set('discount_percent', e.target.value ? Number(e.target.value) : null)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">{t('admin.promos.discountTTL')}</label>
-                <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.discount_ttl_hours ?? ''} onChange={(e) => set('discount_ttl_hours', e.target.value ? Number(e.target.value) : null)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium">{t('admin.promos.discountMaxPayments')}</label>
-                <input type="number" min={0} className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.discount_max_subscription_payments_per_customer ?? 0} onChange={(e) => set('discount_max_subscription_payments_per_customer', e.target.value ? Number(e.target.value) : 0)} />
-                <p className="mt-1 text-xs text-muted-foreground">{t('admin.promos.discountMaxPaymentsHint')}</p>
-              </div>
-            </>
-          )}
-          <div>
-            <label className="mb-1 block text-sm font-medium">{t('admin.promos.maxUses')}</label>
-            <input type="number" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.max_uses ?? ''} onChange={(e) => set('max_uses', e.target.value ? Number(e.target.value) : null)} placeholder={t('admin.promos.unlimited')} />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">{t('admin.promos.validUntil')}</label>
-            <input type="datetime-local" className="admin-input w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={form.valid_until ? form.valid_until.slice(0, 16) : ''} onChange={(e) => set('valid_until', e.target.value ? new Date(e.target.value).toISOString() : null)} />
-          </div>
-          <AdminCheckboxField
-            checked={form.first_purchase_only ?? false}
-            onChange={(v) => set('first_purchase_only', v)}
-            label={t('admin.promos.firstPurchaseOnly')}
-          />
-      </div>
-      {error && (
-        <div role="alert" className="mt-4 rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error}
-        </div>
-      )}
-      <div className="mt-4 flex justify-end gap-2 border-t border-border/50 pt-4">
-          <button className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent" onClick={onClose}>
-            {t('admin.cancel')}
-          </button>
-          <button
-            className={cn('inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90 disabled:opacity-50', pending && '!opacity-100')}
-            disabled={!form.code.trim() || !form.type || pending}
-            onClick={() => onCreate(form)}
-          >
-            {pending && <Spinner />}
-            {t('admin.create')}
-          </button>
-      </div>
-    </AdminModal>
-  )
-}
-
-const promoNeutralButtonClass =
-  'admin-overview-clickable admin-overview-clickable--surface border-border/50 bg-muted/15 hover:bg-muted/35'
-
-function PromoActionButton({
-  icon: Icon,
-  label,
-  className,
-  onClick,
-  busy = false,
-}: {
-  icon: typeof Pencil
-  label: string
-  className?: string
-  onClick: (e: MouseEvent) => void
-  /** Запрос в работе: спиннер вместо иконки, повторное нажатие заблокировано. */
-  busy?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={busy}
-      aria-busy={busy || undefined}
-      className={cn(
-        'inline-flex min-h-10 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors max-md:size-10 max-md:px-0',
-        className,
-      )}
-      onClick={onClick}
-    >
-      {busy ? <Spinner className="h-3.5 w-3.5" /> : <Icon className="size-3.5 shrink-0" />}
-      <span className="hidden md:inline">{label}</span>
-    </button>
-  )
-}
-
-function PromoUsedByModal({
-  promo,
-  open,
-  onClose,
-}: {
-  promo: AdminPromoCode
-  open: boolean
-  onClose: () => void
-}) {
-  const { t, i18n } = useTranslation()
-  const [page, setPage] = useState(1)
-  const limit = 20
-  const { data, isLoading, isError } = useAdminPromoRedemptions(open ? promo.id : null, page, limit)
-  const totalPages = data ? Math.max(1, Math.ceil(data.total / data.limit)) : 1
-
-  useEffect(() => {
-    if (open) setPage(1)
-  }, [open, promo.id])
-
-  const formatUsedAt = (iso: string) => {
-    try {
-      return new Date(iso).toLocaleString(i18n.language, {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return iso
-    }
-  }
-
-  return (
-    <AdminModal
-      open={open}
-      onClose={onClose}
-      title={t('admin.promos.usedByTitle', { code: promo.code })}
-      panelClassName="sm:max-w-md"
-      icon={Users}
-      iconAccent="violet"
-      footer={
-        totalPages > 1 ? (
-          <div className="flex items-center justify-between gap-2">
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-            >
-              <ChevronLeft className="size-4" />
-              {t('admin.prev')}
-            </button>
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {page} / {totalPages}
-            </span>
-            <button
-              type="button"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-            >
-              {t('admin.next')}
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        ) : undefined
-      }
-    >
-      {isLoading && (
-        <div className="flex justify-center py-8">
-          <Loader2 className="size-6 animate-spin text-muted-foreground" />
-        </div>
-      )}
-      {isError && (
-        <p className="py-6 text-center text-sm text-destructive">{t('common.error')}</p>
-      )}
-      {data && data.items.length === 0 && (
-        <p className="py-6 text-center text-sm text-muted-foreground">{t('admin.promos.usedByEmpty')}</p>
-      )}
-      {data && data.items.length > 0 && (
-        <ul className="space-y-2 text-sm">
-          {data.items.map((row) => (
-            <li
-              key={`${row.customer_id}-${row.used_at}`}
-              className="flex gap-2 rounded-lg border border-border/50 bg-muted/15 px-3 py-2"
-            >
-              <span className="shrink-0 text-muted-foreground tabular-nums">•</span>
-              <span className="min-w-0">
-                <span className="text-muted-foreground tabular-nums">{formatUsedAt(row.used_at)}</span>
-                <span className="text-muted-foreground"> — </span>
-                <span className="font-medium">
-                  {formatAdminCustomerLabel({
-                    telegram_username: row.telegram_username,
-                    nickname: row.nickname,
-                    customer_id: row.customer_id,
-                  })}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {data && data.total > 0 && (
-        <p className="mt-3 text-xs text-muted-foreground">
-          {t('admin.promos.usedByTotal', { count: data.total })}
-        </p>
-      )}
-    </AdminModal>
-  )
-}
-
-function PromoExpandedDetails({
-  promo,
-  detail,
-  t,
-  onEdit,
-  onToggle,
-  toggling,
-  onDelete,
-  onShowUsed,
-}: {
-  promo: AdminPromoCode
-  detail?: { redemptions: number; redemptions_today: number }
-  t: TFunction
-  onEdit: () => void
-  onToggle: () => void
-  toggling: boolean
-  onDelete: () => void
-  onShowUsed: () => void
-}) {
-  return (
-    <div className="space-y-3 border-t border-border/50 bg-accent/20 px-4 py-4">
-      {detail && (
-        <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
-          <span>{t('admin.promos.redemptions')}: <strong>{detail.redemptions}</strong></span>
-          <span>{t('admin.promos.redemptionsToday')}: <strong>{detail.redemptions_today}</strong></span>
-        </div>
-      )}
-      <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <span className="text-muted-foreground">{t('admin.promos.code')}: </span>
-          <span className="font-mono font-medium">{promo.code}</span>
-        </div>
-        {promo.subscription_days != null && <div>{t('admin.promos.detailSubDays')}: {promo.subscription_days}</div>}
-        {promo.trial_days != null && <div>{t('admin.promos.detailTrialDays')}: {promo.trial_days}</div>}
-        {promo.extra_hwid_delta != null && <div>{t('admin.promos.detailHwidDelta')}: {promo.extra_hwid_delta}</div>}
-        {promo.discount_percent != null && <div>{t('admin.promos.detailDiscount')}: {promo.discount_percent}%</div>}
-        {promo.discount_ttl_hours != null && <div>{t('admin.promos.detailTTL')}: {promo.discount_ttl_hours}h</div>}
-        {promo.tariff_id != null && <div>{t('admin.promos.detailTariffId')}: {promo.tariff_id}</div>}
-        <div>{t('admin.promos.detailFirstPurchase')}: {promo.first_purchase_only ? t('admin.yes') : t('admin.no')}</div>
-        <div>{t('admin.promos.detailCreated')}: {new Date(promo.created_at).toLocaleDateString()}</div>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <PromoActionButton
-          icon={Pencil}
-          label={t('admin.edit')}
-          className={promoNeutralButtonClass}
-          onClick={(e) => {
-            e.stopPropagation()
-            onEdit()
-          }}
-        />
-        <PromoActionButton
-          icon={Users}
-          label={t('admin.promos.usedBy')}
-          className={promoNeutralButtonClass}
-          onClick={(e) => {
-            e.stopPropagation()
-            onShowUsed()
-          }}
-        />
-        <PromoActionButton
-          icon={promo.active ? ToggleRight : ToggleLeft}
-          label={promo.active ? t('admin.promos.deactivate') : t('admin.promos.activate')}
-          className={
-            promo.active
-              ? 'border-red-500/40 bg-red-500/10 text-red-600 hover:bg-red-500/15 dark:text-red-400'
-              : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/15 dark:text-emerald-400'
+  const update = useCallback(
+    (patch: Partial<{ status: AdminPromoStatusFilter; type: AdminPromoTypeFilter | null; sort: SortState | null; q: string; page: number }>, replace = false) => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          const put = (k: string, v: string | null, def: string | null) => {
+            if (v == null || v === '' || v === def) next.delete(k)
+            else next.set(k, v)
           }
-          busy={toggling}
-          onClick={(e) => {
-            e.stopPropagation()
-            onToggle()
-          }}
-        />
-        <PromoActionButton
-          icon={Trash2}
-          label={t('admin.delete')}
-          className="border-red-500/30 bg-red-500/5 text-red-500 hover:bg-red-500/10"
-          onClick={(e) => {
-            e.stopPropagation()
-            onDelete()
-          }}
-        />
-      </div>
-    </div>
-  )
-}
-
-function PromoListItem({
-  promo,
-  mutationHandlers,
-  variant,
-}: {
-  promo: AdminPromoCode
-  mutationHandlers: (successMessage?: string) => { onSuccess: () => void; onError: (err: unknown) => void }
-  variant: 'table' | 'card'
-}) {
-  const { t } = useTranslation()
-  const [expanded, setExpanded] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [usedOpen, setUsedOpen] = useState(false)
-  const update = useAdminPromoUpdate()
-  const del = useAdminPromoDelete()
-  const { data: detail } = useAdminPromoGet(expanded ? promo.id : null)
-
-  const toggle = useCallback(() => {
-    update.mutate(
-      { id: promo.id, fields: { active: !promo.active } },
-      mutationHandlers(t('admin.feedback.saved')),
-    )
-  }, [promo.id, promo.active, update, mutationHandlers, t])
-
-  const codePreview = truncatePreview(promo.code, PROMO_CODE_PREVIEW_LEN)
-  const usesLabel = `${promo.uses_count}${promo.max_uses != null ? `/${promo.max_uses}` : ''}`
-  const validUntilLabel = promo.valid_until ? new Date(promo.valid_until).toLocaleDateString() : '—'
-
-  const modals = (
-    <>
-      <EditPromoModal
-        open={editOpen}
-        promo={promo}
-        onClose={() => setEditOpen(false)}
-        mutationHandlers={mutationHandlers}
-      />
-      <PromoUsedByModal promo={promo} open={usedOpen} onClose={() => setUsedOpen(false)} />
-      <AdminConfirmModal
-        open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
-        onConfirm={() => {
-          del.mutate(promo.id, {
-            ...mutationHandlers(t('admin.feedback.saved')),
-            onSuccess: () => {
-              mutationHandlers(t('admin.feedback.saved')).onSuccess()
-              setDeleteOpen(false)
-              setExpanded(false)
-            },
-          })
-        }}
-        title={t('admin.delete')}
-        message={t('admin.promos.confirmDeletePrompt')}
-        confirmLabel={t('admin.delete')}
-        variant="destructive"
-        loading={del.isPending}
-        icon={Trash2}
-        iconAccent="rose"
-      />
-    </>
-  )
-
-  const expandedDetails = expanded ? (
-    <PromoExpandedDetails
-      promo={promo}
-      detail={detail}
-      t={t}
-      onEdit={() => setEditOpen(true)}
-      onToggle={toggle}
-      toggling={update.isPending}
-      onDelete={() => setDeleteOpen(true)}
-      onShowUsed={() => setUsedOpen(true)}
-    />
-  ) : null
-
-  if (variant === 'card') {
-    return (
-      <>
-        <div
-          className={cn(
-            'overflow-hidden rounded-lg border border-border/60 bg-card transition-colors',
-            expanded && 'ring-1 ring-primary/20',
-          )}
-        >
-          <button
-            type="button"
-            className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/40 active:bg-accent/60"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-          >
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="font-mono text-sm font-semibold"
-                  title={promo.code.length > PROMO_CODE_PREVIEW_LEN ? promo.code : undefined}
-                >
-                  {codePreview}
-                </span>
-                {typeBadge(promo.type, t)}
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {statusBadge(promo, t)}
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {t('admin.promos.uses')}: {usesLabel}
-                </span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t('admin.promos.validUntil')}: {validUntilLabel}
-              </p>
-            </div>
-            <span className="mt-0.5 shrink-0 text-muted-foreground">
-              {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-            </span>
-          </button>
-          {expandedDetails}
-        </div>
-        {modals}
-      </>
-    )
-  }
-
-  return (
-    <>
-      <tr
-        className="cursor-pointer border-b border-border/50 transition-colors hover:bg-accent/50"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <td className="whitespace-nowrap px-4 py-3">
-          <span
-            className="font-mono text-sm font-medium"
-            title={promo.code.length > PROMO_CODE_PREVIEW_LEN ? promo.code : undefined}
-          >
-            {codePreview}
-          </span>
-        </td>
-        <td className="px-4 py-3">{typeBadge(promo.type, t)}</td>
-        <td className="px-4 py-3">{statusBadge(promo, t)}</td>
-        <td className="px-4 py-3 text-sm tabular-nums">{usesLabel}</td>
-        <td className="px-4 py-3 text-sm text-muted-foreground">{validUntilLabel}</td>
-        <td className="px-4 py-3">
-          {expanded ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
-        </td>
-      </tr>
-      {expanded && (
-        <tr>
-          <td colSpan={6} className="p-0">
-            {expandedDetails}
-          </td>
-        </tr>
-      )}
-      {modals}
-    </>
-  )
-}
-
-function EditPromoModal({
-  open,
-  promo,
-  onClose,
-  mutationHandlers,
-}: {
-  open: boolean
-  promo: AdminPromoCode
-  onClose: () => void
-  mutationHandlers: (successMessage?: string) => { onSuccess: () => void; onError: (err: unknown) => void }
-}) {
-  const { t } = useTranslation()
-  const update = useAdminPromoUpdate()
-  const { data: tariffs } = useAdminTariffList()
-
-  const [maxUses, setMaxUses] = useState(promo.max_uses?.toString() ?? '')
-  const [subDays, setSubDays] = useState(promo.subscription_days?.toString() ?? '')
-  const [trialDays, setTrialDays] = useState(promo.trial_days?.toString() ?? '')
-  const [extraHwidDelta, setExtraHwidDelta] = useState(promo.extra_hwid_delta?.toString() ?? '')
-  const [discountPercent, setDiscountPercent] = useState(promo.discount_percent?.toString() ?? '')
-  const [discountTTL, setDiscountTTL] = useState(promo.discount_ttl_hours?.toString() ?? '')
-  const [tariffId, setTariffId] = useState(promo.tariff_id?.toString() ?? '')
-  const [discountMaxPayments, setDiscountMaxPayments] = useState(
-    String(promo.discount_max_subscription_payments_per_customer ?? 0),
-  )
-  const [validUntil, setValidUntil] = useState(
-    promo.valid_until ? promo.valid_until.slice(0, 16) : '',
-  )
-  const [firstPurchaseOnly, setFirstPurchaseOnly] = useState(promo.first_purchase_only)
-
-  useEffect(() => {
-    if (!open) return
-    setMaxUses(promo.max_uses?.toString() ?? '')
-    setSubDays(promo.subscription_days?.toString() ?? '')
-    setTrialDays(promo.trial_days?.toString() ?? '')
-    setExtraHwidDelta(promo.extra_hwid_delta?.toString() ?? '')
-    setDiscountPercent(promo.discount_percent?.toString() ?? '')
-    setDiscountTTL(promo.discount_ttl_hours?.toString() ?? '')
-    setTariffId(promo.tariff_id?.toString() ?? '')
-    setDiscountMaxPayments(String(promo.discount_max_subscription_payments_per_customer ?? 0))
-    setValidUntil(promo.valid_until ? promo.valid_until.slice(0, 16) : '')
-    setFirstPurchaseOnly(promo.first_purchase_only)
-  }, [open, promo])
-
-  const save = () => {
-    const fields: Record<string, unknown> = {}
-
-    const setIfChanged = (key: string, newVal: unknown, oldVal: unknown) => {
-      if (newVal !== oldVal) fields[key] = newVal
-    }
-
-    const maxUsesVal = maxUses.trim() ? Number(maxUses) : null
-    setIfChanged('max_uses', maxUsesVal, promo.max_uses ?? null)
-
-    if (promo.type === 'subscription_days') {
-      const v = subDays.trim() ? Number(subDays) : null
-      setIfChanged('subscription_days', v, promo.subscription_days ?? null)
-    }
-    if (promo.type === 'trial') {
-      const v = trialDays.trim() ? Number(trialDays) : null
-      setIfChanged('trial_days', v, promo.trial_days ?? null)
-    }
-    if (promo.type === 'extra_hwid') {
-      const v = extraHwidDelta.trim() ? Number(extraHwidDelta) : null
-      setIfChanged('extra_hwid_delta', v, promo.extra_hwid_delta ?? null)
-    }
-    if (promo.type === 'discount') {
-      const dp = discountPercent.trim() ? Number(discountPercent) : null
-      const ttl = discountTTL.trim() ? Number(discountTTL) : null
-      const tid = tariffId.trim() ? Number(tariffId) : null
-      const dmax = discountMaxPayments.trim() ? Number(discountMaxPayments) : 0
-      setIfChanged('discount_percent', dp, promo.discount_percent ?? null)
-      setIfChanged('discount_ttl_hours', ttl, promo.discount_ttl_hours ?? null)
-      setIfChanged('tariff_id', tid, promo.tariff_id ?? null)
-      setIfChanged(
-        'discount_max_subscription_payments_per_customer',
-        dmax,
-        promo.discount_max_subscription_payments_per_customer,
-      )
-    }
-
-    const validUntilIso = validUntil ? new Date(validUntil).toISOString() : null
-    const oldValidSlice = promo.valid_until ? promo.valid_until.slice(0, 16) : ''
-    if (validUntil !== oldValidSlice) {
-      fields.valid_until = validUntilIso
-    }
-
-    setIfChanged('first_purchase_only', firstPurchaseOnly, promo.first_purchase_only)
-
-    if (Object.keys(fields).length === 0) {
-      onClose()
-      return
-    }
-
-    update.mutate(
-      { id: promo.id, fields },
-      {
-        ...mutationHandlers(t('admin.feedback.saved')),
-        onSuccess: () => {
-          mutationHandlers(t('admin.feedback.saved')).onSuccess()
-          onClose()
+          if ('status' in patch) put('status', patch.status ?? null, 'all')
+          if ('type' in patch) put('type', patch.type ?? null, null)
+          if ('sort' in patch) {
+            put('sort', patch.sort?.key ?? null, null)
+            put('dir', patch.sort ? patch.sort.dir : null, null)
+          }
+          if ('q' in patch) put('q', patch.q?.trim() ?? null, '')
+          // Любая смена фильтра возвращает на первую страницу.
+          if ('page' in patch) put('page', patch.page && patch.page > 1 ? String(patch.page) : null, null)
+          else next.delete('page')
+          return next
         },
-      },
-    )
-  }
-
-  return (
-    <AdminModal
-      open={open}
-      onClose={onClose}
-      title={t('admin.promos.editPromo')}
-      panelClassName="sm:max-w-lg"
-      icon={Pencil}
-      iconAccent="violet"
-      footer={
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border px-4 py-2 text-sm hover:bg-accent"
-          >
-            {t('admin.cancel')}
-          </button>
-          <button
-            type="button"
-            onClick={save}
-            disabled={update.isPending}
-            className={cn('inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50', update.isPending && '!opacity-100')}
-          >
-            {update.isPending ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-            {t('admin.save')}
-          </button>
-        </div>
-      }
-    >
-      <div className="space-y-3">
-        <p className="font-mono text-sm font-medium">{promo.code}</p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium">{t('admin.promos.maxUses')}</label>
-            <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} placeholder={t('admin.promos.unlimited')} />
-          </div>
-          {promo.type === 'subscription_days' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium">{t('admin.promos.subscriptionDays')}</label>
-              <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={subDays} onChange={(e) => setSubDays(e.target.value)} />
-            </div>
-          )}
-          {promo.type === 'trial' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium">{t('admin.promos.trialDays')}</label>
-              <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={trialDays} onChange={(e) => setTrialDays(e.target.value)} />
-            </div>
-          )}
-          {promo.type === 'extra_hwid' && (
-            <div>
-              <label className="mb-1 block text-xs font-medium">{t('admin.promos.extraHwidDelta')}</label>
-              <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={extraHwidDelta} onChange={(e) => setExtraHwidDelta(e.target.value)} />
-            </div>
-          )}
-          {promo.type === 'discount' && (
-            <>
-              <div>
-                <label className="mb-1 block text-xs font-medium">{t('admin.promos.discountPercent')}</label>
-                <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium">{t('admin.promos.discountTTL')}</label>
-                <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={discountTTL} onChange={(e) => setDiscountTTL(e.target.value)} />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium">{t('admin.promos.tariffId')}</label>
-                <AdminSelect
-                  value={tariffId || null}
-                  options={(tariffs ?? []).map((tariff) => ({ value: String(tariff.id), label: tariff.name ?? tariff.slug }))}
-                  onChange={(next) => setTariffId(next ?? '')}
-                  allowEmpty
-                  emptyLabel={t('admin.promos.noTariff')}
-                  placeholder={t('admin.promos.noTariff')}
-                  ariaLabel={t('admin.promos.tariffId')}
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-xs font-medium">{t('admin.promos.discountMaxPayments')}</label>
-                <input type="number" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={discountMaxPayments} onChange={(e) => setDiscountMaxPayments(e.target.value)} />
-              </div>
-            </>
-          )}
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-xs font-medium">{t('admin.promos.validUntil')}</label>
-            <input type="datetime-local" className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
-          </div>
-        </div>
-        <AdminCheckboxField
-          checked={firstPurchaseOnly}
-          onChange={setFirstPurchaseOnly}
-          label={t('admin.promos.firstPurchaseOnly')}
-        />
-      </div>
-    </AdminModal>
+        { replace },
+      )
+    },
+    [setParams],
   )
+  return { status, type, sort, q, page, update }
 }
+
+type Dialog =
+  | { kind: 'form'; mode: PromoFormMode }
+  | { kind: 'used'; promo: AdminPromoCodeDTO }
+  | { kind: 'detail'; promo: AdminPromoCodeDTO }
+  | { kind: 'delete'; promo: AdminPromoCodeDTO }
+  | null
 
 export default function AdminPromosPage() {
-  const { t } = useTranslation()
-  const [page, setPage] = useState(1)
-  const [showCreate, setShowCreate] = useState(false)
-  const { data, isLoading } = useAdminPromoList(page)
-  const create = useAdminPromoCreate()
-  const { feedback, clear, handlers } = useAdminMutationFeedback()
+  const { t, i18n } = useTranslation()
+  const { status, type, sort, q, page, update } = usePromoUrlState()
+  const { feedback, clear, showError, showSuccess, showInfo } = useAdminMutationFeedback()
+  const { data: tariffList } = useAdminTariffList()
+  const { data: bootstrap } = useAdminBootstrap()
+  const salesModeTariffs = bootstrap?.sales_mode === 'tariffs'
+  const loyaltyEnabled = Boolean(bootstrap?.loyalty_enabled)
 
-  const totalPages = data ? Math.ceil(data.total / data.limit) : 1
+  // Поиск: поле обновляется сразу, запрос — через 300 мс тишины.
+  const [search, setSearch] = useState(q)
+  // Из адреса — только если там правда другое: иначе дебаунс съедал бы пробел в конце.
+  useEffect(() => setSearch((s) => (s.trim() === q ? s : q)), [q])
+  useEffect(() => {
+    if (search.trim() === q) return
+    const id = window.setTimeout(() => {
+      setPendingCtl(null)
+      update({ q: search }, true)
+    }, 300)
+    return () => window.clearTimeout(id)
+  }, [search, q, update])
 
-  const [createError, setCreateError] = useState<{ message: string; codeTaken: boolean } | null>(null)
+  const list = useAdminPromoList({ page, limit: LIMIT, status, type, q, sort })
+  // Какой контрол запустил перезапрос списка: спиннер только на нём (правило лоадеров).
+  // 'head:<колонка>' — клик в шапке таблицы (code | uses | expiring | type | status).
+  const [pendingCtl, setPendingCtl] = useState<string | null>(null)
+  const busyCtl = list.isPlaceholderData ? pendingCtl : null
+  // Сброс и на ответе из кэша (без placeholder-фазы): иначе спиннер всплыл бы
+  // на «чужом» контроле при следующем перезапросе (например, «назад» в браузере).
+  useEffect(() => {
+    if (!list.isPlaceholderData) setPendingCtl(null)
+  }, [list.isPlaceholderData, list.data])
+  const go = (ctl: string, patch: Parameters<typeof update>[0]) => {
+    setPendingCtl(ctl)
+    update(patch)
+  }
+  const data = list.data
+  const counts = data?.counts
+  // Старый бэкенд без counts: фильтры и вкладки не показываем — счётчики были бы враньём (§6.7 спеки).
+  const filtersSupported = !data || Boolean(counts)
 
-  const handleCreate = (input: CreatePromoInput) => {
-    setCreateError(null)
-    create.mutate(input, {
-      onSuccess: () => {
-        handlers(t('admin.feedback.saved')).onSuccess()
-        setShowCreate(false)
-      },
-      onError: (err) => {
-        setCreateError({
-          message: formatAdminApiError(err, t),
-          codeTaken: err instanceof ApiError && err.status === 409,
-        })
-      },
-    })
+  const tariffs = useMemo(() => (tariffList ?? []).map((x) => ({ id: x.id, name: x.name ?? x.slug })), [tariffList])
+  const tariffName = useCallback(
+    (p: AdminPromoCodeDTO) => (p.tariff_id != null ? tariffs.find((x) => x.id === p.tariff_id)?.name ?? null : null),
+    [tariffs],
+  )
+
+  const listRef = useRef<HTMLDivElement>(null)
+  const { layout, twoColumns } = usePromoListLayout(listRef)
+
+  const [dialog, setDialog] = useState<Dialog>(null)
+  // Окно поверх листа-карточки: лист остаётся под ним и снова виден после закрытия.
+  const [detail, setDetail] = useState<AdminPromoCodeDTO | null>(null)
+  const closeDialog = () => setDialog(null)
+
+  // Лист-карточка показывает свежую версию кода после тумблера и правки.
+  const detailFresh = detail ? data?.items.find((p) => p.id === detail.id) ?? detail : null
+  // Закрытое окно уезжает со своим содержимым (анимация AdminModal), поэтому
+  // держим последнее значение, а не обнуляем сразу.
+  const detailShown = useLast(detailFresh)
+  const usedShown = useLast(dialog?.kind === 'used' ? dialog.promo : null)
+  const deleteShown = useLast(dialog?.kind === 'delete' ? dialog.promo : null)
+  const formShown = useLast(dialog?.kind === 'form' ? dialog.mode : null)
+
+  const onHeaderSort = (key: string) => go(`head:${key}`, { sort: nextSort(sort, key, SORT_FIRST_DIR[key] ?? 'asc') })
+
+  const actions: PromoItemActions = {
+    onEdit: (p, focus) => setDialog({ kind: 'form', mode: { kind: 'edit', promo: p, focus } }),
+    onOpen: (p) => setDetail(p),
+    onUsed: (p) => setDialog({ kind: 'used', promo: p }),
+    onDuplicate: (p) => setDialog({ kind: 'form', mode: { kind: 'duplicate', source: p } }),
+    onDelete: (p) => setDialog({ kind: 'delete', promo: p }),
+    onToggled: (p) => {
+      if (p.active) {
+        const s = resolvePromoDisplayStatus(p)
+        if (s === 'expired') return showInfo(t('admin.promos.toggle.expiredOn'))
+        if (s === 'exhausted') return showInfo(t('admin.promos.toggle.exhaustedOn'))
+      }
+      showSuccess(t('admin.feedback.saved'))
+    },
+    onError: showError,
   }
 
-  const closeCreate = () => {
-    setShowCreate(false)
-    setCreateError(null)
-  }
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / LIMIT))
+  const items = data?.items ?? []
+  const hasFilters = status !== 'all' || type != null || q !== ''
+  const from = total ? (page - 1) * LIMIT + 1 : 0
+  const to = Math.min(page * LIMIT, total)
+
+  // Страница опустела (удалили последний код на ней) — назад, а не пустой экран.
+  useEffect(() => {
+    if (data && !list.isPlaceholderData && data.items.length === 0 && page > 1 && total > 0) update({ page: totalPages }, true)
+  }, [data, list.isPlaceholderData, page, total, totalPages, update])
+
+  const createButton = (
+    <button
+      type="button"
+      onClick={() => setDialog({ kind: 'form', mode: { kind: 'create' } })}
+      className="inline-flex h-10 items-center gap-2 rounded-[12px] bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+    >
+      <Plus className="size-4" />
+      {t('admin.promos.create')}
+    </button>
+  )
 
   return (
     <AdminLayout>
       <AdminFeedback feedback={feedback} onDismiss={clear} />
-      <div className="space-y-6">
+      <div className="space-y-4">
         <AdminPageHeader
           icon={TicketPercent}
           title={t('admin.promos.title')}
-          subtitle={t('admin.promos.subtitle')}
           accent="amber"
-          actions={
-            <button
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              onClick={() => setShowCreate(true)}
-            >
-              <Plus className="size-4" />
-              {t('admin.promos.create')}
-            </button>
-          }
+          actionsEnd
+          actions={createButton}
         />
 
-        <Card className="overflow-hidden">
-          {isLoading ? (
-            <div className="p-8 text-center text-muted-foreground">{t('admin.loading')}</div>
-          ) : !data || data.items.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">{t('admin.promos.empty')}</div>
+        {filtersSupported && <PromoStatusTabs value={status} counts={counts} busy={busyCtl === 'status'} onChange={(s) => go('status', { status: s })} />}
+
+        {/* Панель как на «Нодах»: поиск и одна кнопка «Сортировка и тип»; справа сводка (ПК). */}
+        <div className="flex items-center gap-2">
+          <PromoSearchInput value={search} onChange={setSearch} className="flex-1 md:w-80 md:flex-none" />
+          {filtersSupported && (
+            <PromoFilterMenu
+              sort={sort}
+              type={type}
+              counts={counts}
+              busy={busyCtl === 'menu'}
+              onSort={(v) => go('menu', { sort: v })}
+              onType={(v) => go('menu', { type: v })}
+            />
+          )}
+          {data?.summary && (
+            <p className="ml-auto hidden whitespace-nowrap text-[13.5px] text-muted-foreground md:block">
+              {t('admin.promos.summary.last24h')} <b className="font-semibold text-foreground tabular-nums">{data.summary.redemptions_24h}</b> ·{' '}
+              {t('admin.promos.summary.total')}{' '}
+              <b className="font-semibold text-foreground tabular-nums">{data.summary.redemptions_total.toLocaleString(i18n.language.startsWith('en') ? 'en-US' : 'ru-RU')}</b>
+            </p>
+          )}
+        </div>
+
+        <div ref={listRef}>
+          {list.isError && !data ? (
+            <EmptyState
+              icon={<RotateCcw className="size-6" />}
+              title={t('admin.promos.loadError')}
+              action={
+                <button type="button" onClick={() => void list.refetch()} className={secondaryBtn}>
+                  {list.isFetching ? <SpinnerIcon /> : <RotateCcw className="size-4" />}
+                  {t('admin.promos.retry')}
+                </button>
+              }
+            />
+          ) : list.isLoading ? (
+            <ListSkeleton layout={layout} />
+          ) : items.length === 0 ? (
+            hasFilters ? (
+              <EmptyState
+                icon={<SearchX className="size-6" />}
+                title={t('admin.promos.emptyFiltered')}
+                action={
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch('')
+                      update({ status: 'all', type: null, q: '' })
+                    }}
+                    className={secondaryBtn}
+                  >
+                    {t('admin.promos.resetFilters')}
+                  </button>
+                }
+              />
+            ) : (
+              <EmptyState icon={<TicketPercent className="size-6" />} title={t('admin.promos.empty')} action={createButton} />
+            )
+          ) : layout === 'table' ? (
+            <div role="table" className={cn('overflow-hidden rounded-[18px] border border-border/60 bg-card transition-opacity', list.isPlaceholderData && 'opacity-60')}>
+              <PromoTableHeader
+                sort={sort}
+                onSort={filtersSupported ? onHeaderSort : undefined}
+                type={type}
+                onType={filtersSupported ? (v) => go('head:type', { type: v }) : undefined}
+                status={status}
+                onStatus={filtersSupported ? (v) => go('head:status', { status: v }) : undefined}
+                busyKey={busyCtl?.startsWith('head:') ? busyCtl.slice(5) : null}
+              />
+              {items.map((p) => (
+                <PromoRow key={p.id} promo={p} tariffName={tariffName(p)} actions={actions} />
+              ))}
+              <div className="flex items-center justify-between border-t border-border/60 px-5 py-3.5 text-[13px] text-muted-foreground">
+                <span className="tabular-nums">{t('admin.promos.rangeOf', { from, to, total })}</span>
+                <Pager page={page} totalPages={totalPages} onPage={(p) => go(p < page ? 'prev' : 'next', { page: p })} busyDir={busyCtl === 'prev' || busyCtl === 'next' ? busyCtl : null} />
+              </div>
+            </div>
           ) : (
-            <>
-              <div className="space-y-2 p-3 md:hidden">
-                {data.items.map((promo) => (
-                  <PromoListItem key={promo.id} promo={promo} mutationHandlers={handlers} variant="card" />
+            <div className={cn('transition-opacity', list.isPlaceholderData && 'opacity-60')}>
+              <div className={cn('grid gap-3', twoColumns ? 'grid-cols-2' : 'grid-cols-1')}>
+                {items.map((p) => (
+                  <PromoCard key={p.id} promo={p} tariffName={tariffName(p)} actions={actions} />
                 ))}
               </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full">
-                  <thead>
-                    <tr className="border-b border-border bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      <th className="whitespace-nowrap px-4 py-3">{t('admin.promos.code')}</th>
-                      <th className="px-4 py-3">{t('admin.promos.type')}</th>
-                      <th className="px-4 py-3">{t('admin.promos.status')}</th>
-                      <th className="px-4 py-3">{t('admin.promos.uses')}</th>
-                      <th className="px-4 py-3">{t('admin.promos.validUntil')}</th>
-                      <th className="w-8 px-4 py-3" />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.items.map((promo) => (
-                      <PromoListItem key={promo.id} promo={promo} mutationHandlers={handlers} variant="table" />
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+              {totalPages > 1 && (
+                <div className="mt-4 flex items-center justify-center gap-3 text-sm text-muted-foreground">
+                  <Pager page={page} totalPages={totalPages} onPage={(p) => go(p < page ? 'prev' : 'next', { page: p })} busyDir={busyCtl === 'prev' || busyCtl === 'next' ? busyCtl : null} compact />
+                </div>
+              )}
+            </div>
           )}
-        </Card>
-
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <button
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-              disabled={page <= 1}
-              onClick={() => setPage(page - 1)}
-            >
-              <ChevronLeft className="size-4" />
-            </button>
-            <span className="text-sm text-muted-foreground">
-              {page} / {totalPages}
-            </span>
-            <button
-              className="inline-flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
-              disabled={page >= totalPages}
-              onClick={() => setPage(page + 1)}
-            >
-              <ChevronRight className="size-4" />
-            </button>
-          </div>
-        )}
+        </div>
       </div>
 
-      {showCreate && (
-        <CreatePromoModal
-          onClose={closeCreate}
-          onCreate={handleCreate}
-          error={createError?.message ?? null}
-          codeTaken={createError?.codeTaken ?? false}
-          pending={create.isPending}
-          onEdit={() => setCreateError(null)}
+      <PromoDetailSheet
+        promo={detailShown}
+        tariffName={detailShown ? tariffName(detailShown) : null}
+        open={detail != null && dialog == null}
+        onClose={() => setDetail(null)}
+        onEdit={actions.onEdit}
+        onUsed={actions.onUsed}
+        onDuplicate={actions.onDuplicate}
+        onDelete={actions.onDelete}
+        onToggled={actions.onToggled}
+        onError={showError}
+      />
+
+      {formShown && (
+        <PromoFormModal
+          open={dialog?.kind === 'form'}
+          mode={formShown}
+          onClose={closeDialog}
+          onSaved={(kind) => {
+            closeDialog()
+            showSuccess(kind === 'created' ? t('admin.promos.createdToast') : t('admin.feedback.saved'))
+          }}
+          tariffs={tariffs}
+          salesModeTariffs={salesModeTariffs}
+          loyaltyEnabled={loyaltyEnabled}
         />
       )}
+
+      <PromoUsedByModal key={usedShown?.id ?? 'none'} promo={usedShown} open={dialog?.kind === 'used'} onClose={closeDialog} />
+
+      <PromoDeleteModal
+        promo={deleteShown}
+        open={dialog?.kind === 'delete'}
+        onClose={closeDialog}
+        onDeleted={() => {
+          closeDialog()
+          setDetail(null)
+          showSuccess(t('admin.promos.deletedToast'))
+        }}
+        onDisabled={() => {
+          closeDialog()
+          showSuccess(t('admin.promos.disabledToast'))
+        }}
+        onError={showError}
+      />
     </AdminLayout>
+  )
+}
+
+const secondaryBtn =
+  'inline-flex h-10 items-center gap-2 rounded-[12px] border border-border px-4 text-sm font-semibold transition-colors hover:bg-muted'
+
+function SpinnerIcon() {
+  return <span className="cabinet-btn-spinner box-border inline-block size-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden />
+}
+
+function Pager({
+  page,
+  totalPages,
+  onPage,
+  compact,
+  busyDir,
+}: {
+  page: number
+  totalPages: number
+  onPage: (p: number) => void
+  compact?: boolean
+  busyDir?: 'prev' | 'next' | null
+}) {
+  const { t } = useTranslation()
+  const btn =
+    'inline-flex size-9 items-center justify-center rounded-[10px] border border-border text-foreground transition-colors hover:bg-primary/10 disabled:opacity-40'
+  return (
+    <span className="flex items-center gap-2">
+      <button type="button" aria-label={t('admin.prev')} disabled={page <= 1 || busyDir != null} onClick={() => onPage(page - 1)} className={btn}>
+        {busyDir === 'prev' ? <SpinnerIcon /> : <ChevronLeft className="size-4" />}
+      </button>
+      {compact && (
+        <span className="min-w-12 text-center tabular-nums">
+          {page} / {totalPages}
+        </span>
+      )}
+      <button type="button" aria-label={t('admin.next')} disabled={page >= totalPages || busyDir != null} onClick={() => onPage(page + 1)} className={btn}>
+        {busyDir === 'next' ? <SpinnerIcon /> : <ChevronRight className="size-4" />}
+      </button>
+    </span>
+  )
+}
+
+function EmptyState({ icon, title, action }: { icon: ReactNode; title: string; action?: ReactNode }) {
+  return (
+    <div className="flex flex-col items-center gap-3 rounded-[18px] border border-border/60 bg-card px-6 py-12 text-center">
+      <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">{icon}</span>
+      <p className="text-sm font-semibold">{title}</p>
+      {action}
+    </div>
+  )
+}
+
+function ListSkeleton({ layout }: { layout: 'table' | 'cards' }) {
+  if (layout === 'table') {
+    return (
+      <div className="overflow-hidden rounded-[18px] border border-border/60 bg-card">
+        <PromoTableHeader />
+        {Array.from({ length: 6 }, (_, i) => (
+          <div key={i} className="grid min-h-[68px] items-center gap-4 border-t border-border/60 px-5" style={{ gridTemplateColumns: PROMO_TABLE_COLUMNS }}>
+            <Skeleton className="h-4 w-24 rounded-md" />
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-[34px] rounded-[10px]" />
+              <Skeleton className="h-4 w-36 rounded-md" />
+            </div>
+            <Skeleton className="h-3 w-full rounded-md" />
+            <Skeleton className="h-3 w-20 rounded-md" />
+            <Skeleton className="h-5 w-20 rounded-full" />
+            <Skeleton className="h-7 w-12 rounded-full" />
+            <Skeleton className="size-[34px] rounded-[10px]" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <div className="grid gap-3">
+      {Array.from({ length: 4 }, (_, i) => (
+        <Skeleton key={i} className="h-[136px] rounded-[18px]" />
+      ))}
+    </div>
   )
 }

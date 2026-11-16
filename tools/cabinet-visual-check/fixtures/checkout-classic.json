@@ -1,0 +1,69 @@
+{
+  "/tariffs": {
+    "sales_mode": "classic",
+    "currency": "RUB",
+    "tariffs": [
+      {
+        "id": 0,
+        "slug": "classic",
+        "name": "",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "prices": [
+          {
+            "months": 1,
+            "amount_rub": 199
+          }
+        ]
+      }
+    ]
+  },
+  "/auth/bootstrap": {
+    "payment_providers": {
+      "yookassa": true,
+      "platega_sbp": true,
+      "platega_crypto": true
+    },
+    "yookassa_methods": [
+      "sbp",
+      "bank_card"
+    ],
+    "platega_methods": [
+      "sbp",
+      "crypto"
+    ],
+    "checkout_default_method": "yookassa:sbp",
+    "site_links": {
+      "privacy_policy": "https://example.com/privacy",
+      "terms_of_service": "https://example.com/terms"
+    }
+  },
+  "/me/subscription": {
+    "expire_at": "2026-12-15T12:00:00Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "is_trial": false,
+    "tariff": {
+      "id": 2,
+      "slug": "premium",
+      "name": "Премиум",
+      "traffic_gb": null,
+      "device_limit": 3
+    },
+    "loyalty_xp": 0,
+    "loyalty_tier": null,
+    "hwid_extra": null
+  },
+  "/payments/last-method": {
+    "method": "yookassa:sbp"
+  },
+  "/payments/preview": {
+    "amount": 183,
+    "amount_rub": 183,
+    "currency": "RUB",
+    "sales_mode": "classic",
+    "scenario": "classic_renew",
+    "base_amount_rub": 199,
+    "loyalty_discount_pct": 8,
+    "total_discount_pct": 8
+  }
+}

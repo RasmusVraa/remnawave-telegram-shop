@@ -17,9 +17,25 @@ function rawLabel(label?: string | null): string {
   return l
 }
 
-/** Признак, что админ не задал своё название — для текстов, где есть готовая формулировка. */
+/**
+ * Признак, что админ не задал своё название — для текстов, где есть готовая формулировка.
+ * Пустое название — тоже «не задал»: иначе в текст подставилось бы «Обход» без склонения.
+ */
 export function isDefaultBypassLabel(label?: string | null): boolean {
-  return (label ?? '').trim().toLowerCase() === SERVER_DEFAULT_LABEL
+  const l = (label ?? '').trim().toLowerCase()
+  return l === '' || l === SERVER_DEFAULT_LABEL
+}
+
+/**
+ * «+25 ГБ на серверах Обхода» для страницы оформления. Название от админа не
+ * склоняется, поэтому слово берём в кавычки («Резерв»), аббревиатуру — как есть (LTE).
+ */
+export function bypassServersTitle(gb: string, label?: string | null): string {
+  const l = rawLabel(label)
+  if (isDefaultBypassLabel(l)) return i18n.t('checkout.bypassTitleDefault', { gb })
+  return isAcronym(l)
+    ? i18n.t('checkout.bypassTitleAcronym', { gb, label: l })
+    : i18n.t('checkout.bypassTitleCustom', { gb, label: l })
 }
 
 /**

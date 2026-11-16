@@ -175,6 +175,39 @@ func (h *AdminStatusTargets) registryQuota(ctx context.Context, list []statuspro
 	return out
 }
 
+// cheburcheckQuota — данные карточки Cheburcheck и переключателя источника «России».
+func (h *AdminStatusTargets) cheburcheckQuota(ctx context.Context, list []statusprobe.ConfiguredTarget) *statusprobe.CheburcheckQuota {
+	out := &statusprobe.CheburcheckQuota{
+		Configured: statusprobe.CheburcheckConfigured(),
+		Mode:       statusprobe.RussiaSourceMode(),
+		Active:     statusprobe.SourceGlobalping,
+	}
+	if h.probes != nil {
+		out.Active = h.probes.ActiveRussiaSource()
+		if until, note := h.probes.CheburcheckPause(); until.After(time.Now()) {
+			out.PausedUntil = &until
+			out.PauseNote = note
+		}
+		for _, target := range statusprobe.TargetsFrom(list) {
+			sample, _, ok := h.probes.Snapshot(target.Key)
+			if !ok || sample.ChebAt.IsZero() {
+				continue
+			}
+			if out.LastAt == nil || sample.ChebAt.After(*out.LastAt) {
+				at := sample.ChebAt
+				out.LastAt, out.Pass, out.Total = &at, sample.ChebPass, sample.ChebTotal
+			}
+		}
+	}
+	if out.Configured {
+		// Ноль не показываем: по замеру на стенде проверки идут и при нулевом балансе.
+		if credits, err := statusprobe.FetchCheburcheckCredits(ctx); err == nil && *credits > 0 {
+			out.Credits = credits
+		}
+	}
+	return out
+}
+
 // Quota — оценка расхода Globalping для сохранённого списка.
 func (h *AdminStatusTargets) Quota(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -206,5 +239,8 @@ func (h *AdminStatusTargets) Quota(w http.ResponseWriter, r *http.Request) {
 		est.Real = lim
 	}
 	est.Registry = h.registryQuota(limCtx, list)
+	chebCtx, chebCancel := context.WithTimeout(r.Context(), 6*time.Second)
+	defer chebCancel()
+	est.Cheburcheck = h.cheburcheckQuota(chebCtx, list)
 	writeJSON(w, http.StatusOK, est)
 }

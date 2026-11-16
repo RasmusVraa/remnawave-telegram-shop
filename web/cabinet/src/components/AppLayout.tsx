@@ -564,7 +564,12 @@ export function AppLayout({ children }: AppLayoutProps) {
         onConfirm={confirmLogout}
       />
 
-      <div className="cabinet-shell-content relative z-10 min-h-0 flex-1 overflow-x-hidden touch-pan-y">
+      {/*
+        overflow-x: clip, а не hidden: hidden делает блок контейнером прокрутки, и
+        position: sticky внутри страниц (правая колонка оформления на ПК) перестаёт
+        липнуть. hidden остаётся запасным для браузеров без clip (Safari < 16).
+      */}
+      <div className="cabinet-shell-content relative z-10 min-h-0 flex-1 overflow-x-hidden supports-[overflow:clip]:overflow-x-clip touch-pan-y">
         {/*
           Без animate-fade-in: появление контента теперь ведёт PageReveal внутри страниц
           (components/PageReveal.tsx). Общий фейд поверх «лесенки» давал двойное проявление.

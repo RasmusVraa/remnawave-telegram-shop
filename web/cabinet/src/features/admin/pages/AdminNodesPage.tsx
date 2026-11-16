@@ -2,11 +2,12 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { useQuery } from '@tanstack/react-query'
 import { keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Activity, ArrowDown, ArrowUp, Check, ChevronDown, ListFilter, RefreshCw, Search, Server, Users, X } from 'lucide-react'
+import { Activity, ArrowDown, ArrowUp, ChevronDown, ListFilter, RefreshCw, Search, Server, Users, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
+import { AdminFilterMenuItem, AdminFilterMenuTitle } from '../components/AdminFilterMenu'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -213,16 +214,16 @@ export default function AdminNodesPage() {
             role="menu"
             className="absolute right-0 top-12 z-30 w-72 max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card p-2 shadow-[0_18px_50px_rgba(0,0,0,0.5)]"
           >
-            <MenuTitle>{t('admin.nodes.sortTitle')}</MenuTitle>
+            <AdminFilterMenuTitle>{t('admin.nodes.sortTitle')}</AdminFilterMenuTitle>
             {NODE_SORT_KEYS.map((k: NodeSortKey) => (
-              <MenuItem key={k} active={prefs.sort === k} onClick={() => updatePrefs({ sort: k })}>
+              <AdminFilterMenuItem key={k} active={prefs.sort === k} onClick={() => updatePrefs({ sort: k })}>
                 {t(`admin.nodes.sort.${k}`)}
-              </MenuItem>
+              </AdminFilterMenuItem>
             ))}
             <div className="my-1.5 border-t border-border/60" />
-            <MenuTitle>{t('admin.nodes.showTitle')}</MenuTitle>
+            <AdminFilterMenuTitle>{t('admin.nodes.showTitle')}</AdminFilterMenuTitle>
             {NODE_FILTER_KEYS.map((k: NodeFilterKey) => (
-              <MenuItem
+              <AdminFilterMenuItem
                 key={k}
                 active={prefs.filter === k}
                 count={counts[k]}
@@ -232,7 +233,7 @@ export default function AdminNodesPage() {
                 }}
               >
                 {t(`admin.nodes.filter.${k}`)}
-              </MenuItem>
+              </AdminFilterMenuItem>
             ))}
           </div>
         )}
@@ -329,39 +330,3 @@ export default function AdminNodesPage() {
   )
 }
 
-function MenuTitle({ children }: { children: ReactNode }) {
-  return (
-    <p className="px-2.5 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{children}</p>
-  )
-}
-
-function MenuItem({
-  active,
-  count,
-  onClick,
-  children,
-}: {
-  active: boolean
-  count?: number
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      role="menuitemradio"
-      aria-checked={active}
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left text-sm font-medium transition-colors',
-        active ? 'bg-primary/10 text-primary' : 'text-foreground/90 hover:bg-secondary',
-      )}
-    >
-      <span className="flex size-4 shrink-0 items-center justify-center">
-        {active && <Check className="size-3.5" aria-hidden />}
-      </span>
-      <span className="flex-1">{children}</span>
-      {count != null && <span className="font-mono text-xs text-muted-foreground">{count}</span>}
-    </button>
-  )
-}

@@ -94,6 +94,13 @@ type persistedSample struct {
 	RegistryBlocked     bool                 `json:"registry_blocked,omitempty"`
 	RegistryKind        string               `json:"registry_kind,omitempty"`
 	RegistryStreak      int                  `json:"registry_streak,omitempty"`
+	ChebAt              time.Time            `json:"cheb_at,omitempty"`
+	ChebTryAt           time.Time            `json:"cheb_try_at,omitempty"`
+	ChebOK              bool                 `json:"cheb_ok,omitempty"`
+	ChebPass            int                  `json:"cheb_pass,omitempty"`
+	ChebTotal           int                  `json:"cheb_total,omitempty"`
+	ChebHits            []ProbeHit           `json:"cheb_hits,omitempty"`
+	RuSource            string               `json:"ru_source,omitempty"`
 }
 
 func (h *KVHistory) LoadLatest(ctx context.Context) (map[string]Sample, error) {

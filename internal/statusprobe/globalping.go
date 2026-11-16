@@ -32,6 +32,15 @@ type RateLimitError struct {
 
 func (e *RateLimitError) Error() string { return "globalping rate limit" }
 
+// errorSnippet — начало ответа сервиса для сообщения об ошибке: по одному «422» причину не понять.
+func errorSnippet(raw []byte) string {
+	text := strings.Join(strings.Fields(string(raw)), " ")
+	if len(text) > 200 {
+		text = text[:200]
+	}
+	return text
+}
+
 func authorizeGlobalping(req *http.Request) {
 	token := strings.TrimSpace(os.Getenv("GLOBALPING_TOKEN"))
 	if token != "" {
@@ -126,6 +135,15 @@ type Sample struct {
 	RegistryKind    string
 	// RegistryStreak — сколько ответов подряд адрес числится в списках.
 	RegistryStreak int
+	// Cheburcheck: живые сканеры в российских сетях. ChebAt — последний полученный ответ,
+	// ChebTryAt — последняя попытка (в том числе неудачная), ChebPass из ChebTotal сканеров
+	// открыли сервер, ChebHits — кто что ответил. RuSource — кто дал «Россию» в этом замере.
+	ChebAt, ChebTryAt time.Time
+	ChebOK            bool
+	ChebPass          int
+	ChebTotal         int
+	ChebHits          []ProbeHit
+	RuSource          string
 }
 
 // AllFailed — в этом замере не ответил ни один зонд. Частичный провал не считается:
@@ -294,7 +312,7 @@ func MeasurePingCounts(ctx context.Context, client *http.Client, target string, 
 		return Sample{}, rateLimitFrom(res, raw)
 	}
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return Sample{}, fmt.Errorf("globalping create: %d", res.StatusCode)
+		return Sample{}, fmt.Errorf("globalping create: %d %s", res.StatusCode, errorSnippet(raw))
 	}
 	var created gpCreated
 	if err := json.Unmarshal(raw, &created); err != nil || created.ID == "" {

@@ -169,7 +169,7 @@ func TestEstimateQuota(t *testing.T) {
 		{Enabled: true, Address: "1.1.1.2", IntervalMin: 60, WorldProbes: 3, RussiaProbes: 7, NoExternal: true},
 		{Enabled: false, Address: "1.1.1.3", IntervalMin: 20},
 	})
-	if got.PerHour != 69 || got.Limit != 250 || got.TokenSet {
+	if got.PerHour != 69 || got.Limit != 250 || got.MaxCost != 23 || got.TokenSet {
 		t.Fatalf("estimate: %+v", got)
 	}
 	t.Setenv("GLOBALPING_TOKEN", "x")

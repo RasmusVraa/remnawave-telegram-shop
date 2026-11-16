@@ -11,6 +11,10 @@ func newAlertRunner(t *testing.T) *Runner {
 	t.Setenv("STATUS_RU_FAIL_THRESHOLD", "")
 	t.Setenv("STATUS_ALERT_WORLD", "")
 	t.Setenv("LATENCYLAB_TOKEN", "")
+	// Запросы к cheburcheck в тестах идут без минутной паузы.
+	prevGap := chebGap
+	chebGap = 0
+	t.Cleanup(func() { chebGap = prevGap })
 	return &Runner{samples: map[string]Sample{}, history: map[string][]RunRecord{}}
 }
 

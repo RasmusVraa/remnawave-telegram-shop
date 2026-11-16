@@ -1,0 +1,775 @@
+{
+  "/admin/bootstrap": {
+    "sales_mode": "tariffs",
+    "loyalty_enabled": true,
+    "fortune_enabled": false,
+    "providers": {},
+    "features": {}
+  },
+  "/admin/tariffs": [
+    {
+      "id": 1,
+      "slug": "basic",
+      "name": "Базовый",
+      "sort_order": 1,
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "slug": "pro",
+      "name": "Pro",
+      "sort_order": 2,
+      "is_active": true
+    }
+  ],
+  "/admin/promos": {
+    "items": [
+      {
+        "subscription_days": 7,
+        "trial_days": null,
+        "extra_hwid_delta": null,
+        "discount_percent": null,
+        "discount_ttl_hours": null,
+        "max_uses": 6,
+        "uses_count": 2,
+        "valid_until": "2026-11-16T20:59:00.000Z",
+        "active": true,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-11-16T00:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": null,
+        "note": "Утренняя рассылка в боте",
+        "id": 47,
+        "code": "MORNING",
+        "type": "subscription_days"
+      },
+      {
+        "subscription_days": 14,
+        "trial_days": null,
+        "extra_hwid_delta": null,
+        "discount_percent": null,
+        "discount_ttl_hours": null,
+        "max_uses": 100,
+        "uses_count": 64,
+        "valid_until": null,
+        "active": true,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": 2,
+        "note": "Хэллоуин · пост в канале",
+        "id": 46,
+        "code": "HELL26",
+        "type": "subscription_days"
+      },
+      {
+        "subscription_days": null,
+        "trial_days": null,
+        "extra_hwid_delta": null,
+        "discount_percent": 15,
+        "discount_ttl_hours": 24,
+        "max_uses": 100,
+        "uses_count": 23,
+        "valid_until": null,
+        "active": true,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": null,
+        "note": "для @cryptochat",
+        "id": 45,
+        "code": "CRYPTO",
+        "type": "discount"
+      },
+      {
+        "subscription_days": null,
+        "trial_days": 3,
+        "extra_hwid_delta": null,
+        "discount_percent": null,
+        "discount_ttl_hours": null,
+        "max_uses": 100,
+        "uses_count": 87,
+        "valid_until": "2026-12-01T20:59:00.000Z",
+        "active": true,
+        "first_purchase_only": true,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": null,
+        "note": null,
+        "id": 44,
+        "code": "TRIAL3",
+        "type": "trial"
+      },
+      {
+        "subscription_days": null,
+        "trial_days": null,
+        "extra_hwid_delta": null,
+        "discount_percent": 50,
+        "discount_ttl_hours": 0,
+        "max_uses": 1,
+        "uses_count": 1,
+        "valid_until": null,
+        "active": true,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": null,
+        "note": "блогер Регина, сторис",
+        "id": 43,
+        "code": "REGINA",
+        "type": "discount"
+      },
+      {
+        "subscription_days": null,
+        "trial_days": null,
+        "extra_hwid_delta": 1,
+        "discount_percent": null,
+        "discount_ttl_hours": null,
+        "max_uses": 20,
+        "uses_count": 8,
+        "valid_until": "2026-12-02T03:30:27.553Z",
+        "active": false,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 1,
+        "tariff_id": null,
+        "note": null,
+        "id": 42,
+        "code": "FRIEND",
+        "type": "extra_hwid"
+      },
+      {
+        "subscription_days": null,
+        "trial_days": null,
+        "extra_hwid_delta": null,
+        "discount_percent": 30,
+        "discount_ttl_hours": 72,
+        "max_uses": 0,
+        "uses_count": 412,
+        "valid_until": "2026-11-14T03:30:27.553Z",
+        "active": true,
+        "first_purchase_only": false,
+        "require_customer_in_db": false,
+        "allow_trial_without_payment": true,
+        "created_at": "2026-10-27T03:30:27.553Z",
+        "discount_max_subscription_payments_per_customer": 3,
+        "tariff_id": null,
+        "note": null,
+        "id": 41,
+        "code": "BLACKFRIDAY2026SUPERSALE",
+        "type": "discount"
+      }
+    ],
+    "total": 47,
+    "page": 1,
+    "limit": 20,
+    "counts": {
+      "status": {
+        "all": 47,
+        "active": 31,
+        "ended": 9,
+        "off": 7
+      },
+      "type": {
+        "all": 47,
+        "subscription_days": 18,
+        "discount": 16,
+        "trial": 8,
+        "extra_hwid": 5
+      }
+    },
+    "summary": {
+      "redemptions_24h": 12,
+      "redemptions_total": 1284
+    }
+  },
+  "/admin/promos/47": {
+    "promo": {
+      "subscription_days": 7,
+      "trial_days": null,
+      "extra_hwid_delta": null,
+      "discount_percent": null,
+      "discount_ttl_hours": null,
+      "max_uses": 6,
+      "uses_count": 2,
+      "valid_until": "2026-11-16T20:59:00.000Z",
+      "active": true,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-11-16T00:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": null,
+      "note": "Утренняя рассылка в боте",
+      "id": 47,
+      "code": "MORNING",
+      "type": "subscription_days"
+    },
+    "redemptions": 2,
+    "redemptions_today": 2,
+    "redemptions_24h": 2,
+    "pending_discounts": 0,
+    "payback": {
+      "paid_customers": 1,
+      "payments": 1,
+      "revenue_rub": 290,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/47/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 2,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/46": {
+    "promo": {
+      "subscription_days": 14,
+      "trial_days": null,
+      "extra_hwid_delta": null,
+      "discount_percent": null,
+      "discount_ttl_hours": null,
+      "max_uses": 100,
+      "uses_count": 64,
+      "valid_until": null,
+      "active": true,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": 2,
+      "note": "Хэллоуин · пост в канале",
+      "id": 46,
+      "code": "HELL26",
+      "type": "subscription_days"
+    },
+    "redemptions": 64,
+    "redemptions_today": 3,
+    "redemptions_24h": 3,
+    "pending_discounts": 0,
+    "payback": {
+      "paid_customers": 9,
+      "payments": 11,
+      "revenue_rub": 8400,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/46/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T01:30:27.553Z",
+        "customer_id": 220518,
+        "telegram_username": "dm1try",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 1290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T22:30:27.553Z",
+        "customer_id": 3319047,
+        "telegram_username": null,
+        "nickname": null,
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T15:30:27.553Z",
+        "customer_id": 90871,
+        "telegram_username": "nastya.v",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-13T22:30:27.553Z",
+        "customer_id": 150234,
+        "telegram_username": null,
+        "nickname": "Иван П.",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/45": {
+    "promo": {
+      "subscription_days": null,
+      "trial_days": null,
+      "extra_hwid_delta": null,
+      "discount_percent": 15,
+      "discount_ttl_hours": 24,
+      "max_uses": 100,
+      "uses_count": 23,
+      "valid_until": null,
+      "active": true,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": null,
+      "note": "для @cryptochat",
+      "id": 45,
+      "code": "CRYPTO",
+      "type": "discount"
+    },
+    "redemptions": 23,
+    "redemptions_today": 3,
+    "redemptions_24h": 3,
+    "pending_discounts": 4,
+    "payback": {
+      "paid_customers": 12,
+      "payments": 14,
+      "revenue_rub": 6720,
+      "revenue_stars": 350
+    }
+  },
+  "/admin/promos/45/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T01:30:27.553Z",
+        "customer_id": 220518,
+        "telegram_username": "dm1try",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 1290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T22:30:27.553Z",
+        "customer_id": 3319047,
+        "telegram_username": null,
+        "nickname": null,
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T15:30:27.553Z",
+        "customer_id": 90871,
+        "telegram_username": "nastya.v",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-13T22:30:27.553Z",
+        "customer_id": 150234,
+        "telegram_username": null,
+        "nickname": "Иван П.",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/44": {
+    "promo": {
+      "subscription_days": null,
+      "trial_days": 3,
+      "extra_hwid_delta": null,
+      "discount_percent": null,
+      "discount_ttl_hours": null,
+      "max_uses": 100,
+      "uses_count": 87,
+      "valid_until": "2026-12-01T20:59:00.000Z",
+      "active": true,
+      "first_purchase_only": true,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": null,
+      "note": null,
+      "id": 44,
+      "code": "TRIAL3",
+      "type": "trial"
+    },
+    "redemptions": 87,
+    "redemptions_today": 3,
+    "redemptions_24h": 3,
+    "pending_discounts": 0,
+    "payback": {
+      "paid_customers": 21,
+      "payments": 25,
+      "revenue_rub": 14900,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/44/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T01:30:27.553Z",
+        "customer_id": 220518,
+        "telegram_username": "dm1try",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 1290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T22:30:27.553Z",
+        "customer_id": 3319047,
+        "telegram_username": null,
+        "nickname": null,
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T15:30:27.553Z",
+        "customer_id": 90871,
+        "telegram_username": "nastya.v",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-13T22:30:27.553Z",
+        "customer_id": 150234,
+        "telegram_username": null,
+        "nickname": "Иван П.",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/43": {
+    "promo": {
+      "subscription_days": null,
+      "trial_days": null,
+      "extra_hwid_delta": null,
+      "discount_percent": 50,
+      "discount_ttl_hours": 0,
+      "max_uses": 1,
+      "uses_count": 1,
+      "valid_until": null,
+      "active": true,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": null,
+      "note": "блогер Регина, сторис",
+      "id": 43,
+      "code": "REGINA",
+      "type": "discount"
+    },
+    "redemptions": 1,
+    "redemptions_today": 1,
+    "redemptions_24h": 1,
+    "pending_discounts": 1,
+    "payback": {
+      "paid_customers": 0,
+      "payments": 0,
+      "revenue_rub": 0,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/43/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/42": {
+    "promo": {
+      "subscription_days": null,
+      "trial_days": null,
+      "extra_hwid_delta": 1,
+      "discount_percent": null,
+      "discount_ttl_hours": null,
+      "max_uses": 20,
+      "uses_count": 8,
+      "valid_until": "2026-12-02T03:30:27.553Z",
+      "active": false,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 1,
+      "tariff_id": null,
+      "note": null,
+      "id": 42,
+      "code": "FRIEND",
+      "type": "extra_hwid"
+    },
+    "redemptions": 8,
+    "redemptions_today": 3,
+    "redemptions_24h": 3,
+    "pending_discounts": 0,
+    "payback": {
+      "paid_customers": 2,
+      "payments": 2,
+      "revenue_rub": 980,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/42/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T01:30:27.553Z",
+        "customer_id": 220518,
+        "telegram_username": "dm1try",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 1290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T22:30:27.553Z",
+        "customer_id": 3319047,
+        "telegram_username": null,
+        "nickname": null,
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T15:30:27.553Z",
+        "customer_id": 90871,
+        "telegram_username": "nastya.v",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-13T22:30:27.553Z",
+        "customer_id": 150234,
+        "telegram_username": null,
+        "nickname": "Иван П.",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "limit": 20
+  },
+  "/admin/promos/41": {
+    "promo": {
+      "subscription_days": null,
+      "trial_days": null,
+      "extra_hwid_delta": null,
+      "discount_percent": 30,
+      "discount_ttl_hours": 72,
+      "max_uses": 0,
+      "uses_count": 412,
+      "valid_until": "2026-11-14T03:30:27.553Z",
+      "active": true,
+      "first_purchase_only": false,
+      "require_customer_in_db": false,
+      "allow_trial_without_payment": true,
+      "created_at": "2026-10-27T03:30:27.553Z",
+      "discount_max_subscription_payments_per_customer": 3,
+      "tariff_id": null,
+      "note": null,
+      "id": 41,
+      "code": "BLACKFRIDAY2026SUPERSALE",
+      "type": "discount"
+    },
+    "redemptions": 412,
+    "redemptions_today": 3,
+    "redemptions_24h": 3,
+    "pending_discounts": 0,
+    "payback": {
+      "paid_customers": 380,
+      "payments": 402,
+      "revenue_rub": 398000,
+      "revenue_stars": 0
+    }
+  },
+  "/admin/promos/41/redemptions": {
+    "items": [
+      {
+        "used_at": "2026-11-16T00:30:27.553Z",
+        "customer_id": 482910,
+        "telegram_username": "alex_k",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 490,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T23:30:27.553Z",
+        "customer_id": 77120934,
+        "telegram_username": null,
+        "nickname": "Мария",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-15T01:30:27.553Z",
+        "customer_id": 220518,
+        "telegram_username": "dm1try",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 1290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T22:30:27.553Z",
+        "customer_id": 3319047,
+        "telegram_username": null,
+        "nickname": null,
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-14T15:30:27.553Z",
+        "customer_id": 90871,
+        "telegram_username": "nastya.v",
+        "nickname": null,
+        "paid_count": 1,
+        "paid_rub": 290,
+        "paid_stars": 0
+      },
+      {
+        "used_at": "2026-11-13T22:30:27.553Z",
+        "customer_id": 150234,
+        "telegram_username": null,
+        "nickname": "Иван П.",
+        "paid_count": 0,
+        "paid_rub": 0,
+        "paid_stars": 0
+      }
+    ],
+    "total": 6,
+    "page": 1,
+    "limit": 20
+  }
+}
