@@ -901,6 +901,8 @@ export interface PaymentStatusResponse {
   traffic_pack_bytes?: number
   status: 'new' | 'pending' | 'paid' | 'failed' | 'expired'
   subscription_link: string | null
+  /** Пока pending — ссылка на оплату у провайдера (если окно не открылось). */
+  payment_url?: string
   /** paid: subscription | extra_hwid | tariff_upgrade — для текста успеха. */
   purchase_kind?: string
   /** Реквизиты чека на экране успешной оплаты (см. StatusResult в checkout.go). */

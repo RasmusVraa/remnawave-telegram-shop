@@ -141,7 +141,9 @@ export default function CheckoutPage() {
         idempotencyKey,
       )
       if (payWindow.go(res.payment_url)) {
-        navigate(`/payment/status/${res.checkout_id}`)
+        navigate(`/payment/status/${res.checkout_id}`, {
+          state: { paymentUrl: res.payment_url },
+        })
       }
     } catch (err) {
       payWindow.cancel()

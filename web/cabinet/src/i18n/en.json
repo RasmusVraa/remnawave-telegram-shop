@@ -1166,8 +1166,9 @@
     },
     "paymentStatus": {
       "title": "Payment",
-      "pending": "Processing payment…",
-      "pendingHint": "This usually takes just a few seconds.",
+      "pending": "Waiting for payment…",
+      "pendingHint": "Finish payment on the bank page. If it didn’t open, tap the button below.",
+      "openPayment": "Open payment",
       "success": "Payment successful!",
       "successHint": "Your subscription is now active.",
       "successHintExtraHwid": "Your device limit has been increased.",
