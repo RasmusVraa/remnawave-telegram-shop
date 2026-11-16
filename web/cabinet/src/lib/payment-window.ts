@@ -11,8 +11,8 @@ import { getTelegramInitData } from '@/lib/utils'
  * payment_url. Если вкладку открыть не дали — уходим на оплату в текущей вкладке
  * (return_url провайдера вернёт на /payment/status/:id).
  *
- * В Telegram WebApp `openLink` часто молча ничего не открывает, но мы всё равно
- * уходим на экран статуса — там кнопка «Открыть оплату» и повторный openPaymentUrl.
+ * Telegram Mini App: openLink часто молчит. Делаем попытку открыть банк и
+ * оставляем WebApp на /payment/status — там авто-редирект и кнопка «Открыть оплату».
  */
 export interface PaymentWindow {
   /** Ведёт на оплату. true — текущая страница остаётся (статус/попап), false — ушли на оплату здесь. */
@@ -21,35 +21,30 @@ export interface PaymentWindow {
   cancel(): void
 }
 
-/** Открыть URL оплаты: Telegram openLink → window.open → текущая вкладка. */
-export function openPaymentUrl(url: string): void {
+export type OpenPaymentOptions = {
+  /**
+   * Если внешнее окно не открылось — уйти на оплату в этой же вкладке.
+   * Для авто-редиректа со статуса лучше false: иначе кнопка-запасник не успеет показаться.
+   */
+  allowSameTab?: boolean
+}
+
+function isTelegramMiniApp(): boolean {
+  return getTelegramInitData().length > 0
+}
+
+/** Попытка открыть оплату снаружи (openLink / window.open), без ухода с текущей вкладки. */
+export function tryOpenPaymentExternal(url: string): boolean {
   const trimmed = url.trim()
-  if (!trimmed) return
+  if (!trimmed) return false
 
   const tg = window.Telegram?.WebApp
-  if (getTelegramInitData().length > 0 && typeof tg?.openLink === 'function') {
+  if (isTelegramMiniApp() && typeof tg?.openLink === 'function') {
     try {
       tg.openLink(trimmed, { try_instant_view: false })
     } catch {
-      /* ниже — запасные пути */
+      /* дальше window.open */
     }
-    // openLink не сообщает об успехе. Дублируем через window.open на жесте
-    // пользователя (кнопка «Открыть оплату»); если и это блокируют — текущая вкладка.
-    try {
-      const w = window.open(trimmed, '_blank')
-      if (w) {
-        try {
-          w.opener = null
-        } catch {
-          /* ignore */
-        }
-        return
-      }
-    } catch {
-      /* ignore */
-    }
-    window.location.assign(trimmed)
-    return
   }
 
   try {
@@ -60,23 +55,37 @@ export function openPaymentUrl(url: string): void {
       } catch {
         /* ignore */
       }
-      return
+      return true
     }
   } catch {
     /* ignore */
   }
-  window.location.assign(trimmed)
+  return false
+}
+
+/**
+ * Открыть URL оплаты.
+ * Telegram: openLink → window.open → (опционально) текущая вкладка.
+ * Браузер: window.open → текущая вкладка.
+ */
+export function openPaymentUrl(url: string, opts: OpenPaymentOptions = {}): void {
+  const allowSameTab = opts.allowSameTab !== false
+  if (tryOpenPaymentExternal(url)) return
+  if (allowSameTab) {
+    const trimmed = url.trim()
+    if (trimmed) window.location.assign(trimmed)
+  }
 }
 
 export function reservePaymentWindow(): PaymentWindow {
-  // Telegram Mini App: openLink часто молча не открывает банк. Надёжный путь —
-  // уйти на оплату в этой же WebView; return_url вернёт на /payment/status/:id.
-  // Запасная кнопка «Открыть оплату» на статусе всё равно нужна (рефреш / отмена).
-  if (getTelegramInitData().length > 0) {
+  if (isTelegramMiniApp()) {
     return {
       go(url) {
-        window.location.assign(url)
-        return false
+        // Пытаемся открыть банк сразу (жест ещё «живой» только частично —
+        // openLink Telegram обычно принимает и без него).
+        tryOpenPaymentExternal(url)
+        // Всегда оставляем Mini App на статусе: авто-редирект + кнопка.
+        return true
       },
       cancel() {},
     }

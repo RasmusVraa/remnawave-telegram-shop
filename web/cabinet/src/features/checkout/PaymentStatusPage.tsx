@@ -1,5 +1,5 @@
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, XCircle } from 'lucide-react'
@@ -16,7 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { api, type PaymentStatusResponse } from '@/lib/api'
 import { hapticError, hapticSuccess } from '@/lib/haptic'
-import { openPaymentUrl } from '@/lib/payment-window'
+import { openPaymentUrl, tryOpenPaymentExternal } from '@/lib/payment-window'
 import { BypassCard, packSizeLabel } from '@/features/home/trafficSplit'
 import { bypassLabel } from '@/lib/bypassLabel'
 import { splitDateTimeShort } from '@/lib/utils'
@@ -55,6 +55,16 @@ export default function PaymentStatusPage() {
     () => (data?.payment_url?.trim() || navPaymentUrl).trim(),
     [data?.payment_url, navPaymentUrl],
   )
+  const autoOpenedRef = useRef(false)
+
+  // Авто-редирект на банк без ухода с этой вкладки — кнопка остаётся, если окно не всплыло.
+  useEffect(() => {
+    if (!paymentUrl) return
+    if (status === 'paid' || status === 'failed' || status === 'expired') return
+    if (autoOpenedRef.current) return
+    autoOpenedRef.current = true
+    tryOpenPaymentExternal(paymentUrl)
+  }, [paymentUrl, status])
 
   // Итог оплаты — вибрацией: успех мягким двойным толчком, отказ — сильным.
   useEffect(() => {
@@ -72,7 +82,7 @@ export default function PaymentStatusPage() {
         <RevealItem className="w-full">
         <Card className="w-full">
           <CardContent className="pt-8 pb-8 flex flex-col items-center gap-5 text-center">
-            {isLoading || status === 'new' || status === 'pending' ? (
+            {isLoading || status === 'new' || status === 'pending' || (!status && Boolean(paymentUrl)) ? (
               <PendingState paymentUrl={paymentUrl} />
             ) : status === 'paid' && data ? (
               <SuccessState data={data} />
@@ -108,7 +118,11 @@ function PendingState({ paymentUrl }: { paymentUrl: string }) {
         <p className="text-sm text-muted-foreground mt-1">{t('paymentStatus.pendingHint')}</p>
       </div>
       {paymentUrl ? (
-        <Button type="button" className="w-full" onClick={() => openPaymentUrl(paymentUrl)}>
+        <Button
+          type="button"
+          className="w-full"
+          onClick={() => openPaymentUrl(paymentUrl, { allowSameTab: true })}
+        >
           {t('paymentStatus.openPayment')}
         </Button>
       ) : null}
