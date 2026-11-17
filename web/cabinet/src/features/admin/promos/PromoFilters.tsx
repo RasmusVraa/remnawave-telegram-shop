@@ -173,7 +173,8 @@ export function PromoFilterMenu({
         className={cn(
           'relative inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-0 text-sm font-semibold transition-colors',
           'w-10 sm:w-auto sm:px-3.5',
-          open || active ? 'border-primary/50 bg-primary/10 text-foreground' : 'border-border bg-card hover:bg-secondary/80',
+          'bg-card hover:bg-secondary/80',
+          open || active ? 'border-primary/50 text-foreground' : 'border-border',
         )}
       >
         {busy ? <Spinner /> : <ListFilter className="size-4 shrink-0" aria-hidden />}

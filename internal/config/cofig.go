@@ -62,6 +62,8 @@ type config struct {
 cabinetAdminEmails                                                           []string
 	adminTelegramIds                                                             []int64
 	forwardUserMessagesToAdmin                                                   bool
+	channelGateEnabled                                                           bool
+	channelGateChannel                                                           string
 	suspiciousUserFilterEnabled                                                  bool
 	trialDays                                                                    int
 	squadUUIDs                                                                   map[uuid.UUID]uuid.UUID
@@ -1090,6 +1092,9 @@ func InitConfig() {
 
 	conf.forwardUserMessagesToAdmin = envBoolDefault("FORWARD_USER_MESSAGES_TO_ADMIN", true)
 	conf.suspiciousUserFilterEnabled = envBoolDefault("SUSPICIOUS_USER_FILTER_ENABLED", true)
+	conf.channelGateEnabled = envBoolDefault("CHANNEL_GATE_ENABLED", false)
+	// Неверное значение из .env не должно ронять старт: канал просто не задан.
+	conf.channelGateChannel, _ = NormalizeChannelUsername(os.Getenv("CHANNEL_GATE_CHANNEL"))
 
 	conf.telegramToken = mustEnv("TELEGRAM_TOKEN")
 

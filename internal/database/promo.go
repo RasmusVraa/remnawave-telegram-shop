@@ -409,10 +409,11 @@ WHERE pc.code NOT LIKE '\_\_%'`).Scan(&s.Last24h, &s.Total)
 	return s, err
 }
 
-// PromoPayback — оплаты, связанные с промокодом. Для скидки — покупки, оплаченные
-// с этой скидкой (purchase.promo_code_id). Для остальных типов — оплаты
-// активировавших после их активации (корреляция, не «заслуга» кода). Рубли и
-// Stars — по правилу SumPaidSpendBreakdown, прочие валюты в выручку не входят.
+// PromoPayback — оплаты со скидкой промокода: покупки с purchase.promo_code_id
+// этого кода (столько, сколько оплат даёт скидка). Есть только у скидки: у дней,
+// триала и доп. устройства кода в покупке нет, а «все оплаты после ввода» —
+// не заслуга кода (решение владельца 16.11). Рубли и Stars — по правилу
+// SumPaidSpendBreakdown, прочие валюты в выручку не входят.
 type PromoPayback struct {
 	PaidCustomers int
 	Payments      int
@@ -427,15 +428,11 @@ type PromoDetailStats struct {
 	Payback          PromoPayback
 }
 
-// promoPaymentMatchCond — оплаченная покупка p засчитывается промокоду pc,
-// активированному в pr: у скидки — покупка с этой скидкой, у остальных — оплата
-// не раньше активации (paid_at, а у старых строк без него — created_at).
-const promoPaymentMatchCond = `p.status = 'paid' AND CASE
-    WHEN pc.type = 'discount' THEN p.promo_code_id = pc.id
-    ELSE COALESCE(p.paid_at, p.created_at) >= pr.used_at
-  END`
+// promoPaymentMatchCond — оплаченная покупка p засчитывается промокоду pc: только
+// у скидки и только покупка с этой скидкой. У остальных типов оплат нет.
+const promoPaymentMatchCond = `p.status = 'paid' AND pc.type = 'discount' AND p.promo_code_id = pc.id`
 
-// DetailStats — активации за 24 ч, невыкупленные скидки и отдача промокода.
+// DetailStats — активации за 24 ч, невыкупленные скидки и (у скидки) отдача.
 func (r *PromoRepository) DetailStats(ctx context.Context, promo *PromoCode) (PromoDetailStats, error) {
 	var s PromoDetailStats
 	if err := r.pool.QueryRow(ctx, `
@@ -446,24 +443,18 @@ SELECT
 		return s, fmt.Errorf("promo detail counters: %w", err)
 	}
 
+	if promo.Type != PromoTypeDiscount {
+		return s, nil
+	}
 	sums := `
   COUNT(DISTINCT p.customer_id)::int,
   COUNT(*)::int,
   COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseRubCond + `), 0)::float8,
   COALESCE(SUM(p.amount) FILTER (WHERE ` + purchaseStarsCond + `), 0)::float8`
-	var q string
-	if promo.Type == PromoTypeDiscount {
-		// Точная связь: скидка записана в покупку. Активация для этого не нужна.
-		q = `SELECT` + sums + `
+	// Точная связь: скидка записана в покупку. Активация для этого не нужна.
+	q := `SELECT` + sums + `
 FROM purchase p
 WHERE p.status = 'paid' AND p.promo_code_id = $1`
-	} else {
-		q = `SELECT` + sums + `
-FROM promo_redemption pr
-JOIN promo_code pc ON pc.id = pr.promo_code_id
-JOIN purchase p ON p.customer_id = pr.customer_id AND ` + promoPaymentMatchCond + `
-WHERE pr.promo_code_id = $1`
-	}
 	pb := &s.Payback
 	if err := r.pool.QueryRow(ctx, q, promo.ID).Scan(&pb.PaidCustomers, &pb.Payments, &pb.RevenueRub, &pb.RevenueStars); err != nil {
 		return s, fmt.Errorf("promo payback: %w", err)
@@ -623,8 +614,8 @@ type PromoRedemptionDetailRow struct {
 	// Для аватарки: ссылку подписывает handler, web-only и синтетическим id её не дают.
 	TelegramID int64 `db:"telegram_id"`
 	IsWebOnly  bool  `db:"is_web_only"`
-	// Оплаты этого человека, засчитанные промокоду (правило PromoPayback):
-	// у скидки — покупки с этой скидкой, у остальных — после активации.
+	// Оплаты этого человека со скидкой промокода (правило PromoPayback);
+	// у остальных типов — нули.
 	PaidCount int     `db:"paid_count"`
 	PaidRub   float64 `db:"paid_rub"`
 	PaidStars float64 `db:"paid_stars"`

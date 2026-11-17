@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 
+import { ChannelGateModal } from './ChannelGateModal'
 import { ConfirmModal } from './ConfirmModal'
 import { Logo } from './Logo'
 import { Button } from './ui/button'
@@ -624,6 +625,8 @@ export function AppLayout({ children }: AppLayoutProps) {
           })}
         </div>
       </nav>
+      {/* Обязательная подписка на канал: окно без выхода, пока нет подписки. */}
+      <ChannelGateModal />
     </div>
   )
 }

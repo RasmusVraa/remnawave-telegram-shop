@@ -190,4 +190,7 @@ const (
 
 	CallbackLegalAccept  = "legal_accept"
 	CallbackLegalDecline = "legal_decline"
+
+	// CallbackChannelGateCheck — «Да, я подписался» на экране обязательной подписки.
+	CallbackChannelGateCheck = "channel_gate_check"
 )

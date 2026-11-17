@@ -79,8 +79,7 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 		return
 	}
 
-	if CustomerNeedsLegalGate(existingCustomer) {
-		h.sendLegalGateMessage(ctx, b, update.Message.Chat.ID, langCode, false)
+	if h.gateBeforeMenu(ctx, b, update, existingCustomer, update.Message.Chat.ID, langCode) {
 		return
 	}
 
@@ -135,8 +134,7 @@ func (h Handler) StartCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 		return
 	}
 
-	if CustomerNeedsLegalGate(existingCustomer) {
-		h.editOrSendLegalGate(ctxWithTime, b, update, langCode, false)
+	if h.gateBeforeMenu(ctxWithTime, b, update, existingCustomer, callback.From.ID, langCode) {
 		return
 	}
 

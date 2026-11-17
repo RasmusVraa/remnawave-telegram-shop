@@ -119,6 +119,9 @@
   "yookasa_tinkoff_bank_button": {
     "text": "🟡 T-Pay"
   },
+  "yookasa_alfa_pay_button": {
+    "text": "🔴 Alfa Pay"
+  },
   "yookasa_yoo_money_button": {
     "text": "👛 ЮMoney"
   },
@@ -241,6 +244,13 @@
     "text": "📋 Пользовательское соглашение",
     "style": "blue"
   },
+  "channel_gate_text": "🔒 <b>Почти готово!</b>\nЧтобы пользоваться ботом, подпишитесь на наш канал — там новости, статус серверов и акции.\n\nПосле подписки нажмите «Да, я подписался».",
+  "channel_gate_open_button": "📢 Открыть канал",
+  "channel_gate_check_button": {
+    "text": "✅ Да, я подписался",
+    "style": "green"
+  },
+  "channel_gate_not_subscribed": "Пока не вижу подписки. Подпишитесь на канал и нажмите кнопку ещё раз.",
   "manage_devices_button": {
     "text": "📱 Управление устройствами",
     "style": "blue"

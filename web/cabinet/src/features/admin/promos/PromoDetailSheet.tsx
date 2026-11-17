@@ -116,7 +116,7 @@ export function PromoDetailSheet({
           <Icon className={cn('size-4 shrink-0', tone.icon)} />
           <span>{effect}</span>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className={cn('grid grid-cols-2 gap-2', facts.show ? 'sm:grid-cols-3' : 'sm:grid-cols-4')}>
           <PromoFact label={t('admin.promos.detail.last24h')} loading={facts.loading} {...used}>
             {facts.detail?.redemptions_24h ?? facts.detail?.redemptions_today ?? '—'}
           </PromoFact>
@@ -125,12 +125,16 @@ export function PromoDetailSheet({
           </PromoFact>
           <PromoFact label={t('admin.promos.detail.firstPurchase')} {...edit('firstPurchase')}>{promo.first_purchase_only ? t('admin.yes') : t('admin.no')}</PromoFact>
           <PromoFact label={key.label} {...edit('value')}>{key.value}</PromoFact>
-          <PromoFact label={facts.paidLabel} loading={facts.loading} {...used}>
-            {facts.paid}
-          </PromoFact>
-          <PromoFact label={t('admin.promos.payback.revenue')} loading={facts.loading} {...used}>
-            {facts.revenue}
-          </PromoFact>
+          {facts.show && (
+            <>
+              <PromoFact label={facts.paidLabel} loading={facts.loading} {...used}>
+                {facts.paid}
+              </PromoFact>
+              <PromoFact label={t('admin.promos.payback.revenue')} loading={facts.loading} {...used}>
+                {facts.revenue}
+              </PromoFact>
+            </>
+          )}
         </div>
         {/* Полоска между плитками и кнопками — разделяет цифры и действия. */}
         <button

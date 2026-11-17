@@ -104,6 +104,9 @@
   "yookasa_tinkoff_bank_button": {
     "text": "🟡 T-Pay"
   },
+  "yookasa_alfa_pay_button": {
+    "text": "🔴 Alfa Pay"
+  },
   "yookasa_yoo_money_button": {
     "text": "👛 YooMoney"
   },
@@ -233,6 +236,13 @@
     "text": "Decline",
     "style": "red"
   },
+  "channel_gate_text": "🔒 <b>Almost there!</b>\nTo use the bot, subscribe to our channel — news, server status and offers.\n\nAfter subscribing, tap “Yes, I subscribed”.",
+  "channel_gate_open_button": "📢 Open channel",
+  "channel_gate_check_button": {
+    "text": "✅ Yes, I subscribed",
+    "style": "green"
+  },
+  "channel_gate_not_subscribed": "I don't see your subscription yet. Subscribe to the channel and tap the button again.",
   "manage_devices_button": "📱 Device management",
   "manage_devices_title": "📱 Device management",
   "devices_button": "📱 My Devices",

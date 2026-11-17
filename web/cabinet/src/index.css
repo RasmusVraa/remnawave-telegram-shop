@@ -1506,6 +1506,61 @@
   background-clip: padding-box;
 }
 
+/*
+ * Боковое меню админки на ПК: прокручивается сама скруглённая карточка, и
+ * полоса живёт внутри рамки, а не торчит справа от неё. Ползунок 4px (10px
+ * минус прозрачная рамка) виден только при наведении на меню; дорожка
+ * отступает от скруглений. Место под полосу держится всегда — его вычитаем
+ * из правого отступа карточки, иначе иконки съезжают с центра.
+ */
+.admin-nav-scroll {
+  scrollbar-gutter: stable;
+}
+
+/* Chrome перерисовывает ::-webkit-scrollbar, только когда меняется стиль
+   самого элемента: одного «:hover::-webkit-scrollbar-thumb» мало, ползунок
+   не появлялся. Переменная ничего не красит — она лишь меняет стиль. */
+.admin-nav-scroll:hover {
+  --admin-nav-hover: 1;
+}
+
+.admin-nav-scroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.admin-nav-scroll::-webkit-scrollbar-track {
+  margin-block: 18px;
+  background: transparent;
+}
+
+.admin-nav-scroll::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: 9999px;
+  background-color: transparent;
+  background-clip: padding-box;
+}
+
+.admin-nav-scroll:hover::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--muted-foreground) / 0.35);
+}
+
+.admin-nav-scroll:hover::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--muted-foreground) / 0.55);
+}
+
+/* Firefox не знает ::-webkit-scrollbar. А в Chrome 121+ scrollbar-color/width
+   отключают ::-webkit-scrollbar целиком, поэтому они только здесь. */
+@supports not selector(::-webkit-scrollbar) {
+  .admin-nav-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .admin-nav-scroll:hover {
+    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+  }
+}
+
 /* Кнопка «Крутить» в центре колеса (ПК): мягко «дышит», от неё расходятся волны — видно, что можно нажать */
 .fortune-hub-btn {
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, hsl(var(--primary)) 78%, white), hsl(var(--primary)) 70%);

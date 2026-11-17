@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
+	"remnawave-tg-shop-bot/internal/channelgate"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 )
@@ -14,6 +16,13 @@ import (
 // AdminSettingsHandler — GET/PATCH /cabinet/api/admin/settings (runtime bot config).
 type AdminSettingsHandler struct {
 	repo *database.RuntimeSettingsRepository
+	// channelGate проверяет канал перед включением обязательной подписки; nil — без проверки.
+	channelGate *channelgate.Service
+}
+
+// SetChannelGate подключает проверку канала для настроек CHANNEL_GATE_*.
+func (h *AdminSettingsHandler) SetChannelGate(svc *channelgate.Service) {
+	h.channelGate = svc
 }
 
 // NewAdminSettings — конструктор.
@@ -84,6 +93,11 @@ func (h *AdminSettingsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		normalized[key] = v
 	}
 
+	if msg := h.channelGatePreflight(r.Context(), normalized); msg != "" {
+		http.Error(w, msg, http.StatusBadRequest)
+		return
+	}
+
 	beforeValues := make(map[string]string, len(normalized))
 	for key := range normalized {
 		for _, f := range config.RuntimeSettingsRegistry() {
@@ -138,6 +152,13 @@ func (h *AdminSettingsHandler) Patch(w http.ResponseWriter, r *http.Request) {
 		accountID = claims.AccountID
 	}
 	slog.Info("admin bot settings updated", "admin_account_id", accountID, "changed_keys", changed)
+	for _, k := range changed {
+		if strings.HasPrefix(k, "CHANNEL_GATE_") {
+			// Кэш подписок относится к прежнему каналу и состоянию функции.
+			h.channelGate.Reset()
+			break
+		}
+	}
 
 	writeJSON(w, http.StatusOK, adminSettingsPatchResp{OK: true, Changed: changed})
 }
@@ -152,7 +173,7 @@ func buildAdminSettingsResponse() adminSettingsGetResp {
 	order := []string{
 		"cabinet", "landing", "status", "cabinet_connect", "tariffs",
 		"trial", "hwid", "traffic", "referral", "partner", "stars", "loyalty",
-		"payments", "payments_notify", "admin_alerts", "moynalog", "access", "links", "tags",
+		"payments", "payments_notify", "admin_alerts", "moynalog", "access", "channel_gate", "links", "tags",
 		"lifecycle", "notifications", "monitoring", "fortune",
 	}
 	groupFields := make(map[string][]adminSettingFieldDTO)
@@ -212,4 +233,60 @@ func (h *AdminSettingsHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// channelGatePreflight не даёт включить обязательную подписку с неработающим
+// каналом: человек, которому нечем проверить подписку, запирал бы всех на
+// экране, мимо которого не пройти. Проверка сетевая, поэтому делается здесь, а
+// не внутри ApplyRuntimePatch, который держит общий замок конфига.
+// Возвращает текст ошибки вида «channel_gate:<код>» или пустую строку.
+func (h *AdminSettingsHandler) channelGatePreflight(ctx context.Context, patch map[string]string) string {
+	rawEnabled, hasEnabled := patch["CHANNEL_GATE_ENABLED"]
+	rawChannel, hasChannel := patch["CHANNEL_GATE_CHANNEL"]
+	if !hasEnabled && !hasChannel {
+		return ""
+	}
+	enabled := config.ChannelGateEnabled()
+	if hasEnabled {
+		enabled = strings.EqualFold(strings.TrimSpace(rawEnabled), "true")
+	}
+	if !enabled {
+		return ""
+	}
+	channel := config.ChannelGateChannel()
+	if hasChannel {
+		ch, err := config.NormalizeChannelUsername(rawChannel)
+		if err != nil {
+			return "" // формат отклонит сам ApplyRuntimePatch с понятным текстом
+		}
+		channel = ch
+	}
+	if channel == "" {
+		return "channel_gate:no_channel"
+	}
+	if h.channelGate == nil {
+		return ""
+	}
+	if res := h.channelGate.Probe(ctx, channel); !res.OK {
+		return "channel_gate:" + res.Error
+	}
+	return ""
+}
+
+type channelProbeReq struct {
+	Channel string `json:"channel"`
+}
+
+// ProbeChannel — POST /cabinet/api/admin/channel-gate/check: кнопка «Проверить»
+// в настройках обязательной подписки. Ничего не сохраняет.
+func (h *AdminSettingsHandler) ProbeChannel(w http.ResponseWriter, r *http.Request) {
+	if h.channelGate == nil {
+		http.Error(w, "channel check is unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var req channelProbeReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	writeJSON(w, http.StatusOK, h.channelGate.Probe(r.Context(), req.Channel))
 }

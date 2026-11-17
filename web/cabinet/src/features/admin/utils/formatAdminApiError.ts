@@ -3,6 +3,14 @@ import type { TFunction } from 'i18next'
 import { ApiError } from '@/lib/api'
 
 const BODY_KEY_MAP: Record<string, string> = {
+  'channel_gate:no_channel': 'admin.errors.channelNoChannel',
+  'channel_gate:bot_not_admin': 'admin.errors.channelBotNotAdmin',
+  'channel_gate:not_found': 'admin.errors.channelNotFound',
+  'channel_gate:private': 'admin.errors.channelPrivate',
+  'channel_gate:unavailable': 'admin.errors.channelUnavailable',
+  'channel_gate:bad_format': 'admin.errors.channelBadFormat',
+  'private channel links are not supported': 'admin.errors.channelBadFormat',
+  'use @name or t.me/name of a public channel': 'admin.errors.channelBadFormat',
   'panel not configured': 'admin.errors.panelUnavailable',
   'not found': 'admin.errors.notFound',
   'not implemented': 'admin.errors.notImplemented',
@@ -68,8 +76,14 @@ export function formatAdminApiError(err: unknown, t: TFunction): string {
     if (bodyKey) return t(bodyKey)
 
     switch (err.status) {
-      case 400:
+      case 400: {
+        // Сообщения валидации настроек бота: "FORTUNE_…: invalid integer" и т.п.
+        const detail = err.body.trim()
+        if (detail && detail.length <= 200 && !detail.startsWith('<') && !detail.startsWith('{')) {
+          return detail
+        }
         return t('admin.errors.badRequest')
+      }
       case 401:
         return t('admin.errors.unauthorized')
       case 403:

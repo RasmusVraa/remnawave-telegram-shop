@@ -416,14 +416,23 @@ type promoPaybackDTO struct {
 	RevenueStars  float64 `json:"revenue_stars"`
 }
 
+// paybackDTO — отдача для карточки: только у скидки, у остальных типов поля нет.
+func paybackDTO(p *database.PromoCode, pb database.PromoPayback) *promoPaybackDTO {
+	if p.Type != database.PromoTypeDiscount {
+		return nil
+	}
+	return &promoPaybackDTO{PaidCustomers: pb.PaidCustomers, Payments: pb.Payments, RevenueRub: pb.RevenueRub, RevenueStars: pb.RevenueStars}
+}
+
 type promoGetResp struct {
 	Promo       promoDTO `json:"promo"`
 	Redemptions int      `json:"redemptions"`
 	// RedemptionsToday — с 00:00 UTC; оставлено для совместимости, новое окно — Redemptions24h.
-	RedemptionsToday int             `json:"redemptions_today"`
-	Redemptions24h   int             `json:"redemptions_24h"`
-	PendingDiscounts int             `json:"pending_discounts"`
-	Payback          promoPaybackDTO `json:"payback"`
+	RedemptionsToday int `json:"redemptions_today"`
+	Redemptions24h   int `json:"redemptions_24h"`
+	PendingDiscounts int `json:"pending_discounts"`
+	// Только у скидки: у остальных типов оплат, связанных с кодом, нет.
+	Payback *promoPaybackDTO `json:"payback,omitempty"`
 }
 
 // Get — GET /cabinet/api/admin/promos/{id}
@@ -465,12 +474,7 @@ func (h *AdminPromosHandler) Get(w http.ResponseWriter, r *http.Request) {
 		RedemptionsToday: redemptionsToday,
 		Redemptions24h:   stats.Redemptions24h,
 		PendingDiscounts: stats.PendingDiscounts,
-		Payback: promoPaybackDTO{
-			PaidCustomers: stats.Payback.PaidCustomers,
-			Payments:      stats.Payback.Payments,
-			RevenueRub:    stats.Payback.RevenueRub,
-			RevenueStars:  stats.Payback.RevenueStars,
-		},
+		Payback:          paybackDTO(p, stats.Payback),
 	})
 }
 
@@ -568,7 +572,7 @@ type promoRedemptionItemDTO struct {
 	Nickname         *string `json:"nickname"`
 	// AvatarURL — подписанная ссылка на фото из Telegram; пусто — инициалы.
 	AvatarURL string `json:"avatar_url,omitempty"`
-	// Оплаты человека, засчитанные промокоду (как payback в GET /promos/{id}).
+	// Оплаты человека со скидкой промокода (как payback в GET /promos/{id}); у остальных типов — нули.
 	PaidCount int     `json:"paid_count"`
 	PaidRub   float64 `json:"paid_rub"`
 	PaidStars float64 `json:"paid_stars"`

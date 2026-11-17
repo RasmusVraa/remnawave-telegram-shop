@@ -331,9 +331,9 @@ func TestPromoDetailStats_paybackAndPending(t *testing.T) {
 		}
 	}
 
-	// Дни: c3 платил до активации (не считается) и после — рублями и Stars;
-	// c4 — оплата без paid_at, создана после активации; c5 платил, но код не
-	// вводил; c6 ввёл код 30 ч назад и не платил.
+	// Дни: оплаты после ввода есть (c3 — рублями и Stars, c4 — без paid_at), но у
+	// кода без скидки отдачи нет — ни в карточке, ни в строках. c5 платил, но код
+	// не вводил; c6 ввёл код 30 ч назад и не платил.
 	insertRedemption(t, pool, daysID, c3.ID, time.Hour)
 	insertRedemption(t, pool, daysID, c4.ID, time.Hour)
 	insertRedemption(t, pool, daysID, c6.ID, 30*time.Hour)
@@ -368,9 +368,8 @@ func TestPromoDetailStats_paybackAndPending(t *testing.T) {
 	if ss.Redemptions24h != 2 || ss.PendingDiscounts != 0 {
 		t.Errorf("days counters: %+v", ss)
 	}
-	// c3: 200 ₽ + 15 ⭐ + 5 USD (в платежи, не в выручку); c4: 40 ₽.
-	if pb := ss.Payback; pb.PaidCustomers != 2 || pb.Payments != 4 || !almost(pb.RevenueRub, 240) || !almost(pb.RevenueStars, 15) {
-		t.Errorf("days payback: %+v", pb)
+	if ss.Payback != (PromoPayback{}) {
+		t.Errorf("days payback must be empty: %+v", ss.Payback)
 	}
 
 	// Оплаты в строках «Кто использовал».
@@ -385,14 +384,10 @@ func TestPromoDetailStats_paybackAndPending(t *testing.T) {
 	if len(rows) != 3 {
 		t.Fatalf("days redemptions: %d rows", len(rows))
 	}
-	if r := byCustomer[c3.ID]; r.PaidCount != 3 || !almost(r.PaidRub, 200) || !almost(r.PaidStars, 15) {
-		t.Errorf("c3 row: %+v", r)
-	}
-	if r := byCustomer[c4.ID]; r.PaidCount != 1 || !almost(r.PaidRub, 40) || r.PaidStars != 0 {
-		t.Errorf("c4 row: %+v", r)
-	}
-	if r := byCustomer[c6.ID]; r.PaidCount != 0 || r.PaidRub != 0 || r.PaidStars != 0 {
-		t.Errorf("c6 row: %+v", r)
+	for _, c := range []int64{c3.ID, c4.ID, c6.ID} {
+		if r := byCustomer[c]; r.PaidCount != 0 || r.PaidRub != 0 || r.PaidStars != 0 {
+			t.Errorf("days row %d must have no payments: %+v", c, r)
+		}
 	}
 
 	drows, err := repo.ListRedemptionsPage(ctx, discID, 0, 20)

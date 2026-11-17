@@ -509,6 +509,23 @@ export interface MeResponse {
   avatar_url?: string
   /** Главный способ входа — бейдж на аватарке. Не всегда источник картинки. */
   identity_provider?: 'telegram' | 'google' | 'yandex' | 'vk'
+  /**
+   * Есть, только когда аккаунт нужно остановить на окне обязательной подписки
+   * на Telegram-канал (функция включена, Telegram привязан, подписки нет).
+   */
+  channel_gate?: { required: boolean; channel_url?: string }
+}
+
+/** Итог кнопки «Проверить канал» в настройках обязательной подписки. */
+export interface ChannelGateProbeResult {
+  ok: boolean
+  title?: string
+  username?: string
+  members?: number
+  bot_is_admin: boolean
+  public_url?: string
+  /** bad_format | not_found | private | bot_not_admin | unavailable — пусто при ok. */
+  error?: string
 }
 
 export interface MergeCustomerSnapshot {
@@ -1267,6 +1284,8 @@ type AuthStoreRef = {
   getAccessToken: () => string | null
   setToken: (token: string) => void
   logout: () => void
+  /** Окно обязательной подписки на канал: открыть (info) или закрыть (null). */
+  setChannelGate: (info: { required: boolean; channel_url?: string } | null) => void
 }
 
 let _authRef: AuthStoreRef | null = null
@@ -1299,6 +1318,22 @@ async function doRefresh(): Promise<string | null> {
     }
   })()
   return _refreshing
+}
+
+/**
+ * Закрытый запрос вернул 403 channel_subscription_required: открываем окно
+ * обязательной подписки, даже если /me про это ещё не знал (канал включили
+ * после входа, подписка истекла).
+ */
+function notifyChannelGate(status: number, body: string): void {
+  if (status !== 403 || !body.includes('channel_subscription_required')) return
+  let url: string | undefined
+  try {
+    url = (JSON.parse(body) as { channel_url?: string }).channel_url || undefined
+  } catch {
+    /* тело не JSON — ссылку возьмём из /me */
+  }
+  _authRef?.setChannelGate({ required: true, channel_url: url })
 }
 
 async function request<T>(
@@ -1338,6 +1373,7 @@ async function request<T>(
 
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    notifyChannelGate(res.status, text)
     throw new ApiError(res.status, text)
   }
 
@@ -1368,6 +1404,7 @@ async function rawRequest(method: string, path: string, body?: BodyInit, retryin
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '')
+    notifyChannelGate(res.status, text)
     throw new ApiError(res.status, text)
   }
   return res
@@ -1517,6 +1554,10 @@ export const api = {
   // Me
   me: () =>
     request<MeResponse>('GET', '/me'),
+
+  /** Кнопка «Да, я подписался»: сервер проверяет подписку на канал заново. */
+  channelGateCheck: () =>
+    request<{ subscribed: boolean; too_fast?: boolean }>('POST', '/me/channel-gate/check'),
 
   putLanguage: (language: string) =>
     request<void>('PUT', '/me/language', { language }),
@@ -2218,6 +2259,10 @@ export const api = {
   /** Пробное оповещение админу. draft — чат и тема из формы, ещё не сохранённые. */
   adminAlertTest: (body: { kind: string; draft?: { shared_chat_id: string; chat_id: string; thread_id: string } }) =>
     request<AdminAlertTestResult>('POST', '/admin/alerts/test', body),
+
+  /** «Проверить канал» в настройках обязательной подписки: ничего не сохраняет. */
+  adminChannelGateProbe: (channel: string) =>
+    request<ChannelGateProbeResult>('POST', '/admin/channel-gate/check', { channel }),
 
   adminStatusNodes: () => request<{ nodes: AdminStatusNodeDTO[] }>('GET', '/admin/status/nodes'),
 

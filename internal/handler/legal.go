@@ -170,6 +170,12 @@ func (h Handler) LegalAcceptCallbackHandler(ctx context.Context, b *bot.Bot, upd
 		customer.LegalAcceptedAt = &now
 	}
 
+	// После согласия — экран подписки на канал, если он включён.
+	if h.channelGateBlocks(ctx, callback.From.ID) {
+		h.showChannelGate(ctx, b, update, customer, langCode)
+		return
+	}
+
 	displayName := buildDisplayName(callback.From.FirstName, callback.From.LastName, callback.From.Username)
 	inlineKeyboard := h.buildStartKeyboard(customer, langCode)
 	err = h.sendStartMenuAfterCallback(ctx, b, update, langCode, inlineKeyboard, customer, displayName)

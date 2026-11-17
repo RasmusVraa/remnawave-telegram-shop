@@ -37,8 +37,8 @@ export function ProviderMethodButton({
             'border-border bg-foreground/[0.03] hover:border-primary/40 hover:bg-foreground/[0.06] dark:bg-black/20 dark:hover:bg-black/30',
       )}
     >
-      {/* Плашка иконки светлее самой кнопки: на утопленном фоне bg-muted почти совпал бы с ним. */}
-      <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-muted dark:bg-white/[0.07]">
+      {/* Плашка иконки светлее самой кнопки: на утопленном фоне bg-muted почти совпал бы с ним. Фирменный знак заполняет её целиком (overflow-hidden), тонкая обводка в светлой теме — чтобы белые знаки (МИР, Visa) не сливались с фоном. */}
+      <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0">
         {icon}
       </div>
       <div className="min-w-0 flex-1">

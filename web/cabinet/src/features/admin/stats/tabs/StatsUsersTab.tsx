@@ -5,6 +5,7 @@ import type { AdminStatsInsightsDTO, AdminStatsTimeSeriesDTO } from '@/lib/types
 import type { AdminStatsResponse } from '../../hooks/useAdminStats'
 
 import { StatsBaseComposition } from '../components/StatsBaseComposition'
+import { shouldShowChannelGate, StatsChannelGateBlock } from '../components/StatsChannelGateBlock'
 import { StatsDelta, StatsKpiCard } from '../components/StatsKpiCard'
 import { StatsMainChart } from '../components/StatsMainChart'
 import { TopReferrersTable } from '../components/TopReferrersTable'
@@ -127,6 +128,8 @@ export function StatsUsersTab({
           bonusDaysAll={data.ref_bonus_days_all}
         />
       </div>
+
+      {shouldShowChannelGate(insights?.channel_gate) && <StatsChannelGateBlock gate={insights.channel_gate} />}
     </div>
   )
 }

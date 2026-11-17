@@ -46,6 +46,8 @@ interface AuthState {
 
   setToken: (token: string) => void
   setUser: (user: MeResponse | null) => void
+  /** Окно обязательной подписки на канал: открыть (info) или закрыть (null). */
+  setChannelGate: (info: { required: boolean; channel_url?: string } | null) => void
   logout: () => void
   getAccessToken: () => string | null
   fetchMe: () => Promise<void>
@@ -62,6 +64,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setToken: (token) => set({ accessToken: token }),
 
   setUser: (user) => set({ user }),
+
+  setChannelGate: (info) =>
+    set((state) => {
+      if (!state.user) return state
+      const user = { ...state.user }
+      if (info) user.channel_gate = info
+      else delete user.channel_gate
+      return { user }
+    }),
 
   logout: () => {
     set({ accessToken: null, user: null })
@@ -133,4 +144,5 @@ setAuthStoreRef({
   getAccessToken: () => useAuthStore.getState().getAccessToken(),
   setToken: (token) => useAuthStore.getState().setToken(token),
   logout: () => useAuthStore.getState().logout(),
+  setChannelGate: (info) => useAuthStore.getState().setChannelGate(info),
 })

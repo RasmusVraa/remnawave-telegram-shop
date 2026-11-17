@@ -1,8 +1,19 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Bitcoin, CreditCard, Globe, Layers, Smartphone, Star, Wallet } from 'lucide-react'
+import { CreditCard, Star } from 'lucide-react'
 
-import { HeleketBrandIcon, SbpBrandIcon } from '@/components/BrandIcons'
+import {
+  AlfaPayBrandIcon,
+  BitcoinBrandIcon,
+  HeleketBrandIcon,
+  MethodMosaicIcon,
+  MirBrandIcon,
+  SberPayBrandIcon,
+  SbpBrandIcon,
+  TPayBrandIcon,
+  VisaMastercardBrandIcon,
+  YooMoneyBrandIcon,
+} from '@/components/BrandIcons'
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { api } from '@/lib/api'
 import { PROVIDER_ORDER, useProviderEnabled, type Provider } from '@/features/checkout/checkoutShared'
@@ -18,7 +29,7 @@ import { PROVIDER_ORDER, useProviderEnabled, type Provider } from '@/features/ch
 export type CheckoutMethodId = string
 
 /** Способы ЮKassa — синхрон с config.YookasaPaymentMethodIDs. */
-export const YOOKASSA_METHOD_IDS = ['all', 'sbp', 'bank_card', 'sberbank', 'tinkoff_bank', 'yoo_money'] as const
+export const YOOKASSA_METHOD_IDS = ['all', 'sbp', 'bank_card', 'sberbank', 'tinkoff_bank', 'alfa_pay', 'yoo_money'] as const
 export type YookassaMethodId = (typeof YOOKASSA_METHOD_IDS)[number]
 
 /** Способы Platega — синхрон с config.PlategaPaymentMethodIDs; «all» — общая форма Platega. */
@@ -111,6 +122,35 @@ export interface CheckoutMethodMeta {
   icon: ReactNode
 }
 
+/**
+ * Фирменный знак во всю плашку: плашка (круг или скруглённый квадрат с
+ * overflow-hidden) обрезает его по своей форме.
+ */
+const BRAND_FILL = 'h-full w-full'
+const MOSAIC = 'h-[22px] w-[22px]'
+/** В мозаике знаки — маленькие скруглённые плитки. Обводка — чтобы белые (МИР, Visa) не сливались со светлой плашкой. */
+const MOSAIC_CELL = 'h-[10px] w-[10px] rounded-[3px] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0'
+
+/** «Все способы» ЮKassa: знаки прямых способов, из которых выбирают на форме. */
+const yookassaAllIcon = (
+  <MethodMosaicIcon className={MOSAIC}>
+    <SbpBrandIcon className="h-[10px] w-[10px]" />
+    <SberPayBrandIcon className={MOSAIC_CELL} />
+    <TPayBrandIcon className={MOSAIC_CELL} />
+    <AlfaPayBrandIcon className={MOSAIC_CELL} />
+  </MethodMosaicIcon>
+)
+
+/** Общая форма Platega — так же, из её прямых способов. */
+const plategaAllIcon = (
+  <MethodMosaicIcon className={MOSAIC}>
+    <SbpBrandIcon className="h-[10px] w-[10px]" />
+    <MirBrandIcon className={MOSAIC_CELL} />
+    <VisaMastercardBrandIcon className={MOSAIC_CELL} />
+    <BitcoinBrandIcon className={MOSAIC_CELL} />
+  </MethodMosaicIcon>
+)
+
 export function checkoutMethodMeta(id: CheckoutMethodId, t: (k: string) => string): CheckoutMethodMeta {
   if (id.startsWith(YOOKASSA_PREFIX)) {
     const m = id.slice(YOOKASSA_PREFIX.length)
@@ -119,34 +159,36 @@ export function checkoutMethodMeta(id: CheckoutMethodId, t: (k: string) => strin
       case 'sbp':
         return { label: t('checkout.yookassaMethod.sbp'), provider, icon: <SbpBrandIcon className="h-[18px] w-[18px]" /> }
       case 'bank_card':
-        return { label: t('checkout.yookassaMethod.bank_card'), provider, icon: <CreditCard size={18} className="text-primary" /> }
+        return { label: t('checkout.yookassaMethod.bank_card'), provider, icon: <MirBrandIcon className={BRAND_FILL} /> }
       case 'sberbank':
-        return { label: t('checkout.yookassaMethod.sberbank'), provider, icon: <Smartphone size={18} className="text-emerald-500" /> }
+        return { label: t('checkout.yookassaMethod.sberbank'), provider, icon: <SberPayBrandIcon className={BRAND_FILL} /> }
       case 'tinkoff_bank':
-        return { label: t('checkout.yookassaMethod.tinkoff_bank'), provider, icon: <Smartphone size={18} className="text-yellow-500" /> }
+        return { label: t('checkout.yookassaMethod.tinkoff_bank'), provider, icon: <TPayBrandIcon className={BRAND_FILL} /> }
+      case 'alfa_pay':
+        return { label: t('checkout.yookassaMethod.alfa_pay'), provider, icon: <AlfaPayBrandIcon className={BRAND_FILL} /> }
       case 'yoo_money':
-        return { label: t('checkout.yookassaMethod.yoo_money'), provider, icon: <Wallet size={18} className="text-violet-500" /> }
+        return { label: t('checkout.yookassaMethod.yoo_money'), provider, icon: <YooMoneyBrandIcon className={BRAND_FILL} /> }
       default:
-        return { label: t('checkout.card'), provider, icon: <CreditCard size={18} className="text-primary" /> }
+        return { label: t('checkout.card'), provider, icon: yookassaAllIcon }
     }
   }
   switch (id) {
     case 'cryptopay':
-      return { label: t('checkout.crypto'), provider: t('checkout.providerHintCryptopay'), icon: <Bitcoin size={18} className="text-orange-500" /> }
+      return { label: t('checkout.crypto'), provider: t('checkout.providerHintCryptopay'), icon: <BitcoinBrandIcon className={BRAND_FILL} /> }
     case 'telegram':
       return { label: t('checkout.telegramStars'), provider: t('checkout.providerHintTelegram'), icon: <Star size={18} className="text-amber-500" /> }
     case 'heleket':
       return { label: t('checkout.otherCrypto'), provider: t('checkout.providerHintHeleket'), icon: <HeleketBrandIcon className="h-[18px] w-[18px]" /> }
     case 'platega':
-      return { label: t('checkout.plategaAll'), provider: t('checkout.providerHintPlatega'), icon: <Layers size={18} className="text-primary" /> }
+      return { label: t('checkout.plategaAll'), provider: t('checkout.providerHintPlatega'), icon: plategaAllIcon }
     case 'platega_sbp':
       return { label: t('checkout.plategaSbp'), provider: t('checkout.providerHintPlatega'), icon: <SbpBrandIcon className="h-[18px] w-[18px]" /> }
     case 'platega_acquiring':
-      return { label: t('checkout.plategaAcquiring'), provider: t('checkout.providerHintPlatega'), icon: <CreditCard size={18} className="text-violet-500" /> }
+      return { label: t('checkout.plategaAcquiring'), provider: t('checkout.providerHintPlatega'), icon: <MirBrandIcon className={BRAND_FILL} /> }
     case 'platega_worldwide':
-      return { label: t('checkout.plategaWorldwide'), provider: t('checkout.providerHintPlatega'), icon: <Globe size={18} className="text-indigo-500" /> }
+      return { label: t('checkout.plategaWorldwide'), provider: t('checkout.providerHintPlatega'), icon: <VisaMastercardBrandIcon className={BRAND_FILL} /> }
     case 'platega_crypto':
-      return { label: t('checkout.plategaCrypto'), provider: t('checkout.providerHintPlatega'), icon: <Bitcoin size={18} className="text-primary" /> }
+      return { label: t('checkout.plategaCrypto'), provider: t('checkout.providerHintPlatega'), icon: <BitcoinBrandIcon className={BRAND_FILL} /> }
     default:
       return { label: id, provider: '', icon: <CreditCard size={18} className="text-primary" /> }
   }

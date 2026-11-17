@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 )
 
@@ -94,6 +95,19 @@ type adminPartnerProgramDTO struct {
 	Top               []adminPartnerTopDTO `json:"top"`
 }
 
+// adminChannelGateDTO — блок «Подписка на канал»: новые клиенты, увидевшие экран
+// подписки в окне, и старые, которые его увидели и не подписались.
+type adminChannelGateDTO struct {
+	Enabled      bool   `json:"enabled"`
+	Channel      string `json:"channel,omitempty"`
+	Shown        int64  `json:"shown"`
+	Passed       int64  `json:"passed"`
+	NotPassed    int64  `json:"not_passed"`
+	InProgress   int64  `json:"in_progress"`
+	TriedFailed  int64  `json:"tried_failed"`
+	OldNotPassed int64  `json:"old_not_passed"`
+}
+
 type adminStatsInsightsResp struct {
 	CapturedAt      string                  `json:"captured_at"`
 	Period          string                  `json:"period"`
@@ -108,6 +122,7 @@ type adminStatsInsightsResp struct {
 	Current         adminStatsWindowDTO     `json:"current"`
 	Previous        adminStatsWindowDTO     `json:"previous"`
 	Partners        *adminPartnerProgramDTO `json:"partners"`
+	ChannelGate     *adminChannelGateDTO    `json:"channel_gate"`
 }
 
 // Insights — GET /cabinet/api/admin/stats/insights?period=month
@@ -240,6 +255,22 @@ func (h *AdminStatsHandler) Insights(w http.ResponseWriter, r *http.Request) {
 			slog.Error("admin stats: partner program stats failed", "error", perr.Error())
 		} else {
 			resp.Partners = mapPartnerProgram(prog)
+		}
+	}
+
+	// Подписка на канал — тоже необязательный блок: сбой подсчёта не роняет страницу.
+	if cg, cerr := h.stats.ChannelGateStats(r.Context(), from, to); cerr != nil {
+		slog.Error("admin stats: channel gate stats failed", "error", cerr.Error())
+	} else {
+		resp.ChannelGate = &adminChannelGateDTO{
+			Enabled:      config.ChannelGateActive(),
+			Channel:      config.ChannelGateChannel(),
+			Shown:        cg.Shown,
+			Passed:       cg.Passed,
+			NotPassed:    cg.NotPassed,
+			InProgress:   cg.InProgress,
+			TriedFailed:  cg.TriedFailed,
+			OldNotPassed: cg.OldNotPassed,
 		}
 	}
 

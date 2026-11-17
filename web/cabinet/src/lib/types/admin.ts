@@ -292,6 +292,19 @@ export interface AdminStatsInsightsDTO {
   current: AdminStatsWindowDTO
   previous: AdminStatsWindowDTO
   partners?: AdminPartnerProgramDTO | null
+  channel_gate?: AdminChannelGateDTO | null
+}
+
+/** Блок «Подписка на канал»: новые клиенты, увидевшие экран подписки, и старые, не подписавшиеся. */
+export interface AdminChannelGateDTO {
+  enabled: boolean
+  channel?: string
+  shown: number
+  passed: number
+  not_passed: number
+  in_progress: number
+  tried_failed: number
+  old_not_passed: number
 }
 
 export interface AdminStatsTimeSeriesPointDTO {

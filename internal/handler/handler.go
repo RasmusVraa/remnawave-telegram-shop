@@ -13,6 +13,7 @@ import (
 
 	"remnawave-tg-shop-bot/internal/broadcast"
 	"remnawave-tg-shop-bot/internal/cache"
+	"remnawave-tg-shop-bot/internal/channelgate"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/cryptopay"
 	"remnawave-tg-shop-bot/internal/database"
@@ -43,6 +44,8 @@ type Handler struct {
 	infraBillingRepository *database.InfraBillingRepository
 	loyaltyTierRepository  *database.LoyaltyTierRepository
 	broadcastSender        *broadcast.Sender
+	// channelGate — обязательная подписка на канал; nil — проверки нет (см. SetChannelGate).
+	channelGate *channelgate.Service
 }
 
 func NewHandler(

@@ -1051,6 +1051,17 @@
         "hwid_pinned": "This promo code adds devices, but your device limit is set by the administrator."
       }
     },
+    "channelGate": {
+      "title": "Subscribe to our channel",
+      "text": "To use the cabinet, subscribe to our Telegram channel: news, server status and offers.",
+      "open": "Open channel",
+      "check": "Yes, I subscribed",
+      "checking": "Checking…",
+      "notYet": "I don't see your subscription yet. Subscribe to the channel and tap the button again.",
+      "error": "Couldn't check the subscription. Try again in a minute.",
+      "doneTitle": "Done, thank you!",
+      "doneText": "We can see your subscription. This window will close on its own."
+    },
     "stub": {
       "backHome": "Back to home"
     },
@@ -1086,8 +1097,8 @@
       "title": "Checkout",
       "chooseProvider": "Payment method",
       "pay": "Pay",
-      "card": "Card / Bank transfer",
-      "crypto": "Cryptocurrency",
+      "card": "Cards & wallets",
+      "crypto": "Crypto",
       "otherCrypto": "Other crypto",
       "telegramStars": "Telegram Stars",
       "providerHintYookassa": "YooKassa",
@@ -1096,14 +1107,15 @@
       "providerHintTelegram": "Telegram Stars",
       "providerHintPlatega": "Platega",
       "plategaSbp": "SBP",
-      "plategaAcquiring": "Card",
-      "plategaWorldwide": "Card",
+      "plategaAcquiring": "Mir card",
+      "plategaWorldwide": "Foreign cards",
       "plategaCrypto": "Crypto",
       "yookassaMethod": {
         "sbp": "SBP",
         "bank_card": "Card",
         "sberbank": "SberPay",
         "tinkoff_bank": "T-Pay",
+        "alfa_pay": "Alfa Pay",
         "yoo_money": "YooMoney"
       },
       "changeMethod": "Change",
@@ -1133,7 +1145,7 @@
       "switchDaysExact": "{{days}} d",
       "switchDaysBonus": "+{{days}} d",
       "previewError": "Could not recalculate the amount. Showing catalog price — you will be charged the actual total at checkout.",
-      "plategaAll": "All methods",
+      "plategaAll": "Cards, SBP & crypto",
       "devicesTitle_one": "{{count}} device",
       "devicesTitle_other": "{{count}} devices",
       "trafficLimited": "{{gb}} GB of traffic",
@@ -1339,7 +1351,9 @@
         "infra": "Infrastructure",
         "sync": "Sync",
         "settings": "Bot settings",
-        "monitoring": "Monitoring"
+        "monitoring": "Monitoring",
+        "collapse": "Collapse menu",
+        "expand": "Expand menu"
       },
       "backToCabinet": "Back to cabinet",
       "breadcrumb": {
@@ -1387,6 +1401,12 @@
         "serviceUnavailable": "Service temporarily unavailable.",
         "serverError": "Server error. Please try later.",
         "requestFailed": "Request failed.",
+        "channelNoChannel": "Enter the channel first and press “Check”.",
+        "channelBotNotAdmin": "Can't enable: the bot is not an admin of this channel. Add it as an administrator and try again.",
+        "channelNotFound": "Can't enable: channel not found.",
+        "channelPrivate": "Can't enable: the channel is private, a public one is required.",
+        "channelUnavailable": "Couldn't check the channel: Telegram didn't respond. Try again.",
+        "channelBadFormat": "That doesn't look like @name or a t.me/name link of a public channel.",
         "panelUnavailable": "Remnawave is not configured or panel is unavailable.",
         "syncInProgress": "Sync is already in progress.",
         "broadcastInProgress": "A broadcast is already running. Please wait until it finishes.",
@@ -1469,6 +1489,20 @@
         "chartMetricSales": "Sales",
         "chartMetricNew": "New users",
         "chartEmpty": "No data for the selected period",
+        "channelGateTitle": "Channel subscription",
+        "channelGateSubtitle": "New customers · {{channel}}",
+        "channelGateSubtitleNoChannel": "New customers",
+        "channelGateOff": "Currently off",
+        "channelGateShown": "Saw the subscription screen",
+        "channelGatePassed": "Subscribed",
+        "channelGatePassedPct": "{{pct}}% of those who saw it",
+        "channelGateLeft": "Didn't subscribe and left",
+        "channelGateTried": "Of those who left, pressed “Yes, I subscribed”",
+        "channelGateThinking": "Still thinking",
+        "channelGateThinkingHint": "(screen seen less than a day ago)",
+        "channelGateOld": "Existing customers not subscribed",
+        "channelGateOldHint": "(VPN works)",
+        "channelGateFootnote": "New — arrived and immediately saw the subscription screen. “Left” — didn't subscribe within a day; if they come back and subscribe they move to “Subscribed”. Counted since the feature was turned on.",
         "funnelTitle": "Funnel",
         "funnelRegistered": "Registered",
         "funnelInvoiced": "Created an invoice",
@@ -2411,7 +2445,6 @@
         },
         "payback": {
           "paidDiscount": "Paid with discount",
-          "paidAfter": "Bought after entry",
           "revenue": "Revenue",
           "none": "—",
           "activations": "Redemptions"
@@ -3070,6 +3103,7 @@
           "stars": "Telegram Stars",
           "payments": "Payment methods",
           "payments_notify": "Payment notifications",
+          "channel_gate": "Channel subscription",
           "admin_alerts": "Admin alerts",
           "moynalog": "Moy Nalog",
           "trial": "Trial & traffic",
@@ -3094,6 +3128,28 @@
         "groupIntros": {
           "admin_alerts": "Where the bot tells you about problems and events: cabinet mail is not sending, a server is down, a server bill is due, a payment came in, a partner asks for a payout. Easiest: one group with topics set above, and a topic per kind.",
           "notifications": "This doesn't turn cabinet notifications on or off: they always appear under the bell for everyone. These toggles decide what is also sent as a system notification to the browser or phone of those who tapped \"Turn on\" in the notification feed. People who didn't subscribe get nothing."
+        },
+        "channelGate": {
+          "channelTitle": "Channel",
+          "howTitle": "How to set up",
+          "check": "Check",
+          "botAdmin": "Bot is admin",
+          "members": "Subscribers: {{n}}",
+          "mustCheck": "The requirement can't be enabled until the check passes.",
+          "useLinks": "Use the channel from “Links”: {{value}}",
+          "step1": "Channel → “Manage channel” → “Administrators” → “Add administrator”.",
+          "step2": "Find your bot and add it. You can switch all permissions off — only the admin status is needed.",
+          "step3": "Enter <c>@channel_name</c> or a <c>t.me/…</c> link here and press “Check”.",
+          "step4": "Turn on the switch and save the section.",
+          "err": {
+            "bad_format": "That doesn't look like @name or a t.me/name link of a public channel.",
+            "not_found": "Channel not found. Check the name.",
+            "private": "This is a private channel — a public one is required.",
+            "bot_not_admin": "The bot is not an admin of this channel",
+            "bot_not_admin_hint": "Add the bot as an administrator and press “Check” again.",
+            "unavailable": "Telegram didn't respond. Try again in a minute.",
+            "no_channel": "Enter the channel first."
+          }
         },
         "alerts": {
           "events": "What to send",
@@ -3155,7 +3211,7 @@
         },
         "yookassaMethods": {
           "all": "YooKassa form with all methods",
-          "allHint": "Same as without the setting: one “Card / Bank transfer” button",
+          "allHint": "The payer picks the method on the YooKassa page",
           "connectWarning": "Each method has to be enabled in your YooKassa account, or the payment won't be created.",
           "noAllWarning": "No form with all methods: methods missing from the list aren't available via YooKassa."
         },
@@ -3240,6 +3296,13 @@
           "old_price": "Struck-through full price"
         },
         "fields": {
+          "CHANNEL_GATE_ENABLED": {
+            "label": "Require channel subscription",
+            "hint": "Until the user subscribes, the bot and the cabinet only show the subscription screen. Admins are not affected"
+          },
+          "CHANNEL_GATE_CHANNEL": {
+            "label": "Public channel"
+          },
           "LOYALTY_ENABLED": {
             "label": "Loyalty program",
             "hint": "Tiers — in Loyalty section"

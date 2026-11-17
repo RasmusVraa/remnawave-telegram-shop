@@ -29,6 +29,7 @@ var YookasaPaymentMethodIDs = []string{
 	"bank_card",
 	"sberbank",
 	"tinkoff_bank",
+	"alfa_pay",
 	"yoo_money",
 }
 

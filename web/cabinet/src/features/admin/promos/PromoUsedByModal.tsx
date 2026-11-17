@@ -50,16 +50,21 @@ export function PromoFact({
   )
 }
 
-/** Факты отдачи: «Купили после ввода» (у скидки — «Оплатили со скидкой») и «Выручка». */
+/**
+ * Факты отдачи — только у скидки: «Оплатили со скидкой» и «Выручка» с оплат,
+ * где скидка кода применилась. У дней, триала и устройства их нет (show=false):
+ * оплаты после ввода — не заслуга кода.
+ */
 export function usePromoPaybackFacts(promo: AdminPromoCodeDTO, enabled: boolean) {
   const { t, i18n } = useTranslation()
   const { data, isLoading } = useAdminPromoGet(enabled ? promo.id : null)
   const payback = data?.payback
   const conv = paybackConversion(payback, promo.uses_count)
   return {
+    show: promo.type === 'discount',
     loading: isLoading,
     detail: data,
-    paidLabel: promo.type === 'discount' ? t('admin.promos.payback.paidDiscount') : t('admin.promos.payback.paidAfter'),
+    paidLabel: t('admin.promos.payback.paidDiscount'),
     paid: payback ? (
       <>
         {payback.paid_customers}
@@ -144,19 +149,23 @@ export function PromoUsedByModal({ promo, open, onClose }: { promo: AdminPromoCo
       panelClassName="sm:max-w-[560px]"
     >
       <div className="space-y-3">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className={cn('grid grid-cols-2 gap-2', facts.show && 'sm:grid-cols-4')}>
           <PromoFact label={t('admin.promos.payback.activations')}>
             {usage.max != null ? `${usage.used} ${t('admin.promos.used.ofMax', { max: usage.max })}` : usage.used}
           </PromoFact>
           <PromoFact label={t('admin.promos.usedByModal.last24h')} loading={facts.loading}>
             {facts.detail?.redemptions_24h ?? facts.detail?.redemptions_today ?? '—'}
           </PromoFact>
-          <PromoFact label={facts.paidLabel} loading={facts.loading}>
-            {facts.paid}
-          </PromoFact>
-          <PromoFact label={t('admin.promos.payback.revenue')} loading={facts.loading}>
-            {facts.revenue}
-          </PromoFact>
+          {facts.show && (
+            <>
+              <PromoFact label={facts.paidLabel} loading={facts.loading}>
+                {facts.paid}
+              </PromoFact>
+              <PromoFact label={t('admin.promos.payback.revenue')} loading={facts.loading}>
+                {facts.revenue}
+              </PromoFact>
+            </>
+          )}
         </div>
 
         {list.isLoading && (
@@ -174,7 +183,7 @@ export function PromoUsedByModal({ promo, open, onClose }: { promo: AdminPromoCo
           <ul className="space-y-2">
             {rows.map((row) => {
               const d = new Date(row.used_at)
-              const paid = formatPromoMoney(row.paid_rub, row.paid_stars, i18n.language)
+              const paid = facts.show ? formatPromoMoney(row.paid_rub, row.paid_stars, i18n.language) : null
               const label = formatAdminCustomerLabel({
                 telegram_username: row.telegram_username,
                 nickname: row.nickname,

@@ -139,23 +139,35 @@ function MethodList({
   const { t } = useTranslation()
 
   return (
-    <div className="grid gap-2" role="radiogroup" aria-label={t('checkout.chooseProvider')}>
-      {methods.map((id) => {
-        const meta = checkoutMethodMeta(id, t)
-        return (
-          <ProviderMethodButton
-            key={id}
-            selected={method === id}
-            onClick={() => onSelect(id)}
-            icon={meta.icon}
-            label={meta.label}
-            description={meta.provider}
-          />
-        )
-      })}
-    </div>
+    <>
+      {/* Телефон — строки на всю ширину. */}
+      <div className="grid gap-2 sm:hidden" role="radiogroup" aria-label={t('checkout.chooseProvider')}>
+        {methods.map((id) => {
+          const meta = checkoutMethodMeta(id, t)
+          return (
+            <ProviderMethodButton
+              key={id}
+              selected={method === id}
+              onClick={() => onSelect(id)}
+              icon={meta.icon}
+              label={meta.label}
+              description={meta.provider}
+            />
+          )
+        })}
+      </div>
+      {/* Планшет и ПК — плитки одной ширины, число колонок подбирается по месту. */}
+      <div className={cn('hidden sm:grid', TILE_GRID)} role="radiogroup" aria-label={t('checkout.chooseProvider')}>
+        {methods.map((id) => (
+          <MethodTile key={id} id={id} selected={method === id} onClick={() => onSelect(id)} />
+        ))}
+      </div>
+    </>
   )
 }
+
+/** Плитки: две колонки на телефоне, от sm — авто-колонки не уже 220 px. */
+const TILE_GRID = 'grid-cols-2 gap-2 sm:grid-cols-[repeat(auto-fill,minmax(220px,1fr))] sm:gap-2.5'
 
 /** Прошлый способ одной строкой; «Изменить» раскрывает полный список, выбор сворачивает его. */
 function LastUsedPicker({
@@ -188,7 +200,7 @@ function LastUsedPicker({
       aria-expanded={false}
       className="flex w-full items-center gap-3 rounded-[16px] border border-primary/60 bg-primary/[0.07] px-3 py-2.5 text-left transition-colors hover:bg-primary/[0.11] dark:bg-primary/[0.1] dark:hover:bg-primary/[0.14]"
     >
-      <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-muted dark:bg-white/[0.07]">
+      <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0">
         {meta.icon}
       </div>
       <div className="min-w-0 flex-1">
@@ -230,7 +242,7 @@ function RecommendedPicker({
       />
       <div className="space-y-2">
         <p className="pt-1 text-xs text-muted-foreground">{t('checkout.otherMethods')}</p>
-        <div className="grid grid-cols-2 gap-2">
+        <div className={cn('grid', TILE_GRID)}>
           {others.map((id) => (
             <MethodTile key={id} id={id} selected={method === id} onClick={() => onSelect(id)} />
           ))}
@@ -250,19 +262,19 @@ function MethodTile({ id, selected, onClick }: { id: CheckoutMethodId; selected:
       role="radio"
       aria-checked={selected}
       className={cn(
-        'relative flex min-w-0 items-center gap-2 rounded-[14px] border p-2 text-left transition-all duration-150',
+        'relative flex min-w-0 items-center gap-2 rounded-[14px] border p-2 text-left transition-all duration-150 sm:gap-3 sm:rounded-[16px] sm:px-3 sm:py-2.5',
         selected
           ? 'border-primary/60 bg-primary/[0.07] dark:bg-primary/[0.1]'
           : 'border-border bg-foreground/[0.03] hover:border-primary/40 hover:bg-foreground/[0.06] dark:bg-black/20 dark:hover:bg-black/30',
       )}
     >
-      <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-muted dark:bg-white/[0.07]">
+      <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0 sm:h-[38px] sm:w-[38px]">
         {meta.icon}
       </div>
-      {/* Две строки вместо многоточия: «Другая крипта» в узкую плитку на телефоне не влезает. */}
+      {/* Название в одну строку с многоточием — две строки в плитке выглядят хуже обрезки. */}
       <div className="min-w-0 flex-1">
-        <p className="line-clamp-2 text-[13px] font-medium leading-tight">{meta.label}</p>
-        <p className="truncate text-[11px] text-muted-foreground">{meta.provider}</p>
+        <p className="truncate text-[13px] font-semibold leading-tight sm:text-sm">{meta.label}</p>
+        <p className="truncate text-[11px] text-muted-foreground sm:text-[13px]">{meta.provider}</p>
       </div>
       {selected && (
         <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary">

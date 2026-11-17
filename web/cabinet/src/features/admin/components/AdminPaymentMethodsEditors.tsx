@@ -111,7 +111,7 @@ function AdminMethodList({
         ) : (
           <span className="-ml-1 h-9 w-6 shrink-0" aria-hidden />
         )}
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted dark:bg-white/[0.07]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0">
           {item.icon}
         </span>
         <div className="min-w-0 flex-1">

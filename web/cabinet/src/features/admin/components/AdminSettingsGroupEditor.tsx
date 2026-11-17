@@ -26,6 +26,7 @@ import {
 import { groupSettingsFieldsForLayout, isTextareaSettingType } from '../utils/adminSettingsFieldLayout'
 import { decorThemeOptionLabelStyle } from '@/features/decor/decorThemeAdmin'
 import { AdminAlertRoutes } from './AdminAlertRoutes'
+import { AdminChannelGateEditor } from './AdminChannelGateEditor'
 import type { AdminSettingFieldDTO, AdminSettingGroupDTO } from '@/lib/types/admin'
 
 export function parseBool(v: string): boolean {
@@ -334,7 +335,9 @@ export function AdminSettingsGroupEditor({
 
   const groupTitle = t(`admin.settings.groups.${group.id}`)
   // Пояснение ко всей группе — там, где по подписям полей легко понять не то.
-  const groupIntro = t(`admin.settings.groupIntros.${group.id}`, { defaultValue: '' })
+  // У «Подписки на канал» плашки нет: всё нужное — подсказка под переключателем и «Как подключить»
+  const groupIntro =
+    group.id === 'channel_gate' ? '' : t(`admin.settings.groupIntros.${group.id}`, { defaultValue: '' })
 
   return (
     <Card id={adminSettingsGroupAnchor(group.id)} className={cn('cabinet-elevated-card scroll-mt-24 overflow-hidden', expanded && 'lg:col-span-2')}>
@@ -385,6 +388,8 @@ export function AdminSettingsGroupEditor({
                 onDraftChange={onDraftChange}
                 onToggle={onToggle}
               />
+            ) : group.id === 'channel_gate' ? (
+              <AdminChannelGateEditor draft={draft} saving={saving} onDraftChange={onDraftChange} />
             ) : subsectionBlocks.length === 1 && !subsectionBlocks[0].def ? (
               <div className="rounded-lg border border-border/60 bg-card/80 px-3 shadow-sm">
                 {renderFieldsLayout(subsectionBlocks[0].fields)}

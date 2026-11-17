@@ -77,7 +77,8 @@ var remnaTagPattern = regexp.MustCompile(`^[A-Z0-9_]+$`)
 // RuntimeSettingsRegistry — Phase 1 whitelist (~50 ключей).
 func RuntimeSettingsRegistry() []SettingField {
 	out := append(append(baseRuntimeSettings(), cabinetPushRegistry()...), adminAlertsRegistry()...)
-	return append(out, monitoringRegistry()...)
+	out = append(out, monitoringRegistry()...)
+	return append(out, channelGateRegistry()...)
 }
 
 func baseRuntimeSettings() []SettingField {
@@ -812,36 +813,38 @@ func baseRuntimeSettings() []SettingField {
 		{Key: "VIDEO_GUIDE_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.videoGuideURL = v }), Current: func() string { return conf.videoGuideURL }},
 
 		// --- fortune ---
-		{Key: "FORTUNE_ENABLED", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_ENABLED"), Current: fortuneCurrent("FORTUNE_ENABLED")},
-		{Key: "FORTUNE_DAILY_FREE_SPIN", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_DAILY_FREE_SPIN"), Current: fortuneCurrent("FORTUNE_DAILY_FREE_SPIN")},
-		{Key: "FORTUNE_WINNER_TICKER_ENABLED", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_WINNER_TICKER_ENABLED"), Current: fortuneCurrent("FORTUNE_WINNER_TICKER_ENABLED")},
-		{Key: "FORTUNE_WINNER_TICKER_FAKE_FILL", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_WINNER_TICKER_FAKE_FILL"), Current: fortuneCurrent("FORTUNE_WINNER_TICKER_FAKE_FILL")},
-		{Key: "FORTUNE_MAX_SPINS_PER_DAY", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_MAX_SPINS_PER_DAY", 1), Current: fortuneCurrent("FORTUNE_MAX_SPINS_PER_DAY")},
-		{Key: "FORTUNE_MIN_SUBSCRIPTION_DAYS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_MIN_SUBSCRIPTION_DAYS", 1), Current: fortuneCurrent("FORTUNE_MIN_SUBSCRIPTION_DAYS")},
-		{Key: "FORTUNE_SPIN_COST_DAYS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_SPIN_COST_DAYS", 1), Current: fortuneCurrent("FORTUNE_SPIN_COST_DAYS")},
-		{Key: "FORTUNE_WEIGHT_MICRO", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_MICRO", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_MICRO")},
-		{Key: "FORTUNE_WEIGHT_XP", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_XP", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_XP")},
-		{Key: "FORTUNE_WEIGHT_DISCOUNT_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DISCOUNT_3", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DISCOUNT_3")},
-		{Key: "FORTUNE_WEIGHT_DAYS_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_3", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_3")},
-		{Key: "FORTUNE_WEIGHT_DISCOUNT_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DISCOUNT_5", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DISCOUNT_5")},
-		{Key: "FORTUNE_WEIGHT_DAYS_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_5", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_5")},
-		{Key: "FORTUNE_WEIGHT_DAYS_7", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_7", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_7")},
-		{Key: "FORTUNE_WEIGHT_DAYS_15", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_15", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_15")},
-		{Key: "FORTUNE_WEIGHT_DAYS_30", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_30", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_30")},
-		{Key: "FORTUNE_WEIGHT_DAYS_180", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_180", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_DAYS_180")},
-		{Key: "FORTUNE_WEIGHT_FREE_SPIN", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_FREE_SPIN", 0), Current: fortuneCurrent("FORTUNE_WEIGHT_FREE_SPIN")},
-		{Key: "FORTUNE_REWARD_XP_AMOUNT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_XP_AMOUNT", 0), Current: fortuneCurrent("FORTUNE_REWARD_XP_AMOUNT")},
-		{Key: "FORTUNE_REWARD_MICRO_XP_MIN", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_MICRO_XP_MIN", 0), Current: fortuneCurrent("FORTUNE_REWARD_MICRO_XP_MIN")},
-		{Key: "FORTUNE_REWARD_MICRO_XP_MAX", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_MICRO_XP_MAX", 0), Current: fortuneCurrent("FORTUNE_REWARD_MICRO_XP_MAX")},
-		{Key: "FORTUNE_REWARD_DISCOUNT_3_PERCENT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DISCOUNT_3_PERCENT", 0), Current: fortuneCurrent("FORTUNE_REWARD_DISCOUNT_3_PERCENT")},
-		{Key: "FORTUNE_REWARD_DISCOUNT_5_PERCENT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DISCOUNT_5_PERCENT", 0), Current: fortuneCurrent("FORTUNE_REWARD_DISCOUNT_5_PERCENT")},
-		{Key: "FORTUNE_REWARD_DAYS_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_3", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_3")},
-		{Key: "FORTUNE_REWARD_DAYS_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_5", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_5")},
-		{Key: "FORTUNE_REWARD_DAYS_7", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_7", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_7")},
-		{Key: "FORTUNE_REWARD_DAYS_15", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_15", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_15")},
-		{Key: "FORTUNE_REWARD_DAYS_30", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_30", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_30")},
-		{Key: "FORTUNE_REWARD_DAYS_180", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_180", 0), Current: fortuneCurrent("FORTUNE_REWARD_DAYS_180")},
-		{Key: "FORTUNE_REWARD_FREE_SPINS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_REWARD_FREE_SPINS", 1), Current: fortuneCurrent("FORTUNE_REWARD_FREE_SPINS")},
+		// Current с дефолтами: иначе незаданные FORTUNE_* (особенно FREE_SPIN из 5.30)
+		// отдаются как "" → админка шлёт пустую строку и PATCH падает с «invalid integer».
+		{Key: "FORTUNE_ENABLED", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_ENABLED"), Current: fortuneBoolCurrent("FORTUNE_ENABLED", false)},
+		{Key: "FORTUNE_DAILY_FREE_SPIN", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_DAILY_FREE_SPIN"), Current: fortuneBoolCurrent("FORTUNE_DAILY_FREE_SPIN", true)},
+		{Key: "FORTUNE_WINNER_TICKER_ENABLED", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_WINNER_TICKER_ENABLED"), Current: fortuneBoolCurrent("FORTUNE_WINNER_TICKER_ENABLED", true)},
+		{Key: "FORTUNE_WINNER_TICKER_FAKE_FILL", Group: "fortune", Type: SettingBool, Instant: true, Apply: applyFortuneBool("FORTUNE_WINNER_TICKER_FAKE_FILL"), Current: fortuneBoolCurrent("FORTUNE_WINNER_TICKER_FAKE_FILL", false)},
+		{Key: "FORTUNE_MAX_SPINS_PER_DAY", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_MAX_SPINS_PER_DAY", 1), Current: cabinetIntCurrent("FORTUNE_MAX_SPINS_PER_DAY", 4)},
+		{Key: "FORTUNE_MIN_SUBSCRIPTION_DAYS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_MIN_SUBSCRIPTION_DAYS", 1), Current: cabinetIntCurrent("FORTUNE_MIN_SUBSCRIPTION_DAYS", 2)},
+		{Key: "FORTUNE_SPIN_COST_DAYS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_SPIN_COST_DAYS", 1), Current: cabinetIntCurrent("FORTUNE_SPIN_COST_DAYS", 1)},
+		{Key: "FORTUNE_WEIGHT_MICRO", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_MICRO", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_MICRO", 478)},
+		{Key: "FORTUNE_WEIGHT_XP", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_XP", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_XP", 355)},
+		{Key: "FORTUNE_WEIGHT_DISCOUNT_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DISCOUNT_3", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DISCOUNT_3", 60)},
+		{Key: "FORTUNE_WEIGHT_DAYS_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_3", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_3", 25)},
+		{Key: "FORTUNE_WEIGHT_DISCOUNT_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DISCOUNT_5", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DISCOUNT_5", 40)},
+		{Key: "FORTUNE_WEIGHT_DAYS_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_5", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_5", 15)},
+		{Key: "FORTUNE_WEIGHT_DAYS_7", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_7", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_7", 10)},
+		{Key: "FORTUNE_WEIGHT_DAYS_15", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_15", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_15", 5)},
+		{Key: "FORTUNE_WEIGHT_DAYS_30", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_30", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_30", 2)},
+		{Key: "FORTUNE_WEIGHT_DAYS_180", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_DAYS_180", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_DAYS_180", 0)},
+		{Key: "FORTUNE_WEIGHT_FREE_SPIN", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_WEIGHT_FREE_SPIN", 0), Current: cabinetIntCurrent("FORTUNE_WEIGHT_FREE_SPIN", 10)},
+		{Key: "FORTUNE_REWARD_XP_AMOUNT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_XP_AMOUNT", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_XP_AMOUNT", 35)},
+		{Key: "FORTUNE_REWARD_MICRO_XP_MIN", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_MICRO_XP_MIN", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_MICRO_XP_MIN", 5)},
+		{Key: "FORTUNE_REWARD_MICRO_XP_MAX", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_MICRO_XP_MAX", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_MICRO_XP_MAX", 15)},
+		{Key: "FORTUNE_REWARD_DISCOUNT_3_PERCENT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DISCOUNT_3_PERCENT", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DISCOUNT_3_PERCENT", 3)},
+		{Key: "FORTUNE_REWARD_DISCOUNT_5_PERCENT", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DISCOUNT_5_PERCENT", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DISCOUNT_5_PERCENT", 5)},
+		{Key: "FORTUNE_REWARD_DAYS_3", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_3", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_3", 3)},
+		{Key: "FORTUNE_REWARD_DAYS_5", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_5", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_5", 5)},
+		{Key: "FORTUNE_REWARD_DAYS_7", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_7", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_7", 7)},
+		{Key: "FORTUNE_REWARD_DAYS_15", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_15", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_15", 15)},
+		{Key: "FORTUNE_REWARD_DAYS_30", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_30", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_30", 30)},
+		{Key: "FORTUNE_REWARD_DAYS_180", Group: "fortune", Type: SettingInt, MinInt: intPtr(0), Apply: applyFortuneInt("FORTUNE_REWARD_DAYS_180", 0), Current: cabinetIntCurrent("FORTUNE_REWARD_DAYS_180", 180)},
+		{Key: "FORTUNE_REWARD_FREE_SPINS", Group: "fortune", Type: SettingInt, MinInt: intPtr(1), Apply: applyFortuneInt("FORTUNE_REWARD_FREE_SPINS", 1), Current: cabinetIntCurrent("FORTUNE_REWARD_FREE_SPINS", 1)},
 	}
 }
 
@@ -1146,6 +1149,19 @@ func applyBoundedText(key string, maxRunes int) func(string) error {
 
 func fortuneCurrent(key string) func() string {
 	return func() string { return effectiveEnvUnderRLock(key) }
+}
+
+func fortuneBoolCurrent(key string, def bool) func() string {
+	return func() string {
+		v := strings.TrimSpace(effectiveEnvUnderRLock(key))
+		if v == "" {
+			if def {
+				return "true"
+			}
+			return "false"
+		}
+		return v
+	}
 }
 
 func cabinetLightThemeCurrent() func() string {

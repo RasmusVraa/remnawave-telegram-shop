@@ -25,6 +25,7 @@ func TestParseYookasaPaymentMethods(t *testing.T) {
 		" SBP , bank_card ":               {"sbp", "bank_card"},
 		"bank_card,all":                   {"bank_card", "all"},
 		"sberbank,tinkoff_bank,yoo_money": {"sberbank", "tinkoff_bank", "yoo_money"},
+		"alfa_pay,sbp":                    {"alfa_pay", "sbp"},
 	}
 	for in, want := range ok {
 		got, err := ParseYookasaPaymentMethods(in)

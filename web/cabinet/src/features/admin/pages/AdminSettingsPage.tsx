@@ -181,7 +181,9 @@ export default function AdminSettingsPage() {
   return (
     <AdminLayout>
       <AdminFeedback feedback={feedback} onDismiss={clearFeedback} autoDismissMs={4000} />
-      <div className="mx-auto max-w-2xl space-y-4 lg:max-w-5xl">
+      {/* На ПК без потолка ширины, как у остальных страниц: при свёрнутом меню
+          lg:max-w-5xl центрировал контент вместо того, чтобы растянуть его. */}
+      <div className="mx-auto max-w-2xl space-y-4 lg:max-w-none">
         <AdminPageHeader
           icon={SlidersHorizontal}
           title={t('admin.settings.title')}

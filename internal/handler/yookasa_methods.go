@@ -19,6 +19,7 @@ var yookasaMethodCallbackCodes = map[string]string{
 	"bank_card":                    "c",
 	"sberbank":                     "p",
 	"tinkoff_bank":                 "t",
+	"alfa_pay":                     "l", // «a» занята под all
 	"yoo_money":                    "y",
 }
 
@@ -49,6 +50,7 @@ var yookasaMethodButtonFallback = map[string][2]string{ // [ru, en]
 	"bank_card":    {"💳 Банковская карта", "💳 Bank card"},
 	"sberbank":     {"🟢 SberPay", "🟢 SberPay"},
 	"tinkoff_bank": {"🟡 T-Pay", "🟡 T-Pay"},
+	"alfa_pay":     {"🔴 Alfa Pay", "🔴 Alfa Pay"},
 	"yoo_money":    {"👛 ЮMoney", "👛 YooMoney"},
 }
 

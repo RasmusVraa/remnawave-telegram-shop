@@ -83,8 +83,18 @@ export function useAdminSettingsDraft() {
   const handleSaveSection = useCallback(
     async (groupId: string, keys: string[]) => {
       const payload: Record<string, string> = {}
+      const fieldByKey = new Map<string, { type: string; value: string }>()
+      for (const g of data?.groups ?? []) {
+        for (const f of g.fields) fieldByKey.set(f.key, f)
+      }
       for (const key of keys) {
-        payload[key] = draft[key] ?? ''
+        let value = (draft[key] ?? '').trim()
+        // Пустое int-поле (ещё не сохраняли ключ в runtime) — подставить текущее/0,
+        // иначе бэкенд отвечает 400 invalid integer на весь PATCH секции.
+        if (value === '' && fieldByKey.get(key)?.type === 'int') {
+          value = (fieldByKey.get(key)?.value || '0').trim() || '0'
+        }
+        payload[key] = value
       }
       setSavingGroup(groupId)
       try {
@@ -96,7 +106,7 @@ export function useAdminSettingsDraft() {
         setSavingGroup(null)
       }
     },
-    [draft, patchMutation, showError, showSuccess, t],
+    [data?.groups, draft, patchMutation, showError, showSuccess, t],
   )
 
   const isGroupSaving = useCallback(
