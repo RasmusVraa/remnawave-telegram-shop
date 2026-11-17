@@ -202,7 +202,7 @@
       {
         "id": "meows",
         "name": "Meows",
-        "isFeatured": true,
+        "isFeatured": false,
         "urlScheme": "meows://add/",
         "installationStep": {
           "buttons": [
@@ -563,7 +563,7 @@
       {
         "id": "meows",
         "name": "Meows",
-        "isFeatured": true,
+        "isFeatured": false,
         "urlScheme": "meows://add/",
         "installationStep": {
           "buttons": [
@@ -592,7 +592,7 @@
       {
         "id": "incy",
         "name": "INCY",
-        "isFeatured": false,
+        "isFeatured": true,
         "urlScheme": "incy://add/",
         "installationStep": {
           "buttons": [

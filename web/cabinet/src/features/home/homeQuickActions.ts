@@ -42,7 +42,7 @@ export interface HomeQuickActionMeta {
   /** Ключ подписи кнопки на главной. */
   labelKey: string
   to?: string
-  /** Внешняя ссылка из bootstrap (новости и отзывы ведут в Telegram). */
+  /** Внешняя ссылка из bootstrap (новости — в Telegram-канал). */
   href?: (b: AuthBootstrapResponse | undefined) => string | undefined
   /** Кнопка не ведёт на страницу, а копирует ссылку подписки (см. HomeParts). */
   copiesSubscriptionLink?: boolean
@@ -73,8 +73,7 @@ export const HOME_QUICK_ACTIONS: Record<HomeQuickActionId, HomeQuickActionMeta> 
   feedback: {
     icon: Star,
     labelKey: 'home.qaFeedback',
-    href: siteLink('feedback'),
-    available: (b) => !!siteLink('feedback')(b),
+    to: '/reviews/write',
   },
   sublink: { icon: Link2, labelKey: 'home.qaSubLink', copiesSubscriptionLink: true },
   servers: { icon: Activity, labelKey: 'home.qaServers', to: '/status', available: (b) => b?.status_nav_visible !== false },

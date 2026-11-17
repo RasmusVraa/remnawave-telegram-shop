@@ -277,9 +277,6 @@ func (h *Handler) buildKeyboard(lang string) *models.InlineKeyboardMarkup {
 
 	// Поддержка
 	supportURL := strings.TrimSpace(config.SupportURL())
-	if supportURL == "" {
-		supportURL = strings.TrimSpace(config.FeedbackURL())
-	}
 	if supportURL != "" {
 		supportBtn := h.tm.WithButton(lang, "support_button", models.InlineKeyboardButton{URL: supportURL})
 		rows = append(rows, []models.InlineKeyboardButton{supportBtn})

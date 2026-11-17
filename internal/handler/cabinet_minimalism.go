@@ -74,44 +74,24 @@ func (h Handler) buildCabinetMinimalismCoreRows(langCode string, customer *datab
 	return kb
 }
 
-// cabinetMinimalismExternalLinkRow — опциональные URL-кнопки «Отзывы» / «Канал» внизу меню.
-// 1 кнопка в ряд, если включена одна; 2 в ряд, если включены обе (и заданы URL).
+// cabinetMinimalismExternalLinkRow — опциональные кнопки «Отзывы» / «Канал» внизу меню.
+// Отзывы — WebApp на /cabinet/reviews; канал — внешний CHANNEL_URL.
+// 1 кнопка в ряд, если включена одна; 2 в ряд, если включены обе.
 func (h Handler) cabinetMinimalismExternalLinkRow(langCode string) []models.InlineKeyboardButton {
-	urls := selectCabinetMinimalismExternalURLs(
-		cabcfg.TelegramShowFeedbackButton(),
-		cabcfg.TelegramShowChannelButton(),
-		config.FeedbackURL(),
-		config.ChannelURL(),
-	)
-	if len(urls) == 0 {
-		return nil
+	var row []models.InlineKeyboardButton
+	if cabcfg.TelegramShowFeedbackButton() {
+		if u := cabinetWebAppURL("/cabinet/reviews"); u != "" {
+			row = append(row, h.translation.WithButton(langCode, "cabinet_minimal_btn_feedback", models.InlineKeyboardButton{
+				WebApp: &models.WebAppInfo{URL: u},
+			}))
+		}
 	}
-	row := make([]models.InlineKeyboardButton, 0, len(urls))
-	for _, item := range urls {
-		row = append(row, h.translation.WithButton(langCode, item.key, models.InlineKeyboardButton{URL: item.url}))
+	if cabcfg.TelegramShowChannelButton() {
+		if u := strings.TrimSpace(config.ChannelURL()); u != "" {
+			row = append(row, h.translation.WithButton(langCode, "cabinet_minimal_btn_channel", models.InlineKeyboardButton{URL: u}))
+		}
 	}
 	return row
-}
-
-type cabinetMinimalismExternalURL struct {
-	key string
-	url string
-}
-
-// selectCabinetMinimalismExternalURLs — чистая сборка ссылок для ряда (порядок: отзывы → канал).
-func selectCabinetMinimalismExternalURLs(showFeedback, showChannel bool, feedbackURL, channelURL string) []cabinetMinimalismExternalURL {
-	var out []cabinetMinimalismExternalURL
-	if showFeedback {
-		if u := strings.TrimSpace(feedbackURL); u != "" {
-			out = append(out, cabinetMinimalismExternalURL{key: "cabinet_minimal_btn_feedback", url: u})
-		}
-	}
-	if showChannel {
-		if u := strings.TrimSpace(channelURL); u != "" {
-			out = append(out, cabinetMinimalismExternalURL{key: "cabinet_minimal_btn_channel", url: u})
-		}
-	}
-	return out
 }
 
 func (h Handler) buildCabinetMinimalismGreetingHTML(_ context.Context, customer *database.Customer, langCode, displayName string) string {

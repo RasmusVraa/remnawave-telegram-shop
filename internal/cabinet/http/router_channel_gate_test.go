@@ -30,6 +30,7 @@ var channelGateClosed = map[string]bool{
 	"/cabinet/api/fortune/spin":               true,
 	"/cabinet/api/me/referrals":               true,
 	"/cabinet/api/me/purchases":               true,
+	"/cabinet/api/me/review":                  true,
 	"/cabinet/api/promocodes/state":           true,
 	"/cabinet/api/promocodes/apply":           true,
 	"/cabinet/api/payments/checkout":          true,
@@ -45,6 +46,7 @@ var channelGateClosed = map[string]bool{
 // платежа (оплатил до включения — должен увидеть «оплачено»), безвредное чтение колеса.
 var channelGateOpen = map[string]bool{
 	"/cabinet/api/me":                        true,
+	"/cabinet/api/me/broadcast":              true,
 	"/cabinet/api/me/channel-gate/check":     true,
 	"/cabinet/api/me/language":               true,
 	"/cabinet/api/me/password":               true,

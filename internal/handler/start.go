@@ -360,10 +360,12 @@ func (h Handler) buildStartKeyboard(existingCustomer *database.Customer, langCod
 		inlineKeyboard = append(inlineKeyboard, h.resolveConnectButton(langCode))
 	}
 
-	// 4. Собираем кнопки для 2-в-ряд: отзывы, канал
+	// 4. Собираем кнопки для 2-в-ряд: отзывы (страница кабинета), канал
 	var secondRow []models.InlineKeyboardButton
-	if config.FeedbackURL() != "" {
-		secondRow = append(secondRow, h.translation.WithButton(langCode, "feedback_button", models.InlineKeyboardButton{URL: config.FeedbackURL()}))
+	if u := cabinetWebAppURL("/cabinet/reviews"); u != "" {
+		secondRow = append(secondRow, h.translation.WithButton(langCode, "feedback_button", models.InlineKeyboardButton{
+			WebApp: &models.WebAppInfo{URL: u},
+		}))
 	}
 	if config.ChannelURL() != "" {
 		secondRow = append(secondRow, h.translation.WithButton(langCode, "channel_button", models.InlineKeyboardButton{URL: config.ChannelURL()}))

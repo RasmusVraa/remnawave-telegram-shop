@@ -17,6 +17,7 @@ import {
   FileText,
   Newspaper,
   Star,
+  PenLine,
   ChevronRight,
   type LucideIcon,
 } from 'lucide-react'
@@ -135,7 +136,6 @@ export function AppLayout({ children }: AppLayoutProps) {
   const user = useAuthStore((s) => s.user)
   const partnerMaxPercent = bootstrap?.partner_max_percent ?? 0
   const newsUrl = bootstrap?.site_links?.channel?.trim()
-  const feedbackUrl = bootstrap?.site_links?.feedback?.trim()
   /*
    * Меню ☰ по разделам. Пункты нижней навигации и шапки (Главная, Тарифы,
    * Поддержка, Профиль) сюда не входят — это были дубли; из дублей шапки ПК
@@ -179,13 +179,14 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (bootstrap?.status_nav_visible !== false) {
       about.push({ key: 'servers', icon: Activity, label: t('nav.servers'), to: '/status', decorTo: '/status' })
     }
+    about.push({ key: 'reviews', icon: Star, label: t('nav.reviews'), to: '/reviews', decorTo: '/reviews' })
+    about.push({ key: 'write-review', icon: PenLine, label: t('nav.writeReview'), to: '/reviews/write', decorTo: '/reviews/write' })
     if (newsUrl) about.push({ key: 'news', icon: Newspaper, label: t('dashboard.newsCardTitle'), href: newsUrl })
-    if (feedbackUrl) about.push({ key: 'feedback', icon: Star, label: t('dashboard.feedbackCardTitle'), href: feedbackUrl })
     return [
       { key: 'bonuses', title: t('home.menuBonuses'), items: bonuses },
       { key: 'about', title: t('home.menuAbout'), items: about },
     ]
-  }, [t, bootstrap?.partner_nav_visible, bootstrap?.fortune_nav_visible, bootstrap?.status_nav_visible, partnerMaxPercent, newsUrl, feedbackUrl])
+  }, [t, bootstrap?.partner_nav_visible, bootstrap?.fortune_nav_visible, bootstrap?.status_nav_visible, partnerMaxPercent, newsUrl])
   const navItems = useMemo(() => {
     if (user?.is_admin) {
       return [

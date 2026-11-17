@@ -67,6 +67,7 @@ export const LANDING_FAQ_IDS = [
 export const LANDING_NAV = [
   { id: 'how', href: '/#how' },
   { id: 'tariffs', href: '/#tariffs' },
+  { id: 'reviews', href: '#reviews' },
   { id: 'faq', href: '/#faq' },
   { id: 'status', href: '/status' },
 ] as const

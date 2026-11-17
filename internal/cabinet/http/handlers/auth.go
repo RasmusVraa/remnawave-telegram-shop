@@ -117,7 +117,12 @@ func cabinetSiteLinks() map[string]string {
 	add("bot", botcfg.BotURL())
 	add("server_status", botcfg.ServerStatusURL())
 	add("support", botcfg.SupportURL())
-	add("feedback", botcfg.FeedbackURL())
+	// «Отзывы» всегда ведут на страницу кабинета, без внешнего FEEDBACK_URL.
+	if cabcfg.IsEnabled() {
+		if pub := strings.TrimRight(strings.TrimSpace(cabcfg.PublicURL()), "/"); pub != "" {
+			add("feedback", pub+"/cabinet/reviews")
+		}
+	}
 	add("channel", botcfg.ChannelURL())
 	add("tos", botcfg.TosURL())
 	add("video_guide", botcfg.VideoGuideURL())

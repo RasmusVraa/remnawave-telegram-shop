@@ -8,6 +8,7 @@ import {
   Power,
   PowerOff,
   Shield,
+  Star,
   Trash2,
   Zap,
   type LucideIcon,
@@ -44,6 +45,8 @@ interface Props {
   /** «История» — шторка с событиями клиента. */
   onHistory?: () => void
   historyLabel?: string
+  /** Отзыв от имени клиента. */
+  onReview?: () => void
 }
 
 const variantClasses: Record<NonNullable<ActionItem['variant']>, string> = {
@@ -76,6 +79,7 @@ export function AdminUserActionsModal({
   onChangeTariff,
   onHistory,
   historyLabel,
+  onReview,
 }: Props) {
   const { t } = useTranslation()
   const isActive = rwStatus?.toUpperCase() === 'ACTIVE'
@@ -130,6 +134,14 @@ export function AdminUserActionsModal({
             pending: enablePending,
             variant: 'success' as const,
           }]
+      : []),
+    ...(onReview
+      ? [{
+          key: 'review',
+          label: t('admin.users.review.action'),
+          icon: Star,
+          onClick: run(onReview),
+        }]
       : []),
     ...(onHistory
       ? [{

@@ -39,7 +39,6 @@ type config struct {
 	telegramProxyURL                                                             string
 	yookasaProxyURL                                                              string
 	trialTrafficLimit                                                            int
-	feedbackURL                                                                  string
 	channelURL                                                                   string
 	serverStatusURL                                                              string
 	supportURL                                                                   string
@@ -493,10 +492,6 @@ func LoyaltyMaxTotalDiscountPercent() int {
 // LoyaltyXPMinPerPaidPurchase — минимальный XP за успешную покупку, если сумма не дала XP (LOYALTY_XP_MIN_PER_PURCHASE).
 func LoyaltyXPMinPerPaidPurchase() int64 {
 	return conf.loyaltyXPMinPerPurchase
-}
-
-func FeedbackURL() string {
-	return conf.feedbackURL
 }
 
 func ChannelURL() string {
@@ -1301,7 +1296,6 @@ func InitConfig() {
 			panic("SUPPORT_BOT_API=true requires SUPPORT_BRIDGE_SECRET")
 		}
 	}
-	conf.feedbackURL = os.Getenv("FEEDBACK_URL")
 	conf.channelURL = os.Getenv("CHANNEL_URL")
 	conf.tosURL = os.Getenv("TOS_URL")
 	conf.videoGuideURL = os.Getenv("VIDEO_GUIDE_URL")

@@ -5,6 +5,7 @@ export const ADMIN_BREADCRUMB_ROUTE_KEYS: Record<string, string> = {
   nodes: 'admin.nav.nodes',
   users: 'admin.nav.users',
   payments: 'admin.nav.payments',
+  reviews: 'admin.nav.reviews',
   promos: 'admin.nav.promos',
   tariffs: 'admin.nav.tariffs',
   loyalty: 'admin.nav.loyalty',

@@ -7,8 +7,72 @@ import type { Plugin } from 'vite'
  * Локальный API кабинета без бота. Только `vite dev`: отдаёт те же JSON,
  * что ждёт интерфейс, чтобы можно было потыкать экраны как после релиза.
  */
+type MockReview = {
+  id: number
+  rating: number
+  body: string
+  author_name: string | null
+  author_avatar_url: string | null
+  client_since: string | null
+  tariff_name: string
+  created_at: string
+  edited_at?: string | null
+  original_body?: string
+  visibility: 'anonymous' | 'name' | 'name_avatar'
+  display_name?: string
+}
+
 export function cabinetDevApi(): Plugin {
   let broadcastOptOut = false
+  let myReview: MockReview | null = null
+  const seedReviews: MockReview[] = [
+    {
+      id: 1,
+      rating: 5,
+      body: 'Подключается за минуту, YouTube и Discord без сюрпризов. Поддержка ответила вечером в тот же день.',
+      author_name: 'Анна',
+      author_avatar_url: null,
+      client_since: '2024-11',
+      tariff_name: 'Премиум',
+      created_at: iso(-12 * day),
+      visibility: 'name',
+    },
+    {
+      id: 2,
+      rating: 4.5,
+      body: 'Беру «Свой сервер» — стабильно на работе и в метро. Хочется ещё локаций в Азии.',
+      author_name: 'Игорь',
+      author_avatar_url: 'https://api.dicebear.com/9.x/thumbs/svg?seed=igor',
+      client_since: '2025-02',
+      tariff_name: 'Свой сервер',
+      created_at: iso(-5 * day),
+      edited_at: iso(-1 * day),
+      original_body: 'Беру свой сервер — в целом ок, но иногда подвисает вечером.',
+      visibility: 'name_avatar',
+    },
+    {
+      id: 3,
+      rating: 5,
+      body: 'Анонимно, но честно: после смены тарифа скорость заметно выросла, сайты открываются как раньше.',
+      author_name: null,
+      author_avatar_url: null,
+      client_since: '2023-08',
+      tariff_name: 'Старт',
+      created_at: iso(-2 * day),
+      visibility: 'anonymous',
+    },
+    {
+      id: 4,
+      rating: 5,
+      body: 'Кабинет понятный, оплата прошла без танцев. Рекомендую друзьям.',
+      author_name: 'Мария',
+      author_avatar_url: 'https://api.dicebear.com/9.x/thumbs/svg?seed=maria',
+      client_since: '2025-06',
+      tariff_name: 'Премиум',
+      created_at: iso(-30 * day),
+      visibility: 'name_avatar',
+    },
+  ]
   return {
     name: 'cabinet-dev-api',
     apply: 'serve',
@@ -35,9 +99,82 @@ export function cabinetDevApi(): Plugin {
           return
         }
 
-        const body = route(req.method || 'GET', pathname, url, () => broadcastOptOut, (v) => {
-          broadcastOptOut = v
-        })
+        if (pathname === '/cabinet/api/me/review' && (req.method || 'GET') === 'PUT') {
+          const chunks: Buffer[] = []
+          req.on('data', (c) => chunks.push(Buffer.from(c)))
+          req.on('end', () => {
+            try {
+              const rawBody = Buffer.concat(chunks).toString('utf8')
+              const parsed = JSON.parse(rawBody || '{}') as {
+                rating?: number
+                body?: string
+                visibility?: MockReview['visibility']
+                display_name?: string
+              }
+              const visibility = parsed.visibility || 'name'
+              const nick = String(parsed.display_name || '').trim() || 'Михаил'
+              const name = visibility === 'anonymous' ? null : nick
+              const avatar =
+                visibility === 'name_avatar' ? 'https://api.dicebear.com/9.x/thumbs/svg?seed=michail' : null
+              const nextBody = String(parsed.body || '').trim()
+              const prev = myReview
+              const ratingRaw = Number(parsed.rating)
+              const rating = Math.round((Number.isFinite(ratingRaw) ? ratingRaw : 5) * 2) / 2
+              myReview = {
+                id: prev?.id || 99,
+                rating: Math.max(0.5, Math.min(5, rating)),
+                body: nextBody,
+                author_name: name,
+                author_avatar_url: avatar,
+                client_since: '2024-03',
+                tariff_name: 'Свой сервер',
+                created_at: prev?.created_at || iso(0),
+                edited_at: prev && prev.body !== nextBody ? iso(0) : prev?.edited_at || null,
+                original_body:
+                  prev && prev.body !== nextBody
+                    ? prev.original_body || prev.body
+                    : prev?.original_body || nextBody,
+                visibility,
+                display_name: nick,
+              }
+              sendJSON(res, {
+                ...publicReview(myReview),
+                visibility,
+                display_name: nick,
+                has_review: true,
+              })
+            } catch {
+              res.statusCode = 400
+              res.end('bad json')
+            }
+          })
+          return
+        }
+
+        const originalMatch = pathname.match(/^\/cabinet\/api\/public\/reviews\/(\d+)\/original$/)
+        if (originalMatch && (req.method || 'GET') === 'GET') {
+          const id = Number(originalMatch[1])
+          const found = [myReview, ...seedReviews].find((r) => r && r.id === id)
+          if (!found?.edited_at || !found.original_body) {
+            res.statusCode = 404
+            res.end('not found')
+            return
+          }
+          sendJSON(res, { id: found.id, body: found.original_body })
+          return
+        }
+
+        const body = route(
+          req.method || 'GET',
+          pathname,
+          url,
+          () => broadcastOptOut,
+          (v) => {
+            broadcastOptOut = v
+          },
+          () => myReview,
+          seedReviews,
+        )
         if (body == null) {
           sendJSON(res, { ok: true, items: [], enabled: false })
           return
@@ -45,6 +182,21 @@ export function cabinetDevApi(): Plugin {
         sendJSON(res, body)
       })
     },
+  }
+}
+
+function publicReview(r: MockReview) {
+  return {
+    id: r.id,
+    rating: r.rating,
+    body: r.body,
+    author_name: r.author_name,
+    author_avatar_url: r.author_avatar_url,
+    client_since: r.client_since,
+    tariff_name: r.tariff_name,
+    created_at: r.created_at,
+    edited_at: r.edited_at || null,
+    has_original: Boolean(r.edited_at && r.original_body),
   }
 }
 
@@ -131,6 +283,8 @@ function route(
   url: URL,
   optOut: () => boolean,
   setOptOut: (v: boolean) => void,
+  getMyReview: () => MockReview | null,
+  seedReviews: MockReview[],
 ): unknown | null {
   if (pathname === '/cabinet/api/auth/refresh' || pathname === '/cabinet/api/auth/logout') {
     return { access_token: 'dev-mock', access_exp: Math.floor(Date.now() / 1000) + 3600, csrf_token: 'devmock' }
@@ -159,6 +313,32 @@ function route(
   if (pathname === '/cabinet/api/fortune/status') return fortune()
   if (pathname === '/cabinet/api/fortune/recent-wins') {
     return { items: [{ spin_at: iso(-3600_000), reward_type: 'days_3', reward_value: 3, masked_name: 'А***а' }] }
+  }
+  if (pathname === '/cabinet/api/public/reviews') {
+    const mine = getMyReview()
+    const items = [...(mine ? [publicReview(mine)] : []), ...seedReviews.map(publicReview)].sort(
+      (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    )
+    return { items }
+  }
+  if (pathname === '/cabinet/api/public/reviews/featured') {
+    const limit = Math.max(1, Math.min(12, Number(url.searchParams.get('limit') || 3)))
+    const pool = [...seedReviews]
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[pool[i], pool[j]] = [pool[j], pool[i]]
+    }
+    return { items: pool.slice(0, limit).map(publicReview) }
+  }
+  if (pathname === '/cabinet/api/me/review' && method === 'GET') {
+    const mine = getMyReview()
+    if (!mine) return { has_review: false }
+    return {
+      ...publicReview(mine),
+      visibility: mine.visibility,
+      display_name: mine.display_name || mine.author_name || '',
+      has_review: true,
+    }
   }
   if (pathname === '/cabinet/api/public/status') return status()
   if (pathname === '/cabinet/api/payments/preview') return preview(url)
@@ -239,6 +419,7 @@ function me(optOut: boolean) {
     is_admin: false,
     display_name: 'Михаил',
     username: 'starlit',
+    avatar_url: 'https://api.dicebear.com/9.x/thumbs/svg?seed=michail',
     identity_provider: 'telegram',
     broadcast_opt_out: optOut,
   }
