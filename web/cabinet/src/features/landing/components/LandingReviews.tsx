@@ -49,7 +49,7 @@ export function LandingReviews() {
                 <div key={i} className="landing-card h-44 animate-pulse opacity-60" />
               ))
             : items.map((item, i) => (
-                <Reveal key={item.id} delay={0.05 * i}>
+                <Reveal key={item.id} delay={0.05 * i} className="h-full">
                   <ReviewCard
                     review={item}
                     compact

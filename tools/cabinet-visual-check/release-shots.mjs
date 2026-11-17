@@ -11,8 +11,8 @@
 //     tools/cabinet-visual-check/fixtures/release-5-27.json release-screenshots
 //
 // Под новый релиз меняются только сценарии в конце файла: какую страницу
-// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.27.0
-// (страница «Статус серверов»: публичная, в кабинете, в поддержке и в админке).
+// открыть, что нажать и что обвести. Здесь — сценарии релиза 5.34.0
+// (отзывы: список, форма, админка).
 // mark(locator, 'Подпись', side): side — top | bottom | left | inside | inside-low.
 // Каждый снимок после съёмки посмотреть глазами: подпись не должна закрывать
 // текст интерфейса, рамка — резать соседние строки.
@@ -134,80 +134,41 @@ async function scrollToBlock(page, locator, offset = 120) {
 }
 const shot = (page, name) => page.screenshot({ path: path.join(outDir, name) })
 
-// Сцена со своими данными поверх общей фикстуры.
-const withSub = (patch) => ({ ...base, '/me/subscription': { ...base['/me/subscription'], ...patch } })
-
 {
-  // Публичная страница без входа: карта и таблица, проблемные серверы подсвечены.
-  const { ctx, page, errors } = await open(1440, 1000, base, '/status', '')
+  // Список отзывов в кабинете (ПК).
+  const { ctx, page, errors } = await open(1440, 1000, base, '/reviews')
   await page.mouse.move(2, 900)
-  await scrollToBlock(page, page.getByText('Локация', { exact: true }), 140)
-  await page.waitForTimeout(1500)
-  await mark(page.locator('li').filter({ hasText: 'США' }).first().getByText('Недоступен', { exact: true }).first(), 'Проблемный сервер виден сразу', 'top')
-  await shot(page, '01-status-public.png')
+  await page.waitForTimeout(400)
+  await mark(page.getByRole('heading', { name: 'Что говорят клиенты' }), 'Отзывы клиентов в кабинете', 'bottom')
+  await shot(page, '01-reviews-list.png')
   console.log('1', errors)
   await ctx.close()
 }
 {
-  // Страница статуса внутри кабинета (ПК).
-  const { ctx, page, errors } = await open(1440, 900, base, '/status')
-  await mark(page.locator('.cabinet-status-page').locator('div').filter({ hasText: 'Недоступен' }).filter({ hasText: 'США' }).last(), '', 'top')
-  await caption(page, 'Что не работает — подсвечено', 208)
-  await shot(page, '02-status-cabinet.png')
+  // Форма «Оставить отзыв».
+  const { ctx, page, errors } = await open(1440, 1000, base, '/reviews/write')
+  await page.waitForTimeout(400)
+  await mark(page.getByText('Оценка', { exact: true }).first(), 'Половинки звёзд и анонимность', 'bottom')
+  await shot(page, '02-reviews-write.png')
   console.log('2', errors)
   await ctx.close()
 }
 {
-  // То же на телефоне.
-  const { ctx, page, errors } = await open(390, 844, base, '/status')
-  await shot(page, '03-status-phone.png')
+  // Список на телефоне.
+  const { ctx, page, errors } = await open(390, 844, base, '/reviews')
+  await page.waitForTimeout(400)
+  await caption(page, 'Отзывы на телефоне', 96)
+  await shot(page, '03-reviews-phone.png')
   console.log('3', errors)
   await ctx.close()
 }
 {
-  // Вкладка «Статус» на странице поддержки — живая сводка вместо кнопки.
-  const { ctx, page, errors } = await open(1440, 1100, base, '/support')
-  await page.getByRole('button', { name: 'Статус', exact: true }).click()
-  await page.mouse.move(2, 1000)
-  await page.waitForTimeout(600)
-  await scrollToBlock(page, page.getByText('Статус серверов').first(), 140)
-  await mark(page.locator('ul.divide-y').first(), 'Сводка прямо в поддержке', 'left')
-  await shot(page, '04-status-support.png')
-  console.log('4', errors)
-  await ctx.close()
-}
-{
-  // Админка: список серверов, откуда берутся данные, настройки страницы.
-  const { ctx, page, errors } = await open(1440, 1200, base, '/admin/status')
-  await mark(page.getByRole('button', { name: 'Добавить сервер' }), 'Серверы из панели или вручную', 'top')
-  await shot(page, '05-admin-status.png')
-  console.log('5', errors)
-  await ctx.close()
-}
-{
-  // Окно сервера обхода: хост для проверки, вход и зарубежный выход каскада.
-  const { ctx, page, errors } = await open(1440, 1100, base, '/admin/status')
-  await page.getByRole('button', { name: 'Изменить' }).nth(1).click()
-  await page.waitForTimeout(700)
-  await page.mouse.move(2, 1000)
-  await mark(page.getByText('Хост для проверки', { exact: true }), 'Сервер обхода: хост и выход каскада', 'left')
-  await shot(page, '06-admin-bypass.png')
-  console.log('6', errors)
-  await ctx.close()
-}
-{
-  // Лоадер у кнопок: пока идёт запрос, значок кнопки крутится, повторно нажать нельзя.
-  const { ctx, page, errors } = await open(1440, 900, base, '/admin/status')
-  await ctx.route('**/cabinet/api/admin/status/probe', async (route) => {
-    await new Promise((r) => setTimeout(r, 15000))
-    route.fulfill({ status: 202, contentType: 'application/json', body: '{"ok":true}' }).catch(() => {})
-  })
-  await page.getByRole('button', { name: 'Проверить сейчас' }).click()
-  await page.mouse.move(2, 700)
+  // Админка: скрытое редактирование и удаление.
+  const { ctx, page, errors } = await open(1440, 1000, base, '/admin/reviews')
   await page.waitForTimeout(500)
-  await mark(page.getByRole('button', { name: 'Проверить сейчас' }), 'Кнопка крутится, пока идёт запрос', 'bottom')
-  await shot(page, '07-button-loader.png')
-  console.log('7', errors)
+  await mark(page.getByRole('heading', { name: /Отзывы/i }).first(), 'Админка: править скрытно и удалять', 'bottom')
+  await shot(page, '04-admin-reviews.png')
+  console.log('4', errors)
   await ctx.close()
 }
 await b.close()

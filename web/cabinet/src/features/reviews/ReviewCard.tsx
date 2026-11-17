@@ -88,6 +88,7 @@ export function ReviewCard({
     <article
       onMouseMove={onMouseMove}
       className={cn(
+        'flex h-full flex-col',
         variant === 'landing'
           ? 'landing-card p-5 sm:p-6'
           : 'cabinet-elevated-card rounded-[var(--radius)] p-4 sm:p-5',
@@ -127,43 +128,12 @@ export function ReviewCard({
 
       <p
         className={cn(
-          'mt-3.5 text-pretty text-sm leading-relaxed text-muted-foreground',
+          'mt-3.5 flex-1 text-pretty text-sm leading-relaxed text-muted-foreground',
           compact && 'line-clamp-4',
         )}
       >
         {review.body}
       </p>
-
-      {(posted || edited || review.has_original) && (
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-          <div className="min-w-0">
-            {review.has_original && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => void loadOriginal()}
-                  disabled={originalLoading}
-                  className="text-xs font-medium text-primary hover:underline disabled:opacity-60"
-                >
-                  {originalLoading ? t('reviews.originalLoading') : t('reviews.viewOriginal')}
-                </button>
-                {originalError && (
-                  <p className="mt-1 text-xs text-destructive">{t('reviews.originalError')}</p>
-                )}
-              </>
-            )}
-          </div>
-          <p className="ml-auto text-right text-xs text-muted-foreground/90">
-            {posted ? t('reviews.postedOn', { date: posted }) : null}
-            {edited ? (
-              <>
-                {posted ? <br /> : null}
-                {t('reviews.editedOn', { date: edited })}
-              </>
-            ) : null}
-          </p>
-        </div>
-      )}
 
       {originalOpen && originalBody != null && (
         <div
@@ -183,6 +153,47 @@ export function ReviewCard({
           >
             {t('reviews.hideOriginal')}
           </button>
+        </div>
+      )}
+
+      {(posted || edited || review.has_original) && (
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-x-3 gap-y-1 pt-3">
+          <div className="min-w-0">
+            {review.has_original && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (originalOpen) {
+                      setOriginalOpen(false)
+                      return
+                    }
+                    void loadOriginal()
+                  }}
+                  disabled={originalLoading}
+                  className="text-xs font-medium text-primary hover:underline disabled:opacity-60"
+                >
+                  {originalLoading
+                    ? t('reviews.originalLoading')
+                    : originalOpen
+                      ? t('reviews.hideOriginal')
+                      : t('reviews.viewOriginal')}
+                </button>
+                {originalError && (
+                  <p className="mt-1 text-xs text-destructive">{t('reviews.originalError')}</p>
+                )}
+              </>
+            )}
+          </div>
+          <p className="ml-auto text-right text-xs text-muted-foreground/90">
+            {posted ? t('reviews.postedOn', { date: posted }) : null}
+            {edited ? (
+              <>
+                {posted ? <br /> : null}
+                {t('reviews.editedOn', { date: edited })}
+              </>
+            ) : null}
+          </p>
         </div>
       )}
     </article>

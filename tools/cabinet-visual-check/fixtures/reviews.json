@@ -67,11 +67,53 @@
     "has_telegram_link": true,
     "has_password": true,
     "can_use_email_password_login": true,
+    "is_admin": true,
     "customer_id": 42,
     "display_name": "Михаил",
     "username": "michail",
     "avatar_url": null,
     "registered_at": "2024-03-12T10:00:00Z"
+  },
+  "/admin/reviews": {
+    "items": [
+      {
+        "id": 2,
+        "account_id": 7,
+        "customer_id": 42,
+        "rating": 4.5,
+        "body": "Беру «Свой сервер» — стабильно на работе и в метро. Хочется ещё локаций в Азии.",
+        "visibility": "name",
+        "display_name": "Игорь",
+        "author_name": "Игорь",
+        "author_avatar_url": "https://api.dicebear.com/9.x/thumbs/svg?seed=igor",
+        "client_since": "2025-02",
+        "tariff_name": "Свой сервер",
+        "created_at": "2026-11-12T12:00:00Z",
+        "updated_at": "2026-11-16T12:00:00Z",
+        "edited_at": "2026-11-16T12:00:00Z",
+        "has_original": true
+      },
+      {
+        "id": 1,
+        "account_id": 3,
+        "customer_id": 11,
+        "rating": 5,
+        "body": "Подключается за минуту, YouTube и Discord без сюрпризов. Поддержка ответила вечером в тот же день.",
+        "visibility": "name",
+        "display_name": "Анна",
+        "author_name": "Анна",
+        "author_avatar_url": null,
+        "client_since": "2024-11",
+        "tariff_name": "Премиум",
+        "created_at": "2026-11-05T12:00:00Z",
+        "updated_at": "2026-11-05T12:00:00Z",
+        "edited_at": null,
+        "has_original": false
+      }
+    ],
+    "total": 2,
+    "limit": 20,
+    "offset": 0
   },
   "/auth/bootstrap": {
     "google_oauth_enabled": true,
