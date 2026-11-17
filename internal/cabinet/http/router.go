@@ -276,6 +276,8 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	promoRepo := database.NewPromoRepository(pool)
 	fortuneSvc := cabsvc.NewFortuneService(pool, linkRepo, customerBootstrap, customerRepo, purchaseRepo, promoRepo, fortRepo, rw)
 	fortuneHandler := handlers.NewFortune(fortuneSvc)
+	reviewRepo := repository.NewReviewRepo(pool)
+	reviewsHandler := handlers.NewReviews(reviewRepo, linkRepo, customerRepo, tariffRepo, meHandler)
 
 	var promoCodesHandler *handlers.PromoCodesHandler
 	if promoService != nil {
@@ -398,6 +400,8 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	adminStatsHandler := handlers.NewAdminStats(statsRepo, loyaltyRepo, customerRepo, promoRepo, partnerRepo)
 	adminOverviewHandler := handlers.NewAdminOverview(statsRepo, partnerRepo, rw)
 	adminUsersHandler := handlers.NewAdminUsers(customerRepo, purchaseRepo, referralRepo, tariffRepo, loyaltyRepo, rw, avatarSecret)
+	adminUsersHandler.SetReviews(reviewRepo)
+	adminReviewsHandler := handlers.NewAdminReviews(reviewRepo)
 	adminTrafficRepo := database.NewTrafficSplitRepository(pool)
 	adminUsersHandler.SetTrafficSplit(adminTrafficRepo, trafficquota.New(adminTrafficRepo, customerRepo, tariffRepo, rw, nil))
 	// CheckoutRepo — только на чтение (ключ идемпотентности/провайдер в модалке платежа);
@@ -429,8 +433,8 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 		adminSyncHandler = handlers.NewAdminSync(syncService)
 	}
 
-registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, webAuthHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, jwtIssuer,
-		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminNodesHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
+	registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, subscriptionHandler, connectInviteHandler, webAuthHandler, activityHandler, partnerHandler, promoCodesHandler, oauthHandler, paymentsHandler, linkHandler, fortuneHandler, supportHandler, reviewsHandler, jwtIssuer,
+		adminChecker, adminBootstrapHandler, adminStatsHandler, adminOverviewHandler, adminUsersHandler, adminReviewsHandler, adminPaymentsHandler, adminPromosHandler, adminTariffsHandler, adminLoyaltyHandler, adminPartnersHandler, adminBroadcastHandler, adminInfraHandler, adminNodesHandler, adminSettingsHandler, adminSquadsHandler, adminSyncHandler, adminAcctLim,
 		loginIPLim, loginEmailLim, registerIPLim, forgotEmailLim, resendVerifyAcctLim, verifyEmailConfirmIPLim, verifyResendPublicIPLim, paymentsAcctLim, subscriptionAcctLim, connectPublicIPLim, connectTokenLim, deleteAcctLim, passwordChangeAcctLim, trialActivateAcctLim, supportAcctLim, supportWebhookIPLim,
 		oauthIPLim, telegramIPLim, linkAcctLim, channelGate)
 	registerNotificationRoutes(api, notificationsHandler, jwtIssuer)
@@ -461,6 +465,32 @@ registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, s
 			http.MethodGet: middleware.Chain(
 				http.HandlerFunc(publicStatus.Get),
 				middleware.RateLimit(publicStatusIPLim, ipKey("public-status")),
+			),
+		}),
+	)
+	publicReviewsIPLim := ratelimit.New(ratelimit.Rule{Count: 60, Interval: time.Minute})
+	publicReviewsIPLim.RunGC(ctx)
+	api.Handle("/cabinet/api/public/reviews",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(reviewsHandler.List),
+				middleware.RateLimit(publicReviewsIPLim, ipKey("public-reviews")),
+			),
+		}),
+	)
+	api.Handle("/cabinet/api/public/reviews/featured",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(reviewsHandler.Featured),
+				middleware.RateLimit(publicReviewsIPLim, ipKey("public-reviews-featured")),
+			),
+		}),
+	)
+	api.Handle("/cabinet/api/public/reviews/",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(reviewsHandler.Original),
+				middleware.RateLimit(publicReviewsIPLim, ipKey("public-reviews-original")),
 			),
 		}),
 	)
@@ -531,6 +561,9 @@ registerAPIRoutes(api, authHandler, contentHandler, meHandler, tariffsHandler, s
 	// Публичный статус серверов: тот же бандл, basename выбирается по пути.
 	mux.Handle("/status", spaChain)
 	mux.Handle("/status/", spaChain)
+	// Публичная страница отзывов.
+	mux.Handle("/reviews", spaChain)
+	mux.Handle("/reviews/", spaChain)
 
 	// Часто открывают кабинет как https://host/login без префикса /cabinet — иначе 404.
 	registerCabinetRootRedirects(mux)
@@ -582,12 +615,14 @@ func registerAPIRoutes(
 	link *handlers.LinkHandler,
 	fortune *handlers.FortuneHandler,
 	support *handlers.SupportHandler,
+	reviews *handlers.ReviewsHandler,
 	jwtIssuer *jwt.Issuer,
 	adminChecker *adminauth.Checker,
 	adminBootstrap *handlers.AdminBootstrapHandler,
 	adminStats *handlers.AdminStatsHandler,
 	adminOverview *handlers.AdminOverviewHandler,
 	adminUsers *handlers.AdminUsersHandler,
+	adminReviews *handlers.AdminReviewsHandler,
 	adminPayments *handlers.AdminPaymentsHandler,
 	adminPromos *handlers.AdminPromosHandler,
 	adminTariffs *handlers.AdminTariffsHandler,
@@ -792,6 +827,28 @@ func registerAPIRoutes(
 			),
 		}),
 	)
+
+	// GET/PUT /me/review — свой отзыв.
+	if reviews != nil {
+		api.Handle("/cabinet/api/me/review",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(reviews.Mine),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RequireVerifiedEmail(),
+					middleware.RateLimit(subscriptionAcctLim, accountKey("review_mine")),
+				),
+				http.MethodPut: middleware.Chain(
+					http.HandlerFunc(reviews.Upsert),
+					middleware.RequireAuth(jwtIssuer),
+					channelGate.Require(),
+					middleware.RequireVerifiedEmail(),
+					middleware.CSRF(),
+					middleware.RateLimit(subscriptionAcctLim, accountKey("review_upsert")),
+				),
+			}),
+		)
+	}
 
 	// PUT /me/broadcast — отказ от массовой рассылки.
 	api.Handle("/cabinet/api/me/broadcast",
@@ -1641,6 +1698,29 @@ func registerAPIRoutes(
 			middleware.RateLimit(adminAcctLim, accountKey("admin_users_byid")),
 		),
 	)
+
+	// Admin Reviews — список / скрытое редактирование / удаление.
+	if adminReviews != nil {
+		api.Handle("/cabinet/api/admin/reviews",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(adminReviews.List),
+					middleware.RequireAuth(jwtIssuer),
+					middleware.RequireAdmin(adminChecker),
+					middleware.RateLimit(adminAcctLim, accountKey("admin_reviews")),
+				),
+			}),
+		)
+		api.Handle("/cabinet/api/admin/reviews/",
+			middleware.Chain(
+				http.HandlerFunc(adminReviews.HandleByID),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.CSRF(),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_reviews_byid")),
+			),
+		)
+	}
 
 	// Admin Payments (только чтение: список / карточка / CSV-экспорт).
 	api.Handle("/cabinet/api/admin/payments",

@@ -1780,6 +1780,36 @@ export const api = {
 
   publicStatus: () => request<PublicStatusResponse>('GET', '/public/status'),
 
+  publicReviews: (params?: { limit?: number; offset?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.limit != null) q.set('limit', String(params.limit))
+    if (params?.offset != null) q.set('offset', String(params.offset))
+    const suffix = q.toString() ? `?${q.toString()}` : ''
+    return request<{ items: import('@/features/reviews/reviewTypes').ReviewItem[] }>(
+      'GET',
+      `/public/reviews${suffix}`,
+    )
+  },
+
+  publicReviewsFeatured: (limit = 3) =>
+    request<{ items: import('@/features/reviews/reviewTypes').ReviewItem[] }>(
+      'GET',
+      `/public/reviews/featured?limit=${limit}`,
+    ),
+
+  publicReviewOriginal: (id: number) =>
+    request<{ id: number; body: string }>('GET', `/public/reviews/${id}/original`),
+
+  myReview: () =>
+    request<import('@/features/reviews/reviewTypes').MyReviewResponse>('GET', '/me/review'),
+
+  saveReview: (body: {
+    rating: number
+    body: string
+    visibility: import('@/features/reviews/reviewTypes').ReviewVisibility
+    display_name?: string
+  }) => request<import('@/features/reviews/reviewTypes').MyReviewResponse>('PUT', '/me/review', body),
+
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider, yookassa_method.
   checkout: (
     input: {
@@ -1930,6 +1960,69 @@ export const api = {
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/strategy`, { strategy }),
   adminUserSetDescription: (id: number, description: string | null) =>
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/description`, { description }),
+  adminUserReview: (id: number) =>
+    request<{
+      has_review: boolean
+      can_edit: boolean
+      id?: number
+      rating?: number
+      body?: string
+      visibility?: string
+      display_name?: string
+      avatar_url?: string
+      author_name?: string | null
+      author_avatar_url?: string | null
+      client_since?: string | null
+      tariff_name?: string
+      created_at?: string
+    }>('GET', `/admin/users/${id}/review`),
+  adminUserUpsertReview: (
+    id: number,
+    body: {
+      rating: number
+      body: string
+      visibility: string
+      display_name?: string
+      avatar_url?: string
+    },
+  ) =>
+    request<{
+      has_review: boolean
+      can_edit: boolean
+      id?: number
+      rating?: number
+      body?: string
+      visibility?: string
+    }>('PUT', `/admin/users/${id}/review`, body),
+
+  adminReviews: (params?: { limit?: number; offset?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.limit != null) q.set('limit', String(params.limit))
+    if (params?.offset != null) q.set('offset', String(params.offset))
+    const suffix = q.toString() ? `?${q.toString()}` : ''
+    return request<import('@/features/admin/hooks/useAdminReviews').AdminReviewsListResponse>(
+      'GET',
+      `/admin/reviews${suffix}`,
+    )
+  },
+  adminReviewUpdate: (
+    id: number,
+    body: {
+      rating: number
+      body: string
+      visibility: string
+      display_name?: string
+      avatar_url?: string
+      tariff_name?: string
+    },
+  ) =>
+    request<import('@/features/admin/hooks/useAdminReviews').AdminReviewDTO>(
+      'PUT',
+      `/admin/reviews/${id}`,
+      body,
+    ),
+  adminReviewDelete: (id: number) => request<void>('DELETE', `/admin/reviews/${id}`),
+
   adminUserSetTariff: (id: number, tariffId: number) =>
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/tariff`, { tariff_id: tariffId }),
   adminUserDevices: (id: number) =>

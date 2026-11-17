@@ -15,7 +15,7 @@ func TelegramShowChannelButton() bool {
 
 // TelegramShowFeedbackButton — CABINET_TELEGRAM_SHOW_FEEDBACK_BUTTON (runtime/env).
 // По умолчанию false. При true в режиме CABINET_TELEGRAM_UI_MODE=minimalism
-// внизу меню бота показывается кнопка «Отзывы» (URL из FEEDBACK_URL).
+// внизу меню бота показывается кнопка «Отзывы» → WebApp /cabinet/reviews.
 func TelegramShowFeedbackButton() bool {
 	return strings.EqualFold(strings.TrimSpace(botcfg.EffectiveEnv("CABINET_TELEGRAM_SHOW_FEEDBACK_BUTTON")), "true")
 }

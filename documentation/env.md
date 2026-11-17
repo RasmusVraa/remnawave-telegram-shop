@@ -263,7 +263,6 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 |------------|--------|
 | `SERVER_STATUS_URL` | Статус сервера. Кнопка в боте; в кабинете страница статуса теперь своя ([cabinet/server-status.md](./cabinet/server-status.md)), а эта ссылка нужна только как запасная, пока в списке статуса нет серверов |
 | `SUPPORT_URL` | Поддержка |
-| `FEEDBACK_URL` | Отзывы |
 | `CHANNEL_URL` | Канал |
 | `TOS_URL` | Условия («Помощь» в боте; в кабинете — запасной URL соглашения в дисклеймере) |
 | `VIDEO_GUIDE_URL` | Видеоинструкция |

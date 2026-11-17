@@ -21,6 +21,7 @@ import { AdminSetExpireModal } from '../components/AdminSetExpireModal'
 import { AdminFeedback } from '../components/AdminFeedback'
 import { AdminUserEditModals } from '../components/user-modals/AdminUserEditModals'
 import { AdminUserActionsModal } from '../components/user-modals/AdminUserActionsModal'
+import { AdminUserReviewModal } from '../components/user-modals/AdminUserReviewModal'
 import type { UserEditModalKey } from '../components/user-modals/types'
 import { ClickableOverviewControl } from '../components/overview/ClickableOverviewControl'
 import { AdminUserIdentityCard } from '../components/overview/AdminUserIdentityCard'
@@ -151,6 +152,7 @@ export default function AdminUserDetailPage() {
   const [disableError, setDisableError] = useState<string | null>(null)
   const [actionsModal, setActionsModal] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
   const [editModal, setEditModal] = useState<UserEditModalKey | null>(null)
   const [paymentsPage, setPaymentsPage] = useState(1)
   const [referralsPage, setReferralsPage] = useState(1)
@@ -325,6 +327,7 @@ export default function AdminUserDetailPage() {
               copy={copy}
               onHistory={() => setHistoryOpen(true)}
               historyLabel={historyLabel}
+              onReview={() => setReviewOpen(true)}
             />
           </div>
         </div>
@@ -578,6 +581,16 @@ export default function AdminUserDetailPage() {
         onChangeTariff={canEditTariff ? () => setEditModal('tariff') : undefined}
         onHistory={() => setHistoryOpen(true)}
         historyLabel={historyLabel}
+        onReview={() => setReviewOpen(true)}
+      />
+
+      <AdminUserReviewModal
+        open={reviewOpen}
+        onClose={() => setReviewOpen(false)}
+        userId={user.id}
+        customer={user}
+        onSuccess={handleOverviewSuccess}
+        onError={handleOverviewError}
       />
 
       <AdminUserHistoryModal customerId={user.id} open={historyOpen} onClose={() => setHistoryOpen(false)} />

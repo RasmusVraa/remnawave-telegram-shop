@@ -10,6 +10,7 @@ import { LandingPath } from './components/LandingPath'
 import { LandingTariffs } from './components/LandingTariffs'
 import { LandingSteps } from './components/LandingSteps'
 import { LandingFaq } from './components/LandingFaq'
+import { LandingReviews } from './components/LandingReviews'
 import { LandingFooter } from './components/LandingFooter'
 
 /**
@@ -36,6 +37,7 @@ export default function LandingPage() {
         {copy.showFeatures && <LandingPath />}
         {copy.showTariffs && <LandingTariffs brand={brand} />}
         {copy.showSteps && <LandingSteps brand={brand} />}
+        <LandingReviews />
         {copy.showFaq && <LandingFaq />}
       </main>
       <LandingFooter brand={brand} />

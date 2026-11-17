@@ -804,7 +804,6 @@ func baseRuntimeSettings() []SettingField {
 
 		// --- links ---
 		{Key: "CHANNEL_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.channelURL = v }), Current: func() string { return conf.channelURL }},
-		{Key: "FEEDBACK_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.feedbackURL = v }), Current: func() string { return conf.feedbackURL }},
 		{Key: "TOS_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.tosURL = v }), Current: func() string { return conf.tosURL }},
 		{Key: "SERVER_SELECTION_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.serverSelectionURL = v }), Current: func() string { return conf.serverSelectionURL }},
 		{Key: "PUBLIC_OFFER_URL", Group: "links", Type: SettingURL, Apply: applyStringField(func(v string) { conf.publicOfferURL = v }), Current: func() string { return conf.publicOfferURL }},

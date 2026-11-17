@@ -196,6 +196,24 @@ export function useAdminUserSetDescription(id: number | null) {
   })
 }
 
+export function useAdminUserUpsertReview(id: number | null) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: {
+      rating: number
+      body: string
+      visibility: string
+      display_name?: string
+      avatar_url?: string
+    }) => api.adminUserUpsertReview(id!, body),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['admin-user-review', id] })
+      void qc.invalidateQueries({ queryKey: ['public-reviews'] })
+      void qc.invalidateQueries({ queryKey: ['public-reviews-featured'] })
+    },
+  })
+}
+
 export function useAdminUserSetTariff(id: number | null) {
   const invalidate = useInvalidatePanel(id)
   return useMutation({

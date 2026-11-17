@@ -397,7 +397,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       id: 'bot',
       titleKey: 'admin.settings.subsections.links.bot',
       icon: Link2,
-      keys: ['CHANNEL_URL', 'FEEDBACK_URL', 'SERVER_SELECTION_URL', 'VIDEO_GUIDE_URL', 'TOS_URL'],
+      keys: ['CHANNEL_URL', 'SERVER_SELECTION_URL', 'VIDEO_GUIDE_URL', 'TOS_URL'],
     },
     {
       id: 'legal',

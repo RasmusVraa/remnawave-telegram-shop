@@ -14,6 +14,7 @@ import (
 
 	"remnawave-tg-shop-bot/internal/cabinet/avatartoken"
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
+	"remnawave-tg-shop-bot/internal/cabinet/repository"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/remnawave"
@@ -35,6 +36,8 @@ type AdminUsersHandler struct {
 	// traffic и quota — раздельный трафик (см. admin_users_traffic.go); nil — раздел недоступен.
 	traffic *database.TrafficSplitRepository
 	quota   *trafficquota.Service
+	// reviews — отзывы клиентов; nil — эндпоинт /review недоступен.
+	reviews *repository.ReviewRepo
 }
 
 // adminAvatarTTL — срок жизни ссылки на аватарку в админской карточке.
@@ -1175,6 +1178,12 @@ func (h *AdminUsersHandler) HandleByID(w http.ResponseWriter, r *http.Request) {
 		h.SetStrategy(w, r)
 	case strings.HasSuffix(path, "/description"):
 		h.SetDescription(w, r)
+	case strings.HasSuffix(path, "/review"):
+		if r.Method == http.MethodPut {
+			h.PutReview(w, r)
+		} else {
+			h.GetReview(w, r)
+		}
 	case strings.HasSuffix(path, "/tariff"):
 		h.SetTariff(w, r)
 	case strings.Contains(path, "/devices/"):

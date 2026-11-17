@@ -281,10 +281,6 @@ func (s *LifecycleService) buildSupportContact() string {
 	if supportURL != "" {
 		return supportURL
 	}
-	feedbackURL := config.FeedbackURL()
-	if feedbackURL != "" {
-		return feedbackURL
-	}
 	return "@support"
 }
 
@@ -317,9 +313,6 @@ func (s *LifecycleService) buildNoConnectKeyboard(lang string) models.InlineKeyb
 
 	// 3. Поддержка
 	supportURL := config.SupportURL()
-	if supportURL == "" {
-		supportURL = config.FeedbackURL()
-	}
 	if supportURL != "" {
 		supportBtn := s.tm.WithButton(lang, "lifecycle_btn_support", models.InlineKeyboardButton{
 			URL: supportURL,

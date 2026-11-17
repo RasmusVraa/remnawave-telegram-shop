@@ -1,0 +1,108 @@
+{
+  "/public/reviews": {
+    "items": [
+      {
+        "id": 3,
+        "rating": 5,
+        "body": "Анонимно, но честно: после смены тарифа скорость заметно выросла, сайты открываются как раньше.",
+        "author_name": null,
+        "author_avatar_url": null,
+        "client_since": "2023-08",
+        "tariff_name": "Старт",
+        "created_at": "2026-11-15T12:00:00Z",
+        "edited_at": null,
+        "has_original": false
+      },
+      {
+        "id": 2,
+        "rating": 4.5,
+        "body": "Беру «Свой сервер» — стабильно на работе и в метро. Хочется ещё локаций в Азии.",
+        "author_name": "Игорь",
+        "author_avatar_url": "https://api.dicebear.com/9.x/thumbs/svg?seed=igor",
+        "client_since": "2025-02",
+        "tariff_name": "Свой сервер",
+        "created_at": "2026-11-12T12:00:00Z",
+        "edited_at": "2026-11-16T12:00:00Z",
+        "has_original": true
+      },
+      {
+        "id": 1,
+        "rating": 5,
+        "body": "Подключается за минуту, YouTube и Discord без сюрпризов. Поддержка ответила вечером в тот же день.",
+        "author_name": "Анна",
+        "author_avatar_url": null,
+        "client_since": "2024-11",
+        "tariff_name": "Премиум",
+        "created_at": "2026-11-05T12:00:00Z",
+        "edited_at": null,
+        "has_original": false
+      }
+    ]
+  },
+  "/public/reviews/2/original": {
+    "id": 2,
+    "body": "Беру свой сервер — в целом ок, но иногда подвисает вечером."
+  },
+  "/me/review": {
+    "id": 99,
+    "rating": 5,
+    "body": "Сервис удобный, хочу оставить развёрнутый отзыв после недели использования.",
+    "author_name": "Михаил",
+    "author_avatar_url": null,
+    "client_since": "2024-03",
+    "tariff_name": "Свой сервер",
+    "created_at": "2026-11-10T12:00:00Z",
+    "edited_at": null,
+    "has_original": false,
+    "visibility": "name",
+    "display_name": "Михаил",
+    "has_review": true
+  },
+  "/me": {
+    "id": 7,
+    "email": "demo@starlit.vpn",
+    "email_verified": true,
+    "language": "ru",
+    "providers": ["email", "telegram"],
+    "has_telegram_link": true,
+    "has_password": true,
+    "can_use_email_password_login": true,
+    "customer_id": 42,
+    "display_name": "Михаил",
+    "username": "michail",
+    "avatar_url": null,
+    "registered_at": "2024-03-12T10:00:00Z"
+  },
+  "/auth/bootstrap": {
+    "google_oauth_enabled": true,
+    "yandex_oauth_enabled": true,
+    "vk_oauth_enabled": false,
+    "telegram_oidc_enabled": false,
+    "telegram_web_auth_mode": "widget",
+    "turnstile_enabled": false,
+    "brand_name": "StarlitVPN",
+    "fortune_nav_visible": true,
+    "partner_nav_visible": true,
+    "partner_max_percent": 30,
+    "support_chat_enabled": true,
+    "light_theme_enabled": true,
+    "subscription_loyalty_visible": true,
+    "decor_theme": "halloween",
+    "site_links": {
+      "support": "https://t.me/starlitsupportbot",
+      "channel": "https://t.me/starlitvpn"
+    },
+    "landing": {
+      "show_tariffs": true,
+      "show_steps": true,
+      "show_features": true,
+      "show_faq": true
+    },
+    "payment_providers": {
+      "yookassa": true,
+      "cryptopay": true,
+      "telegram": true,
+      "heleket": false
+    }
+  }
+}

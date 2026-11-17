@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -58,6 +59,39 @@ func pickTelegramID(identityIDs []int64, cust *database.Customer) *int64 {
 		}
 	}
 	return out
+}
+
+// ResolveForReview — имя и аватар для сохранения отзыва (снимок на момент отправки).
+func (h *MeHandler) ResolveForReview(r *http.Request, accountID int64) (displayName, avatarURL string) {
+	if h == nil || r == nil {
+		return "", ""
+	}
+	ctx := r.Context()
+	var ids []repository.Identity
+	if h.ids != nil {
+		if list, err := h.ids.ListByAccount(ctx, accountID); err == nil {
+			ids = list
+		}
+	}
+	var cust *database.Customer
+	var telegramID *int64
+	if h.links != nil && h.customers != nil {
+		if link, err := h.links.FindByAccountID(ctx, accountID); err == nil && link != nil {
+			if c, err := h.customers.FindById(ctx, link.CustomerID); err == nil {
+				cust = c
+				if c != nil && c.TelegramID != 0 {
+					tid := c.TelegramID
+					telegramID = &tid
+				}
+			}
+		}
+	}
+	p := h.resolveIdentityProfile(ctx, accountID, ids, cust, telegramID)
+	name := strings.TrimSpace(p.DisplayName)
+	if name == "" {
+		name = strings.TrimSpace(p.Username)
+	}
+	return name, strings.TrimSpace(p.AvatarURL)
 }
 
 // resolveIdentityProfile собирает шапку профиля. Ошибки Telegram сюда не
