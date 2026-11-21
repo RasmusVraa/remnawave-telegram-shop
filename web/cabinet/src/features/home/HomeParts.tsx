@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
 import { NestedStatRing, SPLIT_DOT_COLOR } from '@/components/NestedStatRing'
 import { StatRing, UnboundedRing } from '@/components/StatRing'
-import { ConnectDeviceButton, RenewNowButton, RenewWarnButton } from '@/components/SubscriptionActions'
+import { ConnectDeviceButton, RenewNowButton } from '@/components/SubscriptionActions'
 import { SubscriptionStatusBadge } from '@/components/SubscriptionStatusBadge'
 import { formatDayMonth } from '@/features/subscription/DeviceSlots'
 import { formatUtcDayMonth } from '@/lib/splitDates'
@@ -271,9 +271,22 @@ export function HomeAlert({ data, desktop }: { data: HomeData; desktop?: boolean
   }
   if (state === 'warn') {
     return (
-      <div className={cn(ALERT_BASE, ALERT_WARN, 'flex-col items-stretch gap-2.5')}>
-        <span>{t('home.alertWarn')}</span>
-        <RenewWarnButton className={desktop ? 'sm:w-auto sm:self-start sm:px-6' : undefined} />
+      <div
+        className={cn(
+          ALERT_BASE,
+          ALERT_WARN,
+          'flex-col items-stretch gap-3 border border-amber-400/50 dark:border-amber-400/30 sm:flex-row sm:items-center sm:gap-4 sm:py-2.5 sm:pr-2.5',
+        )}
+      >
+        <span className="min-w-0 flex-1">{t('home.alertWarn')}</span>
+        <Link
+          to="/tariffs"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-amber-500 px-4 text-sm font-bold text-amber-950 transition-[filter] hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:h-9 sm:rounded-xl"
+        >
+          <Zap size={16} />
+          <span className="sm:hidden">{t('subscriptionPage.renewSubscription')}</span>
+          <span className="hidden sm:inline">{t('subscriptionPage.renew')}</span>
+        </Link>
       </div>
     )
   }
@@ -388,7 +401,7 @@ function useQuickActions(data: HomeData): QuickAction[] {
         onClick: () => void copySubscriptionLink(),
       }
     }
-    return { key: id, icon: meta.icon, label: t(meta.labelKey), to: meta.to, href: meta.href?.(bootstrap) }
+    return { key: id, icon: meta.icon, label: t(meta.labelKey), to: meta.resolveTo?.(bootstrap) ?? meta.to, href: meta.resolveTo?.(bootstrap) ? undefined : meta.href?.(bootstrap) }
   }
   const tail = configured.map(toAction)
   const addExtra: QuickAction = { key: 'extra', icon: AddDeviceIcon, label: t('home.qaAddExtra'), onClick: openConnect, disabled: !hasLink }

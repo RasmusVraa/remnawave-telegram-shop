@@ -1,70 +1,84 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
+import type {
+  AdminReview,
+  AdminReviewCreateInput,
+  AdminReviewUpdateInput,
+  AdminReviewsResponse,
+} from '@/features/reviews/reviewTypes'
 
-export type AdminReviewDTO = {
-  id: number
-  account_id: number
-  customer_id?: number | null
-  rating: number
-  body: string
-  visibility: string
-  display_name: string
-  avatar_url?: string
-  author_name?: string | null
-  author_avatar_url?: string | null
-  client_since?: string | null
-  tariff_name: string
-  created_at: string
-  updated_at: string
-  edited_at?: string | null
-  has_original: boolean
-}
-
-export type AdminReviewsListResponse = {
-  items: AdminReviewDTO[]
-  total: number
+export interface AdminReviewsParams {
+  status: string
+  q: string
+  page: number
   limit: number
-  offset: number
 }
 
-const key = (limit: number, offset: number) => ['admin-reviews', limit, offset] as const
+export function useAdminReviewsList(p: AdminReviewsParams) {
+  return useQuery<AdminReviewsResponse>({
+    queryKey: ['admin-reviews', p],
+    queryFn: () => api.adminReviews({ status: p.status, q: p.q, limit: p.limit, offset: (p.page - 1) * p.limit }),
+    placeholderData: keepPreviousData,
+  })
+}
 
-export function useAdminReviews(limit = 20, offset = 0) {
+/** Счётчик «на проверке» для бейджа в меню админки. */
+export function useAdminReviewsPending() {
+  return useQuery<AdminReviewsResponse>({
+    queryKey: ['admin-reviews-pending'],
+    queryFn: () => api.adminReviews({ limit: 1 }),
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  })
+}
+
+function useInvalidateReviews() {
+  const qc = useQueryClient()
+  return () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: ['admin-reviews'] }),
+      qc.invalidateQueries({ queryKey: ['admin-reviews-pending'] }),
+      qc.invalidateQueries({ queryKey: ['admin-review-customer'] }),
+    ])
+}
+
+export function useUpdateAdminReview() {
+  const invalidate = useInvalidateReviews()
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: AdminReviewUpdateInput }) => api.adminReviewUpdate(id, body),
+    onSuccess: invalidate,
+  })
+}
+
+export function useDeleteAdminReview() {
+  const invalidate = useInvalidateReviews()
+  return useMutation({ mutationFn: (id: number) => api.adminReviewDelete(id), onSuccess: invalidate })
+}
+
+export function useCreateAdminReview() {
+  const invalidate = useInvalidateReviews()
+  return useMutation<AdminReview, Error, AdminReviewCreateInput>({
+    mutationFn: (body) => api.adminReviewCreate(body),
+    onSuccess: invalidate,
+  })
+}
+
+/** Отзыв клиента для окна «от имени клиента» в карточке пользователя. */
+export function useAdminReviewByCustomer(customerId: number | null) {
   return useQuery({
-    queryKey: key(limit, offset),
-    queryFn: () => api.adminReviews({ limit, offset }),
+    queryKey: ['admin-review-customer', customerId],
+    queryFn: () => api.adminReviewByCustomer(customerId as number),
+    enabled: customerId != null && customerId > 0,
   })
 }
 
-export function useAdminReviewUpdate() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (args: {
-      id: number
-      rating: number
-      body: string
-      visibility: string
-      display_name?: string
-      avatar_url?: string
-      tariff_name?: string
-    }) => api.adminReviewUpdate(args.id, args),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['admin-reviews'] })
-      void qc.invalidateQueries({ queryKey: ['public-reviews'] })
-      void qc.invalidateQueries({ queryKey: ['public-reviews-featured'] })
-    },
-  })
-}
-
-export function useAdminReviewDelete() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => api.adminReviewDelete(id),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ['admin-reviews'] })
-      void qc.invalidateQueries({ queryKey: ['public-reviews'] })
-      void qc.invalidateQueries({ queryKey: ['public-reviews-featured'] })
-    },
+/** Подсказки клиентов по ID, @нику, Telegram ID и почте. */
+export function useAdminReviewCustomers(q: string) {
+  return useQuery({
+    queryKey: ['admin-review-customers', q],
+    queryFn: () => api.adminReviewCustomers(q),
+    enabled: q.trim().length >= 1,
+    staleTime: 10_000,
   })
 }

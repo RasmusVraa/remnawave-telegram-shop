@@ -20,8 +20,9 @@ interface Props {
   /** Кнопка «История» — шторка с событиями клиента из «Мониторинга». */
   onHistory?: () => void
   historyLabel?: string
-  /** Отзыв от имени клиента на публичной странице. */
+  /** Кнопка «Отзыв клиента» — правка отзыва или отзыв от имени клиента. */
   onReview?: () => void
+  reviewLabel?: string
 }
 
 /**
@@ -45,6 +46,7 @@ export function AdminUserActionsPanel({
   onHistory,
   historyLabel,
   onReview,
+  reviewLabel,
 }: Props) {
   const { t } = useTranslation()
   const isActive = rwStatus?.toUpperCase() === 'ACTIVE'
@@ -67,13 +69,6 @@ export function AdminUserActionsPanel({
           <CalendarPlus className="size-4 shrink-0" />
           {t('admin.users.extend')}
         </button>
-
-        {onReview && (
-          <button type="button" onClick={onReview} className={actionClass}>
-            <Star className="size-4 shrink-0" />
-            {t('admin.users.review.action')}
-          </button>
-        )}
 
         {copy.available && (
           <button type="button" onClick={copy.copy} className={actionClass}>
@@ -128,6 +123,12 @@ export function AdminUserActionsPanel({
           >
             <History className="size-4 shrink-0" />
             {historyLabel}
+          </button>
+        )}
+        {onReview && (
+          <button type="button" onClick={onReview} className={actionClass}>
+            <Star className="size-4 shrink-0" />
+            {reviewLabel}
           </button>
         )}
       </div>

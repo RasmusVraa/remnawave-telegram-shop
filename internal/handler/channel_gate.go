@@ -83,6 +83,16 @@ func (h Handler) showChannelGate(ctx context.Context, b *bot.Bot, update *models
 	h.editOrSendChannelGate(ctx, b, update, langCode)
 }
 
+// trialChannelGateBlocks — режим «подписка только для пробного»: показывает экран
+// подписки вместо пробного периода. true — экран показан, дальше идти не нужно.
+func (h Handler) trialChannelGateBlocks(ctx context.Context, b *bot.Bot, update *models.Update, customer *database.Customer) bool {
+	if update.CallbackQuery == nil || h.channelGate == nil || !h.channelGate.BlocksTrial(ctx, update.CallbackQuery.From.ID) {
+		return false
+	}
+	h.showChannelGate(ctx, b, update, customer, update.CallbackQuery.From.LanguageCode)
+	return true
+}
+
 // gateBeforeMenu — общий вход перед главным меню: согласие, затем подписка.
 // Возвращает true, если показан один из экранов и меню рисовать не нужно.
 func (h Handler) gateBeforeMenu(ctx context.Context, b *bot.Bot, update *models.Update, customer *database.Customer, telegramID int64, langCode string) bool {
@@ -205,6 +215,10 @@ func (h Handler) ChannelGateCheckCallbackHandler(ctx context.Context, b *bot.Bot
 
 	if CustomerNeedsLegalGate(customer) {
 		h.editOrSendLegalGate(ctx, b, update, langCode, false)
+		return
+	}
+	if config.ChannelGateTrialOnly() && config.TrialEnabled() && customer.SubscriptionLink == nil {
+		h.TrialCallbackHandler(ctx, b, update)
 		return
 	}
 	displayName := buildDisplayName(callback.From.FirstName, callback.From.LastName, callback.From.Username)

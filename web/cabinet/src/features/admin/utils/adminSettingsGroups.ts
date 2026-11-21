@@ -12,7 +12,6 @@ import {
   Handshake,
   LayoutGrid,
   LayoutList,
-  PanelTop,
   Link2,
   ListFilter,
   Megaphone,
@@ -41,7 +40,6 @@ import {
 /** Порядок и иконки секций (синхрон с backend buildAdminSettingsResponse). */
 export const ADMIN_SETTINGS_GROUP_ORDER = [
   'cabinet',
-  'landing',
   'status',
   'cabinet_connect',
   'tariffs',
@@ -63,6 +61,7 @@ export const ADMIN_SETTINGS_GROUP_ORDER = [
   'notifications',
   'monitoring',
   'fortune',
+  'reviews',
 ] as const
 
 export type AdminSettingsGroupId = (typeof ADMIN_SETTINGS_GROUP_ORDER)[number]
@@ -87,8 +86,8 @@ export const ADMIN_SETTINGS_GROUP_ICONS: Record<AdminSettingsGroupId, LucideIcon
   notifications: BellRing,
   monitoring: Radar,
   fortune: CircleDot,
+  reviews: Star,
   cabinet: Sparkles,
-  landing: PanelTop,
   status: Activity,
   cabinet_connect: Settings2,
 }
@@ -118,8 +117,8 @@ export const ADMIN_SETTINGS_GROUP_ICON_STYLES: Record<AdminSettingsGroupId, Admi
   notifications: { box: 'bg-red-500/10 dark:bg-red-500/20', icon: 'text-red-500' },
   monitoring: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
   fortune: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
+  reviews: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
   cabinet: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
-  landing: { box: 'bg-fuchsia-500/10 dark:bg-fuchsia-500/20', icon: 'text-fuchsia-500' },
   status: { box: 'bg-cyan-500/10 dark:bg-cyan-500/20', icon: 'text-cyan-500' },
   cabinet_connect: { box: 'bg-sky-500/10 dark:bg-sky-500/20', icon: 'text-sky-500' },
 }
@@ -170,7 +169,7 @@ export const ADMIN_SETTINGS_CATEGORIES: AdminSettingsCategoryDef[] = [
     id: 'design',
     titleKey: 'admin.settings.categories.design',
     icon: Sparkles,
-    groups: ['cabinet', 'landing', 'cabinet_connect'],
+    groups: ['cabinet', 'cabinet_connect', 'reviews'],
     iconStyle: { box: 'bg-pink-500/10 dark:bg-pink-500/20', icon: 'text-pink-500' },
   },
   {
@@ -277,13 +276,33 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       id: 'period',
       titleKey: 'admin.settings.subsections.trial.period',
       icon: CalendarDays,
-      keys: ['TRIAL_DAYS', 'TRIAL_ADD_TO_PAID'],
+      keys: ['TRIAL_ENABLED', 'TRIAL_DAYS', 'TRIAL_ADD_TO_PAID'],
     },
     {
       id: 'traffic',
       titleKey: 'admin.settings.subsections.trial.traffic',
       icon: Gauge,
-      keys: ['TRIAL_TRAFFIC_LIMIT', 'TRIAL_TRAFFIC_LIMIT_RESET_STRATEGY', 'TRAFFIC_LIMIT_RESET_STRATEGY'],
+      keys: ['TRIAL_TRAFFIC_LIMIT', 'TRIAL_TRAFFIC_LIMIT_RESET_STRATEGY', 'TRIAL_HWID_LIMIT'],
+    },
+    {
+      id: 'servers',
+      titleKey: 'admin.settings.subsections.trial.servers',
+      icon: Shield,
+      keys: ['TRIAL_INTERNAL_SQUADS', 'TRIAL_EXTERNAL_SQUAD_UUID', 'TRIAL_REMNAWAVE_TAG'],
+    },
+  ],
+  traffic: [
+    {
+      id: 'split',
+      titleKey: 'admin.settings.subsections.traffic.split',
+      icon: Gauge,
+      keys: ['TRAFFIC_SPLIT_ENABLED', 'TRAFFIC_PACKS_ENABLED', 'TRAFFIC_BYPASS_LABEL', 'TRAFFIC_ALERT_PERCENT', 'TRAFFIC_POLL_MINUTES'],
+    },
+    {
+      id: 'reset',
+      titleKey: 'admin.settings.subsections.traffic.reset',
+      icon: RefreshCw,
+      keys: ['TRAFFIC_LIMIT_RESET_STRATEGY'],
     },
   ],
   hwid: [
@@ -297,7 +316,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       id: 'limits',
       titleKey: 'admin.settings.subsections.hwid.limits',
       icon: Smartphone,
-      keys: ['HWID_MAX_DEVICE', 'TRIAL_HWID_LIMIT', 'PAID_HWID_LIMIT', 'HWID_FALLBACK_DEVICE_LIMIT'],
+      keys: ['HWID_MAX_DEVICE', 'PAID_HWID_LIMIT', 'HWID_FALLBACK_DEVICE_LIMIT'],
     },
   ],
   referral: [
@@ -397,7 +416,7 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       id: 'bot',
       titleKey: 'admin.settings.subsections.links.bot',
       icon: Link2,
-      keys: ['CHANNEL_URL', 'SERVER_SELECTION_URL', 'VIDEO_GUIDE_URL', 'TOS_URL'],
+      keys: ['CHANNEL_URL', 'FEEDBACK_URL', 'SERVER_SELECTION_URL', 'VIDEO_GUIDE_URL', 'TOS_URL'],
     },
     {
       id: 'legal',
@@ -517,33 +536,6 @@ export const ADMIN_SETTINGS_SUBSECTIONS: Partial<Record<AdminSettingsGroupId, Ad
       titleKey: 'admin.settings.subsections.cabinet.schedule',
       icon: CalendarDays,
       keys: ['CABINET_DECOR_AUTO_ENABLED', 'CABINET_DECOR_SCHEDULE'],
-    },
-  ],
-  landing: [
-    {
-      id: 'copy',
-      titleKey: 'admin.settings.subsections.landing.copy',
-      icon: PanelTop,
-      keys: [
-        'LANDING_HERO_TITLE',
-        'LANDING_HERO_SUBTITLE',
-        'LANDING_NOTE',
-        'LANDING_STAT_TRAFFIC_VALUE',
-        'LANDING_STAT_TRAFFIC_LABEL',
-        'LANDING_STAT_DEVICES_VALUE',
-        'LANDING_STAT_DEVICES_LABEL',
-      ],
-    },
-    {
-      id: 'sections',
-      titleKey: 'admin.settings.subsections.landing.sections',
-      icon: LayoutList,
-      keys: [
-        'LANDING_SHOW_TARIFFS',
-        'LANDING_SHOW_STEPS',
-        'LANDING_SHOW_FEATURES',
-        'LANDING_SHOW_FAQ',
-      ],
     },
   ],
   cabinet_connect: [

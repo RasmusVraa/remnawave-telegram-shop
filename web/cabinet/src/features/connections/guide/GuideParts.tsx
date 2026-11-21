@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import remarkGfm from '@/lib/remarkGfmCompat'
 
 import { cn } from '@/lib/utils'
 import { AppTile, PlatformIcon, platformLabel } from './glyphs'

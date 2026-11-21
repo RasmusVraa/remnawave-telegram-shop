@@ -39,6 +39,7 @@ type config struct {
 	telegramProxyURL                                                             string
 	yookasaProxyURL                                                              string
 	trialTrafficLimit                                                            int
+	feedbackURL                                                                  string
 	channelURL                                                                   string
 	serverStatusURL                                                              string
 	supportURL                                                                   string
@@ -63,8 +64,10 @@ cabinetAdminEmails                                                           []s
 	forwardUserMessagesToAdmin                                                   bool
 	channelGateEnabled                                                           bool
 	channelGateChannel                                                           string
+	channelGateScope                                                             string
 	suspiciousUserFilterEnabled                                                  bool
 	trialDays                                                                    int
+	trialEnabled                                                                 bool
 	squadUUIDs                                                                   map[uuid.UUID]uuid.UUID
 	referralDays                                                                 int
 	referralMode                                                                 string
@@ -456,6 +459,12 @@ func TrialDays() int {
 	return conf.trialDays
 }
 
+// TrialEnabled — пробный период выдаётся: включён переключателем и заданы дни.
+// TRIAL_DAYS=0 по-прежнему выключает его, как до появления переключателя.
+func TrialEnabled() bool {
+	return conf.trialEnabled && conf.trialDays > 0
+}
+
 func TrialTrafficLimitResetStrategy() string {
 	return conf.trialTrafficLimitResetStrategy
 }
@@ -492,6 +501,10 @@ func LoyaltyMaxTotalDiscountPercent() int {
 // LoyaltyXPMinPerPaidPurchase — минимальный XP за успешную покупку, если сумма не дала XP (LOYALTY_XP_MIN_PER_PURCHASE).
 func LoyaltyXPMinPerPaidPurchase() int64 {
 	return conf.loyaltyXPMinPerPurchase
+}
+
+func FeedbackURL() string {
+	return conf.feedbackURL
 }
 
 func ChannelURL() string {
@@ -1090,6 +1103,10 @@ func InitConfig() {
 	conf.channelGateEnabled = envBoolDefault("CHANNEL_GATE_ENABLED", false)
 	// Неверное значение из .env не должно ронять старт: канал просто не задан.
 	conf.channelGateChannel, _ = NormalizeChannelUsername(os.Getenv("CHANNEL_GATE_CHANNEL"))
+	conf.channelGateScope = ChannelGateScopeAll
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("CHANNEL_GATE_SCOPE")), ChannelGateScopeTrial) {
+		conf.channelGateScope = ChannelGateScopeTrial
+	}
 
 	conf.telegramToken = mustEnv("TELEGRAM_TOKEN")
 
@@ -1124,6 +1141,7 @@ func InitConfig() {
 	conf.healthCheckPort = envIntDefault("HEALTH_CHECK_PORT", 8080)
 
 	conf.trialDays = mustEnvInt("TRIAL_DAYS")
+	conf.trialEnabled = envBoolDefault("TRIAL_ENABLED", true)
 
 	conf.trialTrafficLimitResetStrategy = func() string {
 		v := os.Getenv("TRIAL_TRAFFIC_LIMIT_RESET_STRATEGY")
@@ -1296,6 +1314,7 @@ func InitConfig() {
 			panic("SUPPORT_BOT_API=true requires SUPPORT_BRIDGE_SECRET")
 		}
 	}
+	conf.feedbackURL = os.Getenv("FEEDBACK_URL")
 	conf.channelURL = os.Getenv("CHANNEL_URL")
 	conf.tosURL = os.Getenv("TOS_URL")
 	conf.videoGuideURL = os.Getenv("VIDEO_GUIDE_URL")

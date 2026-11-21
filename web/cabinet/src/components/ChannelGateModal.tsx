@@ -130,11 +130,23 @@ export function ChannelGateModal() {
   }
 
   function handleOpenChannel(e: React.MouseEvent<HTMLAnchorElement>) {
-    // В мини-приложении Telegram ссылка на канал открывается самим Telegram, а не браузером.
+    if (!url) return
+    // В мини-приложении Telegram обычный target=_blank часто «молчит» —
+    // открываем через WebApp API, с запасным openLink.
     const tg = window.Telegram?.WebApp
-    if (url && typeof tg?.openTelegramLink === 'function') {
-      e.preventDefault()
-      tg.openTelegramLink(url)
+    const href = url.startsWith('http') ? url : `https://${url}`
+    try {
+      if (typeof tg?.openTelegramLink === 'function' && /(?:^https?:\/\/)?(?:t\.me|telegram\.me)\//i.test(href)) {
+        e.preventDefault()
+        tg.openTelegramLink(href)
+        return
+      }
+      if (typeof tg?.openLink === 'function') {
+        e.preventDefault()
+        tg.openLink(href, { try_instant_view: false })
+      }
+    } catch {
+      // оставляем переход по <a href>
     }
   }
 
@@ -189,7 +201,12 @@ export function ChannelGateModal() {
             )}
             {url && (
               <Button asChild size="lg" className="h-12 w-full rounded-full text-[15.5px] font-bold">
-                <a href={url} target="_blank" rel="noopener noreferrer" onClick={handleOpenChannel}>
+                <a
+                  href={url.startsWith('http') ? url : `https://${url}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleOpenChannel}
+                >
                   <SquareArrowOutUpRight />
                   {t('channelGate.open')}
                 </a>

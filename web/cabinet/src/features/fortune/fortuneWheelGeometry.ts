@@ -38,12 +38,6 @@ export function sectorIndexUnderPointer(rotationDeg: number, sectorCount: number
   return 0
 }
 
-/** Easing, близкий к `cubic-bezier(0.22, 0.61, 0.36, 1)` у transition колеса (для синхронизации иконки в центре). */
-export function spinVisualEase(t: number): number {
-  const x = Math.min(1, Math.max(0, t))
-  return 1 - Math.pow(1 - x, 3)
-}
-
 export function nextSpinRotation(params: {
   currentRotation: number
   sectorIndex: number

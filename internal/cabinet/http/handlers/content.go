@@ -168,9 +168,9 @@ func (h *CabinetContentHandler) readFirstExisting(candidates []string) ([]byte, 
 	return nil, lastErr
 }
 
-// readMerged: вшитый файл из образа как база, диск поверх.
-// На томе могут быть старые FAQ/app-config — недостающие ключи/приложения
-// (например RabbitHole) подтянутся из бинарника, правки на диске сохранятся.
+// readMerged отдаёт файл с диска поверх вшитого в бинарник: ключи, которых на
+// томе ещё нет (том отстал от релиза), приходят из образа, правки владельца
+// на диске сохраняются. Массивы с диска заменяют вшитые целиком.
 func (h *CabinetContentHandler) readMerged(bundledPath string, candidates []string) ([]byte, error) {
 	bundled, bundErr := translationfs.FS.ReadFile(bundledPath)
 	disk, diskErr := h.readFirstExisting(candidates)
@@ -178,7 +178,7 @@ func (h *CabinetContentHandler) readMerged(bundledPath string, candidates []stri
 	case bundErr == nil && diskErr == nil:
 		merged, err := translation.DeepMergeJSON(bundled, disk)
 		if err != nil {
-			// Битый диск — лучше отдать то, что в образе, чем упасть 500.
+			// Битый файл на диске лучше обойти, чем отдать 500.
 			return bundled, nil
 		}
 		return merged, nil

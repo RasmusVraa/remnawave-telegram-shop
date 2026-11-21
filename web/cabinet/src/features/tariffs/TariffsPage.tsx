@@ -448,8 +448,9 @@ function TariffPlanCard({
       {isPopular && (
         <span
           className={cn(
-            'tariff-popular-badge pointer-events-none absolute -top-3 z-10 inline-flex items-center gap-1 rounded-full py-[5px] pl-2 pr-2.5 text-xs font-bold leading-none',
-            isCarousel ? 'right-4' : 'right-5',
+            // Внутри карточки (не -top): overflow родителя больше не срезает нашивку.
+            'tariff-popular-badge pointer-events-none absolute top-2.5 z-10 inline-flex items-center gap-1 rounded-full py-[5px] pl-2 pr-2.5 text-xs font-bold leading-none',
+            isCarousel ? 'right-3' : 'right-4',
           )}
         >
           <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
@@ -457,7 +458,7 @@ function TariffPlanCard({
         </span>
       )}
 
-      <CardHeader className="px-4 pb-2 pt-5">
+      <CardHeader className={cn('px-4 pb-2', isPopular ? 'pt-9' : 'pt-5')}>
         <CardTitle className="text-lg">{head.name}</CardTitle>
         <div className="flex items-baseline gap-1 mt-2">
           <span className="text-[2.5rem] font-bold leading-none tabular-nums">

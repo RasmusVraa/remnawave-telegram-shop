@@ -459,6 +459,7 @@
   "cabinet_notify_referral_title": "Referral bonus",
   "cabinet_notify_referral_body": "Your friend paid for a subscription — you get +%d days.",
   "cabinet_notify_support_title": "Support replied",
+  "cabinet_notify_review_reply_title": "The team replied to your review",
   "cabinet_notify_support_photo": "📷 Photo",
   "cabinet_notify_partner_title": "Partner program",
   "cabinet_notify_devices_title": "Device slots",

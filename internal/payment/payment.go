@@ -1657,7 +1657,7 @@ func (s PaymentService) createTelegramInvoice(ctx context.Context, amount float6
 var ErrTrialAlreadyUsed = errors.New("trial already used")
 
 func (s PaymentService) ActivateTrial(ctx context.Context, telegramId int64) (string, error) {
-	if config.TrialDays() == 0 {
+	if !config.TrialEnabled() {
 		return "", nil
 	}
 	customer, err := s.customerRepository.FindByTelegramId(ctx, telegramId)

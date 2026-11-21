@@ -76,7 +76,7 @@
 
 Webhook torrent blocker → увед клиенту: [notifications.md](./notifications.md). Слушает тот же `HEALTH_CHECK_PORT`, что healthcheck и вебхуки оплат.
 
-Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIAL_INTERNAL_SQUADS`, `TRIAL_EXTERNAL_SQUAD_UUID`.
+Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIAL_INTERNAL_SQUADS`, `TRIAL_EXTERNAL_SQUAD_UUID`. Сквады триала можно выбрать в админке («Тарифы → Условия продажи → Пробный период → Серверы»); пусто — как у `SQUAD_UUIDS`, а если и они пусты — все сквады панели. Сквады тарифов триал не использует.
 
 ---
 
@@ -195,7 +195,8 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 | `TRAFFIC_ALERT_PERCENT` | Порог предупреждения о приближении к лимиту, %. Второе уведомление — при 100%. По умолчанию `80` |
 | `TRAFFIC_POLL_MINUTES` | Как часто воркер проверяет расход обхода, минут. По умолчанию `5` |
 | `HWID_MAX_DEVICE` | Макс. устройств в одной подписке |
-| `TRIAL_HWID_LIMIT` | Лимит устройств на триале |
+| `TRIAL_HWID_LIMIT` | Лимит устройств на триале (в админке — секция «Пробный период»); `0` — не задавать |
+| `TRIAL_ENABLED` | Пробный период выдаётся. По умолчанию `true`; `TRIAL_DAYS=0` по-прежнему выключает его. В админке — переключатель в «Тарифы → Условия продажи → Пробный период» |
 | `PAID_HWID_LIMIT` | Лимит на платной; `0` = `HWID_FALLBACK_DEVICE_LIMIT` |
 | `HWID_FALLBACK_DEVICE_LIMIT` | Fallback, если в Remnawave лимит не задан (по умолчанию `2`) |
 
@@ -279,6 +280,7 @@ Squads — [squads.md](./squads.md): `SQUAD_UUIDS`, `EXTERNAL_SQUAD_UUID`, `TRIA
 |------------|----------|
 | `CHANNEL_GATE_ENABLED` | Требовать подписку на канал перед меню бота и действиями в кабинете. По умолчанию `false` |
 | `CHANNEL_GATE_CHANNEL` | Публичный канал: `@name` или `https://t.me/name` (приглашения `t.me/+…` не поддерживаются). Бот должен быть администратором канала |
+| `CHANNEL_GATE_SCOPE` | Где требовать подписку: `all` (по умолчанию — меню бота и кабинет) или `trial` (только при получении пробного периода; оплата, продление и меню открыты) |
 
 Обе настройки меняются в админке («Настройки бота → Бот и доступ → Подписка на канал») и хранятся в БД; из env они читаются только как значения при первом старте. Включить без работающего канала нельзя: сервер при сохранении проверяет канал. Как подключить: [customization.md](./customization.md#обязательная-подписка-на-канал).
 

@@ -26,6 +26,9 @@ const (
 	// AdminAlertPartner — партнёрка (PARTNER_NOTIFY_*). Партнёру в личку пишет
 	// сам PartnerNotifier, сюда идёт только админская половина.
 	AdminAlertPartner = "partner"
+	// AdminAlertReviews — новые и изменённые отзывы клиентов. Какие события слать,
+	// решает REVIEWS_NOTIFY_EVENTS.
+	AdminAlertReviews = "reviews"
 )
 
 // AdminAlertsChatKey — общий чат для всех видов.
@@ -41,15 +44,18 @@ var adminAlertSettings = []adminAlertSetting{
 	{AdminAlertSystem, "ADMIN_ALERT_SYSTEM"},
 	{AdminAlertServers, "ADMIN_ALERT_SERVERS"},
 	{AdminAlertInfra, "ADMIN_ALERT_INFRA"},
+	{AdminAlertReviews, "ADMIN_ALERT_REVIEWS"},
 }
 
 // AdminAlertKinds — все виды в порядке экрана.
 func AdminAlertKinds() []string {
 	out := make([]string, 0, len(adminAlertSettings)+2)
 	for _, s := range adminAlertSettings {
-		out = append(out, s.kind)
+		if s.kind != AdminAlertReviews {
+			out = append(out, s.kind)
+		}
 	}
-	return append(out, AdminAlertPayments, AdminAlertPartner)
+	return append(out, AdminAlertPayments, AdminAlertPartner, AdminAlertReviews)
 }
 
 // AdminAlertSettings — как настроен вид: включён ли, свой чат (0 — общий) и тема.

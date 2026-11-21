@@ -121,9 +121,22 @@ func (s *Service) OnSubscribed(fn func(telegramID int64)) { s.onSubscribed = fn 
 // SetExemptFunc заменяет правило «кого не проверяем» (по умолчанию — админы бота). Для тестов.
 func (s *Service) SetExemptFunc(fn func(telegramID int64) bool) { s.exempt = fn }
 
-// Active — требование действует: включено и канал задан.
-func (s *Service) Active() bool {
+// Enabled — проверку можно делать: функция включена и канал задан. Не говорит,
+// что именно закрыто: для этого Active (всё) и TrialOnly (только пробный).
+func (s *Service) Enabled() bool {
 	return s != nil && config.ChannelGateActive()
+}
+
+// Active — подписка нужна для всего: меню бота и закрытых страниц кабинета.
+// В режиме «только для пробного» это false: всё открыто, а проверка идёт
+// лишь при выдаче пробного (BlocksTrial).
+func (s *Service) Active() bool {
+	return s.Enabled() && !config.ChannelGateTrialOnly()
+}
+
+// TrialOnly — подписка нужна только для получения пробного периода.
+func (s *Service) TrialOnly() bool {
+	return s.Enabled() && config.ChannelGateTrialOnly()
 }
 
 // Exempt — пользователя не проверяем: админ бота.
@@ -140,9 +153,19 @@ func (s *Service) Blocks(ctx context.Context, telegramID int64) bool {
 	return s.Check(ctx, telegramID) == NotSubscribed
 }
 
+// BlocksTrial — true, если выдачу пробного периода нужно остановить на экране
+// подписки: режим «только для пробного», пользователь не админ и не подписан.
+// Сбой проверки — false, как и везде.
+func (s *Service) BlocksTrial(ctx context.Context, telegramID int64) bool {
+	if !s.TrialOnly() || telegramID <= 0 || s.Exempt(telegramID) {
+		return false
+	}
+	return s.Check(ctx, telegramID) == NotSubscribed
+}
+
 // Check возвращает состояние подписки, при возможности из кэша.
 func (s *Service) Check(ctx context.Context, telegramID int64) State {
-	if !s.Active() || telegramID <= 0 {
+	if !s.Enabled() || telegramID <= 0 {
 		return Subscribed
 	}
 	channel := config.ChannelGateChannel()
@@ -155,7 +178,7 @@ func (s *Service) Check(ctx context.Context, telegramID int64) State {
 // CheckNow — проверка по кнопке «Да, я подписался»: кэш сбрасывается, но не
 // чаще раза в 3 секунды на пользователя (иначе ErrTooFast).
 func (s *Service) CheckNow(ctx context.Context, telegramID int64) (State, error) {
-	if !s.Active() || telegramID <= 0 {
+	if !s.Enabled() || telegramID <= 0 {
 		return Subscribed, nil
 	}
 	channel := config.ChannelGateChannel()

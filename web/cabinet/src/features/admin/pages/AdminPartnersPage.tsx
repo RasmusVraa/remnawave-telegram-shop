@@ -42,7 +42,10 @@ export default function AdminPartnersPage() {
   // «Заявок на выплату» с дашборда должно открывать выплаты, а не заявки.
   const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
-  const tab: TabId = isTabId(tabParam) ? tabParam : 'applications'
+  // Без явной вкладки: есть новые заявки — открываем их, нет — список партнёров.
+  const pending = useAdminPartnerPending()
+  const defaultTab: TabId = pending.data && pending.data.applications === 0 ? 'partners' : 'applications'
+  const tab: TabId = isTabId(tabParam) ? tabParam : defaultTab
   const setTab = (next: TabId) => {
     setSearchParams(
       (prev) => {
@@ -57,7 +60,6 @@ export default function AdminPartnersPage() {
   // обработка выплаты — один заход, уходить со страницы незачем.
   const [openPartner, setOpenPartner] = useState<number | null>(null)
 
-  const pending = useAdminPartnerPending()
   const applications = useAdminPartners(['pending'])
   const [statusFilter, setStatusFilter] = useState<PartnerStatus[]>(loadPartnerStatusFilter)
   const partners = useAdminPartners(statusFilter)

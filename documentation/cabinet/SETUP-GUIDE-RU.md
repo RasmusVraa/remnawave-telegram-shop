@@ -316,7 +316,7 @@ server {
 
 ```yaml
   remnawave-nginx:
-    image: nginx:1.28
+    image: nginx:1.30.7
     network_mode: host
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
@@ -324,6 +324,8 @@ server {
       - /etc/letsencrypt/live/cabinet.example.com/fullchain.pem:/etc/nginx/ssl/cabinet.example.com/fullchain.pem:ro
       - /etc/letsencrypt/live/cabinet.example.com/privkey.pem:/etc/nginx/ssl/cabinet.example.com/privkey.pem:ro
 ```
+
+> **Версия nginx.** Держите образ свежим: в ноябре 2026 закрыты критические уязвимости (в т.ч. CVE-2026-123007 в HTTP/2, затрагивала 1.9.5–1.31.8), исправление — в 1.30.7 (stable) и 1.31.9 (mainline). Образ старее не подойдёт. Актуальные версии: https://nginx.org/en/security_advisories.html. Обновление: поменять тег, затем `docker compose pull remnawave-nginx && docker compose up -d remnawave-nginx` и `docker exec remnawave-nginx nginx -t`.
 
 Имя каталога в `live/` у certbot может быть с суффиксом (`cabinet.example.com-0001`) — важно монтировать **реальные** пути с хоста, они должны совпадать с путями в `ssl_certificate` внутри `nginx.conf`.
 

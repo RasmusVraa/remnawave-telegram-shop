@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { animate, motion, useAnimation } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
@@ -17,7 +17,8 @@ type FortunePrizeModalProps = {
   rewardType: string
   rewardValue: number
   wasFree: boolean
-  onClaim: () => void
+  /** По кнопке «Забрать» приходит положение плитки приза: оттуда он полетит в счётчик. Тап по фону и свайп — без него. */
+  onClaim: (tileRect?: DOMRect) => void
 }
 
 export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onClaim }: FortunePrizeModalProps) {
@@ -25,10 +26,11 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
   const [entered, setEntered] = useState(false)
   const [displayValue, setDisplayValue] = useState(0)
   const modalControls = useAnimation()
+  const tileRef = useRef<HTMLDivElement>(null)
   // Смахнуть шторку — то же, что тап по фону: приз забирается.
   const drag = useSheetDragDismiss<HTMLDivElement, HTMLButtonElement>({
     open,
-    onDismiss: onClaim,
+    onDismiss: () => onClaim(),
     desktopQuery: '(min-width: 768px)',
   })
 
@@ -90,7 +92,7 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
         type="button"
         className="absolute inset-0 bg-neutral-950/65 backdrop-blur-sm transition-opacity dark:bg-black/70"
         aria-label={t('common.close')}
-        onClick={onClaim}
+        onClick={() => onClaim()}
       />
       <motion.div
         ref={drag.sheetRef}
@@ -116,7 +118,7 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
           {t('fortune.prizeModalTitle')}
         </h2>
         <div className="mt-4 flex justify-center" aria-hidden>
-          <div className="fortune-prize-shine relative overflow-hidden rounded-2xl border border-border/80 bg-muted/40 p-4 shadow-inner">
+          <div ref={tileRef} className="fortune-prize-shine relative overflow-hidden rounded-2xl border border-border/80 bg-muted/40 p-4 shadow-inner">
             <PrizeIcon className={cn('size-14 sm:size-16', prizeIconCls)} strokeWidth={2} />
             <span className="absolute inset-0 bg-[linear-gradient(120deg,transparent_26%,rgba(255,255,255,0.58)_48%,transparent_68%)] animate-[fortune-prize-shine_1.2s_ease-out]" />
           </div>
@@ -138,7 +140,7 @@ export function FortunePrizeModal({ open, rewardType, rewardValue, wasFree, onCl
         {wasFree && (
           <p className="mt-2 text-center text-xs font-medium text-primary">{t('fortune.wasFree')}</p>
         )}
-        <Button type="button" size="lg" className="mt-6 w-full max-w-none md:max-w-full" onClick={onClaim}>
+        <Button type="button" size="lg" className="mt-6 w-full max-w-none md:max-w-full" onClick={() => onClaim(tileRef.current?.getBoundingClientRect())}>
           {t('fortune.claimButton')}
         </Button>
       </motion.div>

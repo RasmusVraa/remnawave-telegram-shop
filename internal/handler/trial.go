@@ -37,7 +37,7 @@ func (h Handler) resolveTrialButton(langCode, buttonKey string) models.InlineKey
 }
 
 func (h Handler) TrialCallbackHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if config.TrialDays() == 0 {
+	if !config.TrialEnabled() {
 		return
 	}
 	c, err := h.customerRepository.FindByTelegramId(ctx, update.CallbackQuery.From.ID)
@@ -50,6 +50,9 @@ func (h Handler) TrialCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 		return
 	}
 	if c.SubscriptionLink != nil {
+		return
+	}
+	if h.trialChannelGateBlocks(ctx, b, update, c) {
 		return
 	}
 	callback := update.CallbackQuery.Message.Message
@@ -66,7 +69,7 @@ func (h Handler) TrialCallbackHandler(ctx context.Context, b *bot.Bot, update *m
 }
 
 func (h Handler) ActivateTrialCallbackHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if config.TrialDays() == 0 {
+	if !config.TrialEnabled() {
 		return
 	}
 	c, err := h.customerRepository.FindByTelegramId(ctx, update.CallbackQuery.From.ID)
@@ -79,6 +82,9 @@ func (h Handler) ActivateTrialCallbackHandler(ctx context.Context, b *bot.Bot, u
 		return
 	}
 	if c.SubscriptionLink != nil {
+		return
+	}
+	if h.trialChannelGateBlocks(ctx, b, update, c) {
 		return
 	}
 	callback := update.CallbackQuery.Message.Message

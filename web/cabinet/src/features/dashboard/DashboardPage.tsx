@@ -109,6 +109,8 @@ export default function DashboardPage() {
         navigate('/verify-email', { state: { email: useAuthStore.getState().user?.email ?? '' } })
         return
       }
+      // Нужна подписка на канал: окно подписки уже открылось само (lib/api.ts), тост про «ошибку» не нужен.
+      if (err instanceof ApiError && err.status === 403 && err.body.includes('channel_subscription_required')) return
       toast.error(t('dashboard.trialActivateFailed'))
     },
   })

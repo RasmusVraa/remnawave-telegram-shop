@@ -8,6 +8,18 @@
  * - При 401 (кроме /auth/*) автоматически вызывается refresh и запрос повторяется
  * - При неудаче refresh — стор сбрасывает сессию
  */
+import type {
+  AdminReview,
+  AdminReviewCustomerHit,
+  AdminReviewByCustomerResponse,
+  AdminReviewCreateInput,
+  AdminReviewUpdateInput,
+  AdminReviewsResponse,
+  MyReview,
+  MyReviewResponse,
+  ReviewsListResponse,
+  SaveReviewInput,
+} from '@/features/reviews/reviewTypes'
 
 import { getCookie } from './utils'
 import type {
@@ -209,6 +221,8 @@ export interface AuthBootstrapResponse {
   fortune_nav_visible?: boolean
   /** false, пока в списке статуса нет ни одного сервера: пункт меню, кнопка главной и сама страница скрыты. */
   status_nav_visible?: boolean
+  /** Раздел отзывов включён: пункт «Отзывы» ведёт на /reviews, а не на внешнюю ссылку. */
+  reviews_enabled?: boolean
   /** false при PARTNER_PROGRAM_ENABLED=false — пункт «Партнёрам» скрыт. */
   partner_nav_visible?: boolean
   /** Максимальная ставка партнёрки — бейдж «до N%» рядом с пунктом меню. */
@@ -946,7 +960,7 @@ export interface PaymentStatusResponse {
   traffic_pack_bytes?: number
   status: 'new' | 'pending' | 'paid' | 'failed' | 'expired'
   subscription_link: string | null
-  /** Пока pending — ссылка на оплату у провайдера (если окно не открылось). */
+  /** pending: ссылка на оплату у провайдера — для кнопки, если окно не открылось само. */
   payment_url?: string
   /** paid: subscription | extra_hwid | tariff_upgrade — для текста успеха. */
   purchase_kind?: string
@@ -1780,35 +1794,27 @@ export const api = {
 
   publicStatus: () => request<PublicStatusResponse>('GET', '/public/status'),
 
-  publicReviews: (params?: { limit?: number; offset?: number }) => {
-    const q = new URLSearchParams()
-    if (params?.limit != null) q.set('limit', String(params.limit))
-    if (params?.offset != null) q.set('offset', String(params.offset))
-    const suffix = q.toString() ? `?${q.toString()}` : ''
-    return request<{ items: import('@/features/reviews/reviewTypes').ReviewItem[] }>(
-      'GET',
-      `/public/reviews${suffix}`,
-    )
+  // --- Отзывы ---
+  publicReviews: (limit = 12, offset = 0) =>
+    request<ReviewsListResponse>('GET', `/public/reviews?limit=${limit}&offset=${offset}`),
+  publicReviewsFeatured: () => request<ReviewsListResponse>('GET', '/public/reviews/featured'),
+  myReview: () => request<MyReviewResponse>('GET', '/me/review'),
+  saveMyReview: (body: SaveReviewInput) => request<MyReview>('PUT', '/me/review', body),
+  adminReviews: (p: { status?: string; q?: string; limit?: number; offset?: number }) => {
+    const qs = new URLSearchParams()
+    if (p.status) qs.set('status', p.status)
+    if (p.q) qs.set('q', p.q)
+    qs.set('limit', String(p.limit ?? 20))
+    qs.set('offset', String(p.offset ?? 0))
+    return request<AdminReviewsResponse>('GET', `/admin/reviews?${qs.toString()}`)
   },
-
-  publicReviewsFeatured: (limit = 3) =>
-    request<{ items: import('@/features/reviews/reviewTypes').ReviewItem[] }>(
-      'GET',
-      `/public/reviews/featured?limit=${limit}`,
-    ),
-
-  publicReviewOriginal: (id: number) =>
-    request<{ id: number; body: string }>('GET', `/public/reviews/${id}/original`),
-
-  myReview: () =>
-    request<import('@/features/reviews/reviewTypes').MyReviewResponse>('GET', '/me/review'),
-
-  saveReview: (body: {
-    rating: number
-    body: string
-    visibility: import('@/features/reviews/reviewTypes').ReviewVisibility
-    display_name?: string
-  }) => request<import('@/features/reviews/reviewTypes').MyReviewResponse>('PUT', '/me/review', body),
+  adminReviewUpdate: (id: number, body: AdminReviewUpdateInput) => request<AdminReview>('PUT', `/admin/reviews/${id}`, body),
+  adminReviewDelete: (id: number) => request<{ ok: boolean }>('DELETE', `/admin/reviews/${id}`),
+  adminReviewCreate: (body: AdminReviewCreateInput) => request<AdminReview>('POST', '/admin/reviews', body),
+  adminReviewCustomers: (q: string) =>
+    request<{ items: AdminReviewCustomerHit[] }>('GET', `/admin/reviews/customers?q=${encodeURIComponent(q)}`),
+  adminReviewByCustomer: (customerId: number) =>
+    request<AdminReviewByCustomerResponse>('GET', `/admin/reviews/customer/${customerId}`),
 
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider, yookassa_method.
   checkout: (
@@ -1960,69 +1966,6 @@ export const api = {
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/strategy`, { strategy }),
   adminUserSetDescription: (id: number, description: string | null) =>
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/description`, { description }),
-  adminUserReview: (id: number) =>
-    request<{
-      has_review: boolean
-      can_edit: boolean
-      id?: number
-      rating?: number
-      body?: string
-      visibility?: string
-      display_name?: string
-      avatar_url?: string
-      author_name?: string | null
-      author_avatar_url?: string | null
-      client_since?: string | null
-      tariff_name?: string
-      created_at?: string
-    }>('GET', `/admin/users/${id}/review`),
-  adminUserUpsertReview: (
-    id: number,
-    body: {
-      rating: number
-      body: string
-      visibility: string
-      display_name?: string
-      avatar_url?: string
-    },
-  ) =>
-    request<{
-      has_review: boolean
-      can_edit: boolean
-      id?: number
-      rating?: number
-      body?: string
-      visibility?: string
-    }>('PUT', `/admin/users/${id}/review`, body),
-
-  adminReviews: (params?: { limit?: number; offset?: number }) => {
-    const q = new URLSearchParams()
-    if (params?.limit != null) q.set('limit', String(params.limit))
-    if (params?.offset != null) q.set('offset', String(params.offset))
-    const suffix = q.toString() ? `?${q.toString()}` : ''
-    return request<import('@/features/admin/hooks/useAdminReviews').AdminReviewsListResponse>(
-      'GET',
-      `/admin/reviews${suffix}`,
-    )
-  },
-  adminReviewUpdate: (
-    id: number,
-    body: {
-      rating: number
-      body: string
-      visibility: string
-      display_name?: string
-      avatar_url?: string
-      tariff_name?: string
-    },
-  ) =>
-    request<import('@/features/admin/hooks/useAdminReviews').AdminReviewDTO>(
-      'PUT',
-      `/admin/reviews/${id}`,
-      body,
-    ),
-  adminReviewDelete: (id: number) => request<void>('DELETE', `/admin/reviews/${id}`),
-
   adminUserSetTariff: (id: number, tariffId: number) =>
     request<AdminOkDTO>('PATCH', `/admin/users/${id}/tariff`, { tariff_id: tariffId }),
   adminUserDevices: (id: number) =>
@@ -2036,6 +1979,9 @@ export const api = {
     request<AdminCustomerDTO>('PUT', `/admin/users/${id}/hwid-pin`, { limit }),
 
   adminSquads: () => request<{ items: { uuid: string; name: string }[] }>('GET', '/admin/squads'),
+  /** External squads панели: для выбора внешнего сквада пробного периода. */
+  adminExternalSquads: () =>
+    request<{ items: { uuid: string; name: string }[] }>('GET', '/admin/squads/external'),
 
   adminPayments: (params?: { status?: string; q?: string; page?: number; limit?: number; sort?: string; dir?: string }) => {
     const q = new URLSearchParams()

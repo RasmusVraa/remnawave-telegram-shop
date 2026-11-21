@@ -100,3 +100,22 @@ func TestSPAHandlerStillServesAssets(t *testing.T) {
 }
 
 var _ fs.FS = fstest.MapFS{}
+
+// Пропавший после деплоя хэшированный чанк обязан давать 404, а не index.html:
+// HTML под видом JS отравляет граф модулей и кэш service worker.
+func TestSPAHandlerMissingAssetIs404(t *testing.T) {
+	spaFS := fstest.MapFS{
+		"index.html":    {Data: []byte("<!doctype html>")},
+		"assets/app.js": {Data: []byte("console.log(1)")},
+	}
+
+	rec := httptest.NewRecorder()
+	buildSPAHandler(spaFS).ServeHTTP(
+		rec,
+		httptest.NewRequest(http.MethodGet, "/cabinet/assets/CheckoutPage-OLDHASH.js", nil),
+	)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("статус %d, ожидался 404", rec.Code)
+	}
+}

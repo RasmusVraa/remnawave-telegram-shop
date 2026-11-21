@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Activity, Check, ChevronDown, CircleCheck, CircleX, Handshake, Mail, Send, Server, Wallet, type LucideIcon } from 'lucide-react'
+import { Activity, Check, ChevronDown, CircleCheck, CircleX, Handshake, Mail, Send, Server, Star, Wallet, type LucideIcon } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { ApiError, api, type AdminAlertTestResult } from '@/lib/api'
@@ -43,22 +43,26 @@ const KINDS: AlertKind[] = [
     threadKey: 'PARTNER_NOTIFY_MESSAGE_THREAD_ID',
     icon: Handshake,
   },
+  prefixed('reviews', 'ADMIN_ALERT_REVIEWS', Star),
 ]
 
 const SHARED_KEY = 'ADMIN_ALERTS_CHAT_ID'
-const EVENTS_KEY = 'PAYMENTS_NOTIFY_EVENTS'
-const PAYMENT_EVENTS = ['paid', 'cancel'] as const
-
-/** PAYMENTS_NOTIFY_EVENTS: пусто — оба события (так было всегда), none — ни одного. */
-function parseEvents(raw: string): Set<string> {
-  const v = raw.trim().toLowerCase()
-  if (v === '') return new Set(PAYMENT_EVENTS)
-  if (v === 'none') return new Set()
-  return new Set(v.split(',').map((p) => p.trim()).filter((p) => (PAYMENT_EVENTS as readonly string[]).includes(p)))
+/** Виды с галочками «Что присылать»: ключ настройки и список событий. */
+const EVENT_SETS: Record<string, { key: string; events: readonly string[]; hint: 'cancel' | 'none' }> = {
+  payments: { key: 'PAYMENTS_NOTIFY_EVENTS', events: ['paid', 'cancel'], hint: 'cancel' },
+  reviews: { key: 'REVIEWS_NOTIFY_EVENTS', events: ['new', 'edited'], hint: 'none' },
 }
 
-function formatEvents(set: Set<string>): string {
-  const list = PAYMENT_EVENTS.filter((e) => set.has(e))
+/** Значение настройки событий: пусто — все события (так было всегда), none — ни одного. */
+function parseEvents(raw: string, all: readonly string[]): Set<string> {
+  const v = raw.trim().toLowerCase()
+  if (v === '') return new Set(all)
+  if (v === 'none') return new Set()
+  return new Set(v.split(',').map((p) => p.trim()).filter((p) => all.includes(p)))
+}
+
+function formatEvents(set: Set<string>, all: readonly string[]): string {
+  const list = all.filter((e) => set.has(e))
   return list.length === 0 ? 'none' : list.join(',')
 }
 
@@ -187,7 +191,9 @@ export function AdminAlertRoutes({ group, draft, saving, togglingKey, onDraftCha
                     .join(' · ')
               : ''
 
-          const events = kind === 'payments' && group.fields.some((f) => f.key === EVENTS_KEY) ? parseEvents(draft[EVENTS_KEY] ?? group.fields.find((f) => f.key === EVENTS_KEY)?.value ?? '') : null
+          const eventSet = EVENT_SETS[kind]
+          const eventsKey = eventSet?.key
+          const events = eventSet && group.fields.some((f) => f.key === eventsKey) ? parseEvents(draft[eventsKey] ?? group.fields.find((f) => f.key === eventsKey)?.value ?? '', eventSet.events) : null
 
           return (
             <div
@@ -253,7 +259,7 @@ export function AdminAlertRoutes({ group, draft, saving, togglingKey, onDraftCha
                 <div className="mt-3">
                   <p className="text-xs font-medium text-muted-foreground">{t('admin.settings.alerts.events')}</p>
                   <div className="mt-1.5 flex flex-wrap gap-2">
-                    {PAYMENT_EVENTS.map((ev) => {
+                    {eventSet.events.map((ev) => {
                       const on = events.has(ev)
                       return (
                         <button
@@ -266,7 +272,7 @@ export function AdminAlertRoutes({ group, draft, saving, togglingKey, onDraftCha
                             const next = new Set(events)
                             if (on) next.delete(ev)
                             else next.add(ev)
-                            onDraftChange(EVENTS_KEY, formatEvents(next))
+                            onDraftChange(eventsKey, formatEvents(next, eventSet.events))
                           }}
                           className={cn(
                             'inline-flex min-h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition-colors disabled:opacity-60',
@@ -289,7 +295,7 @@ export function AdminAlertRoutes({ group, draft, saving, togglingKey, onDraftCha
                     })}
                   </div>
                   <p className={cn('mt-1.5 text-xs', events.size === 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-                    {events.size === 0 ? t('admin.settings.alerts.eventsNone') : t('admin.settings.alerts.eventCancelHint')}
+                    {events.size === 0 ? t('admin.settings.alerts.eventsNone') : eventSet.hint === 'cancel' ? t('admin.settings.alerts.eventCancelHint') : ''}
                   </p>
                 </div>
               )}

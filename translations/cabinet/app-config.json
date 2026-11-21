@@ -568,7 +568,7 @@
         "installationStep": {
           "buttons": [
             {
-              "buttonLink": "https://github.com/MrMe0ws/meows-vpn-app/releases/download/windows-latest/Meows.msi",
+              "buttonLink": "https://github.com/MrMe0ws/meows-vpn-app/releases/download/windows-latest/Meows-Setup.exe",
               "buttonText": {
                 "ru": "Скачать для Windows (.msi)"
               }

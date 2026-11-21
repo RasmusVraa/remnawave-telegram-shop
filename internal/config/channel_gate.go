@@ -71,6 +71,22 @@ func ChannelGateActive() bool {
 	return conf.channelGateEnabled && conf.channelGateChannel != ""
 }
 
+// Область действия требования подписки (CHANNEL_GATE_SCOPE).
+const (
+	// ChannelGateScopeAll — подписка нужна для всего: меню бота и закрытые страницы кабинета.
+	ChannelGateScopeAll = "all"
+	// ChannelGateScopeTrial — подписка нужна только при получении пробного периода.
+	ChannelGateScopeTrial = "trial"
+)
+
+// ChannelGateTrialOnly — требование подписки действует только на выдачу пробного
+// периода; остальное (меню, оплата, продление) открыто.
+func ChannelGateTrialOnly() bool {
+	confMu.RLock()
+	defer confMu.RUnlock()
+	return conf.channelGateScope == ChannelGateScopeTrial
+}
+
 // ChannelGateURL — ссылка на канал для кнопки «Открыть канал».
 func ChannelGateURL() string {
 	ch := ChannelGateChannel()
@@ -98,6 +114,12 @@ func channelGateRegistry() []SettingField {
 				return nil
 			},
 			Current: func() string { return conf.channelGateChannel },
+		},
+		{
+			Key: "CHANNEL_GATE_SCOPE", Group: "channel_gate", Type: SettingEnum,
+			EnumValues: []string{ChannelGateScopeAll, ChannelGateScopeTrial},
+			Apply:      applyEnumField([]string{ChannelGateScopeAll, ChannelGateScopeTrial}, func(v string) { conf.channelGateScope = v }),
+			Current:    func() string { return conf.channelGateScope },
 		},
 	}
 }

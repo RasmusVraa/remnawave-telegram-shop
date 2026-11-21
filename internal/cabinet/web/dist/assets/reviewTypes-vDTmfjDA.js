@@ -1,1 +1,0 @@
-function e(a,r){return a?r?"name_avatar":"name":"anonymous"}function t(a){return a==="name_avatar"?{showName:!0,showAvatar:!0}:a==="name"?{showName:!0,showAvatar:!1}:{showName:!1,showAvatar:!1}}export{t,e as v};

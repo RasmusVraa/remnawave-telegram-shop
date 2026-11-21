@@ -311,6 +311,11 @@ func kindLabel(kind string) string {
 			return "Partner program"
 		}
 		return "Партнёрка"
+	case config.AdminAlertReviews:
+		if en {
+			return "Reviews"
+		}
+		return "Отзывы"
 	}
 	return kind
 }

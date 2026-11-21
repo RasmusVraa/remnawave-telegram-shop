@@ -415,3 +415,44 @@ func TestProbe(t *testing.T) {
 		}
 	}
 }
+
+func TestTrialOnlyScope(t *testing.T) {
+	activate(t)
+	api := &fakeAPI{member: func(int64) (*models.ChatMember, error) { return member(models.ChatMemberTypeLeft), nil }}
+	s, _ := newSvc(api, nil)
+	ctx := context.Background()
+
+	// «Для всего»: блокирует меню, а выдачу пробного отдельно не проверяет.
+	if !s.Blocks(ctx, 5) {
+		t.Fatal("в режиме «для всего» неподписанного нужно блокировать")
+	}
+	if s.BlocksTrial(ctx, 5) {
+		t.Fatal("в режиме «для всего» пробный отдельно не проверяется: его закрывает общий гейт")
+	}
+
+	if _, err := config.ApplyRuntimePatch(map[string]string{"CHANNEL_GATE_SCOPE": "trial"}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = config.ApplyRuntimePatch(map[string]string{"CHANNEL_GATE_SCOPE": "all"}) })
+
+	if s.Blocks(ctx, 5) {
+		t.Fatal("в режиме «только для пробного» меню и оплата открыты")
+	}
+	if !s.BlocksTrial(ctx, 5) {
+		t.Fatal("в режиме «только для пробного» неподписанного нужно остановить на выдаче пробного")
+	}
+	// Кнопка «Да, я подписался» работает и в этом режиме.
+	if st, err := s.CheckNow(ctx, 6); err != nil || st != NotSubscribed {
+		t.Fatalf("CheckNow: state=%v err=%v", st, err)
+	}
+
+	api.member = func(int64) (*models.ChatMember, error) { return member(models.ChatMemberTypeMember), nil }
+	if s.BlocksTrial(ctx, 7) {
+		t.Fatal("подписанного останавливать не нужно")
+	}
+	s.SetExemptFunc(func(id int64) bool { return id == 8 })
+	api.member = func(int64) (*models.ChatMember, error) { return member(models.ChatMemberTypeLeft), nil }
+	if s.BlocksTrial(ctx, 8) {
+		t.Fatal("админ не блокируется")
+	}
+}

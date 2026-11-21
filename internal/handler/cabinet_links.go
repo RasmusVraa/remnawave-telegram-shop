@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
+	"remnawave-tg-shop-bot/internal/config"
 )
 
 // BuildCabinetWebAppURL exported версия для использования вне пакета handler
@@ -26,4 +27,13 @@ func cabinetWebAppURL(path string) string {
 		return ""
 	}
 	return base.ResolveReference(target).String()
+}
+
+// reviewsWebAppURL — адрес страницы отзывов в кабинете, если раздел включён и
+// кабинет доступен как Mini App. Пусто — кнопка «Отзывы» остаётся внешней ссылкой.
+func reviewsWebAppURL() string {
+	if !config.ReviewsEnabled() {
+		return ""
+	}
+	return cabinetWebAppURL("/cabinet/reviews")
 }

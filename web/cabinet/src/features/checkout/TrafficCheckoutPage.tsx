@@ -26,7 +26,7 @@ import {
   discountLines,
   type ReceiptMode,
 } from '@/features/checkout/orderSummary'
-import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
+import { PaymentMethodPicker, PaymentMethodRow } from '@/features/checkout/PaymentMethodPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
 /**
@@ -171,6 +171,17 @@ export default function TrafficCheckoutPage() {
     )
   }
 
+  const pickerProps = {
+    methods: checkoutMethod.methods,
+    method: checkoutMethod.method,
+    initialId: checkoutMethod.initial.id,
+    initialSource: checkoutMethod.initial.source,
+    loading: checkoutMethod.loading,
+    onSelect: checkoutMethod.setMethod,
+  }
+  // Способ не выбран (новый человек без способа по умолчанию): на кнопке вместо суммы подсказка.
+  const needMethod = !checkoutMethod.loading && checkoutMethod.methods.length > 0 && !selectedProvider
+
   return (
     <AppLayout>
       <CheckoutLayout
@@ -178,18 +189,8 @@ export default function TrafficCheckoutPage() {
         order={order}
         receipt={isLoading || valid ? renderReceipt : null}
         equalHeights
-        payment={
-          valid ? (
-            <PaymentMethodPicker
-              methods={checkoutMethod.methods}
-              method={checkoutMethod.method}
-              initialId={checkoutMethod.initial.id}
-              initialSource={checkoutMethod.initial.source}
-              loading={checkoutMethod.loading}
-              onSelect={checkoutMethod.setMethod}
-            />
-          ) : undefined
-        }
+        payment={valid ? <PaymentMethodPicker {...pickerProps} /> : undefined}
+        paymentRow={valid ? <PaymentMethodRow {...pickerProps} /> : undefined}
         notices={
           starsMissing ? (
             <Alert variant="destructive">
@@ -202,7 +203,9 @@ export default function TrafficCheckoutPage() {
         pay={
           valid
             ? {
-                label: `${t('checkout.pay')}${priceReady ? ` ${formatNumber(amount)} ${amountSuffix}` : ''}`,
+                label: needMethod
+                  ? t('checkout.choosePaymentMethod')
+                  : `${t('checkout.pay')}${priceReady ? ` ${formatNumber(amount)} ${amountSuffix}` : ''}`,
                 // isPlaceholderData, а не recalculating: без сети запрос встаёт на паузу, а сумма остаётся прошлой.
                 disabled: !selectedProvider || loading || starsMissing || !priceReady || isPlaceholderData,
                 loading,

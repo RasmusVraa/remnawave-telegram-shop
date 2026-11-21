@@ -2,93 +2,57 @@ import { Star } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-/** Заполнение звезды 0..1 для половинок. */
-function fillForStar(rating: number, index: number): number {
-  const left = rating - index
-  if (left >= 1) return 1
-  if (left <= 0) return 0
-  return left >= 0.5 ? 0.5 : 0
-}
+const STARS = [1, 2, 3, 4, 5] as const
 
-export function ReviewStars({
-  rating,
-  size = 'md',
-  className,
-}: {
-  rating: number
-  size?: 'sm' | 'md' | 'lg'
-  className?: string
-}) {
-  const box = size === 'sm' ? 'size-3.5' : size === 'lg' ? 'size-7' : 'size-4'
+/** Звёзды только для показа: целые, закрашенные до value. */
+export function Stars({ value, className, size = 'size-4' }: { value: number; className?: string; size?: string }) {
   return (
-    <span className={cn('inline-flex items-center gap-0.5', className)} aria-label={`${rating}/5`}>
-      {Array.from({ length: 5 }, (_, i) => {
-        const fill = fillForStar(rating, i)
-        return (
-          <span key={i} className={cn('relative inline-flex', box)}>
-            <Star className={cn(box, 'text-muted-foreground/35')} strokeWidth={1.75} />
-            {fill > 0 && (
-              <span
-                className="absolute inset-0 overflow-hidden"
-                style={{ width: fill === 1 ? '100%' : '50%' }}
-              >
-                <Star className={cn(box, 'fill-primary text-primary')} strokeWidth={1.75} />
-              </span>
-            )}
-          </span>
-        )
-      })}
+    <span className={cn('inline-flex items-center gap-0.5', className)} role="img" aria-label={`${value} / 5`}>
+      {STARS.map((n) => (
+        <Star
+          key={n}
+          className={cn(size, n <= value ? 'fill-amber-400 text-amber-400' : 'fill-muted/40 text-muted-foreground/30')}
+          aria-hidden
+        />
+      ))}
     </span>
   )
 }
 
-/**
- * Выбор оценки: 5 пустых звёзд, клик по левой/правой половине — шаг 0.5.
- */
-export function StarRatingInput({
+/** Выбор оценки: пять целых звёзд, клавиатура и тап. */
+export function StarPicker({
   value,
   onChange,
-  className,
+  disabled,
+  label,
 }: {
   value: number
-  onChange: (rating: number) => void
-  className?: string
+  onChange: (v: number) => void
+  disabled?: boolean
+  label: string
 }) {
   return (
-    <div className={cn('inline-flex items-center gap-1', className)} role="radiogroup" aria-label="rating">
-      {Array.from({ length: 5 }, (_, i) => {
-        const starValue = i + 1
-        const fill = fillForStar(value, i)
-        return (
-          <span key={i} className="relative inline-flex size-9 sm:size-10">
-            <Star
-              className="size-9 text-muted-foreground/35 sm:size-10"
-              strokeWidth={1.5}
-              aria-hidden
-            />
-            {fill > 0 && (
-              <span
-                className="pointer-events-none absolute inset-0 overflow-hidden"
-                style={{ width: fill === 1 ? '100%' : '50%' }}
-              >
-                <Star className="size-9 fill-primary text-primary sm:size-10" strokeWidth={1.5} />
-              </span>
+    <div role="radiogroup" aria-label={label} className="flex items-center gap-1.5">
+      {STARS.map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          aria-label={`${n}`}
+          disabled={disabled}
+          onClick={() => onChange(n)}
+          className="rounded-md p-0.5 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:scale-95 disabled:opacity-60"
+        >
+          <Star
+            className={cn(
+              'size-9 transition-colors sm:size-10',
+              n <= value ? 'fill-amber-400 text-amber-400' : 'fill-muted/30 text-muted-foreground/40',
             )}
-            <button
-              type="button"
-              aria-label={`${starValue - 0.5}`}
-              className="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onChange(starValue - 0.5)}
-            />
-            <button
-              type="button"
-              aria-label={`${starValue}`}
-              className="absolute inset-y-0 right-0 z-10 w-1/2 rounded-r-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => onChange(starValue)}
-            />
-          </span>
-        )
-      })}
+            aria-hidden
+          />
+        </button>
+      ))}
     </div>
   )
 }

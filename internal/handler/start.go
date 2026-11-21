@@ -13,7 +13,6 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 
-	"remnawave-tg-shop-bot/internal/cabinet/webauth"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 )
@@ -53,9 +52,6 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 		}
 	}
 
-	// Вход из StarlitConnect / другого клиента: /start webauth_<token>.
-	h.tryApproveWebAuth(ctx, b, update)
-
 	m, err := b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID: update.Message.Chat.ID,
 		Text:   "🧹",
@@ -87,38 +83,6 @@ func (h Handler) StartCommandHandler(ctx context.Context, b *bot.Bot, update *mo
 	inlineKeyboard := h.buildStartKeyboard(existingCustomer, langCode)
 	err = h.sendStartMenu(ctx, b, update.Message.Chat.ID, langCode, inlineKeyboard, existingCustomer, displayName)
 	logEditError("Error sending /start message", err)
-}
-
-// tryApproveWebAuth подтверждает одноразовый токен входа из приложения.
-func (h Handler) tryApproveWebAuth(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message == nil || update.Message.From == nil {
-		return
-	}
-	token, ok := webauth.TokenFromStartArg(parseStartArg(update.Message.Text))
-	if !ok {
-		return
-	}
-	username := ""
-	if update.Message.From.Username != "" {
-		username = update.Message.From.Username
-	}
-	err := webauth.ApproveFromTelegram(ctx, token, update.Message.From.ID, username)
-	langCode := update.Message.From.LanguageCode
-	chatID := update.Message.Chat.ID
-	if err != nil {
-		slog.Warn("webauth approve from telegram failed", "error", err, "telegram_id", update.Message.From.ID)
-		text := h.translation.GetText(langCode, "webauth_failed")
-		if text == "" || text == "webauth_failed" {
-			text = "Не удалось подтвердить вход в приложение. Запросите новую ссылку в клиенте."
-		}
-		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: chatID, Text: text})
-		return
-	}
-	text := h.translation.GetText(langCode, "webauth_ok")
-	if text == "" || text == "webauth_ok" {
-		text = "Вход в приложение подтверждён. Можно вернуться в клиент."
-	}
-	_, _ = b.SendMessage(ctx, &bot.SendMessageParams{ChatID: chatID, Text: text})
 }
 
 func (h Handler) StartCallbackHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -344,7 +308,7 @@ func (h Handler) buildStartKeyboard(existingCustomer *database.Customer, langCod
 	var inlineKeyboard [][]models.InlineKeyboardButton
 
 	// 1. Попробовать бесплатно (если юзер новый)
-	if existingCustomer.SubscriptionLink == nil && config.TrialDays() > 0 {
+	if existingCustomer.SubscriptionLink == nil && config.TrialEnabled() {
 		inlineKeyboard = append(inlineKeyboard, []models.InlineKeyboardButton{
 			h.translation.WithButton(langCode, "trial_button", models.InlineKeyboardButton{CallbackData: CallbackTrial}),
 		})
@@ -360,12 +324,13 @@ func (h Handler) buildStartKeyboard(existingCustomer *database.Customer, langCod
 		inlineKeyboard = append(inlineKeyboard, h.resolveConnectButton(langCode))
 	}
 
-	// 4. Собираем кнопки для 2-в-ряд: отзывы (страница кабинета), канал
+	// 4. Собираем кнопки для 2-в-ряд: отзывы, канал
 	var secondRow []models.InlineKeyboardButton
-	if u := cabinetWebAppURL("/cabinet/reviews"); u != "" {
-		secondRow = append(secondRow, h.translation.WithButton(langCode, "feedback_button", models.InlineKeyboardButton{
-			WebApp: &models.WebAppInfo{URL: u},
-		}))
+	if reviewsURL := reviewsWebAppURL(); reviewsURL != "" {
+		// Отзывы включены: открываем страницу прямо в Mini App.
+		secondRow = append(secondRow, h.translation.WithButton(langCode, "feedback_button", models.InlineKeyboardButton{WebApp: &models.WebAppInfo{URL: reviewsURL}}))
+	} else if config.FeedbackURL() != "" {
+		secondRow = append(secondRow, h.translation.WithButton(langCode, "feedback_button", models.InlineKeyboardButton{URL: config.FeedbackURL()}))
 	}
 	if config.ChannelURL() != "" {
 		secondRow = append(secondRow, h.translation.WithButton(langCode, "channel_button", models.InlineKeyboardButton{URL: config.ChannelURL()}))

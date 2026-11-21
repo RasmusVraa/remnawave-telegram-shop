@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Check } from 'lucide-react'
+import { Check, CreditCard } from 'lucide-react'
 
 import { ProviderMethodButton } from '@/components/ProviderMethodButton'
+import { ResponsiveSheet } from '@/components/ResponsiveSheet'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { hapticSelection } from '@/lib/haptic'
@@ -107,6 +108,113 @@ export function PaymentMethodPicker({
 }
 
 /**
+ * Способ оплаты на ПК (lg+): компактная строка внутри карточки «Расчёт», рядом с итогом и
+ * кнопкой. «Изменить» (или «Выбрать», пока ничего не выбрано) открывает окно со всеми
+ * способами — в узкой правой колонке список из десятка плиток вытянул бы липкую карточку
+ * ниже экрана. Метка «Рекомендуем» стоит, пока выбран способ по умолчанию от админа.
+ * Ниже lg этот вид скрыт, там работает PaymentMethodPicker.
+ */
+export function PaymentMethodRow({
+  methods,
+  method,
+  initialId,
+  initialSource,
+  loading,
+  onSelect,
+}: {
+  methods: CheckoutMethodId[]
+  method: CheckoutMethodId | null
+  initialId: CheckoutMethodId | null
+  initialSource: InitialMethodSource
+  loading: boolean
+  onSelect: (id: CheckoutMethodId) => void
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+
+  let body
+  if (loading) {
+    body = <Skeleton className="h-[60px] w-full rounded-[16px]" aria-hidden />
+  } else if (methods.length === 0) {
+    body = <p className="text-sm text-muted-foreground">{t('checkout.notAvailable')}</p>
+  } else if (method) {
+    const meta = checkoutMethodMeta(method, t)
+    const recommended = initialSource === 'default' && method === initialId
+    const canChange = methods.length > 1
+    body = (
+      <button
+        type="button"
+        disabled={!canChange}
+        onClick={() => setOpen(true)}
+        className={cn(
+          'flex w-full items-center gap-3 rounded-[16px] border border-primary/60 bg-primary/[0.07] px-3 py-2.5 text-left transition-colors dark:bg-primary/[0.1]',
+          canChange && 'hover:bg-primary/[0.11] dark:hover:bg-primary/[0.14]',
+        )}
+      >
+        <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0">
+          {meta.icon}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="truncate text-sm font-semibold">{meta.label}</p>
+            {recommended && <RecommendedBadge>{t('checkout.recommendedBadge')}</RecommendedBadge>}
+          </div>
+          <p className="truncate text-[13px] text-muted-foreground">{meta.provider}</p>
+        </div>
+        {canChange && (
+          <span className="shrink-0 rounded-[12px] bg-primary/[0.12] px-3 py-[7px] text-sm font-semibold text-primary">
+            {t('checkout.changeMethod')}
+          </span>
+        )}
+      </button>
+    )
+  } else {
+    // Ничего не выбрано: пунктирная строка, «Выбрать» — заливкой, это единственное, что мешает оплате.
+    body = (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex w-full items-center gap-3 rounded-[16px] border-[1.5px] border-dashed border-foreground/25 bg-foreground/[0.025] px-3 py-2.5 text-left transition-colors hover:border-primary/50 hover:bg-foreground/[0.05]"
+      >
+        <div className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-foreground/25 text-muted-foreground">
+          <CreditCard size={17} aria-hidden />
+        </div>
+        <p className="min-w-0 flex-1 text-sm font-semibold">{t('checkout.choosePaymentMethod')}</p>
+        <span className="shrink-0 rounded-[12px] bg-primary px-3 py-[7px] text-sm font-semibold text-primary-foreground">
+          {t('checkout.selectMethod')}
+        </span>
+      </button>
+    )
+  }
+
+  return (
+    <>
+      <h2 className="mb-2.5 text-[15px] font-medium text-muted-foreground">{t('checkout.chooseProvider')}</h2>
+      {body}
+      <ResponsiveSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        title={t('checkout.chooseProvider')}
+        centered
+        // Фон как у карточек страницы, а не «background»: окно не должно быть чернее карточки, из которой открылось.
+        className="bg-card"
+      >
+        <MethodList
+          raised
+          methods={methods}
+          method={method}
+          onSelect={(id) => {
+            if (id !== method) hapticSelection()
+            onSelect(id)
+            setOpen(false)
+          }}
+        />
+      </ResponsiveSheet>
+    </>
+  )
+}
+
+/**
  * Прокрутить окно так, чтобы карточка целиком оказалась между шапкой кабинета и
  * закреплённой плашкой оплаты (на телефоне). Если не помещается — к верху, под
  * шапку: список читается сверху. Уже видна — ничего не делаем.
@@ -131,10 +239,13 @@ function MethodList({
   methods,
   method,
   onSelect,
+  raised = false,
 }: {
   methods: CheckoutMethodId[]
   method: CheckoutMethodId | null
   onSelect: (id: CheckoutMethodId) => void
+  /** В окне плитки светлее его фона; на карточке страницы — утоплены (затемнение). */
+  raised?: boolean
 }) {
   const { t } = useTranslation()
 
@@ -159,7 +270,7 @@ function MethodList({
       {/* Планшет и ПК — плитки одной ширины, число колонок подбирается по месту. */}
       <div className={cn('hidden sm:grid', TILE_GRID)} role="radiogroup" aria-label={t('checkout.chooseProvider')}>
         {methods.map((id) => (
-          <MethodTile key={id} id={id} selected={method === id} onClick={() => onSelect(id)} />
+          <MethodTile key={id} id={id} selected={method === id} onClick={() => onSelect(id)} raised={raised} />
         ))}
       </div>
     </>
@@ -252,7 +363,17 @@ function RecommendedPicker({
   )
 }
 
-function MethodTile({ id, selected, onClick }: { id: CheckoutMethodId; selected: boolean; onClick: () => void }) {
+function MethodTile({
+  id,
+  selected,
+  onClick,
+  raised = false,
+}: {
+  id: CheckoutMethodId
+  selected: boolean
+  onClick: () => void
+  raised?: boolean
+}) {
   const { t } = useTranslation()
   const meta = checkoutMethodMeta(id, t)
   return (
@@ -265,7 +386,10 @@ function MethodTile({ id, selected, onClick }: { id: CheckoutMethodId; selected:
         'relative flex min-w-0 items-center gap-2 rounded-[14px] border p-2 text-left transition-all duration-150 sm:gap-3 sm:rounded-[16px] sm:px-3 sm:py-2.5',
         selected
           ? 'border-primary/60 bg-primary/[0.07] dark:bg-primary/[0.1]'
-          : 'border-border bg-foreground/[0.03] hover:border-primary/40 hover:bg-foreground/[0.06] dark:bg-black/20 dark:hover:bg-black/30',
+          : cn(
+              'border-border bg-foreground/[0.03] hover:border-primary/40 hover:bg-foreground/[0.06]',
+              raised ? 'dark:bg-white/[0.05] dark:hover:bg-white/[0.09]' : 'dark:bg-black/20 dark:hover:bg-black/30',
+            ),
       )}
     >
       <div className="flex h-[30px] w-[30px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted dark:bg-white/[0.07] outline outline-1 -outline-offset-1 outline-black/[0.08] dark:outline-0 sm:h-[38px] sm:w-[38px]">

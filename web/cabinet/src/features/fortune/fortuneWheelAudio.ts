@@ -1,5 +1,5 @@
 /**
- * Звуки колеса фортуны через Web Audio API (без внешних файлов).
+ * Звуки колеса фортуны через Web Audio API: тики и фанфара синтезируются, «касса» на выигрыше — сэмпл из статики.
  * Рассчитано на жест пользователя перед resume() контекста.
  */
 
@@ -142,16 +142,22 @@ export function playWinFanfare(ctx: AudioContext, rewardType: string): void {
   const tier = winTier(rewardType)
   const t0 = now(ctx)
   const base = tier === 'large' ? 392 : tier === 'medium' ? 349.23 : 329.63 // G4, F4, E4
+  // +180 и +30 дней — «джекпот»: на семь нот вместо шести, последняя на две октавы выше основной.
+  const jackpot = rewardType === 'days_180' || rewardType === 'days_30'
   const intervals =
     tier === 'large'
-      ? [0, 0.07, 0.14, 0.22, 0.32, 0.42]
+      ? jackpot
+        ? [0, 0.07, 0.14, 0.22, 0.32, 0.42, 0.52]
+        : [0, 0.07, 0.14, 0.22, 0.32, 0.42]
       : tier === 'medium'
         ? [0, 0.08, 0.16, 0.28]
         : [0, 0.1, 0.22]
 
   const freqs =
     tier === 'large'
-      ? [base, base * 1.25, base * 1.5, base * 2, base * 2.5, base * 3]
+      ? jackpot
+        ? [base, base * 1.25, base * 1.5, base * 2, base * 2.5, base * 3, base * 4]
+        : [base, base * 1.25, base * 1.5, base * 2, base * 2.5, base * 3]
       : tier === 'medium'
         ? [base, base * 1.2599, base * 1.4983, base * 2]
         : [base, base * 1.2599, base * 1.4983]
@@ -207,139 +213,41 @@ export function playSpinError(ctx: AudioContext): void {
   osc.stop(t0 + 0.26)
 }
 
-export type SpinSoundSchedule = {
-  clear: () => void
-}
-
-function cubicBezierEasing(x1: number, y1: number, x2: number, y2: number): (x: number) => number {
-  // Inverts `x` for the cubic-bezier curve and returns `y`, like CSS `transition-timing-function`.
-  // Enough for UI sync purposes.
-  const cx = 3 * x1
-  const bx = 3 * (x2 - x1) - cx
-  const ax = 1 - cx - bx
-
-  const cy = 3 * y1
-  const by = 3 * (y2 - y1) - cy
-  const ay = 1 - cy - by
-
-  function sampleCurveX(t: number): number {
-    return ((ax * t + bx) * t + cx) * t
-  }
-  function sampleCurveY(t: number): number {
-    return ((ay * t + by) * t + cy) * t
-  }
-  function sampleDerivativeX(t: number): number {
-    return (3 * ax * t + 2 * bx) * t + cx
-  }
-
-  function solveTforX(x: number): number {
-    if (x <= 0) return 0
-    if (x >= 1) return 1
-
-    // Newton-Raphson iterations.
-    let t = x
-    for (let i = 0; i < 8; i++) {
-      const xEst = sampleCurveX(t)
-      const dx = xEst - x
-      const d = sampleDerivativeX(t)
-      if (Math.abs(dx) < 1e-5) return t
-      if (Math.abs(d) < 1e-5) break
-      t = t - dx / d
-      t = Math.min(1, Math.max(0, t))
-    }
-
-    // Fallback: binary search.
-    let lo = 0
-    let hi = 1
-    t = x
-    for (let i = 0; i < 20; i++) {
-      const xEst = sampleCurveX(t)
-      if (Math.abs(xEst - x) < 1e-5) break
-      if (xEst < x) lo = t
-      else hi = t
-      t = (hi + lo) / 2
-    }
-    return t
-  }
-
-  return (x: number) => {
-    const t = solveTforX(x)
-    return sampleCurveY(t)
-  }
-}
-
 /**
- * Тики «прокрута» с нарастающим интервалом (быстро → медленно), синхронно с ~4.2s анимацией.
- * В конце вызывается onLanded (туда же положить fanfare).
+ * Тик сектора у стрелки. На полной скорости низкий и глухой, к остановке колеса выше и звонче;
+ * высота слегка «гуляет» от тика к тику, чтобы трещотка не звучала как метроном.
  */
-export function scheduleSpinWheelSounds(
-  ctx: AudioContext,
-  durationMs: number,
-  spinFromRotationDeg: number,
-  spinToRotationDeg: number,
-  sectorCount: number,
-  onLanded: () => void,
-): SpinSoundSchedule {
-  // Same timing function as in `FortuneWheelFace`.
-  const ease = cubicBezierEasing(0.22, 0.61, 0.36, 1)
-  const stepAngle = 360 / Math.max(sectorCount, 1)
+export function playWheelTick(ctx: AudioContext, slow: number): void {
+  const when = now(ctx)
+  const s = Math.min(1, Math.max(0, slow))
+  const jitter = 1 + (Math.random() - 0.5) * 0.16
+  const base = (120 + s * 70) * jitter
+  const dur = 0.03 + s * 0.03
+  const g = masterGain(ctx, when, 0.11 + s * 0.08, dur)
 
-  const delta = spinToRotationDeg - spinFromRotationDeg
-  const totalTransitions = Math.max(1, Math.round(Math.abs(delta) / stepAngle))
+  const osc = ctx.createOscillator()
+  osc.type = 'triangle'
+  osc.frequency.setValueAtTime(base, when)
+  osc.frequency.exponentialRampToValueAtTime(base * 0.6, when + dur)
+  osc.connect(g)
+  osc.start(when)
+  osc.stop(when + dur + 0.01)
 
-  let rafId = 0
-  let alive = true
-  let lastSectorIdx: number | null = null
-  let tickIdx = 0
-
-  // Inline copy of `sectorIndexUnderPointer` logic to keep this file standalone.
-  const sectorIndexUnderPointer = (rotationDeg: number): number => {
-    const Ln = ((-rotationDeg % 360) + 360) % 360
-    const step = 360 / Math.max(sectorCount, 1)
-    for (let i = 0; i < sectorCount; i++) {
-      const start = i * step
-      const end = (i + 1) * step
-      if (Ln >= start && Ln < end) return i
-    }
-    return 0
-  }
-
-  const t0Perf = performance.now()
-  const tick = (perfNow: number) => {
-    if (!alive) return
-
-    const elapsedMs = perfNow - t0Perf
-    const u = Math.min(1, elapsedMs / durationMs)
-    const eased = ease(u)
-    const currentR = spinFromRotationDeg + delta * eased
-
-    const sectorIdx = sectorIndexUnderPointer(currentR)
-    if (lastSectorIdx == null) {
-      lastSectorIdx = sectorIdx
-    } else if (sectorIdx !== lastSectorIdx) {
-      const heavy = tickIdx >= totalTransitions - 4
-      playTick(ctx, now(ctx), heavy)
-      tickIdx++
-      lastSectorIdx = sectorIdx
-    }
-
-    if (u < 1) {
-      rafId = requestAnimationFrame(tick)
-      return
-    }
-
-    // Один раз на конец.
-    alive = false
-    playWheelLand(ctx)
-    onLanded()
-  }
-
-  rafId = requestAnimationFrame(tick)
-
-  return {
-    clear: () => {
-      alive = false
-      cancelAnimationFrame(rafId)
-    },
-  }
+  const buf = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * 0.02), ctx.sampleRate)
+  const ch = buf.getChannelData(0)
+  for (let i = 0; i < ch.length; i++) ch[i] = (Math.random() * 2 - 1) * 0.5
+  const ns = ctx.createBufferSource()
+  ns.buffer = buf
+  const bp = ctx.createBiquadFilter()
+  bp.type = 'highpass'
+  bp.frequency.value = (700 + s * 400) * jitter
+  const ng = ctx.createGain()
+  ng.gain.setValueAtTime(0.05 + s * 0.03, when)
+  ng.gain.exponentialRampToValueAtTime(0.001, when + 0.018)
+  ns.connect(bp)
+  bp.connect(ng)
+  ng.connect(ctx.destination)
+  ns.start(when)
+  ns.stop(when + 0.022)
 }
+

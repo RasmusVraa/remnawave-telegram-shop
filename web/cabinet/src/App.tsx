@@ -71,10 +71,10 @@ const PartnerProgramPage = lazy(() => import('@/features/partner/PartnerProgramP
 const FortunePage = lazy(() => import('@/features/fortune/FortunePage'))
 const LoyaltyProgramPage = lazy(() => import('@/features/loyalty/LoyaltyProgramPage'))
 const PromoCodesPage = lazy(() => import('@/features/promocodes/PromoCodesPage'))
-const SupportPage = lazy(() => import('@/features/support/SupportPage'))
-const InfoPage = lazy(() => import('@/features/info/InfoPage'))
 const ReviewsPage = lazy(() => import('@/features/reviews/ReviewsPage'))
 const WriteReviewPage = lazy(() => import('@/features/reviews/WriteReviewPage'))
+const SupportPage = lazy(() => import('@/features/support/SupportPage'))
+const InfoPage = lazy(() => import('@/features/info/InfoPage'))
 
 // Админка: самый крупный кусок, обычному пользователю не нужен никогда.
 const AdminDashboardPage = lazy(() => import('@/features/admin/pages/AdminDashboardPage'))
@@ -378,6 +378,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute requireVerified>
             <PartnerProgramPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reviews"
+        element={
+          <ProtectedRoute>
+            <ReviewsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/reviews/write"
+        element={
+          <ProtectedRoute requireVerified>
+            <WriteReviewPage />
           </ProtectedRoute>
         }
       />

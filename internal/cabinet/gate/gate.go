@@ -232,6 +232,38 @@ func (g *Gate) Require() func(http.Handler) http.Handler {
 	}
 }
 
+// RequireTrial — middleware для выдачи пробного периода: в режиме «только для
+// пробного» неподписанному отвечает тем же 403, что и Require. В режиме «для
+// всего» ничего не делает — там пробный закрывает сам Require.
+func (g *Gate) RequireTrial() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if g == nil || !g.svc.TrialOnly() {
+				next.ServeHTTP(w, r)
+				return
+			}
+			id, ok := accountID(r)
+			if !ok {
+				next.ServeHTTP(w, r)
+				return
+			}
+			info := g.lookup(r.Context(), id)
+			if info.telegramID == 0 || !g.svc.BlocksTrial(r.Context(), info.telegramID) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			g.markShown(r.Context(), info.customerID)
+			w.Header().Set("Content-Type", "application/json")
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"error":       ErrorCode,
+				"channel_url": config.ChannelGateURL(),
+			})
+		})
+	}
+}
+
 type checkResp struct {
 	Subscribed bool `json:"subscribed"`
 	// TooFast — кнопку нажали чаще раза в 3 секунды; фронт просто ждёт.
@@ -249,7 +281,8 @@ func (g *Gate) Check(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-store")
 		_ = json.NewEncoder(w).Encode(v)
 	}
-	if !g.active() {
+	// Проверка нужна и в режиме «только для пробного»: кнопка «Да, я подписался» там тоже есть.
+	if g == nil || !g.svc.Enabled() {
 		respond(checkResp{Subscribed: true})
 		return
 	}

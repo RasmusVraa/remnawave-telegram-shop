@@ -3,6 +3,7 @@ import { Globe, Tv } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import type { AppGuide, PlatformKey } from './types'
+import meowsIcon from './assets/meows-icon.png'
 
 export const platformLabel: Record<PlatformKey, string> = {
   ios: 'iPhone',
@@ -138,19 +139,8 @@ function appGlyph(app: Pick<AppGuide, 'id' | 'name'>): ReactNode | null {
     )
   }
   if (key.includes('meows')) {
-    // Meows — бирюзовая лапка (цвет подключённого состояния приложения) на тёмной плитке:
-    // читается и в светлой, и в тёмной теме, как остальные глифы
-    return (
-      <svg className="size-[62%]" viewBox="0 0 512 512" fill="#00C8C8" aria-hidden>
-        <path d="M256 265C200 265 165 320 130 375C100 420 95 455 120 480C150 505 200 500 256 490C312 500 362 505 392 480C417 455 412 420 382 375C347 320 312 265 256 265Z" />
-        <ellipse cx="185" cy="135" rx="52" ry="78" transform="rotate(-6 185 135)" />
-        <ellipse cx="327" cy="135" rx="52" ry="78" transform="rotate(6 327 135)" />
-        <ellipse cx="82" cy="262" rx="50" ry="82" transform="rotate(-10 82 262)" />
-        <ellipse cx="430" cy="262" rx="50" ry="82" transform="rotate(10 430 262)" />
-        <path d="M153 52C165 22 178 14 172 10C164 28 155 40 153 52ZM359 52C347 22 334 14 340 10C348 28 357 40 359 52Z" />
-        <path d="M40 190C46 165 52 152 46 146C40 162 38 176 40 190ZM472 190C466 165 460 152 466 146C472 162 474 176 472 190Z" />
-      </svg>
-    )
+    // Meows — готовая иконка приложения (скруглённая, с прозрачными углами): плитка под ней прозрачная (см. AppTile)
+    return <img src={meowsIcon} alt="" className="size-full object-cover" draggable={false} />
   }
   if (key.includes('shadowrocket') || key.includes('stash')) {
     return (
@@ -234,13 +224,15 @@ export function AppTile({
   children?: ReactNode
 }) {
   const glyph = appGlyph(app)
-  const isIncy = normalizeAppKey(app).includes('incy')
+  const key = normalizeAppKey(app)
+  const isIncy = key.includes('incy')
+  const isMeows = key.includes('meows')
   return (
     <span
       className={cn(
         'relative inline-grid shrink-0 place-items-center overflow-visible rounded-[28%]',
-        isIncy ? 'bg-white text-[#050505]' : 'bg-slate-900 text-white',
-        'ring-1 ring-foreground/15',
+        isMeows ? '' : isIncy ? 'bg-white text-[#050505]' : 'bg-slate-900 text-white',
+        isMeows ? '' : 'ring-1 ring-foreground/15',
         className,
       )}
       aria-hidden

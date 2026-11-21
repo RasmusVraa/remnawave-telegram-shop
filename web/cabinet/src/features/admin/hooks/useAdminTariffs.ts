@@ -145,6 +145,14 @@ export function useAdminSquads() {
   })
 }
 
+export function useAdminExternalSquads() {
+  return useQuery<{ items: AdminSquadItem[] }>({
+    queryKey: ['admin-external-squads'],
+    queryFn: () => api.adminExternalSquads(),
+    staleTime: 60_000,
+  })
+}
+
 const STRATEGIES = ['NO_RESET', 'DAY', 'WEEK', 'MONTH', 'MONTH_ROLLING'] as const
 export { STRATEGIES }
 

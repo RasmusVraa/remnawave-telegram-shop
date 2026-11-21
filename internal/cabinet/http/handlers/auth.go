@@ -161,6 +161,8 @@ func (h *AuthHandler) AuthBootstrap(w http.ResponseWriter, r *http.Request) {
 		"partner_nav_visible":  botcfg.PartnerProgramEnabled(),
 		"partner_max_percent":  maxPartnerPercent(),
 		"support_chat_enabled": botcfg.SupportBotAPIEnabled(),
+		// Раздел отзывов включён: пункт «Отзывы» ведёт на /reviews, а не на FEEDBACK_URL.
+		"reviews_enabled": botcfg.ReviewsEnabled(),
 		// Скрепка в чате поддержки и её лимиты: картинки идут вместе с чатом.
 		"support_attachments_enabled":   botcfg.SupportBotAPIEnabled(),
 		"support_attachments_max_files": cabsvc.SupportMaxFiles,

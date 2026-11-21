@@ -15,13 +15,13 @@ import {
 import { useState, useEffect, useMemo } from 'react'
 
 import { AdminUserHistoryModal, historyButtonLabel, useAdminUserEventCount } from '../monitoring/AdminUserHistory'
+import { AdminUserReviewModal } from '../components/user-modals/AdminUserReviewModal'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminSectionCard } from '../components/AdminSectionCard'
 import { AdminSetExpireModal } from '../components/AdminSetExpireModal'
 import { AdminFeedback } from '../components/AdminFeedback'
 import { AdminUserEditModals } from '../components/user-modals/AdminUserEditModals'
 import { AdminUserActionsModal } from '../components/user-modals/AdminUserActionsModal'
-import { AdminUserReviewModal } from '../components/user-modals/AdminUserReviewModal'
 import type { UserEditModalKey } from '../components/user-modals/types'
 import { ClickableOverviewControl } from '../components/overview/ClickableOverviewControl'
 import { AdminUserIdentityCard } from '../components/overview/AdminUserIdentityCard'
@@ -328,6 +328,7 @@ export default function AdminUserDetailPage() {
               onHistory={() => setHistoryOpen(true)}
               historyLabel={historyLabel}
               onReview={() => setReviewOpen(true)}
+              reviewLabel={t('admin.reviews.modal.userAction')}
             />
           </div>
         </div>
@@ -582,18 +583,11 @@ export default function AdminUserDetailPage() {
         onHistory={() => setHistoryOpen(true)}
         historyLabel={historyLabel}
         onReview={() => setReviewOpen(true)}
-      />
-
-      <AdminUserReviewModal
-        open={reviewOpen}
-        onClose={() => setReviewOpen(false)}
-        userId={user.id}
-        customer={user}
-        onSuccess={handleOverviewSuccess}
-        onError={handleOverviewError}
+        reviewLabel={t('admin.reviews.modal.userAction')}
       />
 
       <AdminUserHistoryModal customerId={user.id} open={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <AdminUserReviewModal customerId={user.id} open={reviewOpen} onClose={() => setReviewOpen(false)} />
 
       <AdminSetExpireModal
         open={expireModal}

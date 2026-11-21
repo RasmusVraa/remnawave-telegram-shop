@@ -1,358 +1,360 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pencil, Star, Trash2 } from 'lucide-react'
+import { Check, EyeOff, Eye, Pencil, Plus, Reply, Search, Star, Trash2 } from 'lucide-react'
 
+import { cn } from '@/lib/utils'
+import { Card } from '@/components/ui/card'
+import { Spinner } from '@/components/ui/spinner'
+import { Stars } from '@/features/reviews/StarRating'
+import type { AdminReview, ReviewStatus } from '@/features/reviews/reviewTypes'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { AdminTablePagination } from '../components/AdminTablePagination'
 import { AdminConfirmModal } from '../components/AdminConfirmModal'
-import { AdminModal } from '../components/AdminModal'
-import { AdminModalSaveFooter } from '../components/AdminModalSaveFooter'
-import { AdminToggleSwitch } from '../components/AdminToggleSwitch'
-import { StarRatingInput } from '@/features/reviews/StarRating'
-import {
-  togglesFromVisibility,
-  visibilityFromToggles,
-  type ReviewVisibility,
-} from '@/features/reviews/reviewTypes'
-import { ReviewCard } from '@/features/reviews/ReviewCard'
+import { AdminFeedback } from '../components/AdminFeedback'
+import { AdminReviewModal } from '../components/AdminReviewModal'
+import { useAdminMutationFeedback } from '../hooks/useAdminMutationFeedback'
+import { useAdminReviewsList, useAdminReviewsPending, useDeleteAdminReview, useUpdateAdminReview } from '../hooks/useAdminReviews'
 import { formatAdminDateTime } from '../utils/datetime'
-import { formatAdminApiError } from '../utils/formatAdminApiError'
-import { useErrorHaptic } from '@/lib/haptic'
-import { Spinner } from '@/components/ui/spinner'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import {
-  useAdminReviewDelete,
-  useAdminReviews,
-  useAdminReviewUpdate,
-  type AdminReviewDTO,
-} from '../hooks/useAdminReviews'
 
+const TABS = ['all', 'pending', 'published', 'hidden'] as const
+type Tab = (typeof TABS)[number]
+const TAB_KEY: Record<Tab, string> = {
+  all: 'admin.reviews.tabAll',
+  pending: 'admin.reviews.tabPending',
+  published: 'admin.reviews.tabPublished',
+  hidden: 'admin.reviews.tabHidden',
+}
 const PAGE_LIMIT = 20
 
-export default function AdminReviewsPage() {
-  const { t } = useTranslation()
-  const [page, setPage] = useState(0)
-  const offset = page * PAGE_LIMIT
-  const { data, isLoading, isError } = useAdminReviews(PAGE_LIMIT, offset)
-  const update = useAdminReviewUpdate()
-  const remove = useAdminReviewDelete()
+const STATUS_STYLE: Record<ReviewStatus, string> = {
+  pending: 'bg-amber-500/15 text-amber-600 dark:text-amber-400',
+  published: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
+  hidden: 'bg-muted text-muted-foreground',
+}
 
-  const [edit, setEdit] = useState<AdminReviewDTO | null>(null)
-  const [del, setDel] = useState<AdminReviewDTO | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  useErrorHaptic(error)
+function authorLine(r: AdminReview, anonymous: string): string {
+  return r.author_name?.trim() || r.display_name.trim() || anonymous
+}
 
-  const items = data?.items ?? []
-  const total = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_LIMIT))
-
+function IconAction({
+  label,
+  onClick,
+  tone,
+  disabled,
+  children,
+}: {
+  label: string
+  onClick: () => void
+  tone?: 'ok' | 'warn' | 'bad'
+  disabled?: boolean
+  children: React.ReactNode
+}) {
   return (
-    <AdminLayout>
-      <div className="space-y-5">
-        <AdminPageHeader
-          icon={Star}
-          title={t('admin.reviews.title')}
-          subtitle={t('admin.reviews.subtitle', { count: total })}
-          accent="amber"
-        />
-
-        {isLoading ? (
-          <div className="flex h-40 items-center justify-center">
-            <Spinner className="size-6" />
-          </div>
-        ) : isError ? (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {t('admin.reviews.loadError')}
-          </p>
-        ) : items.length === 0 ? (
-          <p className="rounded-xl border border-dashed border-border px-4 py-10 text-center text-sm text-muted-foreground">
-            {t('admin.reviews.empty')}
-          </p>
-        ) : (
-          <>
-            <div className="overflow-hidden rounded-xl border border-border bg-card">
-              <table className="w-full text-left">
-                <thead className="border-b border-border/60 bg-muted/30 text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="px-3 py-2.5 font-medium">#</th>
-                    <th className="px-3 py-2.5 font-medium">{t('admin.reviews.colAuthor')}</th>
-                    <th className="px-3 py-2.5 font-medium">{t('admin.reviews.colRating')}</th>
-                    <th className="hidden px-3 py-2.5 font-medium md:table-cell">{t('admin.reviews.colBody')}</th>
-                    <th className="hidden px-3 py-2.5 font-medium lg:table-cell">{t('admin.reviews.colDate')}</th>
-                    <th className="px-3 py-2.5 font-medium text-right">{t('admin.actions')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b border-border/40 last:border-0">
-                      <td className="whitespace-nowrap px-3 py-2.5 font-mono text-sm tabular-nums">#{item.id}</td>
-                      <td className="max-w-[10rem] truncate px-3 py-2.5 text-sm">
-                        {item.author_name?.trim() || t('reviews.anonymous')}
-                        {item.customer_id ? (
-                          <Link
-                            to={`/admin/users/${item.customer_id}`}
-                            className="mt-0.5 block text-xs text-primary hover:underline"
-                          >
-                            #{item.customer_id}
-                          </Link>
-                        ) : null}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-sm tabular-nums">
-                        {Number.isInteger(item.rating) ? item.rating : item.rating.toFixed(1)}
-                      </td>
-                      <td className="hidden max-w-[18rem] truncate px-3 py-2.5 text-sm text-muted-foreground md:table-cell">
-                        {item.body}
-                      </td>
-                      <td className="hidden whitespace-nowrap px-3 py-2.5 text-sm text-muted-foreground lg:table-cell">
-                        {formatAdminDateTime(item.created_at)}
-                      </td>
-                      <td className="px-3 py-2.5">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => {
-                              setError(null)
-                              setEdit(item)
-                            }}
-                            aria-label={t('admin.reviews.edit')}
-                          >
-                            <Pencil className="size-4" />
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => {
-                              setError(null)
-                              setDel(item)
-                            }}
-                            aria-label={t('admin.reviews.delete')}
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <AdminTablePagination page={page} totalPages={totalPages} onPageChange={setPage} />
-          </>
-        )}
-      </div>
-
-      {edit && (
-        <AdminReviewEditModal
-          review={edit}
-          open
-          error={error}
-          saving={update.isPending}
-          onClose={() => setEdit(null)}
-          onSave={(body) => {
-            setError(null)
-            update.mutate(
-              { id: edit.id, ...body },
-              {
-                onSuccess: () => setEdit(null),
-                onError: (e) => setError(formatAdminApiError(e, t)),
-              },
-            )
-          }}
-        />
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      disabled={disabled}
+      onClick={(e) => {
+        e.stopPropagation()
+        onClick()
+      }}
+      className={cn(
+        'inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground shadow-sm transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-50 dark:shadow-none',
+        tone === 'ok' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400',
+        tone === 'warn' && 'border-amber-500/30 bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:text-amber-400',
+        tone === 'bad' && 'border-rose-500/30 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20 dark:text-rose-400',
       )}
-
-      <AdminConfirmModal
-        open={Boolean(del)}
-        onClose={() => setDel(null)}
-        onConfirm={() => {
-          if (!del) return
-          setError(null)
-          remove.mutate(del.id, {
-            onSuccess: () => setDel(null),
-            onError: (e) => setError(formatAdminApiError(e, t)),
-          })
-        }}
-        title={t('admin.reviews.deleteTitle')}
-        message={t('admin.reviews.deleteHint')}
-        confirmLabel={t('admin.reviews.delete')}
-        variant="destructive"
-        loading={remove.isPending}
-        icon={Trash2}
-        iconAccent="rose"
-      />
-    </AdminLayout>
+    >
+      {children}
+    </button>
   )
 }
 
-function AdminReviewEditModal({
-  review,
-  open,
-  error,
-  saving,
-  onClose,
-  onSave,
-}: {
-  review: AdminReviewDTO
-  open: boolean
-  error: string | null
-  saving: boolean
-  onClose: () => void
-  onSave: (body: {
-    rating: number
-    body: string
-    visibility: string
-    display_name: string
-    avatar_url: string
-    tariff_name: string
-  }) => void
-}) {
+export default function AdminReviewsPage() {
   const { t } = useTranslation()
-  const initial = useMemo(() => togglesFromVisibility(review.visibility as ReviewVisibility), [review.visibility])
-  const [rating, setRating] = useState(review.rating)
-  const [body, setBody] = useState(review.body)
-  const [showName, setShowName] = useState(initial.showName)
-  const [showAvatar, setShowAvatar] = useState(initial.showAvatar)
-  const [displayName, setDisplayName] = useState(review.display_name || review.author_name || '')
-  const [tariffName, setTariffName] = useState(review.tariff_name || '')
+  // null — вкладку ещё не выбирали: открываем «На проверке», если там есть что проверять, иначе «Все».
+  const [pickedTab, setTab] = useState<Tab | null>(null)
+  const pendingCounter = useAdminReviewsPending()
+  const tab: Tab = pickedTab ?? (pendingCounter.data && pendingCounter.data.counts.pending === 0 ? 'all' : 'pending')
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debounced, setDebounced] = useState('')
+  const [editing, setEditing] = useState<AdminReview | null>(null)
+  const [focusReply, setFocusReply] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState<AdminReview | null>(null)
+  const debounce = useMemo(() => ({ timer: null as ReturnType<typeof setTimeout> | null }), [])
 
-  const visibility = visibilityFromToggles(showName, showAvatar)
-  const canSave = body.trim().length >= 10 && rating >= 0.5 && rating <= 5 && !saving
+  const { feedback, clear, showSuccess, showError } = useAdminMutationFeedback()
+  const update = useUpdateAdminReview()
+  const del = useDeleteAdminReview()
 
-  const preview = {
-    id: review.id,
-    rating,
-    body: body.trim() || t('reviews.previewPlaceholder'),
-    author_name: showName ? displayName.trim() || t('reviews.anonymous') : null,
-    author_avatar_url: showName && showAvatar ? review.avatar_url || null : null,
-    client_since: review.client_since,
-    tariff_name: tariffName.trim() || t('reviews.previewTariff'),
-    created_at: review.created_at,
+  const onSearch = useCallback(
+    (v: string) => {
+      setSearch(v)
+      if (debounce.timer) clearTimeout(debounce.timer)
+      debounce.timer = setTimeout(() => {
+        setDebounced(v)
+        setPage(1)
+      }, 350)
+    },
+    [debounce],
+  )
+
+  const { data, isLoading, isError } = useAdminReviewsList({ status: tab === 'all' ? '' : tab, q: debounced, page, limit: PAGE_LIMIT })
+  const items = data?.items ?? []
+  const counts = data?.counts
+  const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_LIMIT))
+  const countFor = (k: Tab) => (counts ? counts[k] : null)
+  const anonymous = t('reviews.anonymous')
+
+  const setStatus = (r: AdminReview, status: ReviewStatus) =>
+    update.mutate(
+      { id: r.id, body: { status } },
+      { onSuccess: () => showSuccess(t('admin.reviews.saved')), onError: () => showError(new Error(t('admin.reviews.modal.error'))) },
+    )
+
+  const openEdit = (r: AdminReview, reply: boolean) => {
+    setFocusReply(reply)
+    setEditing(r)
   }
 
+  // Кнопки стоят на постоянных местах: «скрыть» и «вернуть» — одна кнопка (глаз меняет вид,
+  // но не позицию), а место «опубликовать» у уже опубликованных остаётся пустым.
+  const renderActions = (r: AdminReview) => (
+    <div className="flex items-center justify-end gap-1">
+      {r.status === 'pending' ? (
+        <IconAction label={t('admin.reviews.actionPublish')} tone="ok" disabled={update.isPending} onClick={() => setStatus(r, 'published')}>
+          <Check className="size-4" />
+        </IconAction>
+      ) : (
+        <span className="size-8 shrink-0" aria-hidden />
+      )}
+      <IconAction label={t('admin.reviews.actionReply')} onClick={() => openEdit(r, true)}>
+        <Reply className="size-4" />
+      </IconAction>
+      <IconAction label={t('admin.reviews.actionEdit')} onClick={() => openEdit(r, false)}>
+        <Pencil className="size-4" />
+      </IconAction>
+      {r.status === 'hidden' ? (
+        <IconAction label={t('admin.reviews.actionRestore')} tone="ok" disabled={update.isPending} onClick={() => setStatus(r, 'published')}>
+          <Eye className="size-4" />
+        </IconAction>
+      ) : (
+        <IconAction label={t('admin.reviews.actionHide')} tone="warn" disabled={update.isPending} onClick={() => setStatus(r, 'hidden')}>
+          <EyeOff className="size-4" />
+        </IconAction>
+      )}
+      <IconAction label={t('admin.reviews.actionDelete')} tone="bad" onClick={() => setDeleting(r)}>
+        <Trash2 className="size-4" />
+      </IconAction>
+    </div>
+  )
+
+  const statusChip = (r: AdminReview) => (
+    <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', STATUS_STYLE[r.status])}>
+      {t(`admin.reviews.status.${r.status}`)}
+    </span>
+  )
+
+  const bodyCell = (r: AdminReview) => (
+    <>
+      <p className="line-clamp-3 whitespace-pre-line text-sm text-foreground/90">{r.body}</p>
+      {r.reply && (
+        <p className="mt-1.5 line-clamp-2 text-xs text-primary">
+          ↳ {t('admin.reviews.replyShort')}: {r.reply.body}
+        </p>
+      )}
+      {r.by_admin && <p className="mt-1 text-xs text-muted-foreground">{t('admin.reviews.byAdmin')}</p>}
+    </>
+  )
+
   return (
-    <AdminModal
-      open={open}
-      onClose={onClose}
-      title={t('admin.reviews.editTitle')}
-      description={t('admin.reviews.editSilentHint')}
-      icon={Star}
-      iconAccent="amber"
-      size="lg"
-      footer={
-        <AdminModalSaveFooter
-          onCancel={onClose}
-          onSave={() =>
-            onSave({
-              rating,
-              body: body.trim(),
-              visibility,
-              display_name: showName ? displayName.trim() : '',
-              avatar_url: showName && showAvatar ? review.avatar_url || '' : '',
-              tariff_name: tariffName.trim(),
-            })
-          }
-          isPending={saving}
-          saveDisabled={!canSave}
-        />
-      }
-    >
+    <AdminLayout>
+      <AdminFeedback feedback={feedback} onDismiss={clear} />
       <div className="space-y-4">
-        {error && (
-          <p className="rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-            {error}
+        <AdminPageHeader
+          icon={Star}
+          title={t('admin.reviews.title')}
+          subtitle={t('admin.reviews.subtitle')}
+          accent="rose"
+          actions={
+            <button
+              type="button"
+              onClick={() => setCreating(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-accent"
+            >
+              <Plus className="size-4" />
+              {t('admin.reviews.onBehalf')}
+            </button>
+          }
+        />
+
+        {data && !data.enabled && (
+          <p className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
+            {t('admin.reviews.disabledNote')}
           </p>
         )}
-        <div>
-          <p className="text-sm font-semibold">{t('reviews.ratingLabel')}</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <StarRatingInput value={rating} onChange={setRating} />
-            <span className="text-sm tabular-nums text-muted-foreground">
-              {t('reviews.ratingValue', {
-                n: Number.isInteger(rating) ? rating : rating.toFixed(1),
-              })}
-            </span>
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-semibold" htmlFor="admin-reviews-body">
-            {t('reviews.bodyLabel')}
-          </label>
-          <textarea
-            id="admin-reviews-body"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={5}
-            maxLength={2000}
-            className="mt-2 w-full resize-y rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          />
-        </div>
-        <div>
-          <p className="text-sm font-semibold">{t('reviews.visibilityLabel')}</p>
-          <div className="mt-2 space-y-1">
-            <div className="flex items-start justify-between gap-4 border-b border-border/50 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{t('reviews.toggles.showName')}</p>
-              </div>
-              <AdminToggleSwitch
-                checked={showName}
-                onChange={(v) => {
-                  setShowName(v)
-                  if (!v) setShowAvatar(false)
-                }}
-                aria-label={t('reviews.toggles.showName')}
-              />
-            </div>
-            <div className="flex items-start justify-between gap-4 border-b border-border/50 py-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{t('reviews.toggles.showAvatar')}</p>
-              </div>
-              <AdminToggleSwitch
-                checked={showAvatar}
-                disabled={!showName}
-                onChange={setShowAvatar}
-                aria-label={t('reviews.toggles.showAvatar')}
-              />
-            </div>
-            {showName && (
-              <div className="pt-3">
-                <label className="text-sm font-semibold" htmlFor="admin-reviews-nick">
-                  {t('reviews.nicknameLabel')}
-                </label>
-                <input
-                  id="admin-reviews-nick"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  maxLength={120}
-                  className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-        <div>
-          <label className="text-sm font-semibold" htmlFor="admin-reviews-tariff">
-            {t('admin.reviews.tariffLabel')}
-          </label>
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <input
-            id="admin-reviews-tariff"
-            value={tariffName}
-            onChange={(e) => setTariffName(e.target.value)}
-            maxLength={255}
-            className="mt-2 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            type="text"
+            value={search}
+            onChange={(e) => onSearch(e.target.value)}
+            placeholder={t('admin.reviews.search')}
+            className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
-        <div>
-          <p className={cn('mb-2 text-sm font-semibold')}>{t('reviews.previewLabel')}</p>
-          <ReviewCard review={preview} compact variant="cabinet" />
+
+        <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 pb-0.5">
+          <div className="inline-flex min-w-full gap-1 rounded-lg border border-border/50 bg-card/50 p-1">
+            {TABS.map((k) => {
+              const n = countFor(k)
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setTab(k)
+                    setPage(1)
+                  }}
+                  className={cn(
+                    'min-h-9 flex-1 shrink-0 whitespace-nowrap rounded-md px-3 py-2 text-center text-sm font-medium transition-colors',
+                    tab === k ? 'bg-primary/10 text-primary dark:bg-primary/20' : 'text-foreground/80 hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  {t(TAB_KEY[k])}
+                  {n != null && n > 0 && (
+                    <span
+                      className={cn(
+                        'ml-1.5 rounded-full px-1.5 py-px text-[11px] font-semibold',
+                        k === 'pending' ? 'bg-amber-500 text-amber-950' : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {n}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
         </div>
+
+        <Card className="overflow-hidden">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Spinner />
+            </div>
+          ) : isError ? (
+            <div className="py-12 text-center text-sm text-destructive">{t('admin.reviews.loadError')}</div>
+          ) : items.length === 0 ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">{t('admin.reviews.empty')}</div>
+          ) : (
+            <>
+              <div className="divide-y divide-border/50 md:hidden">
+                {items.map((r) => (
+                  <div
+                    key={r.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEdit(r, false)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && e.target === e.currentTarget) openEdit(r, false)
+                    }}
+                    className={cn('cursor-pointer space-y-2 p-3 transition-colors hover:bg-accent/40 active:bg-accent/60', r.status === 'pending' && 'bg-amber-500/[0.05]')}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="truncate text-sm font-semibold">{authorLine(r, anonymous)}</p>
+                      {statusChip(r)}
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <Stars value={r.rating} />
+                      <span className="text-xs text-muted-foreground">{formatAdminDateTime(r.created_at)}</span>
+                    </div>
+                    <div>{bodyCell(r)}</div>
+                    {renderActions(r)}
+                  </div>
+                ))}
+              </div>
+
+              <div className="hidden overflow-x-auto md:block">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/40 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <th className="px-3 py-2">{t('admin.reviews.colAuthor')}</th>
+                      <th className="px-3 py-2">{t('admin.reviews.colRating')}</th>
+                      <th className="px-3 py-2">{t('admin.reviews.colBody')}</th>
+                      <th className="px-3 py-2">{t('admin.reviews.colStatus')}</th>
+                      <th className="px-3 py-2 text-right">{t('admin.reviews.colActions')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((r) => (
+                      <tr
+                        key={r.id}
+                        onClick={() => openEdit(r, false)}
+                        className={cn('cursor-pointer border-b border-border/40 align-top transition-colors last:border-0 hover:bg-accent/50', r.status === 'pending' && 'bg-amber-500/[0.05]')}
+                      >
+                        <td className="min-w-[8rem] px-3 py-3">
+                          <p className="truncate text-sm font-semibold">{authorLine(r, anonymous)}</p>
+                          <p className="text-xs text-muted-foreground">{formatAdminDateTime(r.created_at)}</p>
+                        </td>
+                        <td className="px-3 py-3">
+                          <Stars value={r.rating} />
+                        </td>
+                        <td className="max-w-[22rem] px-3 py-3">{bodyCell(r)}</td>
+                        <td className="px-3 py-3">{statusChip(r)}</td>
+                        <td className="px-3 py-3">{renderActions(r)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          <AdminTablePagination
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            className="flex items-center justify-between border-t border-border px-3 py-2"
+          />
+        </Card>
       </div>
-    </AdminModal>
+
+      <AdminReviewModal
+        open={editing != null || creating}
+        review={editing}
+        focusReply={focusReply}
+        onClose={() => {
+          setEditing(null)
+          setCreating(false)
+        }}
+        onSaved={showSuccess}
+      />
+
+      <AdminConfirmModal
+        open={deleting != null}
+        onClose={() => setDeleting(null)}
+        title={t('admin.reviews.deleteTitle')}
+        message={t('admin.reviews.deleteHint')}
+        confirmLabel={t('admin.reviews.actionDelete')}
+        variant="destructive"
+        loading={del.isPending}
+        onConfirm={() => {
+          if (!deleting) return
+          del.mutate(deleting.id, {
+            onSuccess: () => {
+              showSuccess(t('admin.reviews.saved'))
+              setDeleting(null)
+            },
+            onError: () => showError(new Error(t('admin.reviews.modal.error'))),
+          })
+        }}
+      />
+    </AdminLayout>
   )
 }

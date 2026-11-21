@@ -25,7 +25,7 @@ import {
   type ReceiptLine,
   type ReceiptMode,
 } from '@/features/checkout/orderSummary'
-import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
+import { PaymentMethodPicker, PaymentMethodRow } from '@/features/checkout/PaymentMethodPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
 export default function CheckoutPage() {
@@ -362,6 +362,17 @@ export default function CheckoutPage() {
     )
   }
 
+  const pickerProps = {
+    methods: checkoutMethod.methods,
+    method: checkoutMethod.method,
+    initialId: checkoutMethod.initial.id,
+    initialSource: checkoutMethod.initial.source,
+    loading: checkoutMethod.loading,
+    onSelect: checkoutMethod.setMethod,
+  }
+  // Способ не выбран (новый человек без способа по умолчанию): на кнопке вместо суммы подсказка.
+  const needMethod = !checkoutMethod.loading && checkoutMethod.methods.length > 0 && !selectedProvider
+
   return (
     <AppLayout>
       <CheckoutLayout
@@ -370,19 +381,15 @@ export default function CheckoutPage() {
         receipt={!tariffsLoading && !tariff ? null : renderReceipt}
         // Раскрытая разбивка срока делает карточку заказа заметно выше — «Расчёт» вытянулся бы пустым.
         equalHeights={!showTariffSwitchBreakdown || !switchOpen}
-        payment={
-          <PaymentMethodPicker
-            methods={checkoutMethod.methods}
-            method={checkoutMethod.method}
-            initialId={checkoutMethod.initial.id}
-            initialSource={checkoutMethod.initial.source}
-            loading={checkoutMethod.loading}
-            onSelect={checkoutMethod.setMethod}
-          />
-        }
+        payment={<PaymentMethodPicker {...pickerProps} />}
+        paymentRow={<PaymentMethodRow {...pickerProps} />}
         error={error}
         pay={{
-          label: payAmount != null ? `${payVerb} ${formatNumber(payAmount)} ${payUnit}` : payVerb,
+          label: needMethod
+            ? t('checkout.choosePaymentMethod')
+            : payAmount != null
+              ? `${payVerb} ${formatNumber(payAmount)} ${payUnit}`
+              : payVerb,
           disabled: payButtonDisabled,
           loading,
           onPay: handlePay,

@@ -140,7 +140,14 @@ export function FortunePossiblePrizes({ sectors, t }: FortunePossiblePrizesProps
 
 
 /** ПК: те же призы столбиком справа от колеса — от лучшего к меньшему, без автопрокрутки. */
-export function FortunePrizeList({ sectors, t }: FortunePossiblePrizesProps) {
+export function FortunePrizeList({
+  sectors,
+  t,
+  highlightType = null,
+}: FortunePossiblePrizesProps & {
+  /** Тип приза, который только что выпал: его строка вспыхивает. */
+  highlightType?: string | null
+}) {
   const sorted = useMemo(() => sortSectorsByPrizeDesc(sectors), [sectors])
   if (sorted.length === 0) return null
 
@@ -154,7 +161,11 @@ export function FortunePrizeList({ sectors, t }: FortunePossiblePrizesProps) {
           return (
             <li
               key={s.reward_type}
-              className="flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-sm dark:border-white/[0.08] dark:bg-white/[0.03] font-semibold text-foreground"
+              className={cn(
+                'flex items-center gap-3 rounded-xl border border-border/60 bg-muted/20 px-3 py-1.5 text-sm dark:border-white/[0.08] dark:bg-white/[0.03] font-semibold text-foreground transition-[background-color,border-color,transform] duration-300',
+                highlightType === s.reward_type &&
+                  'scale-[1.02] border-primary/70 bg-primary/15 dark:border-primary/70 dark:bg-primary/15',
+              )}
             >
               {/* Светлая тема — насыщенные -700, тёмная — светлые -300: пастель на белом не читается. */}
               <Icon className={cn('size-5 shrink-0', sectorIconClassWheel(s.reward_type, 'bento'))} strokeWidth={2} aria-hidden />

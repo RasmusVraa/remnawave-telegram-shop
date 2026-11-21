@@ -5428,3 +5428,27 @@ html:not(.dark) .cabinet-hw-spider {
 .dark .ring-tip-shadow {
   fill-opacity: 0.75;
 }
+
+/* Счётчик на странице колеса подпрыгивает, когда в него «влетел» приз. */
+.fortune-stat-bump {
+  animation: fortune-stat-bump 0.6s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes fortune-stat-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22);
+    background-color: hsl(var(--primary) / 0.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fortune-stat-bump {
+    animation: none;
+  }
+}

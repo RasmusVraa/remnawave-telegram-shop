@@ -347,9 +347,10 @@ function useEqualCardHeight(enabled: boolean) {
  * - < sm (телефон, мини-апп): одна колонка, чек внутри карточки заказа, кнопка —
  *   закреплённая плашка снизу.
  * - sm…lg: одна колонка, кнопка в потоке под способом оплаты.
- * - lg+: две колонки. Справа карточка «Расчёт», липкая: при длинной левой колонке
- *   (раскрытый список способов) кнопка остаётся на экране. С `equalHeights`
- *   карточка заказа и «Расчёт» одной высоты, итог с кнопкой прижат к низу.
+ * - lg+: две колонки. Слева «что покупаю», справа «плачу»: липкая карточка «Расчёт»
+ *   со строками чека, способом оплаты (`paymentRow`), итогом и кнопкой. Если
+ *   `paymentRow` не передан, способ оплаты остаётся отдельной карточкой слева.
+ *   С `equalHeights` карточка заказа и «Расчёт» одной высоты, итог с кнопкой прижат к низу.
  *
  * Чек передаётся функцией и рисуется в двух местах (в карточке заказа и в правой
  * карточке) — расчёт строк один, меняется только рамка.
@@ -359,6 +360,7 @@ export function CheckoutLayout({
   order,
   receipt,
   payment,
+  paymentRow,
   notices,
   error,
   pay,
@@ -369,7 +371,10 @@ export function CheckoutLayout({
   order: ReactNode
   /** Чек; null — не показывать (страница в ошибке). */
   receipt: ((mode: ReceiptMode) => ReactNode) | null
+  /** Способ оплаты карточкой: телефон и планшет, а при отсутствии `paymentRow` — и ПК. */
   payment?: ReactNode
+  /** Способ оплаты строкой внутри «Расчёта» на ПК (lg+); слева карточка `payment` на ПК скрыта. */
+  paymentRow?: ReactNode
   /** Предупреждения над кнопкой (например, «нет цены в звёздах»). */
   notices?: ReactNode
   error?: string | null
@@ -408,7 +413,7 @@ export function CheckoutLayout({
               </div>
             </Card>
           </RevealItem>
-          {payment && <RevealItem>{payment}</RevealItem>}
+          {payment && <RevealItem className={cn(paymentRow && receipt && 'lg:hidden')}>{payment}</RevealItem>}
           {(notices || errorAlert) && (
             <RevealItem className={cn('space-y-3', receipt && 'lg:hidden')}>
               {notices}
@@ -428,6 +433,7 @@ export function CheckoutLayout({
               <div ref={eq.calcTop}>
                 <h2 className="mb-3 text-[15px] font-medium text-muted-foreground">{t('checkout.calcTitle')}</h2>
                 {receipt('lines')}
+                {paymentRow && <div className="mt-4">{paymentRow}</div>}
               </div>
               {/* mt-auto: при выравнивании по высоте итог с кнопкой прижимается к низу карточки. */}
               <div ref={eq.calcBottom} className="mt-auto">

@@ -10,6 +10,7 @@ import { AdminToggleRow } from './AdminToggleSwitch'
 
 const ENABLED_KEY = 'CHANNEL_GATE_ENABLED'
 const CHANNEL_KEY = 'CHANNEL_GATE_CHANNEL'
+const SCOPE_KEY = 'CHANNEL_GATE_SCOPE'
 
 /** t.me/имя из «Ссылок в боте» — годится как канал для проверки; приватные приглашения (t.me/+…) нет. */
 const PUBLIC_LINK = /^(?:https?:\/\/)?(?:t|telegram)\.me\/([A-Za-z][A-Za-z0-9_]{4,31})\/?$/i
@@ -35,6 +36,7 @@ export function AdminChannelGateEditor({ draft, saving, onDraftChange }: AdminCh
 
   const enabled = (draft[ENABLED_KEY] ?? 'false').trim().toLowerCase() === 'true'
   const channel = draft[CHANNEL_KEY] ?? ''
+  const scope: 'all' | 'trial' = (draft[SCOPE_KEY] ?? 'all').trim().toLowerCase() === 'trial' ? 'trial' : 'all'
   const linkMatch = PUBLIC_LINK.exec((draft.CHANNEL_URL ?? '').trim())
   const suggestion = !channel.trim() && linkMatch ? `@${linkMatch[1]}` : null
 
@@ -158,7 +160,41 @@ export function AdminChannelGateEditor({ draft, saving, onDraftChange }: AdminCh
               </div>
             )}
           </div>
-                  <div className="border-t border-border/50 py-3">
+
+          <div className="space-y-2 border-t border-border/50 py-3">
+            <p className="text-sm font-medium leading-snug text-foreground">
+              {t(`admin.settings.fields.${SCOPE_KEY}.label`)}
+            </p>
+            <div
+              role="radiogroup"
+              aria-label={t(`admin.settings.fields.${SCOPE_KEY}.label`)}
+              className="grid grid-cols-2 gap-1 rounded-xl border border-border/60 bg-muted/40 p-1"
+            >
+              {(['all', 'trial'] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={scope === value}
+                  disabled={saving}
+                  onClick={() => onDraftChange(SCOPE_KEY, value)}
+                  className={cn(
+                    'rounded-lg px-3 py-2 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring',
+                    scope === value
+                      ? 'bg-primary/15 text-foreground ring-1 ring-primary/50'
+                      : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  {t(`admin.settings.channelGate.scope.${value}`)}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {t(`admin.settings.channelGate.scope.${scope}Hint`)}
+            </p>
+          </div>
+
+          <div className="border-t border-border/50 py-3">
             <button
               type="button"
               onClick={() => setHowOpen((v) => !v)}

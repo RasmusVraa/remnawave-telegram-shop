@@ -27,6 +27,8 @@ import { groupSettingsFieldsForLayout, isTextareaSettingType } from '../utils/ad
 import { decorThemeOptionLabelStyle } from '@/features/decor/decorThemeAdmin'
 import { AdminAlertRoutes } from './AdminAlertRoutes'
 import { AdminChannelGateEditor } from './AdminChannelGateEditor'
+import { AdminReviewsSettings } from './AdminReviewsSettings'
+import { AdminTrialExternalSquadEditor, AdminTrialInternalSquadsEditor } from './AdminTrialSquadsEditors'
 import type { AdminSettingFieldDTO, AdminSettingGroupDTO } from '@/lib/types/admin'
 
 export function parseBool(v: string): boolean {
@@ -157,6 +159,30 @@ export function AdminSettingsGroupEditor({
           <AdminDecorScheduleEditor
             value={value}
             autoEnabled={parseBool(draft.CABINET_DECOR_AUTO_ENABLED ?? 'false')}
+            disabled={saving}
+            onChange={(next) => onDraftChange(field.key, next)}
+          />
+        </div>
+      )
+    }
+
+    if (field.key === 'TRIAL_INTERNAL_SQUADS') {
+      return (
+        <div key={field.key} className="border-b border-border/50 py-3 last:border-0">
+          <AdminTrialInternalSquadsEditor
+            value={value}
+            disabled={saving}
+            onChange={(next) => onDraftChange(field.key, next)}
+          />
+        </div>
+      )
+    }
+
+    if (field.key === 'TRIAL_EXTERNAL_SQUAD_UUID') {
+      return (
+        <div key={field.key} className="border-b border-border/50 py-3 last:border-0">
+          <AdminTrialExternalSquadEditor
+            value={value}
             disabled={saving}
             onChange={(next) => onDraftChange(field.key, next)}
           />
@@ -381,6 +407,15 @@ export function AdminSettingsGroupEditor({
             )}
             {group.id === 'admin_alerts' ? (
               <AdminAlertRoutes
+                group={group}
+                draft={draft}
+                saving={saving}
+                togglingKey={togglingKey}
+                onDraftChange={onDraftChange}
+                onToggle={onToggle}
+              />
+            ) : group.id === 'reviews' ? (
+              <AdminReviewsSettings
                 group={group}
                 draft={draft}
                 saving={saving}

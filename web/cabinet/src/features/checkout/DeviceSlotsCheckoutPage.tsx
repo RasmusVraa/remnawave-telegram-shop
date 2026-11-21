@@ -24,7 +24,7 @@ import {
   discountLines,
   type ReceiptMode,
 } from '@/features/checkout/orderSummary'
-import { PaymentMethodPicker } from '@/features/checkout/PaymentMethodPicker'
+import { PaymentMethodPicker, PaymentMethodRow } from '@/features/checkout/PaymentMethodPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
 /**
@@ -176,6 +176,17 @@ export default function DeviceSlotsCheckoutPage() {
     )
   }
 
+  const pickerProps = {
+    methods: checkoutMethod.methods,
+    method: checkoutMethod.method,
+    initialId: checkoutMethod.initial.id,
+    initialSource: checkoutMethod.initial.source,
+    loading: checkoutMethod.loading,
+    onSelect: checkoutMethod.setMethod,
+  }
+  // Способ не выбран (новый человек без способа по умолчанию): на кнопке вместо суммы подсказка.
+  const needMethod = !checkoutMethod.loading && checkoutMethod.methods.length > 0 && !selectedProvider
+
   return (
     <AppLayout>
       <CheckoutLayout
@@ -183,23 +194,15 @@ export default function DeviceSlotsCheckoutPage() {
         order={order}
         receipt={subLoading || valid ? renderReceipt : null}
         equalHeights
-        payment={
-          valid ? (
-            <PaymentMethodPicker
-              methods={checkoutMethod.methods}
-              method={checkoutMethod.method}
-              initialId={checkoutMethod.initial.id}
-              initialSource={checkoutMethod.initial.source}
-              loading={checkoutMethod.loading}
-              onSelect={checkoutMethod.setMethod}
-            />
-          ) : undefined
-        }
+        payment={valid ? <PaymentMethodPicker {...pickerProps} /> : undefined}
+        paymentRow={valid ? <PaymentMethodRow {...pickerProps} /> : undefined}
         error={error}
         pay={
           valid
             ? {
-                label: `${t('checkout.pay')}${preview ? ` ${formatNumber(preview.amount_rub)} ${amountSuffix}` : ''}`,
+                label: needMethod
+                  ? t('checkout.choosePaymentMethod')
+                  : `${t('checkout.pay')}${preview ? ` ${formatNumber(preview.amount_rub)} ${amountSuffix}` : ''}`,
                 disabled: payDisabled,
                 loading,
                 onPay: handlePay,

@@ -15,13 +15,17 @@ import { api, ApiError, type FortuneStatusResponse } from '@/lib/api'
 import { hapticImpact, hapticSelection, hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import {
   ensureFortuneAudio,
+  getFortuneAudioContext,
   playSpinAnticipation,
   playSpinError,
+  playWheelLand,
+  playWheelTick,
   playWinFanfare,
-  scheduleSpinWheelSounds,
   winTier,
 } from '@/features/fortune/fortuneWheelAudio'
+import { startWheelSpin, type WheelSpinHandle } from '@/features/fortune/fortuneSpinEngine'
 import { FortunePossiblePrizes, FortunePrizeList } from '@/features/fortune/FortunePossiblePrizes'
+import { FortunePrizeFlight, fortuneFlightTargetId } from '@/features/fortune/FortunePrizeFlight'
 import { FortunePrizeModal } from '@/features/fortune/FortunePrizeModal'
 import { FortuneWinnersMarquee } from '@/features/fortune/fortuneWinnersFeed'
 import {
@@ -29,28 +33,16 @@ import {
   type FortuneDesignVariant,
 } from '@/features/fortune/fortunePrizeVisuals'
 import { arrangeFortuneSlots, slotIndexOfSector } from '@/features/fortune/fortuneWheelLayout'
-import {
-  nextSpinRotation,
-  sectorIndexUnderPointer,
-  sectorCenterDeg,
-  spinVisualEase,
-} from '@/features/fortune/fortuneWheelGeometry'
+import { nextSpinRotation, sectorCenterDeg } from '@/features/fortune/fortuneWheelGeometry'
 import { FortuneWheelFace } from '@/features/fortune/FortuneWheelFace'
-import { WheelWinAnimation } from '@/features/fortune/WheelWinAnimation'
+import { FortuneConfetti } from '@/features/fortune/FortuneConfetti'
 
 const FORTUNE_SOUND_MUTED_KEY = 'cabinet-fortune-sound-muted'
-/** Длительность прокрута колеса (CSS transition и звук тиков). */
-const FORTUNE_SPIN_MS = 4200
+/** Прокрут колеса: первый за визит длиннее, дальше короче (его ещё можно пропустить тапом). */
+const FORTUNE_FIRST_SPIN_MS = 5500
+const FORTUNE_SPIN_MS = 4400
 /** Вспышка/конфетти и задержка модалки «что выиграли». */
 const FORTUNE_WIN_CELEBRATION_MS = 1500
-
-type SpinTweenSnapshot = {
-  from: number
-  to: number
-  n: number
-  t0: number
-  sectorTypes: string[]
-}
 
 function readFortuneSoundMuted(): boolean {
   try {
@@ -114,7 +106,10 @@ function formatCountdownHms(
 export default function FortunePage() {
   const { t } = useTranslation()
   const qc = useQueryClient()
-  const spinSoundRef = useRef<{ clear: () => void } | null>(null)
+  const diskRef = useRef<HTMLDivElement>(null)
+  const pointerRef = useRef<HTMLDivElement>(null)
+  const spinHandleRef = useRef<WheelSpinHandle | null>(null)
+  const spinsDoneRef = useRef(0)
   const [soundMuted, setSoundMuted] = useState(readFortuneSoundMuted)
   const soundMutedRef = useRef(soundMuted)
   soundMutedRef.current = soundMuted
@@ -122,14 +117,19 @@ export default function FortunePage() {
   const [spinning, setSpinning] = useState(false)
   const [lastResult, setLastResult] = useState<{ type: string; value: number; free: boolean } | null>(null)
   const [showPrizeModal, setShowPrizeModal] = useState(false)
+  /** Приз летит из окна «Ваш приз» в счётчик (только дни и бесплатные спины). */
+  const [flight, setFlight] = useState<{ type: string; from: DOMRect; targetId: string } | null>(null)
   const [spinError, setSpinError] = useState<string | null>(null)
   useErrorHaptic(spinError)
   /** Иконка в центре колеса: приз под стрелкой во время/после спина; `null` — дефолтная звезда. */
   const [hubRewardType, setHubRewardType] = useState<string | null>(null)
-  const spinTweenRef = useRef<SpinTweenSnapshot | null>(null)
   const lastWinnerRewardRef = useRef<string | null>(null)
-  const [winnerIndex, setWinnerIndex] = useState(0)
-  const [winCelebration, setWinCelebration] = useState(false)
+  /** После остановки: слот приза (остальные сектора притухают, строка в списке призов подсвечивается). */
+  const [highlightSlot, setHighlightSlot] = useState<number | null>(null)
+  /** Можно ли тапом пропустить прокрут (не на первой крутке за визит). */
+  const [canSkip, setCanSkip] = useState(false)
+  /** Номер выигрыша для салюта: растёт при каждой остановке колеса. */
+  const [confettiBurst, setConfettiBurst] = useState(0)
   const designVariant: FortuneDesignVariant = 'classic'
   const wheelFxControls = useAnimation()
   /** Подсказка по метрикам в шапке: платные спины / дни подписки */
@@ -138,39 +138,10 @@ export default function FortunePage() {
 
   useEffect(() => {
     return () => {
-      spinSoundRef.current?.clear()
-      spinSoundRef.current = null
+      spinHandleRef.current?.cancel()
+      spinHandleRef.current = null
     }
   }, [])
-
-  useEffect(() => {
-    if (!spinning) return undefined
-    const snap = spinTweenRef.current
-    if (!snap || snap.n <= 0 || snap.sectorTypes.length === 0) return undefined
-
-    let raf = 0
-    let lastIdx: number | null = null
-    let lastHapticAt = 0
-    const tick = (now: number) => {
-      const elapsed = now - snap.t0
-      const u = Math.min(1, elapsed / FORTUNE_SPIN_MS)
-      const eased = spinVisualEase(u)
-      const currentR = snap.from + (snap.to - snap.from) * eased
-      const idx = sectorIndexUnderPointer(currentR, snap.n)
-      const rt = snap.sectorTypes[idx]
-      if (rt) setHubRewardType(rt)
-      // Трещотка: тик на каждый сектор под стрелкой. На разгоне секторы мелькают
-      // десятками в секунду — не чаще раза в 70 мс, иначе вместо тиков сплошное жужжание.
-      if (lastIdx !== null && idx !== lastIdx && now - lastHapticAt >= 70) {
-        hapticSelection()
-        lastHapticAt = now
-      }
-      lastIdx = idx
-      if (u < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [spinning])
 
   const setMutedPersist = (muted: boolean) => {
     setSoundMuted(muted)
@@ -212,39 +183,21 @@ export default function FortunePage() {
         fullSpins: 5,
       })
       const sectorTypes = slots.map((s) => s.reward_type)
-      spinTweenRef.current = {
-        from: rotation,
-        to: target,
-        n,
-        t0: performance.now(),
-        sectorTypes,
-      }
       lastWinnerRewardRef.current = res.reward_type
-      setWinnerIndex(winnerSlot)
+      setHighlightSlot(null)
       setSpinning(true)
-      setRotation(target)
+      const durationMs = spinsDoneRef.current === 0 ? FORTUNE_FIRST_SPIN_MS : FORTUNE_SPIN_MS
+      setCanSkip(spinsDoneRef.current > 0)
 
-      spinSoundRef.current?.clear()
-      if (!soundMutedRef.current) {
-        void ensureFortuneAudio().then((ctx) => {
-          if (!ctx) return
-          spinSoundRef.current = scheduleSpinWheelSounds(
-            ctx,
-            FORTUNE_SPIN_MS,
-            rotation,
-            target,
-            n,
-            () => {
-              playWinFanfare(ctx, res.reward_type)
-            },
-          )
-        })
-      }
-
-      window.setTimeout(() => {
+      // Колесо встало: подсветка приза, праздник, вибрация и обновление счётчиков.
+      const finish = () => {
+        spinsDoneRef.current += 1
+        setCanSkip(false)
         setSpinning(false)
+        setRotation(target)
+        setHighlightSlot(winnerSlot)
         setHubRewardType(lastWinnerRewardRef.current)
-        setWinCelebration(true)
+        setConfettiBurst((b) => b + 1)
         // Вибрация выигрыша не зависит от звука: крупный приз — ещё и сильный толчок.
         if (winTier(res.reward_type) === 'large') {
           hapticImpact('heavy')
@@ -265,14 +218,57 @@ export default function FortunePage() {
           y: [0, 1, -1, 1, 0],
           transition: { duration: 0.5, ease: 'easeInOut' },
         })
-        window.setTimeout(() => setWinCelebration(false), FORTUNE_WIN_CELEBRATION_MS)
         window.setTimeout(() => setShowPrizeModal(true), FORTUNE_WIN_CELEBRATION_MS)
         void qc.invalidateQueries({ queryKey: ['fortune', 'status'] })
         void qc.invalidateQueries({ queryKey: ['fortune', 'recent-wins'] })
         void qc.invalidateQueries({ queryKey: ['subscription'] })
         void qc.invalidateQueries({ queryKey: ['loyalty-dashboard'] })
         void qc.invalidateQueries({ queryKey: ['promocodes-state'] })
-      }, FORTUNE_SPIN_MS)
+      }
+
+      const disk = diskRef.current
+      if (!disk) {
+        // Нет узла диска — прокручиваем без анимации, просто в итоговую позицию.
+        setRotation(target)
+        window.setTimeout(finish, durationMs)
+        return
+      }
+      let lastHapticAt = 0
+      spinHandleRef.current?.cancel()
+      spinHandleRef.current = startWheelSpin({
+        disk,
+        pointer: pointerRef.current,
+        from: rotation,
+        to: target,
+        sectorCount: n,
+        durationMs,
+        onSector: (idx) => {
+          const rt = sectorTypes[idx]
+          if (rt) setHubRewardType(rt)
+        },
+        onTick: (slow) => {
+          if (!soundMutedRef.current) {
+            const ctx = getFortuneAudioContext()
+            if (ctx && ctx.state === 'running') playWheelTick(ctx, slow)
+          }
+          // Трещотка: на разгоне секторы мелькают десятками в секунду, вибрация не чаще раза в 70 мс.
+          const nowMs = performance.now()
+          if (nowMs - lastHapticAt >= 70) {
+            hapticSelection()
+            lastHapticAt = nowMs
+          }
+        },
+        onLand: () => {
+          if (!soundMutedRef.current) {
+            const ctx = getFortuneAudioContext()
+            if (ctx && ctx.state === 'running') {
+              playWheelLand(ctx)
+              playWinFanfare(ctx, res.reward_type)
+            }
+          }
+          finish()
+        },
+      })
     },
     onError: (e: unknown) => {
       if (!soundMutedRef.current) {
@@ -394,9 +390,11 @@ export default function FortunePage() {
   const startSpin = () => {
     setSpinError(null)
     setShowPrizeModal(false)
+    setHighlightSlot(null)
     if (!soundMutedRef.current) {
       void ensureFortuneAudio().then((ctx) => {
-        if (ctx) playSpinAnticipation(ctx)
+        if (!ctx) return
+        playSpinAnticipation(ctx)
       })
     }
     spinMut.mutate()
@@ -446,33 +444,32 @@ export default function FortunePage() {
   )
 
   const wheelColumn = (
-    <div className={wheelWrapClassName}>
+    <div
+      className={wheelWrapClassName}
+      onClick={canSkip ? () => spinHandleRef.current?.skip() : undefined}
+    >
       <div
-        className="pointer-events-none absolute -top-1 left-1/2 z-20 -translate-x-1/2 drop-shadow-md"
+        className="pointer-events-none absolute -top-1 left-1/2 z-20 -translate-x-1/2 drop-shadow-[0_0_8px_hsl(var(--primary)/0.75)]"
         aria-hidden
       >
-        <div className="size-0 border-x-[14px] border-x-transparent border-t-[20px] border-t-primary" />
+        {/* Стрелка на пружине: движок отклоняет её при проходе каждого сектора, поворот вокруг верхней точки. */}
+        <div ref={pointerRef} style={{ transformOrigin: '50% 0' }}>
+          <div className="size-0 border-x-[14px] border-x-transparent border-t-[20px] border-t-primary" />
+        </div>
       </div>
       <motion.div className="relative aspect-square w-full overflow-hidden rounded-full" animate={wheelFxControls}>
         <FortuneWheelFace
           sectors={slotSectors}
           rotationDeg={rotation}
-          spinning={spinning || spinMut.isPending}
-          spinMs={FORTUNE_SPIN_MS}
+          diskRef={diskRef}
+          winnerSlot={highlightSlot}
           gradient={gradient}
           designVariant={designVariant}
           t={t}
           hubRewardType={hubRewardType}
         />
-        <WheelWinAnimation
-          active={winCelebration}
-          prize={lastResult?.type ?? null}
-          amount={lastResult?.value ?? 0}
-          winnerIndex={winnerIndex}
-          sectorCount={slotSectors.length}
-          designVariant={designVariant}
-        />
       </motion.div>
+      <FortuneConfetti burstId={confettiBurst} prize={lastResult?.type ?? null} />
       {hubButton}
     </div>
   )
@@ -492,7 +489,11 @@ export default function FortunePage() {
   // платно; если нельзя совсем, таймер в центре колеса) и причины, почему крутить нельзя.
   const sideColumn = (
     <div className="hidden min-w-0 flex-col gap-3 md:flex">
-      <FortunePrizeList sectors={slotSectors} t={t} />
+      <FortunePrizeList
+        sectors={slotSectors}
+        t={t}
+        highlightType={highlightSlot != null ? (lastResult?.type ?? null) : null}
+      />
       {showNextFreeTimer && canPress && (
         <p className="text-sm text-muted-foreground">
           <span className="mr-1.5">{t('fortune.nextFreeIn')}</span>
@@ -526,6 +527,7 @@ export default function FortunePage() {
                       <button
                         type="button"
                         className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-foreground outline-none ring-offset-background transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:ring-offset-background"
+                        id="fortune-stat-spins"
                         aria-expanded={statsHint === 'paid'}
                         aria-controls="fortune-stats-hint"
                         onClick={() => setStatsHint((h) => (h === 'paid' ? null : 'paid'))}
@@ -537,6 +539,7 @@ export default function FortunePage() {
                       <button
                         type="button"
                         className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-foreground outline-none ring-offset-background transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 dark:ring-offset-background"
+                        id="fortune-stat-days"
                         aria-expanded={statsHint === 'subscription'}
                         aria-controls="fortune-stats-hint"
                         onClick={() => setStatsHint((h) => (h === 'subscription' ? null : 'subscription'))}
@@ -647,7 +650,19 @@ export default function FortunePage() {
           rewardType={lastResult.type}
           rewardValue={lastResult.value}
           wasFree={lastResult.free}
-          onClaim={() => setShowPrizeModal(false)}
+          onClaim={(tileRect) => {
+            setShowPrizeModal(false)
+            const targetId = fortuneFlightTargetId(lastResult.type)
+            if (tileRect && targetId) setFlight({ type: lastResult.type, from: tileRect, targetId })
+          }}
+        />
+      )}
+      {flight && (
+        <FortunePrizeFlight
+          rewardType={flight.type}
+          from={flight.from}
+          targetId={flight.targetId}
+          onDone={() => setFlight(null)}
         />
       )}
     </AppLayout>

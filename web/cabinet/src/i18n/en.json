@@ -56,7 +56,8 @@
       "password": "Password",
       "passwordConfirm": "Confirm password",
       "forgotPassword": "Forgot password?",
-      "noAccount": "Don't have an account?",
+      "noAccount": "No customer with this ID. Use the ID from the first column of the Users table.",
+      "noCustomer": "No customer with this ID. Use the ID from the first column of the Users table.",
       "haveAccount": "Already have an account?",
       "createAccount": "Create account",
       "openBotInApp": "Open the bot in the app",
@@ -1121,6 +1122,8 @@
         "yoo_money": "YooMoney"
       },
       "changeMethod": "Change",
+      "selectMethod": "Select",
+      "choosePaymentMethod": "Choose a payment method",
       "recommendedBadge": "Recommended",
       "otherMethods": "Other methods",
       "total": "Total",
@@ -1186,6 +1189,77 @@
       "slotsReceipt": "Device slots ({{count}})",
       "previewFailed": "Could not calculate the amount. Refresh the page.",
       "devicesBreakdown": "{{base}} in plan + {{count}} extra"
+    },
+    "reviews": {
+      "eyebrow": "Reviews",
+      "title": "What customers say",
+      "subtitle": "Real reviews from people who use the service.",
+      "write": "Write a review",
+      "edit": "Edit review",
+      "disabled": "Reviews are currently turned off.",
+      "empty": "No reviews yet. Be the first!",
+      "loadError": "Could not load reviews.",
+      "publishedOn": "Published {{date}}",
+      "showMore": "Show more",
+      "showLess": "Show less",
+      "loadMore": "Show more",
+      "anonymous": "Anonymous",
+      "trial": "Trial",
+      "clientSince": "customer since {{date}}",
+      "replyTitle": "Team reply",
+      "mine": {
+        "pending": "Your review was sent and will appear after moderation.",
+        "hidden": "Your review is not published right now.",
+        "published": "Your review is published. Thank you!"
+      },
+      "gate": {
+        "paid": {
+          "title": "Reviews are for paying customers",
+          "text": "You can write a review after your first paid subscription. Meanwhile, read what others say.",
+          "cta": "Choose a plan"
+        },
+        "sub": {
+          "title": "Reviews are for customers",
+          "text": "You can write a review after activating a trial or paying for a subscription.",
+          "cta": "Choose a plan"
+        },
+        "verify": {
+          "title": "Verify your contact",
+          "text": "To write a review, verify your email or sign in with Telegram.",
+          "cta": "Open profile"
+        },
+        "customer": {
+          "title": "Review unavailable",
+          "text": "We could not find your customer profile. Open the home page and try again.",
+          "cta": "Go home"
+        }
+      },
+      "form": {
+        "back": "Back to reviews",
+        "titleNew": "Your review",
+        "titleEdit": "Edit review",
+        "subtitle": "Tell us how the service works for you. It helps other customers.",
+        "ratingTitle": "Rating",
+        "rating": "{{n}} of 5",
+        "bodyTitle": "Text",
+        "bodyPlaceholder": "What do you like, what is missing?",
+        "bodyHint": "{{min}} to {{max}} characters · {{n}}",
+        "visibilityTitle": "How to show",
+        "showName": "Show my name",
+        "showNameHint": "Otherwise the review is signed “Anonymous”",
+        "showAvatar": "Show my avatar",
+        "showAvatarHint": "Photo from Telegram or Google sign-in",
+        "nameLabel": "Name in the review",
+        "namePlaceholder": "How should we call you",
+        "preview": "How others will see it",
+        "previewToday": "today",
+        "publish": "Publish",
+        "save": "Save changes",
+        "saved": "Review saved",
+        "moderatedNote": "After sending, the review appears on the page once it is checked.",
+        "error": "Could not save the review. Check the text and rating.",
+        "forbidden": "You cannot leave a review right now."
+      }
     },
     "paymentStatus": {
       "title": "Payment",
@@ -1330,7 +1404,70 @@
       "dismiss": "Dismiss"
     },
     "admin": {
+      "reviews": {
+        "title": "Reviews",
+        "subtitle": "Moderation, team replies and reviews on behalf of customers",
+        "search": "Name, text, customer ID, Telegram ID",
+        "tabAll": "All",
+        "tabPending": "Pending",
+        "tabPublished": "Published",
+        "tabHidden": "Hidden",
+        "colAuthor": "Author",
+        "colRating": "Rating",
+        "colBody": "Review",
+        "colStatus": "Status",
+        "colActions": "Actions",
+        "status": {
+          "pending": "Pending",
+          "published": "Published",
+          "hidden": "Hidden"
+        },
+        "empty": "No reviews in this section.",
+        "loadError": "Could not load reviews.",
+        "disabledNote": "Reviews are turned off: customers do not see the page. Turn them on in Bot settings.",
+        "onBehalf": "On behalf of a customer",
+        "reply": "Team reply",
+        "replyShort": "Reply",
+        "actionPublish": "Publish",
+        "actionHide": "Hide",
+        "actionRestore": "Restore",
+        "actionReply": "Reply",
+        "actionEdit": "Edit",
+        "actionDelete": "Delete",
+        "byAdmin": "on behalf of the customer",
+        "deleteTitle": "Delete the review?",
+        "deleteHint": "The review is deleted permanently, with no trace on the site. To just remove it from the page, hide it instead.",
+        "saved": "Saved",
+        "modal": {
+          "titleEdit": "Review: {{name}}",
+          "titleCreate": "Review on behalf of a customer",
+          "subtitleEdit": "Text edits are not shown to the customer. The original is kept and visible only here.",
+          "subtitleCreate": "The review appears on behalf of the customer.",
+          "customerId": "Customer ID",
+          "customerPlaceholder": "Start typing an ID, @username or Telegram ID",
+      "customerSearching": "Searching…",
+      "customerNone": "Nobody found",
+      "dateLabel": "Review date",
+      "dateHintCreate": "Empty — today. Set it when moving an old review, e.g. from a channel.",
+      "dateHintEdit": "Changes the date customers see on the card.",
+          "status": "Status",
+          "rating": "Rating",
+          "body": "Review text",
+          "edited": "Text was edited",
+          "showOriginal": "Show original",
+          "hideOriginal": "Hide original",
+          "replyLabel": "Team reply",
+          "replyHint": "Shown under the review, the customer gets a notification. Empty — no reply.",
+          "showName": "Show name",
+          "showAvatar": "Show avatar",
+          "nameLabel": "Name in the review",
+          "noAccount": "This customer has no cabinet account — a review on their behalf cannot be created.",
+          "error": "Could not save. Check the fields.",
+          "userAction": "Customer review"
+        }
+      },
       "nav": {
+        "reviews": "Reviews",
         "label": "Admin panel navigation",
         "menu": "Menu",
         "group": {
@@ -3065,8 +3202,13 @@
         },
         "subsections": {
           "trial": {
-            "period": "Trial period",
-            "traffic": "Traffic limits & reset"
+            "period": "Issuing & duration",
+            "traffic": "Traffic & device limits",
+            "servers": "Servers & panel tag"
+          },
+          "traffic": {
+            "split": "Bypass & top-ups",
+            "reset": "Paid traffic reset"
           },
           "hwid": {
             "sales": "Extra device sales",
@@ -3127,6 +3269,7 @@
           }
         },
         "groups": {
+          "reviews": "Reviews",
           "loyalty": "Loyalty",
           "stars": "Telegram Stars",
           "payments": "Payment methods",
@@ -3134,7 +3277,7 @@
           "channel_gate": "Channel subscription",
           "admin_alerts": "Admin alerts",
           "moynalog": "Moy Nalog",
-          "trial": "Trial & traffic",
+          "trial": "Trial period",
           "tags": "Remnawave tags",
           "hwid": "HWID / devices",
           "referral": "Referrals",
@@ -3150,12 +3293,24 @@
           "tariffs": "Price display",
           "notifications": "Browser push",
           "status": "Status page",
-          "traffic": "Traffic: bypass and top-up",
+          "traffic": "Traffic",
           "monitoring": "Monitoring"
         },
         "groupIntros": {
           "admin_alerts": "Where the bot tells you about problems and events: cabinet mail is not sending, a server is down, a server bill is due, a payment came in, a partner asks for a payout. Easiest: one group with topics set above, and a topic per kind.",
           "notifications": "This doesn't turn cabinet notifications on or off: they always appear under the bell for everyone. These toggles decide what is also sent as a system notification to the browser or phone of those who tapped \"Turn on\" in the notification feed. People who didn't subscribe get nothing."
+        },
+        "trialSquads": {
+          "selectAll": "Select all",
+          "clear": "Clear",
+          "loading": "Loading squads from the panel…",
+          "noPanel": "The squad list is unavailable: check the connection to the Remnawave panel.",
+          "noneSelected": "Nothing selected — trial users get the squads from SQUAD_UUIDS in .env, or all panel squads if it is empty.",
+          "selected": "Trial users get: {{count}} of {{total}}",
+          "unknown": "Squads missing in the panel: {{count}}",
+          "unknownDrop": "Remove extra",
+          "externalDefault": "Same as paid (default)",
+          "externalMissing": "Not in the panel: {{uuid}}"
         },
         "channelGate": {
           "channelTitle": "Channel",
@@ -3169,6 +3324,12 @@
           "step2": "Find your bot and add it. You can switch all permissions off — only the admin status is needed.",
           "step3": "Enter <c>@channel_name</c> or a <c>t.me/…</c> link here and press “Check”.",
           "step4": "Turn on the switch and save the section.",
+          "scope": {
+            "all": "Everywhere",
+            "trial": "Trial only",
+            "allHint": "Until a person subscribes, the bot menu and the cabinet pages are closed to them — for all users.",
+            "trialHint": "Paid customers, payment and renewal are not affected. We ask for the subscription when a person presses “Activate for free”. Those who already got a trial are left alone."
+          },
           "err": {
             "bad_format": "That doesn't look like @name or a t.me/name link of a public channel.",
             "not_found": "Channel not found. Check the name.",
@@ -3179,9 +3340,44 @@
             "no_channel": "Enter the channel first."
           }
         },
+        "reviews": {
+          "enabledLabel": "Customer reviews",
+          "enabledHint": "Reviews page in the cabinet and bot. Off — the “Reviews” button opens FEEDBACK_URL as before.",
+          "whoTitle": "Who can write reviews",
+          "whoHint": "Anyone can read reviews.",
+          "who": {
+            "verified": {
+              "title": "Everyone with a verified email or Telegram",
+              "text": "Any registered customer, even without a trial or purchases."
+            },
+            "trial_paid": {
+              "title": "Trial and paying customers",
+              "text": "Those who had a subscription at least once: a trial or a payment."
+            },
+            "paid": {
+              "title": "Paying customers only",
+              "text": "At least one paid subscription."
+            }
+          },
+          "publishTitle": "Publishing new reviews",
+          "publish": {
+            "instant": {
+              "title": "Immediately",
+              "text": "The review is visible on the page and landing right after sending. You can remove it later."
+            },
+            "moderated": {
+              "title": "Moderation first",
+              "text": "The review appears after you press “Publish”."
+            }
+          },
+          "landingLabel": "Reviews on the landing",
+          "landingHint": "How many random published reviews to show on the landing. 0 — hide. The block is hidden if fewer than three are published."
+        },
         "alerts": {
           "events": "What to send",
           "event": {
+            "new": "New review",
+            "edited": "Review edited by the customer",
             "paid": "Payment received",
             "cancel": "Invoice cancelled"
           },
@@ -3195,6 +3391,10 @@
           "howTo2": "Open the group in Telegram Web: the number after # in the address is the id. Supergroup ids start with -100.",
           "howTo3": "The topic number is the middle number in a link to a message from it: t.me/c/1234567890/12/345 → topic 12.",
           "kinds": {
+            "reviews": {
+              "title": "Reviews",
+              "desc": "A customer left or edited a review"
+            },
             "system": {
               "title": "System",
               "desc": "Cabinet mail stopped sending and is back"
@@ -3326,10 +3526,13 @@
         "fields": {
           "CHANNEL_GATE_ENABLED": {
             "label": "Require channel subscription",
-            "hint": "Until the user subscribes, the bot and the cabinet only show the subscription screen. Admins are not affected"
+            "hint": "Until a person subscribes, they see the subscription screen. What exactly is closed is chosen below. Admins are not affected"
           },
           "CHANNEL_GATE_CHANNEL": {
             "label": "Public channel"
+          },
+          "CHANNEL_GATE_SCOPE": {
+            "label": "Where to require it"
           },
           "LOYALTY_ENABLED": {
             "label": "Loyalty program",
@@ -3396,6 +3599,10 @@
             "label": "Retry window, hours",
             "hint": "Counted from payment time. After it expires the receipt is dropped and must be entered manually. 720 = 30 days"
           },
+          "TRIAL_ENABLED": {
+            "label": "Trial period enabled",
+            "hint": "Turn off — the “Try for free” button disappears for new users. Trials already issued keep working."
+          },
           "TRIAL_DAYS": {
             "label": "Trial days",
             "hint": "New activations only"
@@ -3414,7 +3621,7 @@
           },
           "TRAFFIC_LIMIT_RESET_STRATEGY": {
             "label": "Paid traffic reset",
-            "hint": ""
+            "hint": "For classic mode and as the default for new tariffs. An existing tariff has its own reset, set in the tariff."
           },
           "REMNAWAVE_TAG": {
             "label": "User tag",
@@ -3422,7 +3629,15 @@
           },
           "TRIAL_REMNAWAVE_TAG": {
             "label": "Trial tag",
-            "hint": "Empty = main tag"
+            "hint": "Empty — same as the main tag. Format A-Z, 0-9, _"
+          },
+          "TRIAL_INTERNAL_SQUADS": {
+            "label": "Internal squads",
+            "hint": "Which server groups a trial user gets. Tariff squads are not used for trials. Paid users are not affected; squads of trials already issued are not changed."
+          },
+          "TRIAL_EXTERNAL_SQUAD_UUID": {
+            "label": "External squad",
+            "hint": "External squad of a trial user. “Default” — the same as paid users."
           },
           "HWID_EXTRA_DEVICES_ENABLED": {
             "label": "Sell extra devices",
@@ -3441,8 +3656,8 @@
             "hint": ""
           },
           "TRIAL_HWID_LIMIT": {
-            "label": "HWID on trial",
-            "hint": ""
+            "label": "Trial device limit",
+            "hint": "0 — don't set, the panel limit stays"
           },
           "PAID_HWID_LIMIT": {
             "label": "HWID on paid plan",

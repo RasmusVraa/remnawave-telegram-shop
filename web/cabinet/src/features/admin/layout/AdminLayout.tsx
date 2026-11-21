@@ -29,6 +29,7 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAdminBootstrap } from '../hooks/useAdminBootstrap'
 import { useAdminPartnerPending } from '../hooks/useAdminPartners'
+import { useAdminReviewsPending } from '../hooks/useAdminReviews'
 import { useAdminAttention } from '../monitoring/useMonitoring'
 import { AdminChrome } from './AdminChrome'
 import { AdminBreadcrumbs } from './AdminBreadcrumbs'
@@ -135,6 +136,7 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
   // Бейдж считает заявки вместе с выплатами: иначе выплаты висят
   // незамеченными по несколько дней.
   const partnerPending = useAdminPartnerPending()
+  const reviewsPending = useAdminReviewsPending()
   // Инциденты «Мониторинга» видно с любой страницы админки.
   const attention = useAdminAttention()
   const incidentCount = attention.data?.items?.length ?? 0
@@ -235,7 +237,7 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
       items: [
         { to: '/admin/users', icon: Users, labelKey: 'admin.nav.users' },
         { to: '/admin/payments', icon: CreditCard, labelKey: 'admin.nav.payments' },
-        { to: '/admin/reviews', icon: Star, labelKey: 'admin.nav.reviews' },
+        { to: '/admin/reviews', icon: Star, labelKey: 'admin.nav.reviews', badge: reviewsPending.data?.counts.pending },
       ],
     },
     {

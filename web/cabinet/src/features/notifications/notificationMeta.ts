@@ -87,6 +87,7 @@ export const NOTIFICATION_BUTTONS: Record<string, NotificationButton> = {
   loyalty: { route: '/loyalty', icon: Star, labelKey: 'admin.broadcast.links.loyalty' },
   fortune: { route: '/fortune', icon: Dices, labelKey: 'admin.broadcast.links.fortune' },
   support: { route: '/support', icon: Headset, labelKey: 'admin.broadcast.links.support' },
+  reviews: { route: '/reviews', icon: Star, labelKey: 'admin.nav.reviews' },
   // «Докупить» из предупреждений о трафике: главная открывает окно докупки на нужной вкладке.
   traffic_buy_main: { route: '/dashboard?buy=main', icon: Plus, labelKey: 'trafficSplit.buyShort' },
   traffic_buy_bypass: { route: '/dashboard?buy=bypass', icon: Plus, labelKey: 'trafficSplit.buyShort' },

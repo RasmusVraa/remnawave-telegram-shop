@@ -403,6 +403,32 @@ func (r *Client) ListInternalSquads(ctx context.Context) ([]InternalSquad, error
 	return out, nil
 }
 
+// ExternalSquad — external squad для выбора в админке.
+type ExternalSquad struct {
+	UUID uuid.UUID
+	Name string
+}
+
+type externalSquadsResponse struct {
+	ExternalSquads []struct {
+		UUID uuid.UUID `json:"uuid"`
+		Name string    `json:"name"`
+	} `json:"externalSquads"`
+}
+
+// ListExternalSquads возвращает external squads с панели Remnawave.
+func (r *Client) ListExternalSquads(ctx context.Context) ([]ExternalSquad, error) {
+	var resp apiResponse[externalSquadsResponse]
+	if err := r.doJSON(ctx, http.MethodGet, "/api/external-squads", nil, &resp); err != nil {
+		return nil, err
+	}
+	out := make([]ExternalSquad, len(resp.Response.ExternalSquads))
+	for i, s := range resp.Response.ExternalSquads {
+		out[i] = ExternalSquad{UUID: s.UUID, Name: s.Name}
+	}
+	return out, nil
+}
+
 func filterSquadsBySelection(allSquads []internalSquadItem, selected map[uuid.UUID]uuid.UUID) []uuid.UUID {
 	if len(selected) == 0 {
 		result := make([]uuid.UUID, 0, len(allSquads))

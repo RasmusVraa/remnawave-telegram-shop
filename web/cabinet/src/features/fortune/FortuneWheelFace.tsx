@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next'
 import { Sparkles } from 'lucide-react'
-import { useMemo } from 'react'
+import { type Ref, useMemo, useRef } from 'react'
 
 import type { FortuneSectorDTO } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -9,6 +9,7 @@ import { FORTUNE_SECTOR_ICONS } from '@/features/fortune/fortuneSectorIcons'
 import {
   type FortuneDesignVariant,
   buildOuterRarityRingGradient,
+  wheelSectorRimSolid,
   sectorIconClassWheel,
 } from '@/features/fortune/fortunePrizeVisuals'
 
@@ -125,9 +126,11 @@ function SectorSpokes({ n, variant }: { n: number; variant: FortuneDesignVariant
 type FortuneWheelFaceProps = {
   /** В порядке слотов на диске (`arrangeFortuneSlots`), а не `index` из API. */
   sectors: FortuneSectorDTO[]
+  /** Угол покоя. Во время спина диск крутит `fortuneSpinEngine` прямо через `diskRef`, это значение не меняется. */
   rotationDeg: number
-  spinning: boolean
-  spinMs: number
+  diskRef?: Ref<HTMLDivElement>
+  /** Слот выигравшего сектора: остальные притухают. `null` — без подсветки. */
+  winnerSlot?: number | null
   gradient: string
   designVariant: FortuneDesignVariant
   t: TFunction
@@ -147,8 +150,8 @@ function outerRingMask(variant: FortuneDesignVariant): string {
 export function FortuneWheelFace({
   sectors,
   rotationDeg,
-  spinning,
-  spinMs,
+  diskRef,
+  winnerSlot = null,
   gradient,
   designVariant,
   t,
@@ -164,6 +167,32 @@ export function FortuneWheelFace({
       ? 'text-emerald-400/90'
       : 'text-primary'
   const rarityRing = useMemo(() => buildOuterRarityRingGradient(ordered), [ordered])
+  // Тёмная заливка всего круга, кроме сектора победителя. Слот i занимает дугу [i·step, (i+1)·step) от верха по часовой.
+  // Слот помним и после сброса подсветки: слой гаснет плавно, и фон при этом не должен перескочить на другой сектор.
+  const lastWinnerSlot = useRef(0)
+  if (winnerSlot != null) lastWinnerSlot.current = winnerSlot
+  const dimSlot = lastWinnerSlot.current
+  const winnerArc = useMemo(() => {
+    if (n === 0) return null
+    const step = 360 / n
+    const r = 49.4
+    const pt = (deg: number) => {
+      const rad = (deg * Math.PI) / 180
+      return `${(50 + r * Math.sin(rad)).toFixed(3)} ${(50 - r * Math.cos(rad)).toFixed(3)}`
+    }
+    // Сектор меньше 180°, поэтому флаг большой дуги 0; от верха по часовой, как слоты на диске.
+    const d = `M ${pt(dimSlot * step + 0.1)} A ${r} ${r} 0 0 1 ${pt((dimSlot + 1) * step - 0.1)}`
+    return { d, glow: wheelSectorRimSolid(ordered[dimSlot]?.reward_type ?? '', dimSlot) }
+  }, [n, dimSlot, ordered])
+  const winnerDim = useMemo(() => {
+    if (n === 0) return null
+    const slot = dimSlot
+    const step = 360 / n
+    const dark = 'rgb(8 14 30 / 0.62)'
+    const a = slot * step
+    const b = (slot + 1) * step
+    return `conic-gradient(from 0deg, ${dark} 0deg ${a}deg, transparent ${a}deg ${b}deg, ${dark} ${b}deg 360deg)`
+  }, [n, dimSlot])
 
   const showRarityRing =
     designVariant === 'porcelain' ||
@@ -193,14 +222,13 @@ export function FortuneWheelFace({
         designVariant === 'void' && 'border-emerald-500/35 dark:border-emerald-400/30',
         designVariant === 'ledger' && 'border-amber-900/25 dark:border-amber-200/20',
         designVariant === 'bento' && 'border-border',
-        'transition-transform [transition-timing-function:cubic-bezier(0.22,0.61,0.36,1)]',
         className,
       )}
+      ref={diskRef}
       style={{
         transform: `rotate(${rotationDeg}deg)`,
         background: gradient,
         boxShadow: diskShadow,
-        transitionDuration: spinning ? `${spinMs}ms` : '0ms',
       }}
     >
       {showRarityRing && rarityRing && (
@@ -243,6 +271,27 @@ export function FortuneWheelFace({
             />
           ))}
       </div>
+
+      {/* Выигрыш: сектор остаётся ярким, остальные притухают. Слой крутится вместе с диском, поверх подписей. */}
+      {winnerDim && (
+        <div
+          className="pointer-events-none absolute inset-0 z-[15] rounded-full transition-opacity duration-500"
+          style={{ background: winnerDim, opacity: winnerSlot == null ? 0 : 1 }}
+          aria-hidden
+        />
+      )}
+
+      {/* Светлый контур по внешней дуге сектора-победителя, со свечением цвета приза. */}
+      {winnerArc && (
+        <svg
+          className="pointer-events-none absolute inset-0 z-[16] h-full w-full rounded-full transition-opacity duration-500"
+          style={{ opacity: winnerSlot == null ? 0 : 1, filter: `drop-shadow(0 0 6px ${winnerArc.glow})` }}
+          viewBox="0 0 100 100"
+          aria-hidden
+        >
+          <path d={winnerArc.d} fill="none" stroke="rgb(255 255 255 / 0.95)" strokeWidth="1.2" strokeLinecap="butt" />
+        </svg>
+      )}
 
       <div
         className={cn(
