@@ -427,16 +427,24 @@ type TariffMismatch struct {
 	TariffID   int64
 }
 
-// ListTariffMismatches — клиенты со снимком, чей текущий тариф не совпадает с тарифом снимка.
-// Клиентов без снимка (покупали до появления функции) не трогаем: для них действует правило «только для будущих покупок».
+// ListTariffMismatches — клиенты со снимком, у которых снимок обхода устарел относительно
+// текущего тарифа: сменили тариф, или в тарифе поменяли лимит / сквад / ноды обхода
+// (например, добавили LTE-ноду). Без этого расход на новых нодах не попадает в учёт.
+// Клиентов без снимка (покупали до появления функции) не трогаем.
 func (r *TrafficSplitRepository) ListTariffMismatches(ctx context.Context) ([]TariffMismatch, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT c.id, c.current_tariff_id
 		FROM customer_bypass_state s
 		JOIN customer c ON c.id = s.customer_id
+		JOIN tariff t ON t.id = c.current_tariff_id
 		WHERE c.current_tariff_id IS NOT NULL
-		  AND s.tariff_id IS DISTINCT FROM c.current_tariff_id
-		  AND c.expire_at IS NOT NULL AND c.expire_at > NOW()`)
+		  AND c.expire_at IS NOT NULL AND c.expire_at > NOW()
+		  AND (
+		    s.tariff_id IS DISTINCT FROM c.current_tariff_id
+		    OR s.limit_bytes IS DISTINCT FROM COALESCE(t.bypass_traffic_limit_bytes, 0)
+		    OR COALESCE(s.squad_uuids, '') IS DISTINCT FROM COALESCE(t.bypass_squad_uuids, '')
+		    OR COALESCE(s.node_uuids, '') IS DISTINCT FROM COALESCE(t.bypass_node_uuids, '')
+		  )`)
 	if err != nil {
 		return nil, err
 	}

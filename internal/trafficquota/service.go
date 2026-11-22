@@ -362,8 +362,9 @@ func (s *Service) reconcileMainLimits(ctx context.Context, now time.Time) {
 	}
 }
 
-// reconcileTariffs обновляет снимок обхода у клиентов, чей тариф сменили мимо покупки (админ):
-// для них это новая выдача тарифа, настройки берутся у нового тарифа.
+// reconcileTariffs обновляет снимок обхода, если он разошёлся с тарифом:
+// смена тарифа админом или правка лимита/сквада/нод обхода у того же тарифа
+// (иначе новая нода обхода не попадает в учёт до продления).
 func (s *Service) reconcileTariffs(ctx context.Context, now time.Time) {
 	list, err := s.repo.ListTariffMismatches(ctx)
 	if err != nil {
@@ -380,7 +381,7 @@ func (s *Service) reconcileTariffs(ctx context.Context, now time.Time) {
 			slog.Error("trafficquota: resnapshot", "customer_id", m.CustomerID, "error", err)
 			continue
 		}
-		slog.Info("trafficquota: snapshot refreshed after tariff change", "customer_id", m.CustomerID, "tariff_id", m.TariffID)
+		slog.Info("trafficquota: bypass snapshot refreshed from tariff", "customer_id", m.CustomerID, "tariff_id", m.TariffID)
 	}
 }
 
