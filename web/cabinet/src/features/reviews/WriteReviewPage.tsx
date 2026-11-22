@@ -31,7 +31,6 @@ export default function WriteReviewPage() {
   const [rating, setRating] = useState(5)
   const [body, setBody] = useState('')
   const [showName, setShowName] = useState(true)
-  const [showAvatar, setShowAvatar] = useState(true)
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [loaded, setLoaded] = useState(false)
@@ -45,7 +44,6 @@ export default function WriteReviewPage() {
       setBody(mine.review.body)
       const tg = togglesFromVisibility(mine.review.visibility)
       setShowName(tg.showName)
-      setShowAvatar(tg.showAvatar)
       setName(mine.review.display_name)
     } else {
       // Новый отзыв: имя из профиля (Telegram, почта), чтобы не печатать самому.
@@ -58,7 +56,8 @@ export default function WriteReviewPage() {
       api.saveMyReview({
         rating,
         body: body.trim(),
-        visibility: visibilityFromToggles(showName, showName && showAvatar),
+        // Клиент пишет только с именем или анонимно — без переключателя аватара.
+        visibility: visibilityFromToggles(showName, false),
         display_name: showName ? name.trim() : '',
       }),
     onSuccess: async () => {
@@ -87,7 +86,7 @@ export default function WriteReviewPage() {
     rating,
     body: body.trim() || t('reviews.form.bodyPlaceholder'),
     author_name: previewName,
-    author_avatar_url: showName && showAvatar ? (review?.author_avatar_url ?? mine?.author?.avatar_url ?? null) : null,
+    author_avatar_url: null,
     client_since: review?.client_since ?? null,
     tariff_label: review?.tariff_label ?? '',
     is_trial: review?.is_trial ?? false,
@@ -180,26 +179,17 @@ export default function WriteReviewPage() {
                     <AdminToggleSwitch checked={showName} onChange={setShowName} disabled={save.isPending} aria-label={t('reviews.form.showName')} />
                   </div>
                   {showName && (
-                    <>
-                      <div className="flex items-center justify-between gap-4">
-                        <div>
-                          <p className="text-sm font-medium">{t('reviews.form.showAvatar')}</p>
-                          <p className="text-xs text-muted-foreground">{t('reviews.form.showAvatarHint')}</p>
-                        </div>
-                        <AdminToggleSwitch checked={showAvatar} onChange={setShowAvatar} disabled={save.isPending} aria-label={t('reviews.form.showAvatar')} />
-                      </div>
-                      <label className="block space-y-1.5">
-                        <span className="text-sm font-medium">{t('reviews.form.nameLabel')}</span>
-                        <input
-                          value={name}
-                          maxLength={120}
-                          disabled={save.isPending}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder={t('reviews.form.namePlaceholder')}
-                          className="h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        />
-                      </label>
-                    </>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium">{t('reviews.form.nameLabel')}</span>
+                      <input
+                        value={name}
+                        maxLength={120}
+                        disabled={save.isPending}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder={t('reviews.form.namePlaceholder')}
+                        className="h-11 w-full rounded-xl border border-input bg-background px-3.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      />
+                    </label>
                   )}
                 </Card>
 

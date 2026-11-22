@@ -445,20 +445,35 @@ function TariffPlanCard({
           : cn(tariffOtherCardHoverClassName, 'hover:brightness-[1.02]'),
       )}
     >
-      {isPopular && (
-        <span
+      {(isPopular || isCurrent) && (
+        // Колонка справа сверху: «Популярный» и «Текущий» друг под другом, без наложения.
+        <div
           className={cn(
-            // Внутри карточки (не -top): overflow родителя больше не срезает нашивку.
-            'tariff-popular-badge pointer-events-none absolute top-2.5 z-10 inline-flex items-center gap-1 rounded-full py-[5px] pl-2 pr-2.5 text-xs font-bold leading-none',
+            'pointer-events-none absolute top-2.5 z-10 flex flex-col items-end gap-1',
             isCarousel ? 'right-3' : 'right-4',
           )}
         >
-          <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
-          {t('tariffs.popular')}
-        </span>
+          {isPopular && (
+            <span className="tariff-popular-badge inline-flex items-center gap-1 rounded-full py-[5px] pl-2 pr-2.5 text-xs font-bold leading-none">
+              <Star size={11} fill="currentColor" strokeWidth={0} aria-hidden />
+              {t('tariffs.popular')}
+            </span>
+          )}
+          {isCurrent && (
+            <Badge variant="secondary" className={cn('w-fit text-xs font-normal', tariffCurrentPlanBadgeClassName)}>
+              {t('tariffs.currentBadge')}
+            </Badge>
+          )}
+        </div>
       )}
 
-      <CardHeader className={cn('px-4 pb-2', isPopular ? 'pt-9' : 'pt-5')}>
+      <CardHeader
+        className={cn(
+          'px-4 pb-2',
+          // Две нашивки в колонке выше — чуть больше воздуха сверху, одна — как раньше.
+          isPopular && isCurrent ? 'pt-12' : isPopular || isCurrent ? 'pt-9' : 'pt-5',
+        )}
+      >
         <CardTitle className="text-lg">{head.name}</CardTitle>
         <div className="flex items-baseline gap-1 mt-2">
           <span className="text-[2.5rem] font-bold leading-none tabular-nums">
@@ -467,15 +482,6 @@ function TariffPlanCard({
           <span className="text-sm text-muted-foreground">₽{t('tariffs.perMonth')}</span>
         </div>
       </CardHeader>
-
-      {isCurrent && (
-        /* У популярного сверху нашивка: метка «Текущий» опускается, чтобы не прилипнуть к ней. */
-        <div className={cn('absolute right-4', isPopular ? 'top-[22px]' : 'top-4')}>
-          <Badge variant="secondary" className={cn('w-fit text-xs font-normal', tariffCurrentPlanBadgeClassName)}>
-            {t('tariffs.currentBadge')}
-          </Badge>
-        </div>
-      )}
 
       <CardContent
         className={cn(
