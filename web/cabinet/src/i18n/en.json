@@ -2180,23 +2180,6 @@
           "grantHint": "Valid until the 1st of next month, like a purchased one. The bypass squad returns right away if the limit is no longer used up."
         }
       },
-      "reviews": {
-        "title": "Reviews",
-        "subtitle": "{{count}} reviews · edits stay without an “edited” label",
-        "loadError": "Could not load reviews",
-        "empty": "No reviews yet",
-        "colAuthor": "Author",
-        "colRating": "Rating",
-        "colBody": "Text",
-        "colDate": "Date",
-        "edit": "Edit",
-        "editTitle": "Edit review",
-        "editSilentHint": "Changes are saved without an “edited” mark on the public card.",
-        "delete": "Delete",
-        "deleteTitle": "Delete this review?",
-        "deleteHint": "The review will disappear from the list and the landing page. This cannot be undone.",
-        "tariffLabel": "Plan on the card"
-      },
       "payments": {
         "title": "Payments",
         "subtitle": "Transaction history and export",
@@ -5125,63 +5108,6 @@
       "done": "Done",
       "buyShort": "Buy",
       "noStars": "This pack has no price in Stars — choose another payment method."
-    },
-    "reviews": {
-      "eyebrow": "Reviews",
-      "title": "What customers say",
-      "subtitle": "Ratings and notes from people who already use the service.",
-      "writeCta": "Write a review",
-      "loginToWrite": "Sign in to write a review",
-      "loadError": "Could not load reviews. Try again later.",
-      "empty": "No reviews yet — you can be the first.",
-      "anonymous": "Anonymous",
-      "clientSince": "Customer since {{since}}",
-      "postedOn": "{{date}}",
-      "editedOn": "edited {{date}}",
-      "viewOriginal": "View original review",
-      "hideOriginal": "Hide original",
-      "originalLabel": "Original",
-      "originalLoading": "Loading…",
-      "originalError": "Could not load the original",
-      "backToList": "All reviews",
-      "writeTitle": "Leave a review",
-      "editTitle": "Edit your review",
-      "writeSubtitle": "Tell others how the service works for you. Publish with a nickname, avatar, or anonymously.",
-      "ratingLabel": "Rating",
-      "ratingValue": "{{n}} of 5",
-      "bodyLabel": "Review text",
-      "bodyPlaceholder": "What you liked, what could be better…",
-      "bodyHint": "{{n}} / 2000 · at least 10 characters",
-      "visibilityLabel": "How to show you",
-      "nicknameLabel": "Nickname in the review",
-      "nicknamePlaceholder": "How to sign you",
-      "toggles": {
-        "showName": "Show nickname",
-        "showNameHint": "Otherwise the review stays anonymous",
-        "showAvatar": "Show avatar",
-        "showAvatarHint": "Requires nickname to be on"
-      },
-      "visibility": {
-        "anonymous": {
-          "title": "Anonymous",
-          "hint": "Name and avatar stay hidden"
-        },
-        "name": {
-          "title": "Nickname only",
-          "hint": "Show your name without an avatar"
-        },
-        "name_avatar": {
-          "title": "Nickname and avatar",
-          "hint": "As in your cabinet profile"
-        }
-      },
-      "previewLabel": "Preview",
-      "previewPlaceholder": "Your review text will appear here…",
-      "previewTariff": "Your plan",
-      "publish": "Publish",
-      "update": "Save",
-      "saved": "Review saved",
-      "saveError": "Could not save the review"
     }
   }
 }

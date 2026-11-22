@@ -1,0 +1,46 @@
+{
+  "/tariffs": {
+    "sales_mode": "tariffs",
+    "currency": "RUB",
+    "price_display": "monthly",
+    "tariffs": [
+      {
+        "id": 1,
+        "slug": "standard",
+        "name": "⭐ Стандарт",
+        "description": "✅ Работает в ограниченных сетях\n🔑 Доступ ко всем серверам",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "bypass_gb": 15,
+        "is_popular": false,
+        "prices": [{ "months": 1, "amount_rub": 150 }]
+      },
+      {
+        "id": 3,
+        "slug": "premium",
+        "name": "🔥 Премиум",
+        "description": "✅ Работает в ограниченных сетях\n🔑 Доступ ко всем серверам",
+        "device_limit": 3,
+        "traffic_limit_bytes": 0,
+        "bypass_gb": 15,
+        "is_popular": true,
+        "prices": [{ "months": 1, "amount_rub": 250 }]
+      }
+    ],
+    "savings_badge": "corner"
+  },
+  "/me/subscription": {
+    "expire_at": "2027-06-01T12:00:00Z",
+    "subscription_link": "https://example.invalid/sub/abc",
+    "subscription_period_months": 1,
+    "traffic_used_gb": 12,
+    "traffic_limit_gb": 0,
+    "tariff": {
+      "id": 3,
+      "slug": "premium",
+      "name": "🔥 Премиум",
+      "traffic_gb": 0,
+      "device_limit": 3
+    }
+  }
+}
