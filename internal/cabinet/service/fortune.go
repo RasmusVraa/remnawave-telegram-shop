@@ -351,9 +351,23 @@ func randIntn(n int) (int, error) {
 	return int(u % uint64(n)), nil
 }
 
+// isDiscountReward — призы, которые кладут скидку в customer_pending_discount.
+func isDiscountReward(rt string) bool { return rt == "discount_3" || rt == "discount_5" }
+
+// pendingDiscountActive — лежит ли у клиента скидка, которая ещё сработает. Просроченную
+// по времени строку (её сотрут при следующей оплате или открытии экрана) не считаем.
+func pendingDiscountActive(pd *database.PendingDiscount, now time.Time) bool {
+	if pd == nil {
+		return false
+	}
+	return pd.UntilFirstPurchase || pd.ExpiresAt == nil || !now.After(*pd.ExpiresAt)
+}
+
 // pickRewardType — выбор сектора по весам. noFreeSpin исключает приз «бесплатный спин»: спин, сыгранный
 // за выигранную попытку, не может выбить новую (иначе попытки размножались бы цепочкой).
-func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig, noFreeSpin bool) (string, error) {
+// noDiscount исключает скидки: у клиента уже есть активная, вторая её затёрла бы или пропала. Остальные
+// призы делят шансы в тех же пропорциях, так что со стороны спин выглядит обычным.
+func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig, noFreeSpin, noDiscount bool) (string, error) {
 	type pair struct {
 		t string
 		w int
@@ -362,7 +376,7 @@ func (s *FortuneService) pickRewardType(cfg cabcfg.FortuneWheelConfig, noFreeSpi
 	sum := 0
 	for _, rt := range FortuneRewardTypesOrder {
 		w := weightForType(cfg, rt)
-		if w <= 0 || (noFreeSpin && rt == "free_spin") {
+		if w <= 0 || (noFreeSpin && rt == "free_spin") || (noDiscount && isDiscountReward(rt)) {
 			continue
 		}
 		pairs = append(pairs, pair{t: rt, w: w})
@@ -497,7 +511,12 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		}
 	}
 
-	rewardType, err := s.pickRewardType(cfg, isBonus)
+	// Скидка не выпадает, пока у клиента уже есть активная (с колеса, промокод, win-back): одна скидка за раз.
+	curDiscount, err := s.promo.GetPendingDiscountByCustomerID(ctx, cust.ID)
+	if err != nil {
+		return nil, err
+	}
+	rewardType, err := s.pickRewardType(cfg, isBonus, pendingDiscountActive(curDiscount, now))
 	if err != nil {
 		return nil, err
 	}
@@ -552,11 +571,9 @@ func (s *FortuneService) Spin(ctx context.Context, accountID int64) (*FortuneSpi
 		if err != nil {
 			return nil, err
 		}
-		apply := true
-		if pd != nil && pd.Percent >= rewardVal {
-			apply = false
-		}
-		if apply {
+		// Выбор выше уже исключил скидки для клиента с активной; здесь страховка от гонки
+		// (промокод активирован между выбором и записью): чужую скидку не затираем.
+		if !pendingDiscountActive(pd, time.Now().UTC()) {
 			if err := s.promo.UpsertPendingDiscount(ctx, tx, cust.ID, promoID, rewardVal, nil, true, 1); err != nil {
 				return nil, err
 			}

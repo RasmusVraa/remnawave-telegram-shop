@@ -80,11 +80,14 @@ function parseArgs(argv) {
     hover: null,
     element: null,
     scroll: null,
+    scrollTimes: 0,
     themes: ['dark'],
     locale: 'ru-RU',
     timezone: 'Europe/Moscow',
     port: 5599,
     settle: 1800,
+    decor: null,
+    css: null,
   }
   for (let i = 2; i < argv.length; i++) {
     const key = argv[i]
@@ -98,6 +101,9 @@ function parseArgs(argv) {
       case '--step': out.steps.push(val); i++; break
       case '--element': out.element = val; i++; break
       case '--scroll': out.scroll = Number(val); i++; break
+      case '--scroll-times': out.scrollTimes = Number(val); i++; break
+      case '--decor': out.decor = val; i++; break
+      case '--css': out.css = val; i++; break
       case '--theme': out.themes = val.split(','); i++; break
       case '--locale': out.locale = val; i++; break
       case '--timezone': out.timezone = val; i++; break
@@ -191,7 +197,7 @@ async function main() {
   const server = createServer(distDir)
   await new Promise((resolve) => server.listen(args.port, resolve))
 
-  const browser = await chromium.launch()
+  const browser = await chromium.launch(process.env.CAB_CHROME ? { executablePath: process.env.CAB_CHROME } : {})
   const written = []
 
   try {
@@ -251,8 +257,14 @@ async function main() {
           waitUntil: 'networkidle',
         })
         await page.waitForTimeout(args.settle)
+        // Декор-тема приходит из конфига; для проверки палитры подменяем атрибут на <html>.
+        if (args.css) await page.addStyleTag({ content: fs.readFileSync(args.css, 'utf8') })
+        if (args.decor) {
+          await page.evaluate((d) => { document.documentElement.dataset.cabinetDecor = d }, args.decor)
+          await page.waitForTimeout(400)
+        }
 
-        const tag = `${theme}-${width}`
+        const tag = args.decor ? `${args.decor}-${theme}-${width}` : `${theme}-${width}`
         const shots = [{ name: 'main', run: async () => {} }]
         for (const step of args.steps) {
           shots.push({
@@ -290,6 +302,12 @@ async function main() {
           }
           await page.waitForTimeout(250)
           const file = path.join(outDir, `${tag}-${shot.name}.png`)
+          // Длинные списки с подгрузкой: докручиваем до низа N раз, ждём новые строки.
+          for (let k = 0; k < args.scrollTimes; k++) {
+            await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+            await page.waitForTimeout(1200)
+          }
+          if (args.scrollTimes) console.log(`  высота страницы после ${args.scrollTimes} прокруток: ${await page.evaluate(() => document.documentElement.scrollHeight)}px`)
           if (args.scroll != null) {
             // Кадр окна после прокрутки — проверка липких блоков (sticky); fullPage их не покажет.
             // -1 — не крутить самим: кадр окна там, куда страницу привели шаги.

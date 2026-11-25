@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/SettingsPage-DJjvMTzy.js
 import{j as n}from"./query-D6ZsvjX7.js";import{f as J,r as a,d as W,L as X}from"./router-C0zOZeWg.js";import{k as Z,u as f,c as $,O as ee,Q as ne,at as te,q as se,T as ae,n as le,B as m,G as ie,Y as re,V as oe,aQ as ce,h as g,A as p}from"./index-CROgp3O5.js";import{C as de}from"./circle-x-BwtTRCnz.js";import{M as me}from"./mail-C-mjRv6L.js";/**
+========
+import{j as n}from"./query-D6ZsvjX7.js";import{f as W,r as a,d as X,L as Q}from"./router-C0zOZeWg.js";import{k as Z,u as f,c as $,a0 as ee,a1 as ne,aw as te,q as se,T as ae,n as le,B as m,G as ie,Y as re,V as oe,aT as ce,h as g,A as p}from"./index-z8i0AR2-.js";import{C as de}from"./circle-x-DLdWyYi9.js";import{M as me}from"./mail-BsGr6bFT.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/SettingsPage-DPGKYRmE.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

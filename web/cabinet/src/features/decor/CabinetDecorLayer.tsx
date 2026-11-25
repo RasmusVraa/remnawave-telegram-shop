@@ -19,8 +19,15 @@ import {
 /**
  * Слой частиц между фоном (cabinet-shell-gradient) и контентом.
  * Монтировать внутри layout сразу после градиента.
+ * theme — принудительная тема (превью); compact — админка без крупных декораций по краям.
  */
-export function CabinetDecorLayer({ theme: themeProp }: { theme?: DecorThemeId } = {}) {
+export function CabinetDecorLayer({
+  theme: themeProp,
+  compact = false,
+}: {
+  theme?: DecorThemeId
+  compact?: boolean
+} = {}) {
   const fromHook = useCabinetDecorTheme()
   const theme = themeProp ?? fromHook
   const effect = decorEffectForTheme(theme)
@@ -70,7 +77,7 @@ export function CabinetDecorLayer({ theme: themeProp }: { theme?: DecorThemeId }
 
   return (
     <div className="cabinet-decor-layer" aria-hidden>
-      <CabinetDecorScene theme={theme} />
+      <CabinetDecorScene theme={themeProp} compact={compact} />
       {fx}
     </div>
   )

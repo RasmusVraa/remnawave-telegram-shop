@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/paperclip-BSs9Uv9n.js
 import{k as a}from"./index-CROgp3O5.js";/**
+========
+import{k as a}from"./index-z8i0AR2-.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/paperclip-qG3jbPpQ.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

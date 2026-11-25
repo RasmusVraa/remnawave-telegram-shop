@@ -86,6 +86,9 @@ export function HomeTitle({ data, lang, compact }: { data: HomeData; lang: strin
 
 // ─── Три кольца ─────────────────────────────────────────────────────────
 
+const STAT_KEY = { days: 'home.statDays', hours: 'home.statHours', minutes: 'home.statMinutes' } as const
+const ALERT_CRIT_KEY = { days: 'home.alertCrit', hours: 'home.alertCritHours', minutes: 'home.alertCritMinutes' } as const
+
 const TONE_TEXT: Record<ToneLevel, string> = {
   calm: 'text-foreground',
   warn: 'text-amber-600 dark:text-amber-400',
@@ -158,7 +161,7 @@ export function HomeRings({
   devicesChevron?: boolean
 }) {
   const { t } = useTranslation()
-  const { isExpiredByDate, days, dayTone, trafficLimit, trafficUsed, trafficPct, trafficTone, connected, deviceLimit, allSlotsTaken, bypass } = data
+  const { isExpiredByDate, days, left, dayTone, trafficLimit, trafficUsed, trafficPct, trafficTone, connected, deviceLimit, allSlotsTaken, bypass } = data
   const size = compact ? 64 : 76
   // При исчерпанном трафике срок ещё идёт — кольцо дней показывает его как есть.
   const shownDays = !isExpiredByDate && days !== null ? Math.max(0, days) : 0
@@ -166,9 +169,12 @@ export function HomeRings({
 
   return (
     <div className={cn('grid grid-cols-3', compact ? 'gap-2' : 'gap-3')}>
-      <RingCard label={t('home.statDays', { count: shownDays })} compact={compact}>
+      <RingCard
+        label={t(STAT_KEY[left?.unit ?? 'days'], { count: left ? left.value : shownDays })}
+        compact={compact}
+      >
         <StatRing value={Math.min(100, (shownDays / DAYS_RING_HORIZON) * 100)} tone={dayTone} size={size}>
-          <span className={numCls}>{shownDays}</span>
+          <span className={numCls}>{left ? left.value : shownDays}</span>
         </StatRing>
       </RingCard>
 
@@ -291,7 +297,9 @@ export function HomeAlert({ data, desktop }: { data: HomeData; desktop?: boolean
     )
   }
   if (state === 'crit') {
-    return <div className={cn(ALERT_BASE, ALERT_CRIT)}>{t('home.alertCrit', { count: Math.max(1, days ?? 1) })}</div>
+    const unit = data.left?.unit ?? 'days'
+    const count = data.left ? data.left.value : Math.max(1, days ?? 1)
+    return <div className={cn(ALERT_BASE, ALERT_CRIT)}>{t(ALERT_CRIT_KEY[unit], { count })}</div>
   }
   if (state === 'expired') {
     return <div className={cn(ALERT_BASE, ALERT_CRIT)}>{t('home.alertExpired')}</div>
@@ -783,7 +791,7 @@ export function trafficSheetSubtitle(data: HomeData, lang: string, t: TFunction)
 
 function UsageTile({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-card/60 px-3.5 py-3">
+    <div className="rounded-2xl border border-border/70 bg-background/40 px-3.5 py-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-1 text-lg font-extrabold leading-tight">
         {value} <span className="text-xs font-semibold text-muted-foreground">{unit}</span>

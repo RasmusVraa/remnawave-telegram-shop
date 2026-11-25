@@ -2213,43 +2213,6 @@ html:not(.dark) .cabinet-decor-particle--spark {
   text-shadow: 0 0 6px hsl(45 100% 45% / 0.45);
 }
 
-/* black_friday: диагональные метки, деньги, золотые вспышки */
-.cabinet-decor-particle--bf {
-  top: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  animation: cabinet-decor-sale-diagonal ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.cabinet-decor-particle--bf-tag {
-  color: hsl(45 100% 58% / 0.95);
-  filter: drop-shadow(0 0 8px hsl(45 100% 50% / 0.55));
-}
-
-.cabinet-decor-particle--bf-money {
-  color: hsl(45 100% 62% / 0.9);
-  text-shadow: 0 0 10px hsl(45 100% 50% / 0.65);
-  font-weight: 700;
-  line-height: 1;
-}
-
-.cabinet-decor-particle--bf-flash {
-  border-radius: 50%;
-  background: radial-gradient(circle, hsl(45 100% 68% / 0.55) 0%, hsl(45 100% 50% / 0.15) 55%, transparent 72%);
-  box-shadow: 0 0 18px hsl(45 100% 55% / 0.45);
-  animation: cabinet-decor-gold-flash ease-in-out infinite;
-}
-
-html:not(.dark) .cabinet-decor-particle--bf-tag {
-  color: hsl(42 95% 44% / 0.92);
-}
-
-html:not(.dark) .cabinet-decor-particle--bf-money {
-  color: hsl(40 92% 38% / 0.88);
-  text-shadow: 0 0 8px hsl(45 100% 45% / 0.5);
-}
 
 .cabinet-decor-particle--aurora {
   color: hsl(168 80% 70% / 0.75);
@@ -2468,46 +2431,6 @@ html:not(.dark) .cabinet-decor-particle--dot {
   }
 }
 
-@keyframes cabinet-decor-sale-diagonal {
-  0% {
-    transform: translate(-18vw, 16vh) rotate(var(--bf-angle, -28deg)) scale(0.82);
-    opacity: 0;
-  }
-  14% {
-    opacity: 1;
-  }
-  86% {
-    opacity: 0.82;
-  }
-  100% {
-    transform: translate(22vw, -22vh) rotate(var(--bf-angle, -28deg)) scale(1.06);
-    opacity: 0;
-  }
-}
-
-@keyframes cabinet-decor-gold-flash {
-  0% {
-    transform: scale(0.4);
-    opacity: 0;
-  }
-  18% {
-    transform: scale(1.15);
-    opacity: 0.75;
-  }
-  35% {
-    transform: scale(0.95);
-    opacity: 0.45;
-  }
-  55% {
-    transform: scale(1.05);
-    opacity: 0.65;
-  }
-  100% {
-    transform: scale(0.5);
-    opacity: 0;
-  }
-}
-
 /* --- new_year --- */
 html[data-cabinet-decor="new_year"],
 html[data-cabinet-decor="new_year_2"] {
@@ -2560,12 +2483,89 @@ html.dark[data-cabinet-decor="green"] {
   --primary: 142 55% 46%;
   --accent: 142 55% 46%;
   --ring: 142 55% 46%;
+  --primary-foreground: 0 0% 100%;
+
+  /* Поверхности подкрашены в зелёный по лесенке светлоты wine. */
+  --background: 145 30% 6%;
+  --foreground: 140 22% 96%;
+  --card: 145 19% 12%;
+  --card-foreground: 140 22% 96%;
+  --muted: 145 22% 9.5%;
+  --muted-foreground: 145 12% 65%;
+  --secondary: 145 17% 17%;
+  --secondary-foreground: 140 22% 96%;
+  --border: 145 15% 23%;
+  --input: 145 15% 21%;
+  --connect-device-inner-bg: 145 17% 17%;
+  --connect-device-inner-bg-hover: 145 17% 20%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(142 60% 36% / 0.24) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(160 50% 30% / 0.16) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(145 32% 10%) 0%, hsl(var(--background)) 45%, hsl(150 40% 4.5%) 100%);
 }
 
+/*
+ * Белая подпись на кнопках: на ярком акценте (142 55% 46%) контраст всего 2,6:1,
+ * поэтому заливка кнопок темнее (142 55% 34%, контраст 4,5:1). Сам --primary
+ * остаётся ярким для колец, ссылок и иконок на тёмном фоне.
+ */
+html.dark[data-cabinet-decor="green"] .cabinet-btn-primary,
+html.dark[data-cabinet-decor="green"] .bg-primary.text-primary-foreground,
+html.dark[data-cabinet-decor="green"] .tariff-popular-badge {
+  background-color: hsl(142 55% 34%);
+}
+
+html:not(.dark)[data-cabinet-decor="green"] body,
+html:not(.dark)[data-cabinet-decor="green"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 78% at 24% -15%, hsl(142 55% 40% / 0.16), transparent 56%),
+    radial-gradient(ellipse 85% 50% at 100% 90%, hsl(160 45% 42% / 0.09), transparent 50%);
+}
+
+/* --- pink / orange / yellow / violet: «целостные» темы по лесенке wine -------
+ *
+ * Как у wine и green: в тёмной теме фон, карточки, muted/secondary, рамки и
+ * градиент фона подкрашены в оттенок акцента, а не остаются сине-серыми.
+ * Насыщенность поверхностей вдвое ниже акцента — цвет виден рядом с белым
+ * текстом, карточка остаётся почти нейтральной. У оранжевой и жёлтой подпись
+ * на кнопках тёмная: белая на тёплом акценте не читается.
+ */
 html[data-cabinet-decor="pink"] {
   --primary: 338 78% 52%;
   --accent: 338 78% 52%;
   --ring: 338 78% 52%;
+}
+
+html.dark[data-cabinet-decor="pink"] {
+  --primary: 332 82% 60%;
+  --accent: 332 82% 60%;
+  --ring: 332 82% 60%;
+
+  --background: 332 30% 7%;
+  --foreground: 335 22% 96%;
+  --card: 332 18% 13.5%;
+  --card-foreground: 335 22% 96%;
+  --muted: 332 22% 10.5%;
+  --muted-foreground: 332 13% 67%;
+  --secondary: 332 16% 18.5%;
+  --secondary-foreground: 335 22% 96%;
+  --border: 332 14% 25%;
+  --input: 332 14% 23%;
+  --connect-device-inner-bg: 332 16% 18.5%;
+  --connect-device-inner-bg-hover: 332 16% 21.5%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(332 80% 46% / 0.26) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(290 55% 38% / 0.16) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(332 32% 11%) 0%, hsl(var(--background)) 45%, hsl(335 38% 5.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="pink"] body,
+html:not(.dark)[data-cabinet-decor="pink"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 78% at 24% -15%, hsl(338 75% 55% / 0.17), transparent 56%),
+    radial-gradient(ellipse 85% 50% at 100% 90%, hsl(300 50% 58% / 0.1), transparent 50%);
 }
 
 html[data-cabinet-decor="orange"] {
@@ -2574,10 +2574,74 @@ html[data-cabinet-decor="orange"] {
   --ring: 28 95% 48%;
 }
 
+html.dark[data-cabinet-decor="orange"] {
+  --primary: 27 95% 55%;
+  --primary-foreground: 24 40% 7%;
+  --accent: 27 95% 55%;
+  --ring: 27 95% 55%;
+
+  --background: 24 28% 6.5%;
+  --foreground: 30 22% 96%;
+  --card: 24 16% 12.5%;
+  --card-foreground: 30 22% 96%;
+  --muted: 24 20% 9.5%;
+  --muted-foreground: 26 11% 66%;
+  --secondary: 24 14% 17.5%;
+  --secondary-foreground: 30 22% 96%;
+  --border: 24 12% 23.5%;
+  --input: 24 12% 21.5%;
+  --connect-device-inner-bg: 24 14% 17.5%;
+  --connect-device-inner-bg-hover: 24 14% 20.5%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(27 90% 46% / 0.24) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(8 70% 38% / 0.15) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(24 30% 10%) 0%, hsl(var(--background)) 45%, hsl(22 36% 4.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="orange"] body,
+html:not(.dark)[data-cabinet-decor="orange"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 78% at 24% -15%, hsl(28 92% 52% / 0.17), transparent 56%),
+    radial-gradient(ellipse 85% 50% at 100% 90%, hsl(10 80% 58% / 0.09), transparent 50%);
+}
+
 html[data-cabinet-decor="yellow"] {
   --primary: 38 92% 46%;
   --accent: 38 92% 46%;
   --ring: 38 92% 46%;
+}
+
+html.dark[data-cabinet-decor="yellow"] {
+  --primary: 45 96% 54%;
+  --primary-foreground: 42 40% 7%;
+  --accent: 45 96% 54%;
+  --ring: 45 96% 54%;
+
+  --background: 42 26% 6%;
+  --foreground: 45 22% 96%;
+  --card: 42 13% 12%;
+  --card-foreground: 45 22% 96%;
+  --muted: 42 18% 9%;
+  --muted-foreground: 44 10% 66%;
+  --secondary: 42 12% 16.5%;
+  --secondary-foreground: 45 22% 96%;
+  --border: 42 10% 22.5%;
+  --input: 42 10% 20.5%;
+  --connect-device-inner-bg: 42 12% 16.5%;
+  --connect-device-inner-bg-hover: 42 12% 19.5%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(45 90% 44% / 0.22) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(28 80% 38% / 0.14) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(42 28% 9.5%) 0%, hsl(var(--background)) 45%, hsl(40 34% 4.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="yellow"] body,
+html:not(.dark)[data-cabinet-decor="yellow"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 78% at 24% -15%, hsl(42 92% 50% / 0.18), transparent 56%),
+    radial-gradient(ellipse 85% 50% at 100% 90%, hsl(28 85% 55% / 0.09), transparent 50%);
 }
 
 html[data-cabinet-decor="violet"] {
@@ -2590,6 +2654,31 @@ html.dark[data-cabinet-decor="violet"] {
   --primary: 262 72% 62%;
   --accent: 262 72% 62%;
   --ring: 262 72% 62%;
+
+  --background: 262 28% 7%;
+  --foreground: 265 22% 96%;
+  --card: 262 17% 13.5%;
+  --card-foreground: 265 22% 96%;
+  --muted: 262 20% 10.5%;
+  --muted-foreground: 262 12% 67%;
+  --secondary: 262 15% 18.5%;
+  --secondary-foreground: 265 22% 96%;
+  --border: 262 13% 25%;
+  --input: 262 13% 23%;
+  --connect-device-inner-bg: 262 15% 18.5%;
+  --connect-device-inner-bg-hover: 262 15% 21.5%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(262 70% 48% / 0.26) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(300 55% 38% / 0.16) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(262 30% 11%) 0%, hsl(var(--background)) 45%, hsl(265 36% 5.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="violet"] body,
+html:not(.dark)[data-cabinet-decor="violet"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 78% at 24% -15%, hsl(262 65% 55% / 0.17), transparent 56%),
+    radial-gradient(ellipse 85% 50% at 100% 90%, hsl(300 50% 58% / 0.09), transparent 50%);
 }
 
 html[data-cabinet-decor="slate"] {
@@ -2894,30 +2983,33 @@ html:not(.dark)[data-cabinet-decor="spring"] .cabinet-shell-gradient {
 
 /* --- black_friday --- */
 html[data-cabinet-decor="black_friday"] {
-  --primary: 45 95% 46%;
-  --accent: 45 95% 46%;
-  --ring: 45 95% 46%;
+  --primary: 45 92% 50%;
+  --accent: 45 92% 50%;
+  --ring: 45 92% 50%;
 }
 
-html.dark[data-cabinet-decor="black_friday"] body {
-  background-image:
-    radial-gradient(ellipse 120% 80% at 50% -20%, hsl(45 90% 50% / 0.14), transparent 55%),
-    radial-gradient(ellipse 90% 60% at 50% 100%, hsl(0 0% 0% / 0.35), transparent 60%),
-    linear-gradient(168deg, hsl(0 0% 6%) 0%, hsl(var(--background)) 45%, hsl(0 0% 4%) 100%);
-}
+/* Тема только тёмная (DARK_ONLY_DECOR_THEMES): тёплый чёрный, золото как акцент.
+   Поверхности подкрашены в один оттенок (hue 40) по лесенке светлоты wine/green. */
+html.dark[data-cabinet-decor="black_friday"] {
+  --primary-foreground: 40 70% 7%;
 
-html.dark[data-cabinet-decor="black_friday"] .cabinet-shell-gradient {
-  background-image:
-    radial-gradient(ellipse 120% 80% at 50% -20%, hsl(45 90% 50% / 0.14), transparent 55%),
-    linear-gradient(168deg, hsl(0 0% 6%) 0%, hsl(var(--background)) 45%, hsl(0 0% 4%) 100%);
-}
+  --background: 40 14% 4.5%;
+  --foreground: 42 30% 96%;
+  --card: 40 10% 9.5%;
+  --card-foreground: 42 30% 96%;
+  --muted: 40 12% 7.5%;
+  --muted-foreground: 40 10% 63%;
+  --secondary: 40 9% 14%;
+  --secondary-foreground: 42 30% 96%;
+  --border: 40 14% 20%;
+  --input: 40 12% 18%;
+  --connect-device-inner-bg: 40 9% 14%;
+  --connect-device-inner-bg-hover: 40 9% 17%;
 
-html:not(.dark)[data-cabinet-decor="black_friday"] body,
-html:not(.dark)[data-cabinet-decor="black_friday"] .cabinet-shell-gradient {
-  background-image:
-    radial-gradient(ellipse 115% 78% at 50% -18%, hsl(45 95% 48% / 0.22), transparent 56%),
-    radial-gradient(ellipse 90% 55% at 50% 100%, hsl(40 30% 25% / 0.06), transparent 55%),
-    radial-gradient(ellipse 120% 85% at 50% -25%, hsl(var(--primary) / 0.08), transparent 55%);
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 80% 55% at 50% -12%, hsl(45 90% 50% / 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, hsl(35 80% 40% / 0.12) 0%, transparent 60%),
+    linear-gradient(170deg, hsl(40 22% 8%) 0%, hsl(var(--background)) 55%, hsl(40 10% 3%) 100%);
 }
 
 /* --- aurora --- */
@@ -2995,25 +3087,56 @@ html[data-cabinet-decor="cyber"] {
   --primary: 140 85% 36%;
   --accent: 140 85% 36%;
   --ring: 140 85% 36%;
+
+  /* Тёмный текст на зелёных кнопках (в т.ч. админка): белый на неоне не читается. */
+  --primary-foreground: 150 40% 4%;
 }
 
 html.dark[data-cabinet-decor="cyber"] {
-  --primary: 140 90% 46%;
-  --accent: 140 90% 46%;
-  --ring: 140 90% 46%;
+  --primary: 142 100% 48%;
+  --primary-foreground: 150 40% 4%;
+  --accent: 142 100% 48%;
+  --ring: 142 100% 48%;
+
+  /* «Матрица»: поверхности чёрно-зелёные (hue 150), а не сине-графитовые. */
+  --background: 150 32% 4.5%;
+  --foreground: 140 28% 94%;
+  --card: 150 20% 9%;
+  --card-foreground: 140 28% 94%;
+  --muted: 150 24% 6.5%;
+  --muted-foreground: 145 13% 60%;
+  --secondary: 150 18% 13%;
+  --secondary-foreground: 140 28% 94%;
+  --border: 150 22% 17%;
+  --input: 150 22% 15%;
+  --connect-device-inner-bg: 150 18% 13%;
+  --connect-device-inner-bg-hover: 150 18% 16%;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 120% 70% at 50% -18%, hsl(142 100% 42% / 0.17), transparent 58%),
+    radial-gradient(ellipse 70% 50% at 100% 100%, hsl(160 90% 30% / 0.1), transparent 55%),
+    linear-gradient(170deg, hsl(150 40% 6.5%) 0%, hsl(var(--background)) 50%, hsl(155 40% 3.5%) 100%);
 }
 
-html.dark[data-cabinet-decor="cyber"] body {
-  background-image:
-    radial-gradient(ellipse 120% 85% at 50% -20%, hsl(140 90% 40% / 0.14), transparent 55%),
-    radial-gradient(ellipse 70% 50% at 100% 80%, hsl(140 70% 30% / 0.08), transparent 50%),
-    linear-gradient(168deg, hsl(140 25% 6%) 0%, hsl(var(--background)) 45%, hsl(150 30% 5%) 100%);
+/* Карточки: тёмная чёрно-зелёная плашка с тихой неоновой рамкой. */
+html.dark[data-cabinet-decor="cyber"] .cabinet-card,
+html.dark[data-cabinet-decor="cyber"] .cabinet-elevated-card,
+html.dark[data-cabinet-decor="cyber"] .subscription-feature-card,
+html.dark[data-cabinet-decor="cyber"] .admin-modal-panel {
+  border-color: hsl(142 100% 48% / 0.2) !important;
+  background-color: hsl(var(--card));
+  background-image: linear-gradient(165deg, hsl(150 20% 10.5%) 0%, hsl(150 22% 8%) 100%) !important;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 hsl(142 100% 70% / 0.06) !important;
 }
 
-html.dark[data-cabinet-decor="cyber"] .cabinet-shell-gradient {
-  background-image:
-    radial-gradient(ellipse 120% 85% at 50% -20%, hsl(140 90% 40% / 0.14), transparent 55%),
-    linear-gradient(168deg, hsl(140 25% 6%) 0%, hsl(var(--background)) 45%, hsl(150 30% 5%) 100%);
+html.dark[data-cabinet-decor="cyber"] .cabinet-stat-tile {
+  background-color: hsl(150 22% 8%);
+}
+
+html.dark[data-cabinet-decor="cyber"] .admin-dash-card-inner {
+  background-color: hsl(150 20% 10.5%);
 }
 
 html:not(.dark)[data-cabinet-decor="cyber"] body,
@@ -3031,16 +3154,372 @@ html[data-cabinet-decor="cyber"] .admin-modal-panel {
   border-color: hsl(var(--primary) / 0.2) !important;
 }
 
-html.dark[data-cabinet-decor="cyber"] .cabinet-elevated-card,
-html.dark[data-cabinet-decor="cyber"] .subscription-feature-card {
-  border-color: hsl(var(--primary) / 0.15) !important;
-}
-
 html[data-cabinet-decor="cyber"] .cabinet-shell .cabinet-elevated-card:hover,
 html[data-cabinet-decor="cyber"] .cabinet-shell .cabinet-elevated-card:focus-within,
 html[data-cabinet-decor="cyber"] .cabinet-shell .subscription-feature-card:hover,
 html[data-cabinet-decor="cyber"] .cabinet-shell .subscription-feature-card:focus-within {
   border-color: transparent !important;
+}
+
+/* Основные кнопки — как на лендинге: градиент зелёный → бирюзовый, мягкое свечение,
+ * тёмная подпись (белая на ярком зелёном не читается). Цвета те же, что --lp-cyan / --lp-violet
+ * в landing.css. Блик по hover уже даёт общее правило .cabinet-btn-primary::after. */
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-image: linear-gradient(
+    135deg,
+    hsl(140 90% 46%) 0%,
+    color-mix(in oklab, hsl(140 90% 46%) 60%, hsl(172 90% 52%)) 55%,
+    hsl(172 90% 52%) 100%
+  );
+  color: hsl(224 40% 10%);
+  box-shadow:
+    0 10px 30px -12px hsl(140 90% 46% / 0.7),
+    inset 0 1px 0 rgb(255 255 255 / 0.22);
+}
+
+/* Цвет кнопки как в варианте C: чистый неон без бирюзы. Свечение — те же параметры,
+ * что у кнопок темы «Туманность» (в покое и на наведении). */
+html.dark[data-cabinet-decor="cyber"] .cabinet-btn-primary {
+  background-image: linear-gradient(135deg, hsl(138 100% 50%) 0%, hsl(150 100% 52%) 100%);
+  box-shadow:
+    0 10px 26px -12px hsl(138 100% 50% / 0.7),
+    inset 0 1px 0 rgb(255 255 255 / 0.2);
+}
+
+/* Кольцо по контуру при наведении: середина не фиолетовая (общий --cabinet-ring-mid
+ * 262 83% 68%), а мятно-зелёная — остаётся в гамме темы. */
+html[data-cabinet-decor="cyber"] .cabinet-shell,
+html[data-cabinet-decor="cyber"] .stats-ring {
+  --cabinet-ring-mid: 150 90% 55%;
+}
+
+/* Блик пробегает по кнопке слева направо при наведении — как в теме «Туманность». */
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.38) 50%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.75s var(--cabinet-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary:hover::after,
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary:focus-visible::after {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-cabinet-decor="cyber"] .cabinet-btn-primary::after {
+    transition: none;
+  }
+}
+
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary:hover,
+html[data-cabinet-decor="cyber"] .cabinet-btn-primary:focus-visible {
+  filter: brightness(1.07);
+  box-shadow:
+    0 16px 42px -12px hsl(140 90% 46% / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+
+html.dark[data-cabinet-decor="cyber"] .cabinet-btn-primary:hover,
+html.dark[data-cabinet-decor="cyber"] .cabinet-btn-primary:focus-visible {
+  box-shadow:
+    0 14px 34px -12px hsl(138 100% 50% / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+/* --- lime («Лайм»): графит капюшона + лайм глаз кота ----------------------
+ *
+ * Палитра снята с маскота: поверхности — тёмный сине-графитовый (hue ~217,
+ * S 10–14%), акцент — салатовый hue ~96 (глаза), кнопки — градиент из трёх
+ * оттенков зелёного, от лайма к свежей зелени (как у cyber, но теплее и без
+ * бирюзы). Белая подпись на лайме не читается, поэтому --primary-foreground
+ * тёмный в обоих режимах.
+ */
+html[data-cabinet-decor="lime"] {
+  --primary: 96 58% 34%;
+  --primary-foreground: 217 30% 9%;
+  --accent: 96 58% 34%;
+  --ring: 96 58% 34%;
+}
+
+html.dark[data-cabinet-decor="lime"] {
+  --primary: 96 68% 52%;
+  --primary-foreground: 217 30% 9%;
+  --accent: 96 68% 52%;
+  --ring: 96 68% 52%;
+
+  /* Поверхности подкрашены в лайм по той же лесенке светлоты, что у wine. */
+  --background: 92 26% 6.5%;
+  --foreground: 90 20% 96%;
+  --card: 92 15% 12.5%;
+  --card-foreground: 90 20% 96%;
+  --muted: 92 18% 9.5%;
+  --muted-foreground: 92 11% 65%;
+  --secondary: 92 13% 17%;
+  --secondary-foreground: 90 20% 96%;
+  --border: 92 11% 23%;
+  --input: 92 11% 21%;
+  --connect-device-inner-bg: 92 13% 17%;
+  --connect-device-inner-bg-hover: 92 13% 20%;
+  --tariffs-shine-color: 222 222 222;
+  --tariffs-shine-shadow: 255 255 255;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(96 68% 40% / 0.2) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(120 50% 32% / 0.14) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(92 28% 10%) 0%, hsl(var(--background)) 45%, hsl(95 34% 4.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="lime"] body,
+html:not(.dark)[data-cabinet-decor="lime"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 80% at 50% -18%, hsl(96 65% 45% / 0.13), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, hsl(120 50% 42% / 0.07), transparent 50%);
+}
+
+/* Карточки: плоская графитовая плашка с тихой лаймовой рамкой (как у carbon). */
+html.dark[data-cabinet-decor="lime"] .cabinet-card,
+html.dark[data-cabinet-decor="lime"] .cabinet-elevated-card,
+html.dark[data-cabinet-decor="lime"] .subscription-feature-card,
+html.dark[data-cabinet-decor="lime"] .admin-modal-panel {
+  border-color: hsl(92 30% 60% / 0.16) !important;
+  background-color: hsl(var(--card));
+  background-image: linear-gradient(
+    165deg,
+    hsl(92 15% 15%) 0%,
+    hsl(92 15% 11.5%) 100%
+  ) !important;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-cabinet-decor="lime"]:not(.dark) .cabinet-elevated-card,
+html[data-cabinet-decor="lime"]:not(.dark) .subscription-feature-card,
+html[data-cabinet-decor="lime"]:not(.dark) .admin-modal-panel {
+  border-color: hsl(var(--primary) / 0.22) !important;
+}
+
+html[data-cabinet-decor="lime"] .cabinet-shell .cabinet-elevated-card:hover,
+html[data-cabinet-decor="lime"] .cabinet-shell .cabinet-elevated-card:focus-within,
+html[data-cabinet-decor="lime"] .cabinet-shell .subscription-feature-card:hover,
+html[data-cabinet-decor="lime"] .cabinet-shell .subscription-feature-card:focus-within {
+  border-color: hsl(var(--primary) / 0.32) !important;
+}
+
+html.dark[data-cabinet-decor="lime"] .cabinet-stat-tile {
+  background-color: hsl(92 15% 11.5%);
+}
+
+html.dark[data-cabinet-decor="lime"] .admin-dash-card-inner {
+  background-color: hsl(92 15% 13.5%);
+}
+
+/* Основные кнопки: градиент из трёх зелёных (лайм → трава → свежая зелень),
+ * мягкое свечение, тёмная подпись. Блик по hover — общий приём .cabinet-btn-primary. */
+html[data-cabinet-decor="lime"] .cabinet-btn-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-image: linear-gradient(
+    135deg,
+    hsl(86 82% 54%) 0%,
+    color-mix(in oklab, hsl(86 82% 54%) 50%, hsl(122 56% 46%)) 50%,
+    hsl(122 56% 46%) 100%
+  );
+  color: hsl(217 30% 9%);
+  box-shadow:
+    0 10px 28px -12px hsl(96 75% 48% / 0.7),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+html[data-cabinet-decor="lime"] .cabinet-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.38) 50%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.75s var(--cabinet-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+html[data-cabinet-decor="lime"] .cabinet-btn-primary:hover::after,
+html[data-cabinet-decor="lime"] .cabinet-btn-primary:focus-visible::after {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-cabinet-decor="lime"] .cabinet-btn-primary::after {
+    transition: none;
+  }
+}
+
+html[data-cabinet-decor="lime"] .cabinet-btn-primary:hover,
+html[data-cabinet-decor="lime"] .cabinet-btn-primary:focus-visible {
+  filter: brightness(1.06);
+  box-shadow:
+    0 16px 40px -12px hsl(96 75% 48% / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.32);
+}
+
+/* --- emerald («Изумруд»): палитра Meows VPN ---------------------------------
+ *
+ * Изумруд #19A978 — цвет продукта (кнопки, кольца, активные состояния), мята
+ * #39C995 — иконки и статусы, лайм #B7F34A («глаза кота») — только мелкие
+ * акценты: кольцо фокуса и свечение фона. Поверхности — чёрно-зелёный фон
+ * #111916 и нейтральные графитовые карточки #202326. Подпись на кнопках
+ * тёмная: белая на #19A978 даёт контраст ~3:1. Вариант с лаймом как основным
+ * акцентом — тема «lime» выше.
+ */
+html[data-cabinet-decor="emerald"] {
+  --primary: 160 74% 30%;
+  --primary-foreground: 158 30% 7%;
+  --accent: 160 74% 30%;
+  --ring: 160 74% 30%;
+}
+
+html.dark[data-cabinet-decor="emerald"] {
+  --primary: 158 57% 51%;
+  --primary-foreground: 158 30% 7%;
+  --accent: 158 57% 51%;
+  --ring: 81 88% 62%;
+
+  /* Поверхности подкрашены в изумруд по лесенке wine; лайм остаётся в кольце фокуса. */
+  --background: 162 34% 6%;
+  --foreground: 160 22% 96%;
+  --card: 162 22% 12%;
+  --card-foreground: 160 22% 96%;
+  --muted: 162 26% 9.5%;
+  --muted-foreground: 162 13% 65%;
+  --secondary: 162 19% 17%;
+  --secondary-foreground: 160 22% 96%;
+  --border: 162 16% 23%;
+  --input: 162 16% 21%;
+  --connect-device-inner-bg: 162 19% 17%;
+  --connect-device-inner-bg-hover: 162 19% 20%;
+  --tariffs-shine-color: 222 222 222;
+  --tariffs-shine-shadow: 255 255 255;
+
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(158 70% 36% / 0.24) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(81 70% 45% / 0.09) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(162 36% 10%) 0%, hsl(var(--background)) 45%, hsl(165 42% 4.5%) 100%);
+}
+
+html:not(.dark)[data-cabinet-decor="emerald"] body,
+html:not(.dark)[data-cabinet-decor="emerald"] .cabinet-shell-gradient {
+  background-image:
+    radial-gradient(ellipse 115% 80% at 50% -18%, hsl(160 65% 40% / 0.13), transparent 55%),
+    radial-gradient(ellipse 80% 50% at 100% 100%, hsl(158 50% 40% / 0.07), transparent 50%);
+}
+
+/* Карточки: плоская графитовая плашка с тихой лаймовой рамкой (как у carbon). */
+html.dark[data-cabinet-decor="emerald"] .cabinet-card,
+html.dark[data-cabinet-decor="emerald"] .cabinet-elevated-card,
+html.dark[data-cabinet-decor="emerald"] .subscription-feature-card,
+html.dark[data-cabinet-decor="emerald"] .admin-modal-panel {
+  border-color: hsl(160 35% 60% / 0.16) !important;
+  background-color: hsl(var(--card));
+  background-image: linear-gradient(
+    165deg,
+    hsl(162 22% 14.5%) 0%,
+    hsl(162 22% 11%) 100%
+  ) !important;
+  box-shadow:
+    0 10px 26px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+}
+
+html[data-cabinet-decor="emerald"]:not(.dark) .cabinet-elevated-card,
+html[data-cabinet-decor="emerald"]:not(.dark) .subscription-feature-card,
+html[data-cabinet-decor="emerald"]:not(.dark) .admin-modal-panel {
+  border-color: hsl(var(--primary) / 0.22) !important;
+}
+
+html[data-cabinet-decor="emerald"] .cabinet-shell .cabinet-elevated-card:hover,
+html[data-cabinet-decor="emerald"] .cabinet-shell .cabinet-elevated-card:focus-within,
+html[data-cabinet-decor="emerald"] .cabinet-shell .subscription-feature-card:hover,
+html[data-cabinet-decor="emerald"] .cabinet-shell .subscription-feature-card:focus-within {
+  border-color: hsl(var(--primary) / 0.32) !important;
+}
+
+html.dark[data-cabinet-decor="emerald"] .cabinet-stat-tile {
+  background-color: hsl(162 22% 11%);
+}
+
+html.dark[data-cabinet-decor="emerald"] .admin-dash-card-inner {
+  background-color: hsl(162 22% 13%);
+}
+
+/* Основные кнопки: градиент из трёх зелёных (лайм → трава → свежая зелень),
+ * мягкое свечение, тёмная подпись. Блик по hover — общий приём .cabinet-btn-primary. */
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background-image: linear-gradient(
+    135deg,
+    hsl(160 74% 38%) 0%,
+    hsl(158 57% 51%) 68%,
+    hsl(110 60% 60%) 100%
+  );
+  color: hsl(158 30% 7%);
+  box-shadow:
+    0 10px 28px -12px hsl(160 74% 40% / 0.7),
+    inset 0 1px 0 rgb(255 255 255 / 0.26);
+}
+
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    rgb(255 255 255 / 0.38) 50%,
+    transparent 80%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.75s var(--cabinet-ease, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary:hover::after,
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary:focus-visible::after {
+  transform: translateX(120%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-cabinet-decor="emerald"] .cabinet-btn-primary::after {
+    transition: none;
+  }
+}
+
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary:hover,
+html[data-cabinet-decor="emerald"] .cabinet-btn-primary:focus-visible {
+  filter: brightness(1.06);
+  box-shadow:
+    0 16px 40px -12px hsl(160 74% 40% / 0.8),
+    inset 0 1px 0 rgb(255 255 255 / 0.32);
 }
 
 /* --- sunset --- */
@@ -3088,21 +3567,32 @@ html[data-cabinet-decor="lavender"] {
 
 html.dark[data-cabinet-decor="lavender"] {
   --primary: 270 48% 68%;
+  --primary-foreground: 268 35% 8%;
   --accent: 270 48% 68%;
   --ring: 270 48% 68%;
-}
 
-html.dark[data-cabinet-decor="lavender"] body {
-  background-image:
-    radial-gradient(ellipse 120% 80% at 30% -15%, hsl(270 50% 62% / 0.24), transparent 55%),
-    radial-gradient(ellipse 90% 55% at 100% 80%, hsl(290 40% 50% / 0.14), transparent 52%),
-    linear-gradient(168deg, hsl(260 30% 11%) 0%, hsl(var(--background)) 45%, hsl(270 28% 9%) 100%);
-}
+  /*
+   * Поверхности — пыльно-сиреневые, а не сине-серые: тон 270 как у акцента,
+   * насыщенность ниже и светлота чуть выше, чем у фиолетовой, — лаванда
+   * мягче и «пастельнее». Синевы (hue 215–250) в поверхностях быть не должно.
+   */
+  --background: 270 20% 8%;
+  --foreground: 272 25% 96%;
+  --card: 270 14% 14.5%;
+  --card-foreground: 272 25% 96%;
+  --muted: 270 16% 11%;
+  --muted-foreground: 270 12% 68%;
+  --secondary: 270 13% 19.5%;
+  --secondary-foreground: 272 25% 96%;
+  --border: 270 11% 26%;
+  --input: 270 11% 24%;
+  --connect-device-inner-bg: 270 13% 19.5%;
+  --connect-device-inner-bg-hover: 270 13% 22.5%;
 
-html.dark[data-cabinet-decor="lavender"] .cabinet-shell-gradient {
-  background-image:
-    radial-gradient(ellipse 120% 80% at 30% -15%, hsl(270 50% 62% / 0.24), transparent 55%),
-    radial-gradient(ellipse 90% 55% at 100% 80%, hsl(290 40% 50% / 0.14), transparent 52%);
+  --cabinet-dark-bg-image:
+    radial-gradient(ellipse 130% 88% at 28% -16%, hsl(270 50% 55% / 0.24) 0%, transparent 58%),
+    radial-gradient(ellipse 75% 55% at 100% 100%, hsl(292 40% 45% / 0.15) 0%, transparent 58%),
+    linear-gradient(168deg, hsl(270 22% 11.5%) 0%, hsl(var(--background)) 45%, hsl(272 26% 6%) 100%);
 }
 
 html:not(.dark)[data-cabinet-decor="lavender"] body,
@@ -3297,25 +3787,6 @@ html:not(.dark) .cabinet-decor-scene--spring .cabinet-decor-scene__spring-bush {
     hsl(var(--primary) / 0.15) 4px
   );
   pointer-events: none;
-}
-
-.cabinet-decor-scene__bf-corner {
-  position: absolute;
-  width: 120px;
-  height: 120px;
-  opacity: 0.35;
-  background: linear-gradient(135deg, hsl(var(--primary) / 0.5), transparent 55%);
-}
-
-.cabinet-decor-scene__bf-corner--tl {
-  top: 0;
-  left: 0;
-}
-
-.cabinet-decor-scene__bf-corner--br {
-  bottom: 0;
-  right: 0;
-  transform: rotate(180deg);
 }
 
 .cabinet-decor-scene__aurora-band {
@@ -3576,9 +4047,9 @@ html[data-cabinet-decor="neon"] .renew-subscription-cta-static span.inline-flex.
 }
 
 /* black_friday: золотая диагональ на карточках тарифов */
+/* Без overflow: hidden — он резал нашивку «Популярный», выступающую над рамкой. Уголок скругляется сам. */
 html[data-cabinet-decor="black_friday"] [data-tariff-card] {
   position: relative;
-  overflow: hidden;
 }
 
 html[data-cabinet-decor="black_friday"] [data-tariff-card]::before {
@@ -3588,6 +4059,7 @@ html[data-cabinet-decor="black_friday"] [data-tariff-card]::before {
   right: 0;
   width: 72px;
   height: 72px;
+  border-top-right-radius: inherit;
   background: linear-gradient(135deg, transparent 48%, hsl(var(--primary) / 0.55) 48%, hsl(var(--primary) / 0.35) 100%);
   pointer-events: none;
 }
@@ -4201,6 +4673,53 @@ html[data-cabinet-decor="nebula"]:not([data-nebula-nav="pill"])
 @media (prefers-reduced-motion: reduce) {
   html[data-cabinet-decor="nebula"]:not([data-nebula-nav="pill"])
     .cabinet-nav-link::after {
+    transition: none;
+  }
+}
+
+/*
+ * Шапка кабинета на ПК во всех темах, кроме «Туманности» (у неё свой блок выше):
+ * вместо плашки у активной страницы и смены фона при наведении — линия под
+ * иконкой в основном цвете темы. Тянется слева направо, ничего не двигает.
+ */
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link {
+  position: relative;
+  background-color: transparent;
+  box-shadow: none;
+}
+
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--primary) / 0.55));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.25s ease;
+  pointer-events: none;
+}
+
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link:hover::after,
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link[aria-current="page"]::after {
+  transform: scaleX(1);
+}
+
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link[aria-current="page"],
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link[aria-current="page"] svg {
+  color: hsl(var(--primary));
+}
+
+html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link:hover {
+  background-color: transparent;
+  color: hsl(var(--foreground));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-cabinet-decor="nebula"]) .cabinet-nav-link::after {
     transition: none;
   }
 }
@@ -5451,4 +5970,33 @@ html:not(.dark) .cabinet-hw-spider {
   .fortune-stat-bump {
     animation: none;
   }
+}
+
+/* Ползунок шанса приза в админке колеса: заливка до значения цветом приза */
+.fortune-chance-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 8px;
+  border-radius: 4px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--chance-color) var(--p), hsl(var(--border)) var(--p));
+}
+.fortune-chance-range:disabled { cursor: default; opacity: 0.6; }
+.fortune-chance-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--chance-color);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
+}
+.fortune-chance-range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--chance-color);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.45);
 }

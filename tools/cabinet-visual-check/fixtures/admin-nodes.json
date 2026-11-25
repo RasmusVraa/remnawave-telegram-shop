@@ -26,7 +26,8 @@
           "name": "nordhost"
         },
         "plugin_name": "TBlocker",
-        "traffic_used_bytes": 700713176924.16
+        "traffic_used_bytes": 700713176924.16,
+        "view_position": 10
       },
       {
         "state": "online",
@@ -53,7 +54,8 @@
           "name": "alpha vps"
         },
         "plugin_name": "TBlocker",
-        "traffic_used_bytes": 844519419412.48
+        "traffic_used_bytes": 844519419412.48,
+        "view_position": 1
       },
       {
         "state": "online",
@@ -79,7 +81,8 @@
         "provider": {
           "name": "cloudline"
         },
-        "traffic_used_bytes": 541047767695.36
+        "traffic_used_bytes": 541047767695.36,
+        "view_position": 2
       },
       {
         "state": "online",
@@ -105,7 +108,8 @@
         "provider": {
           "name": "cloudline"
         },
-        "traffic_used_bytes": 386922866278.4
+        "traffic_used_bytes": 386922866278.4,
+        "view_position": 3
       },
       {
         "state": "online",
@@ -131,7 +135,8 @@
         "provider": {
           "name": "eurovds"
         },
-        "traffic_used_bytes": 109586090557.44
+        "traffic_used_bytes": 109586090557.44,
+        "view_position": 5
       },
       {
         "state": "online",
@@ -157,7 +162,8 @@
         "provider": {
           "name": "balticnet"
         },
-        "traffic_used_bytes": 45258217881.6
+        "traffic_used_bytes": 45258217881.6,
+        "view_position": 11
       },
       {
         "state": "online",
@@ -183,7 +189,8 @@
         "provider": {
           "name": "vistula"
         },
-        "traffic_used_bytes": 121053653237.76
+        "traffic_used_bytes": 121053653237.76,
+        "view_position": 8
       },
       {
         "state": "online",
@@ -209,7 +216,8 @@
         "provider": {
           "name": "harbour"
         },
-        "traffic_used_bytes": 182829711.36
+        "traffic_used_bytes": 182829711.36,
+        "view_position": 6
       },
       {
         "uuid": "n9",
@@ -229,7 +237,8 @@
         "traffic_used_bytes": 76353781104.64,
         "traffic_limit_bytes": 0,
         "traffic_reset_day": 25,
-        "xray_uptime_sec": 0
+        "xray_uptime_sec": 0,
+        "view_position": 9
       },
       {
         "uuid": "n10",
@@ -248,7 +257,8 @@
         "traffic_used_bytes": 0,
         "traffic_limit_bytes": 0,
         "traffic_reset_day": 25,
-        "xray_uptime_sec": 0
+        "xray_uptime_sec": 0,
+        "view_position": 7
       },
       {
         "uuid": "n11",
@@ -267,8 +277,19 @@
         "traffic_used_bytes": 0,
         "traffic_limit_bytes": 0,
         "traffic_reset_day": 0,
-        "xray_uptime_sec": 0
+        "xray_uptime_sec": 0,
+        "view_position": 4
       }
     ]
+  },
+  "/admin/reviews": {
+    "items": [],
+    "total": 0,
+    "counts": {
+      "pending": 0,
+      "published": 0,
+      "hidden": 0,
+      "all": 0
+    }
   }
 }

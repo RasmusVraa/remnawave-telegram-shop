@@ -2,6 +2,8 @@ import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 
 import { cn } from '@/lib/utils'
 
+import './blackFriday.css'
+
 /** ≥768px — крупные частицы только на ПК/планшете. */
 function useIsDesktopViewport(): boolean {
   const [desktop, setDesktop] = useState(
@@ -704,102 +706,138 @@ export function SpringEffect() {
   )
 }
 
-const BLACK_FRIDAY_MONEY = ['💰', '💵', '$', '%'] as const
-const BLACK_FRIDAY_GLYPHS = ['tag', 'money', 'flash'] as const
-type BlackFridayGlyph = (typeof BLACK_FRIDAY_GLYPHS)[number]
+/**
+ * Чёрная пятница: падающие золотые монеты (₽ и %) и редкие искры. Слой на весь
+ * экран (position: fixed в blackFriday.css), монет мало — это фон. Эмодзи и
+ * мигающих вспышек больше нет.
+ */
+interface CoinParticle {
+  left: string
+  size: number
+  mark: '₽' | '%'
+  opacity: number
+  drift: string
+  rot: string
+  animationDuration: string
+  animationDelay: string
+  flip: string
+}
 
-interface SaleParticleStyle {
+interface SparkParticle {
   left: string
   top: string
   size: number
   animationDuration: string
   animationDelay: string
-  opacity: number
-  glyph: BlackFridayGlyph
-  char: string
-  angle: number
 }
 
-function buildSaleParticleStyles(
-  count: number,
-  opts?: { sizeMin?: number; sizeMax?: number; durationMin?: number; durationMax?: number },
-): SaleParticleStyle[] {
-  const sizeMin = opts?.sizeMin ?? 18
-  const sizeMax = opts?.sizeMax ?? 34
-  const durationMin = opts?.durationMin ?? 6
-  const durationMax = opts?.durationMax ?? 13
-  return Array.from({ length: count }, () => {
-    const glyph = BLACK_FRIDAY_GLYPHS[Math.floor(Math.random() * BLACK_FRIDAY_GLYPHS.length)]!
-    const timing = staggeredTiming(durationMin, durationMax)
-    return {
-      left: `${randomBetween(-5, 88)}%`,
-      top: `${randomBetween(10, 80)}%`,
-      size: randomBetween(sizeMin, sizeMax),
-      animationDuration: timing.animationDuration,
-      animationDelay: timing.animationDelay,
-      opacity: randomBetween(0.45, 0.92),
-      glyph,
-      char: BLACK_FRIDAY_MONEY[Math.floor(Math.random() * BLACK_FRIDAY_MONEY.length)]!,
-      angle: randomBetween(-38, -18),
-    }
-  })
-}
-
-function SaleTagSvg() {
+function BlackFridayGlyphs() {
   return (
-    <svg viewBox="0 0 32 32" fill="none" aria-hidden className="size-full">
-      <path
-        d="M6 8 L22 6 L26 22 L10 26 Z"
-        fill="currentColor"
-        opacity="0.92"
-      />
-      <circle cx="10" cy="10" r="2.2" fill="hsl(var(--background))" opacity="0.55" />
-      <text x="16" y="19" textAnchor="middle" fill="hsl(var(--background))" fontSize="9" fontWeight="700" opacity="0.9">
-        %
-      </text>
+    <svg width="0" height="0" style={{ position: 'absolute' }} aria-hidden focusable="false">
+      <defs>
+        <radialGradient id="bfc-cg" cx="35%" cy="30%" r="80%">
+          <stop offset="0" stopColor="#fff6c0" />
+          <stop offset=".45" stopColor="#f2c230" />
+          <stop offset="1" stopColor="#a86d00" />
+        </radialGradient>
+        {(['₽', '%'] as const).map((mark) => (
+          <symbol key={mark} id={mark === '₽' ? 'bfc-rub' : 'bfc-pct'} viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="19" fill="url(#bfc-cg)" />
+            <circle cx="20" cy="20" r="15" fill="none" stroke="#8a5a00" strokeOpacity=".55" strokeWidth="1.4" />
+            <text
+              x="20"
+              y={mark === '₽' ? 27 : 26}
+              textAnchor="middle"
+              fontSize={mark === '₽' ? 20 : 17}
+              fontWeight="800"
+              fill="#7a4d00"
+              fontFamily="Inter,Arial,sans-serif"
+            >
+              {mark}
+            </text>
+          </symbol>
+        ))}
+        <symbol id="bfc-star" viewBox="0 0 20 20">
+          <path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8Z" fill="currentColor" />
+        </symbol>
+      </defs>
     </svg>
   )
 }
 
 export function SparksEffect() {
   const desktop = useIsDesktopViewport()
-  const buildOpts = useMemo(
-    () =>
-      desktop
-        ? { sizeMin: 20, sizeMax: 38, durationMin: 7, durationMax: 14 }
-        : { sizeMin: 16, sizeMax: 28, durationMin: 6, durationMax: 12 },
-    [desktop],
-  )
   const n = particleCount(4)
-  const styles = useMemo(() => buildSaleParticleStyles(n, buildOpts), [n, buildOpts])
-  if (styles.length === 0) return null
+  const coins = useMemo<CoinParticle[]>(() => {
+    const [sizeMin, sizeMax] = desktop ? [20, 34] : [16, 26]
+    return Array.from({ length: n }, () => {
+      const timing = staggeredTiming(11, 20)
+      return {
+        left: `${randomBetween(2, 96)}%`,
+        size: randomBetween(sizeMin, sizeMax),
+        mark: Math.random() < 0.7 ? '₽' : '%',
+        opacity: randomBetween(0.5, 0.9),
+        drift: `${randomBetween(-60, 60)}px`,
+        rot: `${randomBetween(-70, 70)}deg`,
+        flip: `${randomBetween(1.2, 2.2)}s`,
+        ...timing,
+      }
+    })
+  }, [n, desktop])
+  const sparks = useMemo<SparkParticle[]>(
+    () =>
+      Array.from({ length: Math.ceil(n / 2) }, () => {
+        const sec = randomBetween(2.6, 4.4)
+        return {
+          left: `${randomBetween(4, 94)}%`,
+          top: `${randomBetween(8, 86)}%`,
+          size: randomBetween(9, 16),
+          animationDuration: `${sec}s`,
+          animationDelay: `-${randomBetween(0, sec)}s`,
+        }
+      }),
+    [n],
+  )
+  if (n === 0) return null
 
   return (
     <div className="cabinet-decor-fx cabinet-decor-fx--black_friday" aria-hidden>
-      {styles.map((s, i) => (
+      <BlackFridayGlyphs />
+      {coins.map((c, i) => (
         <span
-          key={i}
-          className={cn(
-            'cabinet-decor-particle',
-            'cabinet-decor-particle--bf',
-            s.glyph === 'flash' && 'cabinet-decor-particle--bf-flash',
-            s.glyph === 'tag' && 'cabinet-decor-particle--bf-tag',
-            s.glyph === 'money' && 'cabinet-decor-particle--bf-money',
-          )}
+          key={`c${i}`}
+          className="bf-coin"
           style={{
-            left: s.left,
-            top: s.top,
-            width: s.glyph === 'flash' ? s.size * 2.2 : s.size,
-            height: s.glyph === 'flash' ? s.size * 2.2 : s.size,
-            fontSize: s.glyph === 'money' ? `${s.size}px` : undefined,
-            animationDuration: s.animationDuration,
-            animationDelay: s.animationDelay,
-            opacity: s.opacity,
-            ['--bf-angle' as string]: `${s.angle}deg`,
+            left: c.left,
+            width: c.size,
+            height: c.size,
+            opacity: c.opacity,
+            animationDuration: c.animationDuration,
+            animationDelay: c.animationDelay,
+            ['--bf-drift' as string]: c.drift,
+            ['--bf-rot' as string]: c.rot,
           }}
         >
-          {s.glyph === 'tag' ? <SaleTagSvg /> : s.glyph === 'money' ? s.char : null}
+          <svg style={{ animationDuration: c.flip }}>
+            <use href={c.mark === '₽' ? '#bfc-rub' : '#bfc-pct'} />
+          </svg>
         </span>
+      ))}
+      {sparks.map((sp, i) => (
+        <svg
+          key={`s${i}`}
+          className="bf-spark"
+          style={{
+            left: sp.left,
+            top: sp.top,
+            width: sp.size,
+            height: sp.size,
+            animationDuration: sp.animationDuration,
+            animationDelay: sp.animationDelay,
+          }}
+        >
+          <use href="#bfc-star" />
+        </svg>
       ))}
     </div>
   )

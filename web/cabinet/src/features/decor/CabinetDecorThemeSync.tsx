@@ -1,13 +1,11 @@
 import { useEffect } from 'react'
 
-import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
-import { effectiveDecorTheme } from './decorSchedule'
+import { useCabinetDecorTheme } from './useCabinetDecorTheme'
 import { useDecorCardSpotlight } from './useDecorCardSpotlight'
 
 /** Синхронизирует data-cabinet-decor на <html> для CSS-тем (фон, neon и т.д.). */
 export function CabinetDecorThemeSync() {
-  const { data } = useAuthBootstrap()
-  const theme = effectiveDecorTheme(data?.decor_theme)
+  const theme = useCabinetDecorTheme()
 
   // Подсветка карточек под курсором — нужна только теме nebula, хук сам это проверяет.
   useDecorCardSpotlight()

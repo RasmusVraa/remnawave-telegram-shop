@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react'
 
 import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { applyTheme, readSavedTheme, setThemeClass } from '@/hooks/useTheme'
-import { effectiveDecorTheme } from '@/features/decor/decorSchedule'
+import { useCabinetDecorTheme } from '@/features/decor/useCabinetDecorTheme'
 import { isDarkOnlyDecorTheme } from '@/features/decor/decorThemes'
 
 const LightThemeAllowedContext = createContext(true)
@@ -11,7 +11,7 @@ export function ThemePolicyProvider({ children }: { children: ReactNode }) {
   const { data } = useAuthBootstrap()
   const lightDisabledByAdmin = data?.light_theme_enabled === false
   // Сцены halloween_2 / new_year_2 рисованы только тёмными.
-  const darkOnlyDecor = isDarkOnlyDecorTheme(effectiveDecorTheme(data?.decor_theme))
+  const darkOnlyDecor = isDarkOnlyDecorTheme(useCabinetDecorTheme())
   const lightAllowed = !lightDisabledByAdmin && !darkOnlyDecor
 
   useEffect(() => {

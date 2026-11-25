@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/LandingMotion-CbQNd9vX.js
 import{k as d,ar as c,x as p}from"./index-CROgp3O5.js";import{j as r}from"./query-D6ZsvjX7.js";import{r as l}from"./router-C0zOZeWg.js";/**
+========
+import{k as d,w as c,x as p}from"./index-z8i0AR2-.js";import{j as r}from"./query-D6ZsvjX7.js";import{r as l}from"./router-C0zOZeWg.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/LandingMotion-Bi207UXy.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

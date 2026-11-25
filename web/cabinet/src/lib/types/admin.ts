@@ -107,6 +107,16 @@ export interface AdminAttentionItemDTO {
   params?: Record<string, string | number>
 }
 
+/** Что админ уже прочитал и скрыл в «Требует внимания»: хранится на сервере по аккаунту. */
+export interface AdminAttentionDismissedDTO {
+  key: string
+  /** Сколько было, когда скрыли: выросло — пункт возвращается. */
+  count: number
+  severity: 'crit' | 'warn'
+  /** С какого момента горело: новее — событие случилось заново. */
+  since?: string
+}
+
 /** Строка ленты «Мониторинга» и истории клиента. */
 export interface AdminEventDTO {
   id: number
@@ -1111,6 +1121,8 @@ export interface AdminNodeDTO {
   country_code: string
   address: string
   state: AdminNodeState
+  /** Место в списке панели Remnawave, с 1. */
+  view_position: number
   users_online: number
   provider?: { name: string; favicon_link?: string }
   /** Есть только у нод с назначенным плагином. */

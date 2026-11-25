@@ -1,12 +1,18 @@
 import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Globe, Moon, Smartphone, Sun, Vibrate, VibrateOff } from 'lucide-react'
+import { ChevronRight, Globe, Moon, Palette, Smartphone, Sun, Vibrate, VibrateOff } from 'lucide-react'
 
 import { useLightThemeAllowed } from '@/components/ThemePolicyProvider'
+import { DecorThemePickerSheet } from '@/features/decor/DecorThemePickerSheet'
+import { DECOR_PICKER_ACCENT } from '@/features/decor/decorThemePicker'
+import { setUserDecorPref, useUserDecorPref } from '@/features/decor/userDecorPref'
+import { useAuthBootstrap } from '@/hooks/useAuthBootstrap'
 import { useTheme } from '@/hooks/useTheme'
 import { setLanguage } from '@/i18n'
 import { hapticSelection, setHapticsEnabled, useHapticsEnabled } from '@/lib/haptic'
 import { cn } from '@/lib/utils'
+import { normalizeDecorTheme } from '@/features/decor/decorThemes'
 
 /**
  * «Настройки» в профиле: язык, тема и вибрация.
@@ -25,6 +31,7 @@ export function ProfileSettingsCard() {
   const { t, i18n } = useTranslation()
   const lightAllowed = useLightThemeAllowed()
   const lang = i18n.language === 'en' ? 'en' : 'ru'
+  const { data: bootstrap } = useAuthBootstrap()
 
   return (
     // Отступы и кегль — как у карточки аккаунта над ней: cabinet-card-pad,
@@ -43,6 +50,7 @@ export function ProfileSettingsCard() {
         />
       </SettingRow>
       {lightAllowed && <ThemeRow />}
+      {bootstrap?.user_theme_picker_enabled === true && <DecorRow />}
       <HapticsRow />
     </section>
   )
@@ -63,6 +71,69 @@ function ThemeRow() {
         ariaLabel={t('home.settingsTheme')}
       />
     </SettingRow>
+  )
+}
+
+/**
+ * «Оформление»: кнопка с текущей темой, выбор — в шторке/окне с плитками.
+ * Выбор хранится в браузере (userDecorPref); «Как у сервиса» возвращает тему админа
+ * и праздничное расписание. Что именно видно сейчас, показываем кружком и названием.
+ */
+function DecorRow() {
+  const { t } = useTranslation()
+  const { data: bootstrap } = useAuthBootstrap()
+  const pref = useUserDecorPref()
+  const [open, setOpen] = useState(false)
+  const shown = pref === 'auto' ? normalizeDecorTheme(bootstrap?.decor_theme) : pref
+  const label =
+    pref === 'auto'
+      ? t('home.decorPicker.auto')
+      : t(`admin.settings.enum.${shown}`, { defaultValue: shown })
+  return (
+    <>
+      <SettingRow icon={<Palette className="size-4" />} label={t('home.settingsDecor')}>
+        {/* Те же классы, что у Segmented: ширина и высота совпадают с соседними строками. Название темы — в подсказке и окне. */}
+        <div className="inline-flex shrink-0 rounded-[10px] border border-border bg-muted p-[3px]">
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={label}
+            title={label}
+            className="inline-flex h-7 w-10 items-center justify-center rounded-[7px] bg-secondary text-foreground shadow-sm"
+          >
+            <span
+              className="size-[18px] shrink-0 rounded-full border border-white/20"
+              style={{
+                background:
+                  pref === 'auto'
+                    ? `linear-gradient(135deg, hsl(var(--card)) 50%, ${DECOR_PICKER_ACCENT[shown]} 50%)`
+                    : DECOR_PICKER_ACCENT[shown],
+              }}
+              aria-hidden
+            />
+          </button>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            aria-label={label}
+            tabIndex={-1}
+            className="inline-flex h-7 w-10 items-center justify-center rounded-[7px] text-muted-foreground opacity-60 transition-[color,opacity] hover:text-foreground hover:opacity-100"
+          >
+            <ChevronRight className="size-4" />
+          </button>
+        </div>
+      </SettingRow>
+      <DecorThemePickerSheet
+        open={open}
+        onClose={() => setOpen(false)}
+        value={pref}
+        includeAuto
+        onApply={(next) => {
+          setUserDecorPref(next)
+          hapticSelection()
+        }}
+      />
+    </>
   )
 }
 

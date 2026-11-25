@@ -24,12 +24,18 @@ export function AdminStatusRowChecks({
   checks,
   enabled,
   showRegistry = false,
+  size = 'md',
+  tooltipAlign = 'right',
   className,
 }: {
   checks?: AdminRowChecksDTO
   enabled: boolean
   /** Третий значок «РКН». У строк обхода его нет: там адрес — хост из белого списка, не сервер. */
   showRegistry?: boolean
+  /** sm — 24px, для плотных карточек (страница «Ноды»). */
+  size?: 'md' | 'sm'
+  /** С какого края значка открывается подсказка: слева направо там, где справа от значка есть место. */
+  tooltipAlign?: 'left' | 'right'
   className?: string
 }) {
   const { t } = useTranslation()
@@ -42,12 +48,16 @@ export function AdminStatusRowChecks({
     <div className={cn('flex shrink-0 gap-1', className)} role="group" aria-label={t('admin.statusPage.chkAria')}>
       <CheckBadge
         result={world}
+        size={size}
+        tooltipAlign={tooltipAlign}
         title={t('admin.statusPage.chkWorld')}
         hint={t('admin.statusPage.chkWorldHint')}
         icon={<Globe className="size-4" />}
       />
       <CheckBadge
         result={russia}
+        size={size}
+        tooltipAlign={tooltipAlign}
         title={checks?.operators ? t('admin.statusPage.chkOps') : t('admin.statusPage.chkRu')}
         hint={
           checks?.operators
@@ -61,6 +71,8 @@ export function AdminStatusRowChecks({
       {showRegistry && (
         <CheckBadge
           result={registryResult}
+          size={size}
+          tooltipAlign={tooltipAlign}
           title={t('admin.statusPage.chkRkn')}
           hint={t(registry.state === 'bad' ? (registry.kind === 'cdn' ? 'admin.statusPage.chkRknCdnHint' : 'admin.statusPage.chkRknHint') : 'admin.statusPage.chkRknOkHint')}
           verdict={t(`admin.statusPage.chkRkn${registry.state[0].toUpperCase()}${registry.state.slice(1)}`)}
@@ -79,6 +91,8 @@ function CheckBadge({
   verdict: verdictText,
   source,
   failed,
+  size,
+  tooltipAlign,
 }: {
   result: AdminCheckResult
   title: string
@@ -89,6 +103,8 @@ function CheckBadge({
   /** Откуда взят результат «РФ» и кто не открыл сервер. */
   source?: string
   failed?: string[]
+  size: 'md' | 'sm'
+  tooltipAlign: 'left' | 'right'
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -113,7 +129,8 @@ function CheckBadge({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'relative flex size-[30px] items-center justify-center rounded-[9px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'relative flex items-center justify-center border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          size === 'sm' ? 'size-[24px] rounded-[8px]' : 'size-[30px] rounded-[9px]',
           TONE[result.state],
         )}
       >
@@ -132,7 +149,9 @@ function CheckBadge({
       <div
         role="tooltip"
         className={cn(
-          'absolute right-0 top-9 z-30 w-60 max-w-[75vw] rounded-xl border border-border bg-card p-3 text-left text-xs shadow-xl',
+          'absolute z-30 w-60 max-w-[75vw] rounded-xl border border-border bg-card p-3 text-left text-xs shadow-xl',
+          tooltipAlign === 'left' ? 'left-0' : 'right-0',
+          size === 'sm' ? 'top-[30px]' : 'top-9',
           open ? 'block' : 'hidden group-hover:block',
         )}
       >

@@ -156,8 +156,8 @@ export function AdminDatePicker({
   // Календарь живёт внутри модалки, а `cabinet-elevated-card` красил его ровно
   // как её панель — берём поднятый уровень шкалы.
   return (
-    <div className={cn(surface('raised', 'rounded-xl p-3'), className)}>
-      <div className="mb-3 flex items-center justify-between gap-2">
+    <div className={cn(surface('raised', 'rounded-xl p-2.5'), className)}>
+      <div className="mb-2 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => {
@@ -251,15 +251,15 @@ export function AdminDatePicker({
 
       {viewMode === 'days' && (
         <>
-          <div className="mb-1 grid grid-cols-7 gap-1">
+          <div className="mb-0.5 grid grid-cols-7 gap-0.5">
             {weekdayLabels.map((w) => (
-              <div key={w} className="py-1 text-center text-[10px] font-medium uppercase text-muted-foreground">
+              <div key={w} className="py-0.5 text-center text-[10px] font-medium uppercase text-muted-foreground">
                 {w}
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7 gap-0.5">
             {cells.map(({ date, inMonth }) => {
               const disabled = minDay != null && date < minDay
               const selected = value != null && isSameDay(date, value)
@@ -279,7 +279,7 @@ export function AdminDatePicker({
                       : undefined
                   }
                   className={cn(
-                    'aspect-square rounded-lg text-sm tabular-nums transition-colors',
+                    'h-8 rounded-lg text-[13px] tabular-nums transition-colors',
                     !inMonth && 'text-muted-foreground/40',
                     inMonth && !selected && !disabled && 'hover:bg-accent',
                     isToday && !selected && !isCurrentExpire && 'ring-1 ring-primary/40',
@@ -299,13 +299,13 @@ export function AdminDatePicker({
       )}
 
       {showTime && viewMode === 'days' && (
-        <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/50 pt-3">
+        <div className="mt-2 flex items-center justify-between gap-3 border-t border-border/50 pt-2">
           <span className="text-sm text-muted-foreground">{t('admin.users.expireTime')}</span>
           <input
             type="time"
             value={timeValue}
             onChange={(e) => onTimeChange(e.target.value)}
-            className="admin-input rounded-lg border border-border bg-background px-3 py-1.5 text-sm tabular-nums"
+            className="admin-input rounded-lg border border-border bg-background px-2.5 py-1 text-sm tabular-nums"
           />
         </div>
       )}

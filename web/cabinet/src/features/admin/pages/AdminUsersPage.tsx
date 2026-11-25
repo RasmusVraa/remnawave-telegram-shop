@@ -4,25 +4,31 @@ import { useTranslation } from 'react-i18next'
 import {
   AtSign,
   CalendarClock,
-  ChevronLeft,
   ChevronRight,
   CircleDot,
-  Hash,
+  ListFilter,
   Search,
   Send,
   Users,
+  X,
   Zap,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
+import { AdminModal } from '../components/AdminModal'
+import { AdminLoadMore } from '../components/AdminLoadMore'
+import { AdminFilterMenuDivider, AdminFilterMenuItem, AdminFilterMenuTitle } from '../components/AdminFilterMenu'
+import { AdminUserAvatar } from '../components/overview/AdminUserAvatar'
 import { HeaderFilter } from '../components/HeaderFilter'
 import { SortableTh, nextSort, type SortDir, type SortState } from '../components/SortableTh'
+import type { RwIconTone } from '../utils/rwStatusStyles'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import {
-  useAdminUsers,
+  useAdminUsersInfinite,
   useAdminUserSearch,
   type AdminCustomerDTO,
 } from '../hooks/useAdminUsers'
@@ -45,10 +51,11 @@ function HeadCell({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
   )
 }
 
-const SCOPES = ['all', 'active', 'inactive', 'expiring', 'trial'] as const
+const SCOPES = ['all', 'active', 'expiring', 'trial', 'expired', 'inactive'] as const
 type Scope = (typeof SCOPES)[number]
 
-const PAGE_LIMIT = 20
+/** Сколько клиентов приходит за один запрос: на строку уходит один лёгкий запрос на оплаты, 50 — без ощутимой нагрузки. */
+const PAGE_LIMIT = 50
 
 /** Колонки, по которым сортирует сервер, и направление первого клика по ним. */
 const SORT_FIRST_DIR: Record<string, SortDir> = {
@@ -86,11 +93,42 @@ function statusBadge(status: string, t: (k: string) => string) {
 function formatDate(iso?: string | null): string {
   if (!iso) return '—'
   try {
-    return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
   } catch {
     return iso
   }
 }
+
+/**
+ * Триал в списке — не статус, а «тариф»: сверху обычный Активен, снизу Триал.
+ * Серверный `trial` бывает только у действующей подписки, поэтому истёкший
+ * триал сюда приходит уже как `expired`.
+ */
+function statusView(user: AdminCustomerDTO): { status: string; trial: boolean } {
+  return user.status === 'trial' ? { status: 'active', trial: true } : { status: user.status, trial: false }
+}
+
+function avatarTone(status: string): RwIconTone {
+  if (status === 'active') return 'success'
+  if (status === 'expired' || status === 'disabled') return 'danger'
+  return 'default'
+}
+
+function userLabel(user: AdminCustomerDTO): string {
+  if (user.telegram_username) return `@${user.telegram_username}`
+  return user.panel_login || `#${user.id}`
+}
+
+/** Цвет даты окончания: прошла или осталось до 3 дней — красный, до 7 — жёлтый. */
+function expireTone(iso?: string | null): string {
+  if (!iso) return 'text-muted-foreground'
+  const days = (new Date(iso).getTime() - Date.now()) / 86_400_000
+  if (days <= 3) return 'text-red-600 dark:text-red-400'
+  if (days <= 7) return 'text-amber-600 dark:text-amber-400'
+  return 'text-muted-foreground'
+}
+
+const TRIAL_PILL = 'bg-amber-500/15 text-amber-700 dark:text-amber-400'
 
 function UserRow({
   user,
@@ -103,14 +141,17 @@ function UserRow({
   t: (k: string) => string
   tariffs?: AdminTariff[]
 }) {
-  const tariffLabel = resolveTariffLabel(user.current_tariff_id, undefined, tariffs)
+  const view = statusView(user)
+  const tariffLabel = view.trial ? t('admin.users.statusTrial') : resolveTariffLabel(user.current_tariff_id, undefined, tariffs)
 
   return (
     <tr
       onClick={onClick}
       className="cursor-pointer border-b border-border/40 transition-colors hover:bg-accent/50 last:border-0"
     >
-      <td className="w-[1%] whitespace-nowrap px-3 py-2.5 text-sm font-mono tabular-nums">{user.id}</td>
+      <td className="w-[1%] py-2 pl-4 pr-2">
+        <AdminUserAvatar url={user.avatar_url} name={userLabel(user)} tone={avatarTone(view.status)} size="sm" />
+      </td>
       <td className="w-[7rem] max-w-[7rem] truncate px-3 py-2.5 text-sm font-mono tabular-nums" title={String(user.telegram_id)}>
         {user.telegram_id}
       </td>
@@ -126,36 +167,74 @@ function UserRow({
         )}
       </td>
       <td className="hidden px-3 py-2.5 text-sm sm:table-cell">{formatDate(user.expire_at)}</td>
-      <td className="px-3 py-2.5 text-sm">{statusBadge(user.status, t)}</td>
-      <td className="hidden max-w-[8rem] truncate px-3 py-2.5 text-sm md:table-cell" title={tariffLabel ?? undefined}>
+      <td className="px-3 py-2.5 text-sm">{statusBadge(view.status, t)}</td>
+      <td
+        className={cn(
+          'hidden max-w-[8rem] truncate px-3 py-2.5 text-sm md:table-cell',
+          view.trial && 'text-amber-700 dark:text-amber-400',
+        )}
+        title={tariffLabel ?? undefined}
+      >
         {tariffLabel ?? '—'}
       </td>
     </tr>
   )
 }
 
+/**
+ * Карточка на телефоне: слева аватарка, имя и дата окончания; справа статус и
+ * тариф друг под другом — на тех же двух строках, что имя и дата.
+ */
 function UserMobileCard({
   user,
   onClick,
   t,
+  tariffs,
 }: {
   user: AdminCustomerDTO
   onClick: () => void
   t: (k: string) => string
+  tariffs?: AdminTariff[]
 }) {
-  const displayName = user.telegram_username ? `@${user.telegram_username}` : `#${user.id}`
+  const view = statusView(user)
+  const displayName = userLabel(user)
+  const tariffLabel = view.trial ? t('admin.users.statusTrial') : resolveTariffLabel(user.current_tariff_id, undefined, tariffs)
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between gap-3 rounded-lg border border-border/60 bg-card px-4 py-3 text-left transition-colors hover:bg-accent/40 active:bg-accent/60"
+      className="flex w-full items-center gap-3 rounded-[14px] border border-border/60 bg-card px-3 py-2.5 text-left transition-colors hover:bg-accent/40 active:bg-accent/60"
     >
-      <p className="min-w-0 truncate text-sm font-semibold">{displayName}</p>
-      <div className="flex shrink-0 items-center gap-2">
-        {statusBadge(user.status, t)}
-        <ChevronRight className="size-4 text-muted-foreground" />
+      <AdminUserAvatar
+        url={user.avatar_url}
+        name={displayName}
+        tone={avatarTone(view.status)}
+        size="sm"
+        className="m-1"
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[15px] font-semibold leading-5">{displayName}</p>
+        <p className={cn('mt-1 text-xs leading-5 tabular-nums', expireTone(user.expire_at))}>
+          {user.expire_at ? `${t('admin.users.until')} ${formatDate(user.expire_at)}` : '—'}
+        </p>
       </div>
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        {statusBadge(view.status, t)}
+        {tariffLabel ? (
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+              view.trial ? TRIAL_PILL : 'bg-muted text-muted-foreground',
+            )}
+          >
+            {tariffLabel}
+          </span>
+        ) : (
+          <span className="h-5" aria-hidden />
+        )}
+      </div>
+      <ChevronRight className="-mr-1 size-4 shrink-0 text-muted-foreground" />
     </button>
   )
 }
@@ -166,6 +245,25 @@ const SCOPE_LABEL_KEYS: Record<Scope, string> = {
   inactive: 'admin.users.scopeInactive',
   expiring: 'admin.users.scopeExpiring',
   trial: 'admin.users.scopeTrial',
+  expired: 'admin.users.scopeExpired',
+}
+
+/**
+ * Сортировки шторки на телефоне. Тот же серверный порядок, что у заголовков
+ * таблицы на ПК, поэтому выбранное в шторке сохраняется при смене экрана.
+ */
+const SHEET_SORTS = [
+  { id: 'def', sort: null },
+  { id: 'expAsc', sort: { key: 'expire_at', dir: 'asc' } },
+  { id: 'expDesc', sort: { key: 'expire_at', dir: 'desc' } },
+  { id: 'name', sort: { key: 'username', dir: 'asc' } },
+  { id: 'tariff', sort: { key: 'tariff', dir: 'asc' } },
+  { id: 'status', sort: { key: 'status', dir: 'asc' } },
+] as const satisfies ReadonlyArray<{ id: string; sort: SortState | null }>
+
+function sheetSortId(sort: SortState | null): string {
+  const hit = SHEET_SORTS.find((s) => (s.sort ? s.sort.key === sort?.key && s.sort.dir === sort?.dir : !sort))
+  return hit?.id ?? 'def'
 }
 
 /**
@@ -183,7 +281,6 @@ const LIST_STATE_KEY = 'admin-users-list-state'
 
 interface ListState {
   scope: Scope
-  page: number
   q: string
   sort: SortState | null
 }
@@ -194,9 +291,8 @@ function readStoredListState(): ListState | null {
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<ListState>
     const scope = SCOPES.includes(parsed.scope as Scope) ? (parsed.scope as Scope) : 'all'
-    const page = Number.isFinite(parsed.page) ? Math.max(1, Number(parsed.page)) : 1
     const sort = parseSort(parsed.sort?.key ?? null, parsed.sort?.dir ?? null)
-    return { scope, page, q: typeof parsed.q === 'string' ? parsed.q : '', sort }
+    return { scope, q: typeof parsed.q === 'string' ? parsed.q : '', sort }
   } catch {
     // Приватный режим или переполненное хранилище — не повод ломать страницу.
     return null
@@ -210,7 +306,6 @@ export default function AdminUsersPage() {
 
   const paramScope = searchParams.get('scope')
   const scope: Scope = SCOPES.includes(paramScope as Scope) ? (paramScope as Scope) : 'all'
-  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1)
   const urlQuery = searchParams.get('q') ?? ''
   const sortKeyParam = searchParams.get('sort')
   const sortDirParam = searchParams.get('dir')
@@ -226,13 +321,11 @@ export default function AdminUsersPage() {
     (next: Partial<ListState>) => {
       const state: ListState = {
         scope: next.scope ?? scope,
-        page: next.page ?? page,
         q: next.q ?? urlQuery,
         sort: next.sort === undefined ? sort : next.sort,
       }
       const params: Record<string, string> = {}
       if (state.scope !== 'all') params.scope = state.scope
-      if (state.page > 1) params.page = String(state.page)
       if (state.q.trim()) params.q = state.q
       if (state.sort) {
         params.sort = state.sort.key
@@ -245,14 +338,14 @@ export default function AdminUsersPage() {
         /* ignore */
       }
     },
-    [page, scope, setSearchParams, sort, urlQuery],
+    [scope, setSearchParams, sort, urlQuery],
   )
 
   // Возврат по крошкам или через меню: адрес чистый, восстанавливаем из памяти.
   useEffect(() => {
     if (searchParams.toString() !== '') return
     const stored = readStoredListState()
-    if (!stored || (stored.scope === 'all' && stored.page === 1 && !stored.q && !stored.sort)) return
+    if (!stored || (stored.scope === 'all' && !stored.q && !stored.sort)) return
     setSearchQuery(stored.q)
     setDebouncedSearch(stored.q)
     applyListState(stored)
@@ -266,9 +359,12 @@ export default function AdminUsersPage() {
     setDebouncedSearch(urlQuery)
   }, [urlQuery])
 
+  const [sheetOpen, setSheetOpen] = useState(false)
   const isSearching = debouncedSearch.trim().length > 0
+  const activeSortId = sheetSortId(sort)
+  const filtersCount = (scope !== 'all' ? 1 : 0) + (activeSortId !== 'def' ? 1 : 0)
 
-  const listQuery = useAdminUsers({ scope, page, limit: PAGE_LIMIT, sort: sort?.key, dir: sort?.dir })
+  const listQuery = useAdminUsersInfinite({ scope, limit: PAGE_LIMIT, sort: sort?.key, dir: sort?.dir })
   const searchResult = useAdminUserSearch(debouncedSearch)
   const { data: tariffs } = useAdminTariffList()
 
@@ -280,7 +376,7 @@ export default function AdminUsersPage() {
       if (debounceRef.timer) clearTimeout(debounceRef.timer)
       debounceRef.timer = setTimeout(() => {
         setDebouncedSearch(val)
-        applyListState({ q: val, page: 1 })
+        applyListState({ q: val })
       }, 350)
     },
     [applyListState, debounceRef],
@@ -288,13 +384,17 @@ export default function AdminUsersPage() {
 
   // Поиск отдаёт до 24 совпадений в порядке релевантности — сортировать там нечего.
   const onSort = useCallback(
-    (key: string) => applyListState({ sort: nextSort(sort, key, SORT_FIRST_DIR[key] ?? 'asc'), page: 1 }),
+    (key: string) => applyListState({ sort: nextSort(sort, key, SORT_FIRST_DIR[key] ?? 'asc') }),
     [applyListState, sort],
   )
 
-  const items = isSearching ? (searchResult.data?.items ?? []) : (listQuery.data?.items ?? [])
-  const total = isSearching ? items.length : (listQuery.data?.total ?? 0)
-  const totalPages = isSearching ? 1 : Math.max(1, Math.ceil(total / PAGE_LIMIT))
+  // Новый клиент между запросами сдвигает страницы, и строка может прийти дважды.
+  const listItems = useMemo(() => {
+    const seen = new Set<number>()
+    return (listQuery.data?.pages ?? []).flatMap((p) => p.items).filter((u) => !seen.has(u.id) && seen.add(u.id))
+  }, [listQuery.data])
+  const items = isSearching ? (searchResult.data?.items ?? []) : listItems
+  const total = isSearching ? items.length : (listQuery.data?.pages[0]?.total ?? 0)
   const isLoading = isSearching ? searchResult.isLoading : listQuery.isLoading
   const isError = isSearching ? searchResult.isError : listQuery.isError
 
@@ -308,40 +408,108 @@ export default function AdminUsersPage() {
           accent="violet"
         />
 
-        {/* Search */}
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('admin.users.searchPlaceholder')}
-            className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          />
+        {/* Search + на телефоне кнопка «Сортировка и фильтр» (на ПК это шапка таблицы) */}
+        <div className="flex items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              placeholder={t('admin.users.searchPlaceholder')}
+              className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:h-9 md:rounded-md"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={isSearching}
+            aria-label={t('admin.users.sortAndFilter')}
+            onClick={() => setSheetOpen(true)}
+            className={cn(
+              'relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 md:hidden',
+              filtersCount > 0
+                ? 'border-primary/50 bg-primary/10 text-primary'
+                : 'border-border bg-card hover:bg-secondary/80',
+            )}
+          >
+            <ListFilter className="size-4" aria-hidden />
+            {filtersCount > 0 && (
+              <span className="flex min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold leading-4 text-primary-foreground">
+                {filtersCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Scope tabs */}
-        {!isSearching && (
-          <div className="-mx-1 overflow-x-auto md:hidden overscroll-x-contain px-1 pb-0.5">
-            <div className="inline-flex min-w-full gap-1 rounded-lg border border-border/50 bg-card/50 p-1 sm:min-w-0 sm:w-full">
-              {SCOPES.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  onClick={() => applyListState({ scope: s, page: 1 })}
-                  className={cn(
-                    'min-h-9 shrink-0 rounded-md px-3 py-2 text-center text-sm font-medium transition-colors sm:flex-1',
-                    scope === s
-                      ? 'bg-primary/10 text-primary dark:bg-primary/20'
-                      : 'text-foreground/80 hover:bg-accent hover:text-foreground',
-                  )}
-                >
-                  {t(SCOPE_LABEL_KEYS[s])}
-                </button>
-              ))}
-            </div>
+        {/* Выбранное в шторке — плашками, нажал и сбросил */}
+        {!isSearching && filtersCount > 0 && (
+          <div className="flex flex-wrap gap-1.5 md:hidden">
+            {scope !== 'all' && (
+              <button
+                type="button"
+                onClick={() => applyListState({ scope: 'all' })}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/45 bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
+              >
+                {t(SCOPE_LABEL_KEYS[scope])}
+                <X className="size-3.5" aria-hidden />
+              </button>
+            )}
+            {activeSortId !== 'def' && (
+              <button
+                type="button"
+                onClick={() => applyListState({ sort: null })}
+                className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/45 bg-primary/10 pl-3 pr-1.5 text-xs font-medium text-primary"
+              >
+                {t(`admin.users.sort.${activeSortId}`)}
+                <X className="size-3.5" aria-hidden />
+              </button>
+            )}
           </div>
         )}
+
+        <AdminModal
+          open={sheetOpen}
+          onClose={() => setSheetOpen(false)}
+          title={t('admin.users.sortAndFilter')}
+          footer={
+            <div className="flex w-full gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                disabled={filtersCount === 0}
+                onClick={() => applyListState({ scope: 'all', sort: null })}
+              >
+                {t('admin.users.reset')}
+              </Button>
+              <Button type="button" className="flex-1" onClick={() => setSheetOpen(false)}>
+                {t('admin.users.showResult')}
+              </Button>
+            </div>
+          }
+        >
+          <AdminFilterMenuTitle>{t('admin.users.sortTitle')}</AdminFilterMenuTitle>
+          {SHEET_SORTS.map((s) => (
+            <AdminFilterMenuItem
+              key={s.id}
+              active={activeSortId === s.id}
+              onClick={() => applyListState({ sort: s.sort })}
+            >
+              {t(`admin.users.sort.${s.id}`)}
+            </AdminFilterMenuItem>
+          ))}
+          <AdminFilterMenuDivider />
+          <AdminFilterMenuTitle>{t('admin.users.showTitle')}</AdminFilterMenuTitle>
+          {SCOPES.map((s) => (
+            <AdminFilterMenuItem
+              key={s}
+              active={scope === s}
+              onClick={() => applyListState({ scope: s })}
+            >
+              {t(SCOPE_LABEL_KEYS[s])}
+            </AdminFilterMenuItem>
+          ))}
+        </AdminModal>
 
         {/* Table */}
         <Card className="overflow-hidden">
@@ -365,6 +533,7 @@ export default function AdminUsersPage() {
                     key={u.id}
                     user={u}
                     t={t}
+                    tariffs={tariffs}
                     onClick={() => navigate(`/admin/users/${u.id}`)}
                   />
                 ))}
@@ -373,9 +542,8 @@ export default function AdminUsersPage() {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="border-b border-border bg-muted/40 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                      <SortableTh sortKey="id" sort={sort} onSort={onSort} disabled={isSearching} className="w-[1%] whitespace-nowrap">
-                        <HeadCell icon={Hash} label={t('admin.users.id')} />
-                      </SortableTh>
+                      {/* Колонка аватарок: вместо внутреннего ID, без сортировки (порядок «новые» — по умолчанию). */}
+                      <th className="w-[1%] px-2" aria-label={t('admin.users.avatar')} />
                       <SortableTh sortKey="telegram_id" sort={sort} onSort={onSort} disabled={isSearching} className="w-[9rem] max-w-[9rem]">
                         <HeadCell icon={Send} label={t('admin.users.telegramId')} />
                       </SortableTh>
@@ -394,7 +562,7 @@ export default function AdminUsersPage() {
                           <HeaderFilter
                             value={scope}
                             options={SCOPES.map((s) => ({ value: s, label: t(SCOPE_LABEL_KEYS[s]) }))}
-                            onChange={(s) => applyListState({ scope: s, page: 1 })}
+                            onChange={(s) => applyListState({ scope: s })}
                             ariaLabel={t('admin.users.status')}
                           />
                         }
@@ -422,29 +590,14 @@ export default function AdminUsersPage() {
             </>
           )}
 
-          {/* Pagination */}
-          {!isSearching && totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-border px-3 py-2">
-              <button
-                disabled={page <= 1}
-                onClick={() => applyListState({ page: Math.max(1, page - 1) })}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-              >
-                <ChevronLeft className="size-4" />
-                {t('admin.prev')}
-              </button>
-              <span className="text-sm text-muted-foreground tabular-nums">
-                {page} / {totalPages}
-              </span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => applyListState({ page: Math.min(totalPages, page + 1) })}
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
-              >
-                {t('admin.next')}
-                <ChevronRight className="size-4" />
-              </button>
-            </div>
+          {/* Подгрузка: две страницы сами по достижении низа, дальше кнопка */}
+          {!isSearching && !isLoading && (
+            <AdminLoadMore
+              hasMore={Boolean(listQuery.hasNextPage)}
+              loading={listQuery.isFetchingNextPage}
+              onLoadMore={() => void listQuery.fetchNextPage()}
+              resetKey={`${scope}|${sort?.key ?? ''}|${sort?.dir ?? ''}`}
+            />
           )}
         </Card>
       </div>

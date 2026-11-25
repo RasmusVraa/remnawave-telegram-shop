@@ -264,8 +264,19 @@ export default function ConnectionsPage() {
   /** Действия шага. compact — карточка на ПК; isCurrent — только у текущего шага главная кнопка яркая. */
   function stepActions(i: number, compact: boolean, isCurrent: boolean): ReactNode {
     if (!app) return null
-    const size = compact ? 'h-10 w-full' : 'h-12 w-full text-base [&_svg]:size-[18px]'
-    const primary = isCurrent ? 'default' : 'outline'
+    // На ПК не яркие кнопки — со своей заливкой, как «Нет, скачать» на телефоне, а не пустой контур.
+    const size = compact
+      ? 'h-10 w-full'
+      : 'h-12 w-full text-base [&_svg]:size-[18px]'
+    const quiet = compact
+      ? cn(
+          size,
+          'bg-foreground text-background hover:bg-foreground/90',
+          'dark:bg-white/10 dark:text-foreground dark:hover:bg-white/15',
+        )
+      : size
+    const quietVariant = compact ? 'secondary' : 'outline'
+    const primary = isCurrent ? 'default' : quietVariant
 
     if (i === 0) {
       const buttons = (app.installationStep.buttons || []).filter((b) => b.buttonLink?.trim())
@@ -273,8 +284,8 @@ export default function ConnectionsPage() {
         <Button
           key={`${btn.buttonLink}-${idx}`}
           asChild
-          variant={idx === 0 && !flow.downloaded ? primary : 'outline'}
-          className={size}
+          variant={idx === 0 && !flow.downloaded ? primary : quietVariant}
+          className={idx === 0 && !flow.downloaded && isCurrent ? size : quiet}
         >
           <a
             href={btn.buttonLink}
@@ -303,7 +314,7 @@ export default function ConnectionsPage() {
         return (
           <>
             {installButtons}
-            <Button variant="outline" className={size} onClick={() => addSubscription(true)} disabled={g.addDisabled} loading={g.addLoading}>
+            <Button variant={quietVariant} className={quiet} onClick={() => addSubscription(true)} disabled={g.addDisabled} loading={g.addLoading}>
               <Plus />
               {text.alreadyInstalledAdd}
             </Button>
@@ -415,7 +426,7 @@ export default function ConnectionsPage() {
       ) : null
       return (
         <>
-          <Button variant={primary} className={size} onClick={() => addSubscription(compact)} disabled={g.addDisabled} loading={g.addLoading}>
+          <Button variant={primary} className={isCurrent ? size : quiet} onClick={() => addSubscription(compact)} disabled={g.addDisabled} loading={g.addLoading}>
             <Plus />
             {flow.noOpen ? text.tryAgain : text.addSubscription}
           </Button>
@@ -433,7 +444,7 @@ export default function ConnectionsPage() {
     }
 
     return (
-      <Button variant={primary} className={size} onClick={() => complete(2)}>
+      <Button variant={primary} className={isCurrent ? size : quiet} onClick={() => complete(2)}>
         <Check />
         {text.connected}
       </Button>
@@ -576,7 +587,9 @@ export default function ConnectionsPage() {
         onCopy={g.subscriptionLink ? copyLink : null}
         copied={copied}
         onSupport={g.supportChat || g.supportUrl ? openSupport : null}
-        className={isDesktop ? 'mt-4' : 'bg-card dark:bg-[linear-gradient(180deg,#0e1b34d6,#0a1428d1)]'}
+        className={
+          isDesktop ? 'mt-4' : 'cabinet-card bg-card dark:bg-[linear-gradient(180deg,#0e1b34d6,#0a1428d1)]'
+        }
       />
     ) : null
 

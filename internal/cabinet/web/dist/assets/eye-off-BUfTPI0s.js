@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/eye-off-BUfTPI0s.js
 import{k as e}from"./index-CROgp3O5.js";/**
+========
+import{k as e}from"./index-z8i0AR2-.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/eye-off-Dzt9XRZ2.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

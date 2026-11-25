@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { motion, useAnimation } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
-import { CalendarDays, CalendarMinus, Ticket, Volume2, VolumeX } from 'lucide-react'
+import { CalendarDays, CalendarMinus, Lock, Ticket, Volume2, VolumeX } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Card, CardContent } from '@/components/ui/card'
-import { cn } from '@/lib/utils'
+import { cn, timeLeftMs } from '@/lib/utils'
 import { api, ApiError, type FortuneStatusResponse } from '@/lib/api'
 import { hapticImpact, hapticSelection, hapticSuccess, useErrorHaptic } from '@/lib/haptic'
 import {
@@ -315,13 +315,10 @@ export default function FortunePage() {
     return t('fortune.spinButtonPaid', { count: spinCostDays })
   }, [spinning, spinMut.isPending, status?.daily_free_available, status?.bonus_spins, spinCostDays, t])
 
-  const rawRemainDays = status?.subscription_remain_days
-  const subscriptionDaysLeft =
-    status == null
-      ? 0
-      : typeof rawRemainDays === 'number' && rawRemainDays > 0
-        ? rawRemainDays
-        : Math.max(0, Math.ceil((status.subscription_remain_hours ?? 0) / 24))
+  // Остаток — по той же шкале, что на главной: дни вниз, меньше суток — часы, меньше часа — минуты.
+  const subscriptionLeft = timeLeftMs((status?.subscription_remain_hours ?? 0) * 3_600_000)
+  const hasLeft = (status?.subscription_remain_hours ?? 0) > 0
+  const subscriptionLeftSuffix = t(`fortune.${hasLeft ? subscriptionLeft.unit : 'days'}ShortSuffix`)
 
   const paidSpinsLeft = useMemo(() => {
     if (!status?.enabled || !status.panel_ready) return 0
@@ -351,6 +348,14 @@ export default function FortunePage() {
     status?.enabled && status?.panel_ready && status?.daily_free_enabled && status?.daily_free_available === false,
   )
   const nextFreeCountdownMs = useUtcMidnightCountdown(showNextFreeTimer)
+
+  // Если крутить нельзя из-за подписки (триал без оплат, мало дней, лимит), в центре колеса пишем именно это —
+  // иначе таймер бесплатной попытки выглядит как причина. Таймер при этом уходит в боковую колонку / шапку.
+  const hubReasonCode =
+    status?.enabled && status?.panel_ready && !status.can_spin &&
+    ['no_paid', 'insufficient_days', 'daily_limit'].includes(status.reason_code ?? '')
+      ? status.reason_code
+      : null
 
   const bonusSpins = status?.bonus_spins ?? 0
   const hasFreeSpin = Boolean(status?.daily_free_available) || bonusSpins > 0
@@ -430,6 +435,11 @@ export default function FortunePage() {
           )}
           {spinPill}
         </>
+      ) : hubReasonCode ? (
+        <>
+          <Lock className="size-4 sm:size-5" aria-hidden />
+          <span className="px-3 font-semibold text-foreground">{t(`fortune.hubReason.${hubReasonCode}`)}</span>
+        </>
       ) : showNextFreeTimer ? (
         <>
           <span className="px-3">{t('fortune.nextFreeIn')}</span>
@@ -494,7 +504,7 @@ export default function FortunePage() {
         t={t}
         highlightType={highlightSlot != null ? (lastResult?.type ?? null) : null}
       />
-      {showNextFreeTimer && canPress && (
+      {showNextFreeTimer && (canPress || hubReasonCode) && (
         <p className="text-sm text-muted-foreground">
           <span className="mr-1.5">{t('fortune.nextFreeIn')}</span>
           <span className="font-semibold tabular-nums text-foreground">{formatCountdownHms(nextFreeCountdownMs, t)}</span>
@@ -546,8 +556,8 @@ export default function FortunePage() {
                       >
                         <CalendarDays className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
                         <span className="font-semibold">
-                          {subscriptionDaysLeft}
-                          {t('fortune.daysShortSuffix')}
+                          {hasLeft ? subscriptionLeft.value : 0}
+                          {subscriptionLeftSuffix}
                         </span>
                       </button>
                     </div>
@@ -583,7 +593,7 @@ export default function FortunePage() {
                     {soundMuted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
                   </Button>
                 </div>
-                {showNextFreeTimer && status?.can_spin && (
+                {showNextFreeTimer && (status?.can_spin || hubReasonCode) && (
                   <p className="max-w-[11rem] text-right text-[11px] leading-snug text-muted-foreground sm:max-w-none sm:text-xs md:hidden">
                     <span className="mr-1.5 align-middle">{t('fortune.nextFreeIn')}</span>
                     <span className="inline-block align-middle font-semibold tabular-nums text-foreground">

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { i18n } from '@/i18n'
 import { bypassLabel } from '@/lib/bypassLabel'
 import { api, SUBSCRIPTION_STALE_MS, type MyTrafficResponse, type SubscriptionResponse } from '@/lib/api'
-import { daysUntil, trafficUsagePercent } from '@/lib/utils'
+import { daysUntil, timeLeft, trafficUsagePercent } from '@/lib/utils'
 import { daysTone, devicesTone, trafficTone, type ToneLevel } from '@/lib/subscriptionTone'
 
 /**
@@ -109,6 +109,7 @@ export function useHomeData() {
     usage: usageQuery.data,
     isTrial,
     days,
+    left: sub?.expire_at && !isExpiredByDate ? timeLeft(sub.expire_at) : null,
     effectiveDays,
     isActive,
     isExpiredByDate,

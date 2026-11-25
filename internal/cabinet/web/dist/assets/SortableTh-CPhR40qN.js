@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/SortableTh-CPhR40qN.js
 import{j as t}from"./query-D6ZsvjX7.js";import{r as d,d as j}from"./router-C0zOZeWg.js";import{k,j as E,t as u,ae as N,aF as L}from"./index-CROgp3O5.js";import{a as S,A as I}from"./arrow-up-BDKVNhbg.js";/**
+========
+import{j as t}from"./query-D6ZsvjX7.js";import{r as d,d as j}from"./router-C0zOZeWg.js";import{k,j as E,t as u,aj as N,aI as L}from"./index-z8i0AR2-.js";import{a as S,A as I}from"./arrow-up-DvpGjIXo.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/SortableTh-DsSnNjTY.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

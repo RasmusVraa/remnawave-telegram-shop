@@ -141,8 +141,6 @@ function TrafficBuySheet({
           <Button
             className={cn(
               'h-[52px] w-full shrink-0 rounded-full text-base font-bold',
-              kind === 'bypass' &&
-                'border-0 bg-[hsl(var(--split-bypass-deep))] text-white shadow-[0_10px_30px_hsl(var(--split-bypass-deep)/0.3)] [background-image:linear-gradient(90deg,hsl(var(--split-bypass-deep)),hsl(var(--split-bypass-alt)))] hover:brightness-110',
             )}
             disabled={!chosen}
             loading={pending}
@@ -216,7 +214,7 @@ function TrafficBuySheet({
                     ? kind === 'bypass'
                       ? 'border-[hsl(var(--split-bypass))] bg-[hsl(var(--split-bypass)/0.12)]'
                       : 'border-primary bg-primary/10'
-                    : 'border-border bg-card/50',
+                    : 'border-border bg-background/40',
                 )}
               >
                 {i === 1 && packs.length > 2 && (
@@ -274,8 +272,6 @@ export function BuyTrafficButton({ data }: { data: HomeData }) {
       type="button"
       className={cn(
         'h-[52px] w-full shrink-0 rounded-full text-base font-bold',
-        accent &&
-          'border-0 bg-[hsl(var(--split-bypass-deep))] text-white shadow-[0_10px_30px_hsl(var(--split-bypass-deep)/0.3)] [background-image:linear-gradient(90deg,hsl(var(--split-bypass-deep)),hsl(var(--split-bypass-alt)))] hover:brightness-110',
       )}
       onClick={() => open(data.bypass?.blocked ? 'bypass' : undefined)}
     >
@@ -309,7 +305,7 @@ export function SplitBlocks({ data, lang, usedText }: { data: HomeData; lang: st
   return (
     <>
       {bypass.blocked && <BlockedBanner label={bypass.label} date={until} />}
-      <div className="rounded-2xl border border-border/70 bg-card/60 px-4 py-3.5">
+      <div className="rounded-2xl border border-border/70 bg-background/40 px-4 py-3.5">
         <div className="mb-2.5 flex items-center gap-2 text-[15px] font-bold">
           <span className={cn('size-2.5 rounded-full', mainColor)} />
           {t('trafficSplit.mainTitle')}
@@ -364,7 +360,7 @@ export function BypassCard({ split, lang }: { split: MyTrafficResponse; lang: st
   const blocked = isBypassBlocked(split)
   const left = Math.max(0, total - info.used_bytes) / GB
   return (
-    <div className="rounded-2xl border border-border/70 bg-card/60 px-4 py-3.5">
+    <div className="rounded-2xl border border-border/70 bg-background/40 px-4 py-3.5">
       <div className="mb-2.5 flex items-center gap-2 text-[15px] font-bold">
         <span className={cn('size-2.5 rounded-full', color)} />
         {bypass.label}

@@ -24,6 +24,7 @@ import {
 import { ChannelGateModal } from './ChannelGateModal'
 import { ConfirmModal } from './ConfirmModal'
 import { Logo } from './Logo'
+import { useNavTip } from './NavTip'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
 import { FortuneWheelIcon } from '@/features/fortune/FortuneWheelIcon'
@@ -203,6 +204,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   const { data: supportSummary } = useSupportSummary(supportChatEnabled, 60_000)
   const supportUnread = supportSummary?.unread_count ?? 0
   const [menuOpen, setMenuOpen] = useState(false)
+  const navTip = useNavTip()
   /*
    * Анимация меню: menuMounted держит разметку, пока идёт уход, menuVisible
    * переключает классы перехода (тот же приём, что у шторок). Снимаем по
@@ -359,6 +361,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     aria-current={active ? 'page' : undefined}
                     aria-label={label}
                     className="flex items-center"
+                    {...(active ? {} : navTip.bind(label))}
                   >
                     <NavIconWithDot showDot={to === '/support' && supportUnread > 0}>
                       <DecorNavIcon
@@ -373,19 +376,14 @@ export function AppLayout({ children }: AppLayoutProps) {
                         strokeWidth={1.75}
                       />
                     </NavIconWithDot>
-                    <span
-                      className={cn(
-                        'max-w-0 overflow-hidden whitespace-nowrap text-sm font-medium opacity-0 transition-all duration-200',
-                        'group-hover:max-w-[9rem] group-hover:opacity-100',
-                      )}
-                    >
-                      {label}
-                    </span>
+                    {/* Подпись — только у текущей страницы; у остальных подсказка при наведении (NavTip). */}
+                    {active && <span className="whitespace-nowrap text-sm font-medium">{label}</span>}
                   </Link>
                 </Button>
               )
             })}
           </nav>
+          {navTip.node}
 
           <div className="flex items-center gap-0.5 sm:gap-1 ml-auto shrink-0">
             {/* Колокольчик — всем вошедшим, с подпиской или без. */}

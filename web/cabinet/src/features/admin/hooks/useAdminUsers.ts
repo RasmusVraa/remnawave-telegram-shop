@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { api } from '@/lib/api'
 import type {
@@ -32,6 +32,23 @@ export function useAdminUsers(params: { scope: string; page: number; limit: numb
     queryKey: ['admin-users', params.scope, params.page, params.limit, params.sort ?? '', params.dir ?? ''],
     queryFn: () => api.adminUsers(params),
     staleTime: 15_000,
+  })
+}
+
+/**
+ * Список подгружается страницами по `limit` штук и склеивается в одну ленту.
+ * Ключ начинается с `admin-users`, поэтому правки клиента сбрасывают и его.
+ * Обновление при возврате на вкладку выключено: оно перезапрашивало бы разом
+ * все уже открытые страницы.
+ */
+export function useAdminUsersInfinite(params: { scope: string; limit: number; sort?: string; dir?: string }) {
+  return useInfiniteQuery({
+    queryKey: ['admin-users', 'infinite', params.scope, params.limit, params.sort ?? '', params.dir ?? ''],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => api.adminUsers({ ...params, page: pageParam }),
+    getNextPageParam: (last, all) => (all.length * params.limit < last.total ? all.length + 1 : undefined),
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
   })
 }
 

@@ -23,9 +23,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"remnawave-tg-shop-bot/internal/broadcast"
-	"remnawave-tg-shop-bot/internal/channelgate"
 	adminauth "remnawave-tg-shop-bot/internal/cabinet/admin/auth"
-	"remnawave-tg-shop-bot/internal/cabinet/gate"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/jwt"
 	googleoauth "remnawave-tg-shop-bot/internal/cabinet/auth/oauth"
 	"remnawave-tg-shop-bot/internal/cabinet/auth/password"
@@ -34,6 +32,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/auth/tokens"
 	"remnawave-tg-shop-bot/internal/cabinet/bootstrap"
 	cabcfg "remnawave-tg-shop-bot/internal/cabinet/config"
+	"remnawave-tg-shop-bot/internal/cabinet/gate"
 	"remnawave-tg-shop-bot/internal/cabinet/http/handlers"
 	"remnawave-tg-shop-bot/internal/cabinet/http/middleware"
 	"remnawave-tg-shop-bot/internal/cabinet/linking"
@@ -47,6 +46,7 @@ import (
 	"remnawave-tg-shop-bot/internal/cabinet/web"
 	"remnawave-tg-shop-bot/internal/cabinet/webauth"
 	"remnawave-tg-shop-bot/internal/cabinetnotify"
+	"remnawave-tg-shop-bot/internal/channelgate"
 	"remnawave-tg-shop-bot/internal/config"
 	"remnawave-tg-shop-bot/internal/database"
 	"remnawave-tg-shop-bot/internal/notification"
@@ -472,15 +472,17 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	adminAlerts := handlers.NewAdminAlerts()
 	adminMonitoring := handlers.NewAdminMonitoring(pool)
 	adminOverviewHandler.SetIncidents(adminMonitoring.Incidents)
+	adminAttentionDismissed := handlers.NewAdminAttentionDismissed(pool)
 	for route, handler := range map[string]http.HandlerFunc{
-		"/cabinet/api/admin/monitoring/events":  adminMonitoring.Events,
-		"/cabinet/api/admin/monitoring/summary": adminMonitoring.Summary,
-		"/cabinet/api/admin/attention":          adminMonitoring.Attention,
-		"/cabinet/api/admin/alerts/test":        adminAlerts.Test,
-		"/cabinet/api/admin/status/targets":     adminStatusTargets.Handle,
-		"/cabinet/api/admin/status/probe":       adminStatusTargets.Probe,
-		"/cabinet/api/admin/status/nodes":       adminStatusTargets.Nodes,
-		"/cabinet/api/admin/status/quota":       adminStatusTargets.Quota,
+		"/cabinet/api/admin/monitoring/events":   adminMonitoring.Events,
+		"/cabinet/api/admin/monitoring/summary":  adminMonitoring.Summary,
+		"/cabinet/api/admin/attention":           adminMonitoring.Attention,
+		"/cabinet/api/admin/attention/dismissed": adminAttentionDismissed.Handle,
+		"/cabinet/api/admin/alerts/test":         adminAlerts.Test,
+		"/cabinet/api/admin/status/targets":      adminStatusTargets.Handle,
+		"/cabinet/api/admin/status/probe":        adminStatusTargets.Probe,
+		"/cabinet/api/admin/status/nodes":        adminStatusTargets.Nodes,
+		"/cabinet/api/admin/status/quota":        adminStatusTargets.Quota,
 	} {
 		api.Handle(route,
 			middleware.Chain(
@@ -1379,6 +1381,17 @@ func registerAPIRoutes(
 				),
 			}),
 		)
+		api.Handle("/cabinet/api/promocodes/history",
+			methodRouter(map[string]http.Handler{
+				http.MethodGet: middleware.Chain(
+					http.HandlerFunc(promocodes.GetHistory),
+					middleware.RequireAuth(jwtIssuer),
+					channelGate.Require(),
+					middleware.RequireVerifiedEmail(),
+					middleware.RateLimit(subscriptionAcctLim, accountKey("promocodes_history")),
+				),
+			}),
+		)
 		api.Handle("/cabinet/api/promocodes/apply",
 			onlyPOST(middleware.Chain(
 				http.HandlerFunc(promocodes.Apply),
@@ -1866,6 +1879,15 @@ func registerAPIRoutes(
 			middleware.RequireAdmin(adminChecker),
 			middleware.CSRF(),
 			middleware.RateLimit(adminAcctLim, accountKey("admin_nodes")),
+		),
+	)
+	api.Handle("/cabinet/api/admin/nodes/reorder",
+		middleware.Chain(
+			http.HandlerFunc(adminNodes.Reorder),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireAdmin(adminChecker),
+			middleware.CSRF(),
+			middleware.RateLimit(adminAcctLim, accountKey("admin_nodes_reorder")),
 		),
 	)
 

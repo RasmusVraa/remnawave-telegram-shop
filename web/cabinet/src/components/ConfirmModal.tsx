@@ -103,7 +103,7 @@ export function ConfirmModal({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          'max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background/95 p-5 pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] shadow-[0_24px_60px_-24px_rgb(0_0_0_/_0.55)] backdrop-blur-sm',
+          'max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-card p-5 pb-[max(1.25rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] shadow-[0_24px_60px_-24px_rgb(0_0_0_/_0.55)] backdrop-blur-sm',
           'transition-[opacity,transform] duration-[250ms] ease-out sm:max-h-[90vh] sm:max-w-sm sm:rounded-2xl sm:pb-5',
           visible
             ? 'translate-y-0 opacity-100 sm:scale-100'

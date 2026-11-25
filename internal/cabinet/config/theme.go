@@ -14,3 +14,9 @@ func LightThemeEnabled() bool {
 	}
 	return strings.EqualFold(v, "true")
 }
+
+// UserThemePickerEnabled — CABINET_USER_THEME_PICKER_ENABLED (runtime/env). По умолчанию false:
+// выбор оформления в профиле админ включает сам. Сам выбор хранится в браузере пользователя.
+func UserThemePickerEnabled() bool {
+	return strings.EqualFold(strings.TrimSpace(botcfg.EffectiveEnv("CABINET_USER_THEME_PICKER_ENABLED")), "true")
+}

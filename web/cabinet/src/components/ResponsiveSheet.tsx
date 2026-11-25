@@ -116,7 +116,7 @@ export function ResponsiveSheet({
         aria-label={typeof title === 'string' ? title : undefined}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'home-sheet flex max-h-[calc(100dvh-3.5rem-var(--cabinet-tg-safe-top))] w-full flex-col overflow-hidden border border-border bg-background shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-[opacity,transform] duration-[250ms] ease-out',
+          'home-sheet flex max-h-[calc(100dvh-3.5rem-var(--cabinet-tg-safe-top))] w-full flex-col overflow-hidden border border-border bg-card shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-[opacity,transform] duration-[250ms] ease-out',
           'rounded-t-[28px] sm:max-w-[540px] sm:rounded-[26px] sm:shadow-[0_30px_80px_rgba(0,0,0,0.6)]',
           centered ? 'sm:max-h-[calc(100dvh-3rem)]' : 'sm:max-h-[calc(100dvh-9rem)]',
           visible
@@ -150,7 +150,7 @@ export function ResponsiveSheet({
           {children}
         </div>
         {footer && (
-          <div className="shrink-0 border-t border-border/60 bg-background px-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] pt-3 sm:px-5 sm:pb-5">
+          <div className="shrink-0 border-t border-border/60 bg-card px-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] pt-3 sm:px-5 sm:pb-5">
             {footer}
           </div>
         )}

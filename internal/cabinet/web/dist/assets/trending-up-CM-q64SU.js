@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/trending-up-CM-q64SU.js
 import{k as n}from"./index-CROgp3O5.js";/**
+========
+import{k as n}from"./index-z8i0AR2-.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/trending-up-PIe0CbqA.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

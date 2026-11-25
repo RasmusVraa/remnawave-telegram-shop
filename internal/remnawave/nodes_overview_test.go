@@ -1,7 +1,11 @@
 package remnawave
 
 import (
+	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -105,5 +109,66 @@ func TestOverviewFromWire_pluginUnknownUUID(t *testing.T) {
 	got := overviewFromWire(decodeNode(t, nodeOnlineJSON), map[string]string{})
 	if got.PluginName != "" {
 		t.Fatalf("plugin = %q, want empty", got.PluginName)
+	}
+}
+
+func TestOverviewFromWire_viewPosition(t *testing.T) {
+	got := overviewFromWire(decodeNode(t, `{"uuid":"a","name":"x","viewPosition":7}`), nil)
+	if got.ViewPosition != 7 {
+		t.Fatalf("view position = %d, want 7", got.ViewPosition)
+	}
+}
+
+func TestListNodesOverview_sortedByViewPosition(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = io.WriteString(w, `{"response":[
+			{"uuid":"c","name":"Обход","viewPosition":3},
+			{"uuid":"a","name":"Финка","viewPosition":1},
+			{"uuid":"b","name":"германия","viewPosition":2}]}`)
+	}))
+	defer srv.Close()
+
+	nodes, err := NewClient(srv.URL, "t", "remote").ListNodesOverview(context.Background())
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	var names []string
+	for _, n := range nodes {
+		names = append(names, n.Name)
+	}
+	if len(names) != 3 || names[0] != "Финка" || names[1] != "германия" || names[2] != "Обход" {
+		t.Fatalf("order = %v", names)
+	}
+}
+
+func TestReorderNodes_body(t *testing.T) {
+	var gotPath, gotMethod string
+	var gotBody struct {
+		Nodes []struct {
+			UUID         string `json:"uuid"`
+			ViewPosition int    `json:"viewPosition"`
+		} `json:"nodes"`
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotMethod = r.URL.Path, r.Method
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		_, _ = io.WriteString(w, `{"response":[]}`)
+	}))
+	defer srv.Close()
+
+	if err := NewClient(srv.URL, "t", "remote").ReorderNodes(context.Background(), []string{"b", "c", "a"}); err != nil {
+		t.Fatalf("reorder: %v", err)
+	}
+	if gotMethod != http.MethodPost || gotPath != "/api/nodes/actions/reorder" {
+		t.Fatalf("request = %s %s", gotMethod, gotPath)
+	}
+	if len(gotBody.Nodes) != 3 {
+		t.Fatalf("body = %+v", gotBody)
+	}
+	// Позиции идут с 1 в порядке списка: первая в списке — первая в панели.
+	for i, want := range []string{"b", "c", "a"} {
+		if gotBody.Nodes[i].UUID != want || gotBody.Nodes[i].ViewPosition != i+1 {
+			t.Fatalf("item %d = %+v, want %s at %d", i, gotBody.Nodes[i], want, i+1)
+		}
 	}
 }

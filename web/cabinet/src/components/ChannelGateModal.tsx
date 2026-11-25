@@ -165,7 +165,7 @@ export function ChannelGateModal() {
         aria-modal="true"
         aria-label={t('channelGate.title')}
         className={cn(
-          'home-sheet flex w-full flex-col items-stretch gap-3.5 border border-border bg-background px-5 pb-[max(1.5rem,calc(1rem+var(--cabinet-sheet-safe-bottom)))] pt-6 text-center shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-[opacity,transform] duration-[250ms] ease-out',
+          'home-sheet flex w-full flex-col items-stretch gap-3.5 border border-border bg-card px-5 pb-[max(1.5rem,calc(1rem+var(--cabinet-sheet-safe-bottom)))] pt-6 text-center shadow-[0_-20px_50px_rgba(0,0,0,0.5)] transition-[opacity,transform] duration-[250ms] ease-out',
           'rounded-t-[28px] sm:max-w-[440px] sm:rounded-[26px] sm:px-7 sm:pb-6 sm:shadow-[0_30px_80px_rgba(0,0,0,0.6)]',
           visible
             ? 'translate-y-0 opacity-100 sm:scale-100'

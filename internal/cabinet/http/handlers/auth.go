@@ -176,6 +176,8 @@ func (h *AuthHandler) AuthBootstrap(w http.ResponseWriter, r *http.Request) {
 		// окне отдаём тему окна, вне окон — выбранную админом вручную.
 		"decor_theme": cabcfg.EffectiveDecorTheme(),
 		"landing":     cabcfg.LandingPublic(),
+		// CABINET_USER_THEME_PICKER_ENABLED: строка «Оформление» в профиле.
+		"user_theme_picker_enabled": cabcfg.UserThemePickerEnabled(),
 		// CABINET_SUBSCRIPTION_SHOW_LOYALTY: плашка уровня на /subscription.
 		// Раздел /loyalty и плашка в профиле от флага не зависят.
 		"subscription_loyalty_visible": cabcfg.SubscriptionLoyaltyVisible(),

@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/calendar-days-CC0lDB05.js
 import{k as h}from"./index-CROgp3O5.js";/**
+========
+import{k as h}from"./index-z8i0AR2-.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/calendar-days-BMlE4YRw.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

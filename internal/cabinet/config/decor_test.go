@@ -28,7 +28,7 @@ func TestDecorTheme_unknownFallsBackToOff(t *testing.T) {
 }
 
 func TestDecorTheme_atmosphericPresets(t *testing.T) {
-	for _, id := range []string{"violet", "slate", "aurora", "ocean", "cyber", "sunset", "lavender", "wine"} {
+	for _, id := range []string{"violet", "slate", "aurora", "ocean", "cyber", "lime", "emerald", "sunset", "lavender", "wine"} {
 		t.Run(id, func(t *testing.T) {
 			t.Setenv("CABINET_DECOR_THEME", id)
 			if got := DecorTheme(); got != id {

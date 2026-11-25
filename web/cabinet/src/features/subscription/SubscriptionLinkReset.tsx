@@ -156,7 +156,7 @@ export function SubscriptionLinkResetSheet({
         aria-label={step === 'done' ? t('linkReset.doneTitle') : t('linkReset.title')}
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          'max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background/95 p-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] backdrop-blur-sm transition-[opacity,transform] duration-[250ms] ease-out sm:max-h-[90vh] sm:rounded-2xl sm:p-5 sm:pb-5',
+          'max-h-[88dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-card p-4 pb-[max(1rem,calc(0.75rem+var(--cabinet-sheet-safe-bottom)))] shadow-[0_4px_6px_-1px_rgb(0_0_0_/_0.1),0_2px_4px_-2px_rgb(0_0_0_/_0.1)] backdrop-blur-sm transition-[opacity,transform] duration-[250ms] ease-out sm:max-h-[90vh] sm:rounded-2xl sm:p-5 sm:pb-5',
           visible
             ? 'translate-y-0 opacity-100 sm:scale-100'
             : 'translate-y-full opacity-0 sm:translate-y-0 sm:scale-[0.97]',

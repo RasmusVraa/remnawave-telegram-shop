@@ -62,6 +62,10 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        'nav-tip-in': {
+          from: { opacity: '0', transform: 'translateY(-4px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
         'spin-slow': {
           to: { transform: 'rotate(360deg)' },
         },
@@ -77,6 +81,7 @@ const config: Config = {
       },
       animation: {
         'fade-in': 'fade-in 0.3s ease-out both',
+        'nav-tip-in': 'nav-tip-in 0.15s ease-out both',
         'spin-slow': 'spin-slow 2s linear infinite',
         'fortune-winners-marquee': 'fortune-winners-marquee 250s linear infinite',
         'toast-out': 'toast-out 0.3s ease-in forwards',

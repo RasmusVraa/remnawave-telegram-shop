@@ -212,3 +212,59 @@ func TestLockTrial_Exclusive(t *testing.T) {
 	}
 	unlock2()
 }
+
+// Промокод со скидкой: активная скидка блокирует активацию, просроченная по времени — нет.
+func TestActivateDiscountPromo_PendingDiscountRules(t *testing.T) {
+	pool := guardsTestPool(t)
+	ctx := context.Background()
+	promoRepo := database.NewPromoRepository(pool)
+	svc := promo.NewService(promoRepo, database.NewCustomerRepository(pool), database.NewPurchaseRepository(pool), nil)
+	cust := guardsCustomer(t, pool)
+
+	var anchorID, promoID int64
+	suffix := time.Now().UnixNano()
+	if err := pool.QueryRow(ctx, `INSERT INTO promo_code (code, type, discount_percent) VALUES ($1, 'discount', 5) RETURNING id`, fmt.Sprintf("A%d", suffix)).Scan(&anchorID); err != nil {
+		t.Fatalf("insert anchor promo: %v", err)
+	}
+	code := fmt.Sprintf("P%d", suffix)
+	if err := pool.QueryRow(ctx, `INSERT INTO promo_code (code, type, discount_percent, discount_ttl_hours) VALUES ($1, 'discount', 4, 0) RETURNING id`, code).Scan(&promoID); err != nil {
+		t.Fatalf("insert promo: %v", err)
+	}
+	t.Cleanup(func() {
+		ctx := context.Background()
+		_, _ = pool.Exec(ctx, `DELETE FROM customer_pending_discount WHERE customer_id = $1`, cust.ID)
+		_, _ = pool.Exec(ctx, `DELETE FROM promo_redemption WHERE promo_code_id = $1`, promoID)
+		_, _ = pool.Exec(ctx, `DELETE FROM promo_code WHERE id IN ($1, $2)`, anchorID, promoID)
+	})
+	setPending := func(expires *time.Time, untilFirst bool) {
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := promoRepo.UpsertPendingDiscount(ctx, tx, cust.ID, anchorID, 5, expires, untilFirst, 1); err != nil {
+			t.Fatalf("upsert discount: %v", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Активная скидка (до первой оплаты): промокод отклоняется, скидка остаётся прежней.
+	setPending(nil, true)
+	if _, err := svc.Activate(ctx, cust.TelegramID, "", cust, code); err == nil {
+		t.Fatal("promo must be refused while a discount is active")
+	}
+	if pd, err := promoRepo.GetPendingDiscountByCustomerID(ctx, cust.ID); err != nil || pd == nil || pd.Percent != 5 {
+		t.Fatalf("active discount must stay untouched: %+v err=%v", pd, err)
+	}
+
+	// Скидка с вышедшим сроком не блокирует: промокод активируется и заменяет её.
+	past := time.Now().UTC().Add(-time.Hour)
+	setPending(&past, false)
+	if _, err := svc.Activate(ctx, cust.TelegramID, "", cust, code); err != nil {
+		t.Fatalf("expired discount must not block promo: %v", err)
+	}
+	if pd, err := promoRepo.GetPendingDiscountByCustomerID(ctx, cust.ID); err != nil || pd == nil || pd.Percent != 4 || pd.PromoCodeID != promoID {
+		t.Fatalf("promo discount expected after activation: %+v err=%v", pd, err)
+	}
+}

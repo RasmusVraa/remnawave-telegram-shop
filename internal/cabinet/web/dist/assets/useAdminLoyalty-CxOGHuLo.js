@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/useAdminLoyalty-CxOGHuLo.js
 import{k as r,h as t}from"./index-CROgp3O5.js";import{u as o,a as i,c as n}from"./query-D6ZsvjX7.js";/**
+========
+import{k as r,h as t}from"./index-z8i0AR2-.js";import{u as o,a as i,c as n}from"./query-D6ZsvjX7.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/useAdminLoyalty-Cs-5O8-W.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

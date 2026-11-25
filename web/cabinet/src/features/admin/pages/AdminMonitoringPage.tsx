@@ -11,7 +11,8 @@ import { Spinner } from '@/components/ui/spinner'
 import type { AdminCustomerDTO, AdminMonitoringPeriod } from '@/lib/types/admin'
 import { AdminLayout } from '../layout/AdminLayout'
 import { EventList } from '../monitoring/EventList'
-import { IncidentsCard } from '../monitoring/IncidentsCard'
+import { AttentionMenu } from '../monitoring/AttentionMenu'
+import { incidentEntries, isIncidentId } from '../monitoring/attention'
 import { EventFilterMenu, PeriodMenu, loadFeedFilter, loadPeriod, type FeedFilter } from '../monitoring/MonitoringMenus'
 import { useAdminAttention } from '../monitoring/useMonitoring'
 import { useEventFeed } from '../monitoring/useEventFeed'
@@ -138,7 +139,7 @@ export default function AdminMonitoringPage() {
   const [customer, setCustomer] = useState<{ id: number; label: string } | null>(null)
 
   const attention = useAdminAttention(paused ? 30_000 : 10_000)
-  const incidents = attention.data?.items ?? []
+  const entries = useMemo(() => incidentEntries(attention.data?.items, t), [attention.data, t])
 
   const categories = useMemo(() => [...filter.categories], [filter.categories])
   // Нажатия показываем, только пока их запись включена: иначе сохранённое
@@ -203,20 +204,19 @@ export default function AdminMonitoringPage() {
             {live}
           </div>
           <div className="flex items-center gap-2 sm:ml-auto">
-            <div className="sm:hidden">
-              <PeriodMenu value={period} onChange={setPeriod} short className="h-10 px-3 text-sm" />
-            </div>
+            <AttentionMenu entries={entries} ready={!!attention.data} owns={isIncidentId} />
             {pauseButton}
           </div>
         </div>
-
-        {incidents.length > 0 && <IncidentsCard items={incidents} />}
 
         <Card className="rounded-[--radius] px-3.5 pb-3 pt-3.5 sm:px-5 sm:pt-4">
           <div className="flex items-center gap-2 sm:gap-3">
             <CustomerSearch value={customer} onChange={setCustomer} />
             <div className="sm:hidden">
               <EventFilterMenu value={filter} onChange={setFilter} botActionsAvailable={botAvailable} botActionsOff compact />
+            </div>
+            <div className="sm:hidden">
+              <PeriodMenu value={period} onChange={setPeriod} short className="h-10 px-3 text-sm" />
             </div>
             <div className="hidden sm:block">
               <EventFilterMenu value={filter} onChange={setFilter} botActionsAvailable={botAvailable} botActionsOff />

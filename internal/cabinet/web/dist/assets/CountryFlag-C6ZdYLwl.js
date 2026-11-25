@@ -1,0 +1,5 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/CountryFlag-Jayi_fej.js
+import{j as e}from"./query-D6ZsvjX7.js";import{t as o}from"./index-CROgp3O5.js";function p({code:t,className:n}){const r=t==null?void 0:t.trim().toLowerCase();if(!r||!/^[a-z]{2}$/.test(r))return null;const s=r.toUpperCase();return e.jsx("img",{src:`/cabinet/flags/${r}.svg`,alt:s,title:s,loading:"lazy",className:o("h-3.5 w-5 shrink-0 rounded-[2px] object-cover",n),onError:a=>{a.currentTarget.style.display="none"}})}export{p as C};
+========
+import{j as e}from"./query-D6ZsvjX7.js";import{t as o}from"./index-z8i0AR2-.js";function p({code:t,className:n}){const r=t==null?void 0:t.trim().toLowerCase();if(!r||!/^[a-z]{2}$/.test(r))return null;const s=r.toUpperCase();return e.jsx("img",{src:`/cabinet/flags/${r}.svg`,alt:s,title:s,loading:"lazy",className:o("h-3.5 w-5 shrink-0 rounded-[2px] object-cover",n),onError:a=>{a.currentTarget.style.display="none"}})}export{p as C};
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/CountryFlag-C6ZdYLwl.js

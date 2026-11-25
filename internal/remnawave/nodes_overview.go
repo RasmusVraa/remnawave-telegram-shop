@@ -3,6 +3,7 @@ package remnawave
 import (
 	"context"
 	"net/http"
+	"sort"
 	"strings"
 )
 
@@ -25,6 +26,8 @@ type NodeOverview struct {
 	CountryCode string
 	Address     string
 	State       string
+	// ViewPosition — место ноды в списке панели (с 1); админ двигает его перетаскиванием.
+	ViewPosition int
 
 	UsersOnline int
 
@@ -64,6 +67,7 @@ type nodeOverviewWire struct {
 	Name                    string `json:"name"`
 	Address                 string `json:"address"`
 	CountryCode             string `json:"countryCode"`
+	ViewPosition            int    `json:"viewPosition"`
 	IsConnected             bool   `json:"isConnected"`
 	IsConnecting            bool   `json:"isConnecting"`
 	IsDisabled              bool   `json:"isDisabled"`
@@ -126,6 +130,8 @@ func overviewFromWire(n nodeOverviewWire, plugins map[string]string) NodeOvervie
 		CountryCode: strings.ToUpper(strings.TrimSpace(n.CountryCode)),
 		Address:     strings.TrimSpace(n.Address),
 		State:       overviewState(n),
+
+		ViewPosition: n.ViewPosition,
 	}
 	if n.UsersOnline != nil {
 		out.UsersOnline = *n.UsersOnline
@@ -202,5 +208,23 @@ func (r *Client) ListNodesOverview(ctx context.Context) ([]NodeOverview, error) 
 	for _, n := range resp.Response {
 		out = append(out, overviewFromWire(n, plugins))
 	}
+	// Панель и так отдаёт ноды по viewPosition, но порядок — часть контракта страницы, не её случайность.
+	sort.SliceStable(out, func(i, j int) bool { return out[i].ViewPosition < out[j].ViewPosition })
 	return out, nil
+}
+
+type reorderNodeItem struct {
+	UUID         string `json:"uuid"`
+	ViewPosition int    `json:"viewPosition"`
+}
+
+// ReorderNodes — POST /api/nodes/actions/reorder: ставит ноды в указанном порядке (позиции с 1).
+// Панель принимает полный список; частичный оставил бы у остальных старые позиции и задвоил места,
+// поэтому проверка, что список полный, лежит на вызывающем.
+func (r *Client) ReorderNodes(ctx context.Context, uuids []string) error {
+	items := make([]reorderNodeItem, 0, len(uuids))
+	for i, id := range uuids {
+		items = append(items, reorderNodeItem{UUID: id, ViewPosition: i + 1})
+	}
+	return r.doJSON(ctx, http.MethodPost, "/api/nodes/actions/reorder", map[string]any{"nodes": items}, nil)
 }

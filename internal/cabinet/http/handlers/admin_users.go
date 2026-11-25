@@ -261,6 +261,8 @@ func (h *AdminUsersHandler) customerDTOWithStatus(ctx context.Context, c *databa
 	if c == nil {
 		return dto
 	}
+	// Аватарка нужна и в списке: ссылка подписанная, без запроса в Telegram.
+	dto.AvatarURL = h.avatarURL(c)
 	h.enrichLoyaltyDTO(ctx, c.LoyaltyXP, &dto)
 	if h.purchases == nil {
 		return dto
@@ -333,6 +335,8 @@ func (h *AdminUsersHandler) List(w http.ResponseWriter, r *http.Request) {
 		scope = database.CustomerListScopeInactive
 	case "expiring":
 		scope = database.CustomerListScopeExpiringSoon
+	case "expired":
+		scope = database.CustomerListScopeExpired
 	case "trial", "trials":
 		scope = database.CustomerListScopeTrial
 	default:

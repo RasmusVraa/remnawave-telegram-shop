@@ -15,6 +15,8 @@ var cabinetDecorThemeIDs = []string{
 	"green",
 	"spring",
 	"cyber",
+	"lime",
+	"emerald",
 	"neon",
 	"ocean",
 	"new_year",
@@ -565,6 +567,11 @@ func baseRuntimeSettings() []SettingField {
 			EnumValues: cabinetDecorThemeIDs,
 			Apply:      applyCabinetDecorTheme(),
 			Current:    cabinetDecorThemeCurrent(),
+		},
+		{
+			Key: "CABINET_USER_THEME_PICKER_ENABLED", Group: "cabinet", Type: SettingBool, Instant: true,
+			Apply:   applyFortuneBool("CABINET_USER_THEME_PICKER_ENABLED"),
+			Current: cabinetBoolCurrent("CABINET_USER_THEME_PICKER_ENABLED", false),
 		},
 		{
 			Key: "CABINET_DECOR_AUTO_ENABLED", Group: "cabinet", Type: SettingBool, Instant: true,

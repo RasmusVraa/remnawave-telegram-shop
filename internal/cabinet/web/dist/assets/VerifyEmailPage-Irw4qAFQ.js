@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/VerifyEmailPage-Irw4qAFQ.js
 import{j as t}from"./query-D6ZsvjX7.js";import{u as G,f as J,e as Q,r as n,L as X}from"./router-C0zOZeWg.js";import{A as R}from"./AuthLayout-Xo94RrPk.js";import{k as Y,u as Z,c as v,b as ee,d as te,h as l,C as D,e as I,l as se,m as ae,n as re,B as j,A as L,o as ne}from"./index-CROgp3O5.js";import{L as ie,I as oe}from"./label-6OLLRXms.js";import{A as C,a as w}from"./alert-CngE9AHN.js";import{g as le}from"./turnstile-C_xvbDYp.js";import"./ThemeToggle-DJQ0bKPx.js";import"./sun-CJva86vE.js";import"./LangToggle-UuipwcEn.js";/**
+========
+import{j as t}from"./query-D6ZsvjX7.js";import{u as G,f as J,e as Q,r as n,L as X}from"./router-C0zOZeWg.js";import{A as R}from"./AuthLayout-Bp24YF88.js";import{k as Y,u as Z,c as v,b as ee,d as te,h as l,C as D,e as I,l as se,m as ae,n as re,B as j,A as L,o as ne}from"./index-z8i0AR2-.js";import{L as ie,I as oe}from"./label-Dv3urXtt.js";import{A as C,a as w}from"./alert-DZ05tavp.js";import{g as le}from"./turnstile-C_xvbDYp.js";import"./ThemeToggle-eAGRDA6L.js";import"./sun-B1820i6J.js";import"./LangToggle-C9SSU_Pc.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/VerifyEmailPage-DIPqhYMs.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

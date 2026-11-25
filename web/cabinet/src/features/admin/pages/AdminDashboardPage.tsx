@@ -3,13 +3,11 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
-  AlertTriangle,
   ArrowRight,
   Banknote,
   CalendarDays,
   CalendarRange,
   Check,
-  CircleCheck,
   CircleSlash,
   Clock,
   Cpu,
@@ -35,13 +33,11 @@ import { cn } from '@/lib/utils'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
 import { useAdminOverview } from '../hooks/useAdminOverview'
-import { incidentLabel, incidentLink } from '../monitoring/IncidentsCard'
+import { AttentionMenu } from '../monitoring/AttentionMenu'
+import { incidentEntries, type AttentionEntry } from '../monitoring/attention'
 import { StatsIconChip } from '../stats/components/StatsPanel'
 import { formatRub, statsNumberLocale } from '../stats/utils/statsFormat'
 import { STATS_ACCENT } from '../stats/utils/statsPalette'
-
-/** Уровень срочности дела. Цвет плашки — по худшему из них. */
-type Severity = 'warn' | 'crit'
 
 /**
  * Статусы пользователей в панели. Ключи — как их отдаёт Remnawave; набор задаёт
@@ -54,14 +50,6 @@ const PANEL_STATUSES = [
   { key: 'LIMITED', color: STATS_ACCENT.amber },
   { key: 'DISABLED', color: STATS_ACCENT.red },
 ] as const
-
-interface AttentionItem {
-  key: string
-  count: number
-  to: string
-  label: string
-  severity: Severity
-}
 
 export default function AdminDashboardPage() {
   return (
@@ -110,45 +98,47 @@ function AdminDashboardContent() {
   // Заявка в партнёры или висящий счёт подождут до завтра.
   // Сначала то, что горит сейчас (из «Мониторинга»: нода лежит, поддержка
   // ждёт), потом дела на дни. Список инцидентов общий — один источник на бэке.
-  const incidentItems: AttentionItem[] = (data?.incidents ?? []).map((it, i) => ({
-    key: `incident-${it.key}-${i}`,
-    count: it.count || 1,
-    to: incidentLink(it),
-    severity: it.severity,
-    label: incidentLabel(it, t),
-  }))
+  const incidentItems: AttentionEntry[] = incidentEntries(data?.incidents, t)
 
-  const taskItems: AttentionItem[] = [
+  const taskItems: AttentionEntry[] = [
     {
-      key: 'billingOverdue',
+      id: 'billingOverdue',
       count: a?.billing_overdue ?? 0,
       to: '/admin/infra',
       severity: 'crit' as const,
-      label: t('admin.overview.attentionBillingOverdue', { count: a?.billing_overdue ?? 0 }),
+      label: t('admin.overview.attentionBillingOverdue', {
+        count: a?.billing_overdue ?? 0,
+      }),
     },
     {
-      key: 'billingDueUrgent',
+      id: 'billingDueUrgent',
       count: a?.billing_due_urgent ?? 0,
       to: '/admin/infra',
       severity: 'crit' as const,
-      label: t('admin.overview.attentionBillingUrgent', { count: a?.billing_due_urgent ?? 0 }),
+      label: t('admin.overview.attentionBillingUrgent', {
+        count: a?.billing_due_urgent ?? 0,
+      }),
     },
     {
-      key: 'partnerPayouts',
+      id: 'partnerPayouts',
       count: a?.partner_payouts ?? 0,
       to: '/admin/partners?tab=payouts',
       severity: 'crit' as const,
-      label: t('admin.overview.attentionPartnerPayouts', { count: a?.partner_payouts ?? 0 }),
+      label: t('admin.overview.attentionPartnerPayouts', {
+        count: a?.partner_payouts ?? 0,
+      }),
     },
     {
-      key: 'billingDueSoon',
+      id: 'billingDueSoon',
       count: a?.billing_due_soon ?? 0,
       to: '/admin/infra',
       severity: 'warn' as const,
-      label: t('admin.overview.attentionBillingDueSoon', { count: a?.billing_due_soon ?? 0 }),
+      label: t('admin.overview.attentionBillingDueSoon', {
+        count: a?.billing_due_soon ?? 0,
+      }),
     },
     {
-      key: 'fortuneLoss',
+      id: 'fortuneLoss',
       count: a?.fortune_net_loss_days ?? 0,
       to: '/admin/stats?tab=mechanics',
       severity: 'warn' as const,
@@ -157,7 +147,7 @@ function AdminDashboardContent() {
       }),
     },
     {
-      key: 'partnerApplications',
+      id: 'partnerApplications',
       count: a?.partner_applications ?? 0,
       to: '/admin/partners?tab=applications',
       severity: 'warn' as const,
@@ -168,12 +158,6 @@ function AdminDashboardContent() {
   ].filter((item) => item.count > 0)
   const attentionItems = [...incidentItems, ...taskItems]
 
-  const worst: Severity | null = attentionItems.some((i) => i.severity === 'crit')
-    ? 'crit'
-    : attentionItems.length > 0
-      ? 'warn'
-      : null
-
   return (
     <div className="space-y-4">
       <AdminPageHeader
@@ -182,20 +166,26 @@ function AdminDashboardContent() {
         accent="blue"
         actionsEnd
         actions={
-          <button
-            type="button"
-            onClick={() => void handleRefresh()}
-            disabled={isFetching}
-            aria-label={refreshDone ? t('admin.stats.refreshDone') : t('admin.stats.refresh')}
-            title={refreshDone ? t('admin.stats.refreshDone') : t('admin.stats.refresh')}
-            className={cn('inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card transition-colors hover:bg-accent disabled:opacity-50', isFetching && '!opacity-100')}
-          >
-            {refreshDone ? (
-              <Check className="size-4 animate-fade-in text-emerald-500 dark:text-emerald-400" />
-            ) : (
-              <RefreshCw className={cn('size-4', isFetching && 'animate-spin')} />
-            )}
-          </button>
+          <>
+            <AttentionMenu entries={attentionItems} ready={!!data} />
+            <button
+              type="button"
+              onClick={() => void handleRefresh()}
+              disabled={isFetching}
+              aria-label={refreshDone ? t('admin.stats.refreshDone') : t('admin.stats.refresh')}
+              title={refreshDone ? t('admin.stats.refreshDone') : t('admin.stats.refresh')}
+              className={cn(
+                'inline-flex size-11 shrink-0 items-center justify-center rounded-lg border border-border/60 bg-card transition-colors hover:bg-accent disabled:opacity-50',
+                isFetching && '!opacity-100',
+              )}
+            >
+              {refreshDone ? (
+                <Check className="size-4 animate-fade-in text-emerald-500 dark:text-emerald-400" />
+              ) : (
+                <RefreshCw className={cn('size-4', isFetching && 'animate-spin')} />
+              )}
+            </button>
+          </>
         }
       />
 
@@ -214,8 +204,6 @@ function AdminDashboardContent() {
       {data && (
         <>
           <HeroBlock data={data} numberLocale={numberLocale} t={t} />
-
-          <AttentionBar items={attentionItems} worst={worst} t={t} />
 
           {!panel?.available && (
             <Card className="flex items-center gap-3 border-amber-500/40 p-4 text-sm sm:px-5">
@@ -396,7 +384,9 @@ function HeroBlock({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <UserRoundX className="size-3.5 shrink-0" aria-hidden />
-              {t('admin.overview.heroNever', { count: online?.never_online ?? 0 })}
+              {t('admin.overview.heroNever', {
+                count: online?.never_online ?? 0,
+              })}
             </span>
           </div>
 
@@ -454,9 +444,7 @@ function HeroBlock({
                       style={{ backgroundColor: st.color }}
                       aria-hidden
                     />
-                    <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                      {st.label}
-                    </span>
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">{st.label}</span>
                     <span className="shrink-0 font-semibold tabular-nums">
                       {st.value.toLocaleString(numberLocale)}
                     </span>
@@ -499,70 +487,7 @@ function HeroStat({
         <Icon className="mt-0.5 size-3.5 shrink-0" style={{ color }} aria-hidden />
         <span className="text-xs leading-tight text-muted-foreground">{label}</span>
       </div>
-      <p className="mt-1 truncate font-heading text-xl font-bold tabular-nums sm:text-[22px]">
-        {value}
-      </p>
-    </div>
-  )
-}
-
-/**
- * Полоса дел во всю ширину, сразу под героем.
- *
- * Цвет плашки — по худшему делу в списке, а не по их количеству: одна
- * просроченная оплата сервера важнее пяти висящих счетов. Когда чинить нечего,
- * полоса не исчезает, а становится зелёной: «дел нет» — это тоже ответ, и его
- * лучше увидеть, чем гадать, загрузилось ли вообще.
- */
-function AttentionBar({
-  items,
-  worst,
-  t,
-}: {
-  items: AttentionItem[]
-  worst: Severity | null
-  t: TFunction
-}) {
-  if (worst === null) {
-    return (
-      <div className="flex items-center gap-3 rounded-[--radius] border border-emerald-500/40 bg-emerald-500/[0.07] p-4 sm:px-5">
-        <CircleCheck className="size-5 shrink-0 text-emerald-500" />
-        <span className="text-sm font-medium">{t('admin.overview.attentionClear')}</span>
-      </div>
-    )
-  }
-
-  return (
-    <div
-      className={cn(
-        'flex flex-wrap items-center gap-x-4 gap-y-2.5 rounded-[--radius] border p-4 sm:px-5',
-        worst === 'crit'
-          ? 'border-rose-500/45 bg-gradient-to-r from-rose-500/[0.16] via-rose-500/[0.07] to-transparent'
-          : 'border-amber-500/45 bg-gradient-to-r from-amber-500/[0.16] via-amber-500/[0.07] to-transparent',
-      )}
-    >
-      <span className="flex items-center gap-2 text-sm font-semibold">
-        <AlertTriangle
-          className={cn('size-4 shrink-0', worst === 'crit' ? 'text-rose-500' : 'text-amber-500')}
-        />
-        {t('admin.overview.attentionTitle')}
-      </span>
-      {items.map((item) => (
-        <Link
-          key={item.key}
-          to={item.to}
-          className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[13px] transition-colors',
-            item.severity === 'crit' &&
-              'border-rose-500/50 bg-rose-500/10 text-rose-500 hover:border-rose-500',
-            item.severity === 'warn' &&
-              'border-amber-500/50 bg-amber-500/10 text-amber-600 hover:border-amber-500 dark:text-amber-400',
-          )}
-        >
-          {item.label}
-          <ArrowRight className="size-3.5 shrink-0" />
-        </Link>
-      ))}
+      <p className="mt-1 truncate font-heading text-xl font-bold tabular-nums sm:text-[22px]">{value}</p>
     </div>
   )
 }
@@ -584,9 +509,7 @@ function DetailCard({
     <Card className="cabinet-elevated-card stats-ring flex flex-col p-4 sm:px-5">
       <div className="mb-1 flex items-center gap-2.5">
         <StatsIconChip icon={icon} color={color} size="sm" />
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {title}
-        </h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h2>
       </div>
       {rows.map((row, i) => {
         const RowIcon = row.icon

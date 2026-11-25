@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -31,14 +33,16 @@ type adminNodeProviderDTO struct {
 }
 
 type adminNodeDTO struct {
-	UUID        string                `json:"uuid"`
-	Name        string                `json:"name"`
-	CountryCode string                `json:"country_code"`
-	Address     string                `json:"address"`
-	State       string                `json:"state"`
-	UsersOnline int                   `json:"users_online"`
-	Provider    *adminNodeProviderDTO `json:"provider,omitempty"`
-	PluginName  string                `json:"plugin_name,omitempty"`
+	UUID        string `json:"uuid"`
+	Name        string `json:"name"`
+	CountryCode string `json:"country_code"`
+	Address     string `json:"address"`
+	State       string `json:"state"`
+	// ViewPosition — место в списке панели (с 1): по нему страница сортирует «как в панели».
+	ViewPosition int                   `json:"view_position"`
+	UsersOnline  int                   `json:"users_online"`
+	Provider     *adminNodeProviderDTO `json:"provider,omitempty"`
+	PluginName   string                `json:"plugin_name,omitempty"`
 
 	// Живые метрики. null — панель их не прислала (нода не в сети).
 	MemoryUsedPct *float64  `json:"memory_used_pct"`
@@ -67,6 +71,7 @@ func nodeToDTO(n remnawave.NodeOverview) adminNodeDTO {
 		CountryCode:       n.CountryCode,
 		Address:           n.Address,
 		State:             n.State,
+		ViewPosition:      n.ViewPosition,
 		UsersOnline:       n.UsersOnline,
 		PluginName:        n.PluginName,
 		MemoryUsedPct:     n.MemoryUsedPct,
@@ -122,4 +127,66 @@ func (h *AdminNodesHandler) List(w http.ResponseWriter, r *http.Request) {
 		out.Nodes = append(out.Nodes, nodeToDTO(n))
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+type reorderNodesBody struct {
+	UUIDs []string `json:"uuids"`
+}
+
+// Reorder — POST /cabinet/api/admin/nodes/reorder: ставит ноды в порядок, заданный перетаскиванием.
+// Порядок пишется в панель (viewPosition), поэтому и в панели ноды встанут так же.
+// Список должен быть полным и без повторов: иначе у пропущенных нод остались бы старые позиции.
+func (h *AdminNodesHandler) Reorder(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if h.rw == nil {
+		http.Error(w, "panel not configured", http.StatusServiceUnavailable)
+		return
+	}
+	var body reorderNodesBody
+	if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 1<<16)).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	uuids := make([]string, 0, len(body.UUIDs))
+	seen := make(map[string]struct{}, len(body.UUIDs))
+	for _, id := range body.UUIDs {
+		id = strings.ToLower(strings.TrimSpace(id))
+		if _, dup := seen[id]; id == "" || dup {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		seen[id] = struct{}{}
+		uuids = append(uuids, id)
+	}
+
+	// Свежий список из панели, не из кэша: ноду могли добавить или удалить, пока админ тянул карточку.
+	current, err := h.rw.ListNodesOverview(r.Context())
+	if err != nil {
+		slog.Error("admin nodes: reorder: list", "error", err)
+		http.Error(w, "failed to fetch nodes", http.StatusBadGateway)
+		return
+	}
+	if len(current) != len(uuids) {
+		http.Error(w, "node list changed", http.StatusConflict)
+		return
+	}
+	for _, n := range current {
+		if _, ok := seen[n.UUID]; !ok {
+			http.Error(w, "node list changed", http.StatusConflict)
+			return
+		}
+	}
+
+	if err := h.rw.ReorderNodes(r.Context(), uuids); err != nil {
+		slog.Error("admin nodes: reorder", "error", err)
+		http.Error(w, "failed to reorder nodes", http.StatusBadGateway)
+		return
+	}
+	h.mu.Lock()
+	h.cached = nil
+	h.mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
 }

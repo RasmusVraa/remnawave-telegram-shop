@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { keepPreviousData } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Activity, ArrowDown, ArrowUp, ChevronDown, ListFilter, RefreshCw, Search, Server, Users, X } from 'lucide-react'
+import {
+  Activity,
+  ArrowDown,
+  ArrowUp,
+  ChevronDown,
+  GripVertical,
+  ListFilter,
+  RefreshCw,
+  Search,
+  Server,
+  Users,
+  X,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { api } from '@/lib/api'
@@ -11,10 +22,12 @@ import { AdminFilterMenuItem, AdminFilterMenuTitle } from '../components/AdminFi
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useToast } from '@/components/ui/toast'
 import type { AdminNodesDTO } from '@/lib/types/admin'
 import { AdminLayout } from '../layout/AdminLayout'
 import { AdminPageHeader } from '../components/AdminPageHeader'
-import { NodeCard, type NodeLayout } from '../nodes/NodeCard'
+import { useSortableList } from '../hooks/useSortableList'
+import { NodeCard, type NodeChecks, type NodeLayout } from '../nodes/NodeCard'
 import { splitBitrate } from '../nodes/format'
 import {
   NODE_FILTER_KEYS,
@@ -32,8 +45,39 @@ import {
 
 /** Пока вкладка открыта, обновляем раз в 10 с: скорость и «кто сейчас на ноде» быстро устаревают. */
 const REFRESH_MS = 10_000
+/** Пауза после последнего сдвига карточки: серия стрелок с клавиатуры уходит в панель одним запросом. */
+const REORDER_SAVE_DELAY_MS = 300
 /** Уже этой ширины список не помещается в строку: переходим на карточки, как на телефоне. */
 const ROW_MIN_WIDTH_PX = 900
+
+/**
+ * Проверки «мир / РФ / РКН» из «Статусов серверов». Нода связана с целью по node_uuid: берём включённую
+ * обычную цель, а если такой нет — включённую цель обхода. Нет цели или замера — у ноды нет значков.
+ */
+function useNodeChecks(): Map<string, NodeChecks> {
+  const q = useQuery({
+    queryKey: ['admin-status-targets'],
+    queryFn: () => api.adminStatusTargets(),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+    retry: 0,
+  })
+  const { targets, checks } = q.data ?? {}
+  return useMemo(() => {
+    const out = new Map<string, NodeChecks>()
+    for (const row of targets ?? []) {
+      const c = checks?.[row.id]
+      if (!row.enabled || !row.node_uuid || !c) continue
+      const bypass = row.kind === 'bypass'
+      const measured = c.world.state !== 'none' || c.russia.state !== 'none' || (!bypass && !!c.registry && c.registry.state !== 'none')
+      if (!measured) continue
+      const cur = out.get(row.node_uuid)
+      if (cur && (!cur.bypass || bypass)) continue
+      out.set(row.node_uuid, { checks: c, bypass })
+    }
+    return out
+  }, [targets, checks])
+}
 
 function useAdminNodes() {
   return useQuery<AdminNodesDTO>({
@@ -96,7 +140,10 @@ function Unit({ children }: { children: ReactNode }) {
 
 export default function AdminNodesPage() {
   const { t } = useTranslation()
+  const toast = useToast()
+  const qc = useQueryClient()
   const q = useAdminNodes()
+  const checksByNode = useNodeChecks()
   const [prefs, setPrefs] = useState<NodePrefs>(loadNodePrefs)
   const [query, setQuery] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
@@ -105,6 +152,10 @@ export default function AdminNodesPage() {
   const menuRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const layout = useListLayout(listRef)
+  // Порядок, который админ только что выставил: показываем его, пока панель не подтвердила.
+  const [localOrder, setLocalOrder] = useState<string[] | null>(null)
+  const localOrderRef = useRef<string[] | null>(null)
+  localOrderRef.current = localOrder
 
   const updatePrefs = useCallback((next: Partial<NodePrefs>) => {
     setPrefs((cur) => {
@@ -137,10 +188,55 @@ export default function AdminNodesPage() {
   const nodes = q.data?.nodes
   const summary = useMemo(() => summarize(nodes ?? []), [nodes])
   const counts = useMemo(() => countByFilter(nodes ?? []), [nodes])
-  const visible = useMemo(
-    () => sortNodes(filterNodes(nodes ?? [], prefs.filter, query), prefs.sort),
-    [nodes, prefs, query],
+  const visible = useMemo(() => {
+    const sorted = sortNodes(filterNodes(nodes ?? [], prefs.filter, query), prefs.sort)
+    if (!localOrder || prefs.sort !== 'panel') return sorted
+    const pos = new Map(localOrder.map((id, i) => [id, i]))
+    return sorted.sort((a, b) => (pos.get(a.uuid) ?? Infinity) - (pos.get(b.uuid) ?? Infinity))
+  }, [nodes, prefs, query, localOrder])
+
+  // Порядок можно менять, только когда виден весь список в порядке панели: при фильтре, поиске
+  // или другой сортировке «место карточки» не значит место ноды в панели.
+  const canReorder = prefs.sort === 'panel' && prefs.filter === 'all' && query.trim() === '' && !!nodes && nodes.length > 1
+
+  const reorder = useMutation({
+    meta: { haptics: true },
+    mutationFn: async (uuids: string[]) => {
+      // Опрос списка, уже ушедший к панели, вернул бы старый порядок поверх нашего.
+      await qc.cancelQueries({ queryKey: ['admin-nodes'] })
+      return api.adminNodesReorder(uuids)
+    },
+    onSuccess: (_res, uuids) => {
+      const pos = new Map(uuids.map((id, i) => [id, i + 1]))
+      qc.setQueryData<AdminNodesDTO>(['admin-nodes'], (cur) =>
+        cur && {
+          nodes: cur.nodes
+            .map((n) => ({ ...n, view_position: pos.get(n.uuid) ?? n.view_position }))
+            .sort((a, b) => a.view_position - b.view_position),
+        },
+      )
+      // Если за время запроса админ успел двинуть ещё — это уже другой порядок, его не трогаем.
+      if (localOrderRef.current?.join(',') === uuids.join(',')) setLocalOrder(null)
+    },
+    onError: (_err, uuids) => {
+      toast.error(t('admin.nodes.reorderError'))
+      if (localOrderRef.current?.join(',') === uuids.join(',')) setLocalOrder(null)
+      void qc.invalidateQueries({ queryKey: ['admin-nodes'] })
+    },
+  })
+
+  const sortable = useSortableList(
+    visible.map((n) => n.uuid),
+    setLocalOrder,
   )
+
+  // Сохраняем после паузы и только когда карточку отпустили: пока её тянут, порядок меняется на каждом шаге.
+  const { mutate: saveOrder } = reorder
+  useEffect(() => {
+    if (!localOrder || sortable.dragId) return
+    const timer = window.setTimeout(() => saveOrder(localOrder), REORDER_SAVE_DELAY_MS)
+    return () => window.clearTimeout(timer)
+  }, [localOrder, sortable.dragId, saveOrder])
 
   const closeSearch = () => {
     setSearchOpen(false)
@@ -321,9 +417,35 @@ export default function AdminNodesPage() {
             <Card className="rounded-2xl p-8 text-center text-sm text-muted-foreground">{t('admin.nodes.noMatch')}</Card>
           )}
 
-          {visible.map((n) => (
-            <NodeCard key={n.uuid} node={n} layout={layout} />
-          ))}
+          <ul className="relative flex flex-col gap-2" {...(canReorder ? sortable.listProps : {})}>
+            {visible.map((n) => (
+              <li
+                key={n.uuid}
+                ref={canReorder ? sortable.itemRef(n.uuid) : undefined}
+                className={cn(
+                  'relative rounded-[14px] transition-shadow duration-200',
+                  sortable.dragId === n.uuid && 'z-20 shadow-2xl shadow-black/40',
+                )}
+              >
+                <NodeCard node={n} layout={layout} checks={checksByNode.get(n.uuid)} reserveHandle={canReorder} />
+                {canReorder && (
+                  <button
+                    type="button"
+                    aria-label={t('admin.nodes.drag')}
+                    title={t('admin.nodes.drag')}
+                    {...sortable.handleProps(n.uuid)}
+                    className={cn(
+                      'absolute right-1.5 top-1/2 flex h-9 w-7 -translate-y-1/2 touch-none items-center justify-center rounded-[9px] text-muted-foreground transition-colors',
+                      'hover:bg-secondary/80 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      sortable.dragId === n.uuid ? 'cursor-grabbing text-foreground' : 'cursor-grab',
+                    )}
+                  >
+                    <GripVertical className="size-5" aria-hidden />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
         </div>
       </div>
     </AdminLayout>

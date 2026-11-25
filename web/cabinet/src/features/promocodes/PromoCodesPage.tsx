@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { BadgePercent, Gift, TicketPercent } from 'lucide-react'
+import { BadgePercent, TicketPercent } from 'lucide-react'
 
 import { AppLayout } from '@/components/AppLayout'
 import { PageReveal, RevealItem } from '@/components/PageReveal'
@@ -13,6 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api, ApiError, type PromoApplyResponse } from '@/lib/api'
 import { hapticSuccess, useErrorHaptic } from '@/lib/haptic'
+import { PromoHistoryCard } from './PromoHistoryCard'
 
 export default function PromoCodesPage() {
   const { t } = useTranslation()
@@ -36,6 +37,7 @@ export default function PromoCodesPage() {
       setError(null)
       setCode('')
       await qc.invalidateQueries({ queryKey: ['promocodes-state'] })
+      await qc.invalidateQueries({ queryKey: ['promocodes-history'] })
       await qc.invalidateQueries({ queryKey: ['paymentPreview'] })
     },
     onError: (e) => {
@@ -144,19 +146,7 @@ export default function PromoCodesPage() {
         </RevealItem>
 
         <RevealItem>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Gift size={18} />
-              {t('promocodes.infoTitle')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground space-y-2">
-            <p>{t('promocodes.info1')}</p>
-            <p>{t('promocodes.info2')}</p>
-            <p>{t('promocodes.info3')}</p>
-          </CardContent>
-        </Card>
+          <PromoHistoryCard />
         </RevealItem>
       </PageReveal>
     </AppLayout>

@@ -1,0 +1,216 @@
+/*
+ * «Чёрная пятница»: золотой фон под контентом. Слой кабинета растянут на всю
+ * высоту страницы, поэтому всё, что должно висеть на экране, — position: fixed
+ * (так же сделан .holiday-weather). Ничего не ловит клики.
+ */
+
+/* ── лучи сверху: очень тихие ── */
+.bf-rays {
+  position: fixed;
+  left: 50%;
+  top: -34vh;
+  width: 110vh;
+  height: 110vh;
+  margin-left: -55vh;
+  pointer-events: none;
+  opacity: 0.32;
+  background: repeating-conic-gradient(from 0deg at 50% 50%, hsl(45 90% 55% / 0.1) 0 6deg, transparent 6deg 18deg);
+  -webkit-mask: radial-gradient(circle at 50% 50%, #000 0, transparent 60%);
+  mask: radial-gradient(circle at 50% 50%, #000 0, transparent 60%);
+  animation: bf-rays-spin 140s linear infinite;
+}
+
+@keyframes bf-rays-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── слитки, стопки, ценники: только широкий экран ── */
+.bf-art {
+  position: fixed;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.bf-art__defs {
+  position: absolute;
+}
+
+@media (min-width: 1400px) {
+  .bf-art {
+    display: block;
+  }
+}
+
+.bf-art__ingots {
+  position: absolute;
+  right: 1.6vw;
+  bottom: -4px;
+  width: clamp(280px, 22vw, 420px);
+  opacity: 0.5;
+}
+
+.bf-art__stacks {
+  position: absolute;
+  left: 1.4vw;
+  bottom: 6px;
+  width: clamp(160px, 13vw, 240px);
+  opacity: 0.45;
+}
+
+/* Ценник висит на нитке от шапки и чуть качается. Центрирован в боковом поле
+   (контент кабинета ≈ 1120px). */
+.bf-tag {
+  --bf-side: max(10px, calc((100vw - 1120px) / 4 - 42px));
+  position: absolute;
+  top: 4.6rem;
+  width: 84px;
+  opacity: 0.88;
+  transform-origin: 50% -6px;
+  animation: bf-tag-sway 5s ease-in-out infinite;
+}
+
+.bf-tag::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: -90px;
+  width: 2px;
+  height: 96px;
+  background: linear-gradient(hsl(45 90% 55% / 0), hsl(45 90% 55% / 0.65));
+}
+
+.bf-tag--l1 {
+  left: var(--bf-side);
+}
+
+.bf-tag--r1 {
+  right: var(--bf-side);
+  animation-delay: -1.6s;
+}
+
+.bf-tag--r2 {
+  right: var(--bf-side);
+  top: 15rem;
+  animation-delay: -3s;
+}
+
+.bf-tag__body {
+  position: relative;
+  margin-top: 6px;
+  padding: 22px 6px 20px;
+  border-radius: 8px;
+  text-align: center;
+  line-height: 1;
+  color: #3a2400;
+  background: linear-gradient(160deg, #fff1a8, #f2c230 45%, #b97d00);
+  clip-path: polygon(0 0, 100% 0, 100% 84%, 50% 100%, 0 84%);
+  filter: drop-shadow(0 6px 10px rgb(0 0 0 / 0.5));
+}
+
+.bf-tag__body::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  border-radius: 50%;
+  background: #14110a;
+}
+
+.bf-tag__glyph {
+  display: block;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.bf-tag__body small {
+  display: block;
+  margin-top: 5px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+@keyframes bf-tag-sway {
+  0%,
+  100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+/* ── частицы: золотые монеты и искры (SparksEffect) ── */
+.cabinet-decor-fx--black_friday {
+  position: fixed;
+  inset: 0;
+}
+
+.bf-coin {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: bf-coin-fall linear infinite;
+  will-change: transform;
+}
+
+.bf-coin svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 5px hsl(45 90% 50% / 0.4));
+  animation: bf-coin-flip 1.7s linear infinite;
+}
+
+@keyframes bf-coin-fall {
+  from {
+    transform: translate3d(0, -14vh, 0) rotate(0deg);
+  }
+  to {
+    transform: translate3d(var(--bf-drift, 0px), 112vh, 0) rotate(var(--bf-rot, 40deg));
+  }
+}
+
+@keyframes bf-coin-flip {
+  0%,
+  100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(0.2);
+  }
+}
+
+.bf-spark {
+  position: absolute;
+  color: hsl(48 100% 82%);
+  filter: drop-shadow(0 0 4px hsl(45 100% 60% / 0.8));
+  animation: bf-spark-twinkle ease-in-out infinite;
+}
+
+@keyframes bf-spark-twinkle {
+  0%,
+  100% {
+    transform: scale(0.2) rotate(0deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1) rotate(45deg);
+    opacity: 0.9;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bf-rays,
+  .bf-tag {
+    animation: none;
+  }
+}

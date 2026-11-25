@@ -32,6 +32,7 @@ var channelGateClosed = map[string]bool{
 	"/cabinet/api/me/purchases":               true,
 	"/cabinet/api/me/review":                  true,
 	"/cabinet/api/promocodes/state":           true,
+	"/cabinet/api/promocodes/history":         true,
 	"/cabinet/api/promocodes/apply":           true,
 	"/cabinet/api/payments/checkout":          true,
 	"/cabinet/api/payments/preview":           true,

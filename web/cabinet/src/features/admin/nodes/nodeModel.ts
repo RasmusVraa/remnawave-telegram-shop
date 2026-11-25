@@ -1,19 +1,20 @@
 import type { AdminNodeDTO, AdminNodeState } from '@/lib/types/admin'
 
-export type NodeSortKey = 'users_desc' | 'users_asc' | 'name' | 'memory' | 'traffic' | 'uptime'
+export type NodeSortKey = 'panel' | 'users_desc' | 'users_asc' | 'name' | 'memory' | 'traffic' | 'uptime'
 export type NodeFilterKey = 'all' | AdminNodeState
 
-export const NODE_SORT_KEYS: NodeSortKey[] = ['users_desc', 'users_asc', 'name', 'memory', 'traffic', 'uptime']
+export const NODE_SORT_KEYS: NodeSortKey[] = ['panel', 'users_desc', 'users_asc', 'name', 'memory', 'traffic', 'uptime']
 export const NODE_FILTER_KEYS: NodeFilterKey[] = ['all', 'online', 'offline', 'connecting', 'disabled']
 
-const PREFS_KEY = 'cabinet.admin.nodes.prefs'
+// v2: умолчание стало «Как в панели» — старые сохранённые «Больше людей» его бы не пустили.
+const PREFS_KEY = 'cabinet.admin.nodes.prefs.v2'
 
 export interface NodePrefs {
   sort: NodeSortKey
   filter: NodeFilterKey
 }
 
-const DEFAULT_PREFS: NodePrefs = { sort: 'users_desc', filter: 'all' }
+const DEFAULT_PREFS: NodePrefs = { sort: 'panel', filter: 'all' }
 
 /** Выбранные сортировка и фильтр помним в браузере; без хранилища (приватное окно) работаем с умолчаниями. */
 export function loadNodePrefs(): NodePrefs {
@@ -52,6 +53,9 @@ export function sortNodes(nodes: AdminNodeDTO[], key: NodeSortKey): AdminNodeDTO
   out.sort((a, b) => {
     let c = 0
     switch (key) {
+      case 'panel':
+        c = a.view_position - b.view_position
+        break
       case 'users_desc':
         c = b.users_online - a.users_online
         break

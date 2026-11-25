@@ -23,6 +23,7 @@ import type {
 
 import { getCookie } from './utils'
 import type {
+  AdminAttentionDismissedDTO,
   AdminAttentionItemDTO,
   AdminEventsDTO,
   AdminMonitoringPeriod,
@@ -260,6 +261,8 @@ export interface AuthBootstrapResponse {
   }
   /** Кнопки на местах 3 и 4 быстрых действий главной (CABINET_HOME_QUICK_ACTIONS), id из features/home/homeQuickActions.ts. */
   home_quick_actions?: string[]
+  /** false — строка «Оформление» в профиле скрыта, личный выбор игнорируется (CABINET_USER_THEME_PICKER_ENABLED). */
+  user_theme_picker_enabled?: boolean
   /** Декоративная тема кабинета (CABINET_DECOR_THEME) */
   decor_theme?:
     | 'off'
@@ -283,6 +286,8 @@ export interface AuthBootstrapResponse {
     | 'nebula'
     | 'ocean'
     | 'cyber'
+    | 'lime'
+    | 'emerald'
     | 'sunset'
     | 'lavender'
     | 'wine'
@@ -294,6 +299,7 @@ export interface AuthBootstrapResponse {
     platega?: boolean
     platega_sbp?: boolean
     platega_acquiring?: boolean
+    platega_cards?: boolean
     platega_worldwide?: boolean
     platega_crypto?: boolean
     heleket?: boolean
@@ -1276,6 +1282,20 @@ export interface PromoStateResponse {
   } | null
 }
 
+export interface PromoHistoryItem {
+  used_at: string
+  code: string
+  type: 'subscription_days' | 'trial' | 'extra_hwid' | 'discount'
+  subscription_days?: number
+  trial_days?: number
+  extra_hwid_delta?: number
+  discount_percent?: number
+}
+
+export interface PromoHistoryResponse {
+  items: PromoHistoryItem[]
+}
+
 export interface PromoApplyResponse {
   applied: boolean
   type: 'subscription_days' | 'trial' | 'extra_hwid' | 'discount'
@@ -1735,6 +1755,13 @@ export const api = {
   fortuneSpin: () => request<FortuneSpinResponse>('POST', '/fortune/spin', {}),
 
   promoState: () => request<PromoStateResponse>('GET', '/promocodes/state'),
+  promoHistory: (params?: { limit?: number; offset?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.limit != null) q.set('limit', String(params.limit))
+    if (params?.offset != null) q.set('offset', String(params.offset))
+    const suffix = q.toString() ? `?${q.toString()}` : ''
+    return request<PromoHistoryResponse>('GET', `/promocodes/history${suffix}`)
+  },
   applyPromoCode: (code: string) =>
     request<PromoApplyResponse>('POST', '/promocodes/apply', { code }),
 
@@ -2238,6 +2265,8 @@ export const api = {
     request<AdminBroadcastHistoryItemDTO>('GET', `/admin/broadcast/history/${id}`),
 
   adminNodes: () => request<AdminNodesDTO>('GET', '/admin/nodes'),
+  /** Порядок нод пишется в панель Remnawave (viewPosition): список должен быть полным. */
+  adminNodesReorder: (uuids: string[]) => request<{ ok: boolean }>('POST', '/admin/nodes/reorder', { uuids }),
   adminMonitoringEvents: (params: {
     afterId?: number
     beforeId?: number
@@ -2262,6 +2291,12 @@ export const api = {
   adminMonitoringSummary: (period: AdminMonitoringPeriod) =>
     request<AdminMonitoringSummaryDTO>('GET', `/admin/monitoring/summary?period=${period}`),
   adminAttention: () => request<{ items: AdminAttentionItemDTO[] }>('GET', '/admin/attention'),
+  adminAttentionDismissed: () =>
+    request<{ items: AdminAttentionDismissedDTO[] }>('GET', '/admin/attention/dismissed'),
+  adminAttentionDismiss: (items: AdminAttentionDismissedDTO[]) =>
+    request<{ ok: boolean }>('POST', '/admin/attention/dismissed', { items }),
+  adminAttentionRestore: (key?: string) =>
+    request<{ ok: boolean }>('DELETE', `/admin/attention/dismissed${key ? `?key=${encodeURIComponent(key)}` : ''}`),
   adminInfraNodes: () => request<AdminInfraNodesDTO>('GET', '/admin/infra/nodes'),
   adminInfraCreateNode: (body: { provider_uuid: string; node_uuid: string; next_billing_at?: string }) =>
     request<AdminInfraNodesDTO>('POST', '/admin/infra/nodes', body),

@@ -645,6 +645,51 @@ LIMIT $2`
 	return out, rows.Err()
 }
 
+// CustomerRedemptionRow — одна строка «Истории промокодов» клиента: что он ввёл и что получил.
+// Тип и значение берутся из самого промокода; удалённый админом код из истории пропадает
+// (promo_redemption уходит каскадом) — это решение владельца.
+type CustomerRedemptionRow struct {
+	UsedAt           time.Time
+	Code             string
+	Type             string
+	SubscriptionDays *int
+	TrialDays        *int
+	ExtraHwidDelta   *int
+	DiscountPercent  *int
+}
+
+// ListCustomerRedemptions — введённые клиентом промокоды, свежие сверху. Служебные коды
+// (`__…`, например колесо фортуны) клиент не вводил, поэтому в историю не попадают.
+func (r *PromoRepository) ListCustomerRedemptions(ctx context.Context, customerID int64, offset, limit int) ([]CustomerRedemptionRow, error) {
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	rows, err := r.pool.Query(ctx, `
+SELECT pr.used_at, pc.code, pc.type, pc.subscription_days, pc.trial_days, pc.extra_hwid_delta, pc.discount_percent
+FROM promo_redemption pr
+JOIN promo_code pc ON pc.id = pr.promo_code_id
+WHERE pr.customer_id = $1 AND pc.code NOT LIKE '\_\_%'
+ORDER BY pr.used_at DESC, pr.id DESC
+LIMIT $2 OFFSET $3`, customerID, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []CustomerRedemptionRow
+	for rows.Next() {
+		var row CustomerRedemptionRow
+		if err := rows.Scan(&row.UsedAt, &row.Code, &row.Type, &row.SubscriptionDays, &row.TrialDays,
+			&row.ExtraHwidDelta, &row.DiscountPercent); err != nil {
+			return nil, err
+		}
+		out = append(out, row)
+	}
+	return out, rows.Err()
+}
+
 func (r *PromoRepository) ListRedemptionsPage(ctx context.Context, promoID int64, offset, limit int) ([]PromoRedemptionDetailRow, error) {
 	if limit < 1 || limit > 100 {
 		limit = 20

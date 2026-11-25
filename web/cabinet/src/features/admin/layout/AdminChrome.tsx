@@ -28,7 +28,7 @@ export function AdminChrome({ children, hideMobileHeader }: AdminChromeProps) {
   return (
     <div className="relative flex min-h-dvh flex-col">
       <div className="cabinet-shell-gradient" aria-hidden />
-      <CabinetDecorLayer />
+      <CabinetDecorLayer compact />
       {/* iPhone: фон шапки над краем экрана, под панелями браузера (index.css) */}
       <div className="cabinet-edge-top" aria-hidden />
       <header

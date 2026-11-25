@@ -31,10 +31,10 @@ function MyReviewBanner({ mine }: { mine: MyReviewResponse }) {
       className={cn(
         'flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm leading-snug',
         status === 'published'
-          ? 'border-emerald-500/30 bg-emerald-500/[0.08] text-emerald-700 dark:text-emerald-300'
+          ? 'border-emerald-500/30 bg-card bg-gradient-to-r from-emerald-500/[0.12] to-emerald-500/[0.12] text-emerald-700 dark:text-emerald-300'
           : status === 'pending'
-            ? 'border-primary/30 bg-primary/[0.07]'
-            : 'border-amber-500/30 bg-amber-500/[0.08] text-amber-700 dark:text-amber-300',
+            ? 'border-primary/30 bg-card bg-gradient-to-r from-primary/[0.10] to-primary/[0.10]'
+            : 'border-amber-500/30 bg-card bg-gradient-to-r from-amber-500/[0.12] to-amber-500/[0.12] text-amber-700 dark:text-amber-300',
       )}
     >
       <Info className="mt-0.5 size-4 shrink-0" aria-hidden />

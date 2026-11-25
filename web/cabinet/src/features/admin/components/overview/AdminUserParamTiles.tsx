@@ -3,7 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { CalendarDays, Gauge, Infinity as InfinityIcon, Layers, Pencil, Smartphone } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
-import { cn } from '@/lib/utils'
+import type { TFunction } from 'i18next'
+
+import { cn, timeLeft } from '@/lib/utils'
 import { formatDecimals } from '@/lib/format'
 import { surface } from '../Surface'
 import type { UserCardMetrics } from './userCardMetrics'
@@ -103,6 +105,19 @@ interface Props {
   onOpenExpire: () => void
 }
 
+/** Подпись под сроком — та же шкала, что у пользователя на главной: дни вниз, меньше суток — часы, минуты. */
+function expireHint(t: TFunction, metrics: Props['metrics']): string | undefined {
+  if (metrics.days == null || !metrics.expireAt) return undefined
+  if (new Date(metrics.expireAt).getTime() <= Date.now()) {
+    return metrics.days < 0
+      ? t('admin.users.overview.stripExpiredDays', { count: Math.abs(metrics.days) })
+      : t('admin.users.overview.stripExpiredToday')
+  }
+  const left = timeLeft(metrics.expireAt)
+  const key = { days: 'stripDaysLeft', hours: 'stripHoursLeft', minutes: 'stripMinutesLeft' }[left.unit]
+  return t(`admin.users.overview.${key}`, { count: left.value })
+}
+
 export function AdminUserParamTiles({
   metrics,
   hasRwUser,
@@ -127,13 +142,7 @@ export function AdminUserParamTiles({
         icon={CalendarDays}
         label={t('admin.users.overview.tileExpire')}
         value={metrics.expireAt ? shortDate(metrics.expireAt, dateLocale) : '—'}
-        hint={
-          metrics.days == null
-            ? undefined
-            : metrics.days < 0
-              ? t('admin.users.overview.stripExpiredDays', { count: Math.abs(metrics.days) })
-              : t('admin.users.overview.stripDaysLeft', { count: metrics.days })
-        }
+        hint={expireHint(t, metrics)}
         onClick={onOpenExpire}
         editLabel={editLabel}
       />

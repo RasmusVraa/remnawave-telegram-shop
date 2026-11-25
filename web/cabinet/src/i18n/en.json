@@ -1,5 +1,10 @@
 {
   "translation": {
+    "decorBlackFriday": {
+      "tagSale": "BLACK FRIDAY",
+      "tagDeal": "DEAL",
+      "tagHit": "HOT"
+    },
     "common": {
       "loading": "Loading…",
       "error": "Error",
@@ -133,6 +138,14 @@
     "home": {
       "statDays_one": "day",
       "statDays_other": "days",
+      "statHours_one": "hour",
+      "statHours_other": "hours",
+      "statMinutes_one": "minute",
+      "statMinutes_other": "minutes",
+      "alertCritHours_one": "Your VPN will stop in {{count}} hour",
+      "alertCritHours_other": "Your VPN will stop in {{count}} hours",
+      "alertCritMinutes_one": "Your VPN will stop in {{count}} minute",
+      "alertCritMinutes_other": "Your VPN will stop in {{count}} minutes",
       "statDevices_one": "device",
       "statDevices_other": "devices",
       "statTraffic": "traffic",
@@ -142,8 +155,8 @@
       "statusTrafficExhausted": "Traffic used up",
       "expiredSince": "ended {{date}}",
       "alertWarn": "Renew in advance so your VPN keeps working",
-      "alertCrit_one": "Your VPN will stop on all devices in {{count}} day",
-      "alertCrit_other": "Your VPN will stop on all devices in {{count}} days",
+      "alertCrit_one": "Your VPN will stop in {{count}} day",
+      "alertCrit_other": "Your VPN will stop in {{count}} days",
       "alertExpired": "Your VPN is off. Renew your subscription to turn it back on",
       "alertTrafficWarn": "{{left}} GB of {{limit}} left — traffic will run out soon",
       "changeTariff": "Change plan",
@@ -187,6 +200,18 @@
       "settingsHaptics": "Vibration",
       "settingsHapticsOn": "On",
       "settingsHapticsOff": "Off",
+      "settingsDecor": "Appearance",
+      "decorPicker": {
+        "title": "Appearance",
+        "subtitleUser": "Applies to you only. \u201cService default\u201d is the theme set by the administrator, including seasonal ones.",
+        "subtitleAdmin": "Default theme for all users. Anyone who picked their own will see theirs.",
+        "auto": "Service default",
+        "apply": "Apply",
+        "change": "Change",
+        "darkOnly": "dark only",
+        "darkOnlyHint": "This theme has no light variant \u2014 while it is selected, the cabinet stays dark.",
+        "groups": { "base": "Basic", "color": "Colorful", "seasonal": "Seasonal" }
+      },
       "qaServers": "Server status"
     },
     "dashboard": {
@@ -609,10 +634,17 @@
       "paidSpinsLeftHint": "Paid spins remaining today (UTC day; free daily spin does not count)",
       "subscriptionDaysHint": "Subscription buffer in days (from remaining time)",
       "daysShortSuffix": " d",
+      "hoursShortSuffix": " h",
+      "minutesShortSuffix": " min",
       "nextFreeIn": "Free spin in",
       "countdownHms": "{{h}}h {{m}}m {{s}}s",
       "hubSpin": "Spin",
       "hubFree": "free",
+      "hubReason": {
+        "no_paid": "Paid plan needed",
+        "insufficient_days": "Not enough days",
+        "daily_limit": "Daily limit reached"
+      },
       "spinCostPill": "−{{count}} d",
       "youCanWinTitle": "You can win:",
       "prizeCard": {
@@ -1031,10 +1063,21 @@
       "unlimitedPayments": "Unlimited discounted payments (until expiry).",
       "remainingPayments": "Discounted payments left: {{n}}.",
       "expiresAt": "Expires at: {{dt}}",
-      "infoTitle": "Supported promo types",
-      "info1": "Cabinet supports all admin-created promo types (subscription days, trial, extra device, discount).",
-      "info2": "first purchase / tariff / max uses / validity limits are enforced exactly like in the bot.",
-      "info3": "Promo discounts are combined with loyalty and capped by server total-discount limit.",
+      "historyTitle": "Promo code history",
+      "historyEmpty": "You haven't entered any promo codes yet.",
+      "historyColDate": "Date",
+      "historyColCode": "Promo code",
+      "historyColReward": "Received",
+      "historyTypeDiscount": "Discount",
+      "historyTypeSubscriptionDays": "Subscription days",
+      "historyTypeTrial": "Trial period",
+      "historyTypeExtraHwid": "Extra device",
+      "historyRewardDays_one": "+{{count}} day",
+      "historyRewardDays_other": "+{{count}} days",
+      "historyRewardTrial_one": "{{count}} day",
+      "historyRewardTrial_other": "{{count}} days",
+      "historyRewardHwid_one": "+{{count}} device",
+      "historyRewardHwid_other": "+{{count}} devices",
       "success": {
         "generic": "Promo code applied successfully.",
         "discount": "Promo activated: {{pct}}% discount for payment.",
@@ -1912,6 +1955,24 @@
         "scopeInactive": "Inactive",
         "scopeExpiring": "Expiring",
         "scopeTrial": "Trials",
+        "scopeExpired": "Expired",
+        "until": "until",
+        "avatar": "Avatar",
+        "sortAndFilter": "Sort and filter",
+        "sortTitle": "Sort",
+        "showTitle": "Show",
+        "reset": "Reset",
+        "showResult": "Show",
+        "showMore": "Show more",
+        "loadingMore": "Loading…",
+        "sort": {
+          "def": "Newest first",
+          "expAsc": "Expiring soonest",
+          "expDesc": "Expiring latest",
+          "name": "Username A–Z",
+          "tariff": "Tariff",
+          "status": "Status"
+        },
         "id": "ID",
         "telegramId": "Telegram ID",
         "username": "Username",
@@ -2004,6 +2065,11 @@
           "paidTotalValue_other": "{{sum}} ₽ · {{count}} payments",
           "stripDaysLeft_one": "{{count}} day left",
           "stripDaysLeft_other": "{{count}} days left",
+          "stripHoursLeft_one": "{{count}} hour left",
+          "stripHoursLeft_other": "{{count}} hours left",
+          "stripMinutesLeft_one": "{{count}} minute left",
+          "stripMinutesLeft_other": "{{count}} minutes left",
+          "stripExpiredToday": "expired today",
           "stripExpiredDays_one": "expired {{count}} day ago",
           "stripExpiredDays_other": "expired {{count}} days ago",
           "tileExpire": "Valid until",
@@ -3075,6 +3141,7 @@
         "sortTitle": "Sort by",
         "showTitle": "Show",
         "sort": {
+          "panel": "Panel order",
           "users_desc": "Most users",
           "users_asc": "Fewest users",
           "name": "By name",
@@ -3100,6 +3167,9 @@
           "connecting": "connecting…",
           "disabled": "disabled"
         },
+        "addressCopied": "Address copied",
+        "addressCopyFailed": "Couldn't copy the address",
+        "addressCopyAria": "Copy address {{value}}",
         "usersTitle": "Users on this node right now",
         "memoryTitle": "Memory in use",
         "loadTitle": "Load average over 1 / 5 / 15 minutes",
@@ -3113,6 +3183,8 @@
         "nodeTitle": "Remnawave node version",
         "empty": "The panel has no nodes yet",
         "noMatch": "Nothing found",
+        "drag": "Drag to reorder (↑ ↓ arrows from the keyboard)",
+        "reorderError": "Couldn't save the node order in the panel",
         "error": "Could not load nodes from the Remnawave panel"
       },
       "infra": {
@@ -3464,7 +3536,51 @@
           "basic": "Rules & limits",
           "ticker": "Winner feed",
           "weights": "Sector probability",
-          "rewards": "Prize amounts"
+          "rewards": "Prize amounts",
+          "chances": {
+            "name": {
+              "micro": "Small XP bonus",
+              "xp": "Big XP bonus",
+              "discount": "{{n}}% discount",
+              "days": "+{{n}} days of subscription",
+              "free_spin": "Free spin"
+            },
+            "lockFixed": "This prize can never drop: the “+180 days” sector is for show only",
+            "reset": "Reset to defaults",
+            "never": "Never drops",
+            "half": "every 2nd spin or more often",
+            "oneIn": "1 in {{n}} spins",
+            "lock": "Pin this chance",
+            "unlock": "Unpin",
+            "prize": "Prize:",
+            "from": "from",
+            "to": "to",
+            "unit": {
+              "xp": "XP",
+              "discount": "% off",
+              "days": "days",
+              "spin": "spin"
+            },
+            "profit": {
+              "title": "Is it profitable for you?",
+              "intro": "A player pays {{cost}} day(s) of subscription per spin. Below is how many days they win back on average. Discounts and XP give no days, so they are not counted.",
+              "badge": { "ok": "You profit", "warn": "Generous", "bad": "Losing" },
+              "spend": "Player pays per spin",
+              "back": "Wins back per spin",
+              "chance": "Chance to win days or a spin",
+              "returns": "Player gets back {{pct}}% of what they spend",
+              "returnsInf": "Free spins drop too often — the wheel would spin forever",
+              "breakEven": "The line is 100%: player breaks even",
+              "sim": "Test on 1000 spins",
+              "simSpins": "Spins played",
+              "simFree": "free ones: {{n}}",
+              "simWon": "Days won",
+              "simPaid": "paid: {{n}} d.",
+              "simNet": "Result for you",
+              "simNetGood": "days ahead",
+              "simNetBad": "days behind"
+            }
+          }
         },
         "enum": {
           "crypt5": "crypt5 — current (Happ 5.x)",
@@ -3480,6 +3596,8 @@
           "green": "Green",
           "spring": "Spring",
           "cyber": "Cyber",
+          "lime": "Lime",
+          "emerald": "Emerald",
           "neon": "Neon",
           "ocean": "Ocean",
           "new_year": "New Year",
@@ -3737,6 +3855,10 @@
           "CABINET_LIGHT_THEME_ENABLED": {
             "label": "Light theme",
             "hint": "Turn off to force dark theme for all users"
+          },
+          "CABINET_USER_THEME_PICKER_ENABLED": {
+            "label": "User theme picker",
+            "hint": "Show the \u201cAppearance\u201d row in the profile. The choice is stored in the user browser and overrides the seasonal schedule"
           },
           "CABINET_DECOR_THEME": {
             "label": "Decor theme",
@@ -4435,6 +4557,17 @@
         "addressIsNode": "This is the address of the panel node itself. For a bypass enter the whitelisted host, otherwise operators will not reach it.",
         "drag": "Drag to reorder (or use the up and down arrows)",
         "neverMeasured": "Not checked yet"
+      },
+      "attention": {
+        "title": "Needs attention",
+        "allRead": "All read",
+        "empty": "All read — anything new will show up here",
+        "groupCrit": "Urgent",
+        "groupWarn": "Soon",
+        "dismiss": "Hide until it changes",
+        "dismissAll": "Hide all",
+        "showHidden_one": "Show hidden ({{count}})",
+        "showHidden_other": "Show hidden ({{count}})"
       },
       "monitoring": {
         "title": "Monitoring",

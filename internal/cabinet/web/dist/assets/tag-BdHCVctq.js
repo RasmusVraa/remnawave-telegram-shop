@@ -1,4 +1,8 @@
+<<<<<<<< HEAD:internal/cabinet/web/dist/assets/tag-BdHCVctq.js
 import{k as c}from"./index-CROgp3O5.js";/**
+========
+import{k as c}from"./index-z8i0AR2-.js";/**
+>>>>>>>> upstream/main:internal/cabinet/web/dist/assets/tag-Csh9PK3R.js
  * @license lucide-react v0.475.0 - ISC
  *
  * This source code is licensed under the ISC license.

@@ -9,7 +9,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { AdminToggleRow } from './AdminToggleSwitch'
 import { AdminSelect } from './AdminSelect'
 import { AdminDecorScheduleEditor } from './AdminDecorScheduleEditor'
+import { AdminDecorThemeField } from './AdminDecorThemeField'
 import { AdminHomeQuickActionsEditor } from './AdminHomeQuickActionsEditor'
+import { AdminFortuneChancesEditor, FORTUNE_CHANCES_KEYS } from './AdminFortuneChancesEditor'
 import {
   AdminCheckoutDefaultMethodEditor,
   AdminPlategaMethodsEditor,
@@ -244,6 +246,21 @@ export function AdminSettingsGroupEditor({
       )
     }
 
+    if (field.key === 'CABINET_DECOR_THEME') {
+      return (
+        <AdminDecorThemeField
+          key={field.key}
+          id={`setting-${field.key}`}
+          label={label}
+          hint={hint}
+          value={value}
+          disabled={saving}
+          busy={togglingKey === field.key}
+          onChange={(next) => onInstantEnum(field.key, next)}
+        />
+      )
+    }
+
     if (field.type === 'bool') {
       return (
         <AdminToggleRow
@@ -348,16 +365,32 @@ export function AdminSettingsGroupEditor({
   const renderSubsection = (
     block: { def: (typeof subsectionBlocks)[0]['def']; fields: AdminSettingFieldDTO[] },
     index: number,
-  ) => (
-    <div key={block.def?.id ?? `flat-${index}`} className="mb-4 last:mb-0">
-      {block.def && (
-        <SettingsSubsectionTitle icon={block.def.icon}>{t(block.def.titleKey)}</SettingsSubsectionTitle>
-      )}
-      <div className="rounded-lg border border-border/60 bg-card/80 px-3 shadow-sm">
-        {renderFieldsLayout(block.fields)}
+  ) => {
+    // Колесо: шансы и размер призов — один редактор «пирога», отдельный блок размеров не нужен.
+    const isChances = group.id === 'fortune' && block.def?.id === 'weights'
+    if (group.id === 'fortune' && block.def?.id === 'rewards' && hasChancesBlock) return null
+    const chancesValues: Record<string, string> = {}
+    if (isChances) {
+      for (const key of [...FORTUNE_CHANCES_KEYS, 'FORTUNE_SPIN_COST_DAYS']) {
+        chancesValues[key] = draft[key] ?? fieldByKey.get(key)?.value ?? ''
+      }
+    }
+    return (
+      <div key={block.def?.id ?? `flat-${index}`} className="mb-4 last:mb-0">
+        {block.def && (
+          <SettingsSubsectionTitle icon={block.def.icon}>{t(block.def.titleKey)}</SettingsSubsectionTitle>
+        )}
+        <div className="rounded-lg border border-border/60 bg-card/80 px-3 shadow-sm">
+          {isChances ? (
+            <AdminFortuneChancesEditor values={chancesValues} disabled={saving} onChange={onDraftChange} />
+          ) : (
+            renderFieldsLayout(block.fields)
+          )}
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+  const hasChancesBlock = subsectionBlocks.some((b) => b.def?.id === 'weights') && group.id === 'fortune'
 
   const groupTitle = t(`admin.settings.groups.${group.id}`)
   // Пояснение ко всей группе — там, где по подписям полей легко понять не то.

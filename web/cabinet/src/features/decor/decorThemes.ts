@@ -5,6 +5,8 @@ export const DECOR_THEME_IDS = [
   'green',
   'spring',
   'cyber',
+  'lime',
+  'emerald',
   // cyan / blue
   'neon',
   'ocean',
@@ -58,6 +60,8 @@ export const DECOR_THEMES: Record<DecorThemeId, DecorThemeDef> = {
   green: { id: 'green', effect: null },
   spring: { id: 'spring', effect: 'petals' },
   cyber: { id: 'cyber', effect: 'matrix' },
+  lime: { id: 'lime', effect: null },
+  emerald: { id: 'emerald', effect: null },
   neon: { id: 'neon', effect: null },
   ocean: { id: 'ocean', effect: 'bubbles' },
   new_year: { id: 'new_year', effect: null },
@@ -89,7 +93,11 @@ export function normalizeDecorTheme(value: string | undefined | null): DecorThem
 }
 
 /** Темы, у которых нет светлого варианта: пока они включены, кабинет только тёмный. */
-const DARK_ONLY_DECOR_THEMES: ReadonlySet<DecorThemeId> = new Set(['halloween_2', 'new_year_2'])
+const DARK_ONLY_DECOR_THEMES: ReadonlySet<DecorThemeId> = new Set([
+  'halloween_2',
+  'new_year_2',
+  'black_friday',
+])
 
 export function isDarkOnlyDecorTheme(theme: DecorThemeId): boolean {
   return DARK_ONLY_DECOR_THEMES.has(theme)

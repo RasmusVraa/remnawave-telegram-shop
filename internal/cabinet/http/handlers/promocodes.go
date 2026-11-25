@@ -3,7 +3,9 @@ package handlers
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"remnawave-tg-shop-bot/internal/adminevents"
@@ -128,6 +130,84 @@ func (h *PromoCodesHandler) GetState(w http.ResponseWriter, r *http.Request) {
 				dto.ExpiresAt = d.ExpiresAt.UTC().Format("2006-01-02T15:04:05Z07:00")
 			}
 			resp.PendingDiscount = dto
+		}
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type promoHistoryItemDTO struct {
+	UsedAt           string `json:"used_at"`
+	Code             string `json:"code"`
+	Type             string `json:"type"`
+	SubscriptionDays int    `json:"subscription_days,omitempty"`
+	TrialDays        int    `json:"trial_days,omitempty"`
+	ExtraHwidDelta   int    `json:"extra_hwid_delta,omitempty"`
+	DiscountPercent  int    `json:"discount_percent,omitempty"`
+}
+
+type promoHistoryResp struct {
+	Items []promoHistoryItemDTO `json:"items"`
+}
+
+func intOrZero(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// GetHistory — GET /cabinet/api/promocodes/history?limit=20&offset=0.
+func (h *PromoCodesHandler) GetHistory(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	claims := middleware.AuthClaims(r)
+	if claims == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	customer, err := h.loadCustomer(r.Context(), claims.AccountID)
+	if err != nil || customer == nil {
+		if handleAccountGone(w, err, "promocodes.history", claims.AccountID) {
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	limit := 20
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	offset := 0
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, perr := strconv.Atoi(v); perr == nil && n >= 0 {
+			offset = n
+		}
+	}
+
+	resp := promoHistoryResp{Items: []promoHistoryItemDTO{}}
+	if h.promo != nil && h.promo.PromoRepo != nil {
+		rows, rerr := h.promo.PromoRepo.ListCustomerRedemptions(r.Context(), customer.ID, offset, limit)
+		if rerr != nil {
+			slog.Error("promocodes: history", "error", rerr.Error())
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		for _, row := range rows {
+			resp.Items = append(resp.Items, promoHistoryItemDTO{
+				UsedAt:           row.UsedAt.UTC().Format("2006-01-02T15:04:05Z07:00"),
+				Code:             row.Code,
+				Type:             row.Type,
+				SubscriptionDays: intOrZero(row.SubscriptionDays),
+				TrialDays:        intOrZero(row.TrialDays),
+				ExtraHwidDelta:   intOrZero(row.ExtraHwidDelta),
+				DiscountPercent:  intOrZero(row.DiscountPercent),
+			})
 		}
 	}
 	w.Header().Set("Cache-Control", "no-store")

@@ -40,7 +40,7 @@ function subscriptionPayloadForScheme(scheme: string, subscriptionLink: string, 
   const s = scheme.trim().toLowerCase()
   // Deep link: префикс + полный URL подписки без encodeURIComponent (иначе https:// и точки «ломаются»).
   // RabbitHole с закодированным URL открывается, но подписку не скачивает.
-  const rawUrlPrefixes = ['happ://add/', 'incy://add/', 'rabbithole://add/', 'meows://add/', 'v2raytun://import/', 'v2rayn://import/'] as const
+  const rawUrlPrefixes = ['happ://add/', 'incy://add/', 'rabbithole://add/', 'meows://add/', 'dodoapp://add/', 'v2raytun://import/', 'v2rayn://import/'] as const
   if (rawUrlPrefixes.some((p) => s.startsWith(p))) {
     return subscriptionLink
   }

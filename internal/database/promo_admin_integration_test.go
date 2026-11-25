@@ -428,3 +428,66 @@ func TestPromoDetailStats_empty(t *testing.T) {
 		}
 	}
 }
+
+// История промокодов клиента: свежие сверху, только свои, служебные коды скрыты,
+// значение берётся из самого промокода, пагинация по offset/limit.
+func TestListCustomerRedemptions(t *testing.T) {
+	pool := partnerTestPool(t)
+	repo := NewPromoRepository(pool)
+	ctx := context.Background()
+	tok := promoTestToken()
+
+	pct, days, trial, hwid := 20, 30, 3, 1
+	discID := makePromo(t, pool, PromoCode{Code: tok + "DISC", Type: PromoTypeDiscount, Active: true, DiscountPercent: &pct})
+	daysID := makePromo(t, pool, PromoCode{Code: tok + "DAYS", Type: PromoTypeSubscriptionDays, Active: true, SubscriptionDays: &days})
+	trialID := makePromo(t, pool, PromoCode{Code: tok + "TRIAL", Type: PromoTypeTrial, Active: true, TrialDays: &trial})
+	hwidID := makePromo(t, pool, PromoCode{Code: tok + "HWID", Type: PromoTypeExtraHwid, Active: true, ExtraHwidDelta: &hwid})
+	techID := makePromo(t, pool, PromoCode{Code: "__" + tok, Type: PromoTypeDiscount, Active: true, DiscountPercent: &pct})
+
+	me, other := makeCustomer(t, pool), makeCustomer(t, pool)
+	insertRedemption(t, pool, hwidID, me.ID, 4*time.Hour)
+	insertRedemption(t, pool, trialID, me.ID, 3*time.Hour)
+	insertRedemption(t, pool, daysID, me.ID, 2*time.Hour)
+	insertRedemption(t, pool, discID, me.ID, time.Hour)
+	insertRedemption(t, pool, techID, me.ID, time.Minute)  // служебный — скрыт
+	insertRedemption(t, pool, discID, other.ID, time.Hour) // чужой — не виден
+
+	got, err := repo.ListCustomerRedemptions(ctx, me.ID, 0, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantCodes := []string{tok + "DISC", tok + "DAYS", tok + "TRIAL", tok + "HWID"}
+	if len(got) != len(wantCodes) {
+		t.Fatalf("получили %d строк, ждали %d: %+v", len(got), len(wantCodes), got)
+	}
+	for i, c := range wantCodes {
+		if got[i].Code != c {
+			t.Errorf("строка %d: код %q, ждали %q", i, got[i].Code, c)
+		}
+	}
+	if got[0].DiscountPercent == nil || *got[0].DiscountPercent != 20 {
+		t.Errorf("скидка: %+v", got[0])
+	}
+	if got[1].SubscriptionDays == nil || *got[1].SubscriptionDays != 30 {
+		t.Errorf("дни: %+v", got[1])
+	}
+	if got[2].TrialDays == nil || *got[2].TrialDays != 3 {
+		t.Errorf("триал: %+v", got[2])
+	}
+	if got[3].ExtraHwidDelta == nil || *got[3].ExtraHwidDelta != 1 {
+		t.Errorf("устройство: %+v", got[3])
+	}
+
+	page, err := repo.ListCustomerRedemptions(ctx, me.ID, 1, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 2 || page[0].Code != tok+"DAYS" || page[1].Code != tok+"TRIAL" {
+		t.Errorf("страница offset=1 limit=2: %+v", page)
+	}
+
+	none, err := repo.ListCustomerRedemptions(ctx, other.ID+1_000_000, 0, 20)
+	if err != nil || len(none) != 0 {
+		t.Errorf("пустая история: %v %+v", err, none)
+	}
+}

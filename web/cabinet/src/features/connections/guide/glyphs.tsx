@@ -129,6 +129,42 @@ function appGlyph(app: Pick<AppGuide, 'id' | 'name'>): ReactNode | null {
       </svg>
     )
   }
+  if (key.includes('dodo')) {
+    // DoDo — своя цветная иконка (круг), плитка под ней прозрачная (см. AppTile)
+    return (
+      <svg className="size-full" viewBox="0 0 340 340" aria-hidden>
+        <defs>
+          <linearGradient id="dodo-bg" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#0E9AA7" />
+            <stop offset="1" stopColor="#7ED957" />
+          </linearGradient>
+          <clipPath id="dodo-clip">
+            <circle cx="340" cy="200" r="146" />
+          </clipPath>
+        </defs>
+        <rect width="340" height="340" rx="76" fill="url(#dodo-bg)" />
+        <g transform="translate(170 170) scale(0.8) translate(-170 -170)">
+        <circle cx="170" cy="170" r="166" fill="#ffffff" />
+        <circle cx="170" cy="170" r="154" fill="#111111" />
+        <g transform="translate(-170 -30)">
+          <g clipPath="url(#dodo-clip)">
+          <path d="M 256 66 Q 346 40 352 118 L 352 166 Q 352 178 340 178 L 292 178 Q 232 172 228 128 Q 228 82 256 66 Z" fill="#ffffff" />
+          <circle cx="286" cy="108" r="16" fill="#111111" />
+          <path d="M 186 168 Q 192 122 250 122 Q 262 142 258 170 Z" fill="#F5B33A" />
+          <rect x="364" y="58" width="140" height="112" rx="10" fill="#3A7FD5" />
+          <rect x="364" y="180" width="140" height="74" rx="10" fill="#F2593F" />
+          <rect x="198" y="190" width="54" height="44" rx="8" fill="#3A7FD5" />
+          <rect x="262" y="190" width="92" height="52" rx="8" fill="#F2593F" />
+          <path d="M 200 244 Q 200 330 268 346 L 268 252 Q 268 244 260 244 Z" fill="#1F7A55" />
+          <rect x="278" y="252" width="86" height="40" rx="8" fill="#1F7A55" />
+          <rect x="278" y="302" width="86" height="46" rx="8" fill="#6B5BD2" />
+          <path d="M 376 266 L 474 266 L 474 300 Q 440 340 376 346 Z" fill="#F5B33A" />
+          </g>
+        </g>
+        </g>
+      </svg>
+    )
+  }
   if (key.includes('incy')) {
     // INCY — тёмные буквы на белом: плитка под ним белая (см. AppTile)
     return (
@@ -226,7 +262,7 @@ export function AppTile({
   const glyph = appGlyph(app)
   const key = normalizeAppKey(app)
   const isIncy = key.includes('incy')
-  const isMeows = key.includes('meows')
+  const isMeows = key.includes('meows') || key.includes('dodo')
   return (
     <span
       className={cn(

@@ -25,7 +25,10 @@ export function useSortableList(ids: string[], onReorder: (next: string[]) => vo
     const layoutTop = ul.getBoundingClientRect().top + el.offsetTop
     const dy = pointerY.current - grabOffset.current - layoutTop
     el.style.transition = 'none'
-    el.style.transform = `translateY(${dy}px) scale(1.02)`
+    // Строка растёт на 2%, но не больше чем на ~14px с каждой стороны: у широкого списка больший
+    // рост упирается в край контейнера, где его обрезает overflow, и пропадают бока карточки.
+    const scale = Math.min(1.02, 1 + 28 / Math.max(el.offsetWidth, 1))
+    el.style.transform = `translateY(${dy}px) scale(${scale})`
   }
 
   function onPointerMove(clientY: number) {

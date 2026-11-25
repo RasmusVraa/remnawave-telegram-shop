@@ -58,7 +58,7 @@ func TestPickRewardTypeNoFreeSpinChain(t *testing.T) {
 	svc := &FortuneService{}
 	cfg := cabcfg.FortuneWheelConfig{WeightFreeSpin: 1000, WeightXP: 1}
 	for i := 0; i < 300; i++ {
-		rt, err := svc.pickRewardType(cfg, true)
+		rt, err := svc.pickRewardType(cfg, true, false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -68,7 +68,7 @@ func TestPickRewardTypeNoFreeSpinChain(t *testing.T) {
 	}
 	seen := false
 	for i := 0; i < 300 && !seen; i++ {
-		rt, _ := svc.pickRewardType(cfg, false)
+		rt, _ := svc.pickRewardType(cfg, false, false)
 		seen = rt == "free_spin"
 	}
 	if !seen {
@@ -81,7 +81,7 @@ func TestZeroWeightPrizeNeverPicked(t *testing.T) {
 	cfg := testWheelCfg()
 	cfg.WeightFreeSpin = 0
 	for i := 0; i < 2000; i++ {
-		rt, err := svc.pickRewardType(cfg, false)
+		rt, err := svc.pickRewardType(cfg, false, false)
 		if err != nil {
 			t.Fatal(err)
 		}

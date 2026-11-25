@@ -223,7 +223,9 @@ func (s *Service) validatePromoRow(ctx context.Context, p *database.PromoCode, c
 		if p.DiscountTTLHours != nil && *p.DiscountTTLHours < 0 {
 			return database.ValidationErrorf("bad discount ttl")
 		}
-		pd, err := s.PromoRepo.GetPendingDiscountByCustomerID(ctx, customer.ID)
+		// Скидку с вышедшим сроком getActivePendingDiscount стирает и не считает: иначе она до
+		// чьей-нибудь оплаты или открытия экрана блокировала бы новый промокод.
+		pd, err := s.getActivePendingDiscount(ctx, customer.ID)
 		if err != nil {
 			return err
 		}

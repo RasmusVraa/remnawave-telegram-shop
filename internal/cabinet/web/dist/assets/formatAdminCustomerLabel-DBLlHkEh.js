@@ -1,1 +1,0 @@
-function a(e){var m,t;const r=(m=e.telegram_username)==null?void 0:m.trim().replace(/^@+/,"");if(r)return`@${r}`;const n=(t=e.nickname)==null?void 0:t.trim();return n||(e.customer_id!=null?`#${e.customer_id}`:"—")}export{a as f};
