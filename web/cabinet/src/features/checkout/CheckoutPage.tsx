@@ -26,6 +26,7 @@ import {
   type ReceiptMode,
 } from '@/features/checkout/orderSummary'
 import { PaymentMethodPicker, PaymentMethodRow } from '@/features/checkout/PaymentMethodPicker'
+import { TariffLocationPicker } from '@/features/checkout/TariffLocationPicker'
 import { useCheckoutMethod } from '@/features/checkout/paymentMethods'
 
 export default function CheckoutPage() {
@@ -39,6 +40,7 @@ export default function CheckoutPage() {
   // Выбор человека по тумблеру доп. мест; null — не трогал (тогда места продлеваются).
   const [extraChoice, setExtraChoice] = useState<boolean | null>(null)
   const [switchOpen, setSwitchOpen] = useState(false)
+  const [locationId, setLocationId] = useState<number | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   useErrorHaptic(error)
@@ -69,6 +71,11 @@ export default function CheckoutPage() {
   const tariff: TariffItem | undefined = tariffsData?.tariffs.find(
     (t) => t.slug === tariffSlug && t.months === months,
   ) ?? tariffsData?.tariffs.find((t) => t.slug === tariffSlug)
+
+  const locations = tariff?.locations ?? []
+  const needsLocation = locations.length > 0
+  const allLocationsSoldOut = needsLocation && locations.every((loc) => loc.sold_out)
+  const locationReady = !needsLocation || (locationId != null && locationId > 0 && !allLocationsSoldOut)
 
   const previewTariffId =
     tariffsData?.sales_mode === 'tariffs' && tariff != null && tariff.id != null && tariff.id > 0
@@ -145,6 +152,14 @@ export default function CheckoutPage() {
   async function handlePay() {
     if (!selectedProvider) return
     if (!tariff) { setError(t('errors.unknown')); return }
+    if (needsLocation && (locationId == null || locationId <= 0)) {
+      setError(t('checkout.locationRequired'))
+      return
+    }
+    if (allLocationsSoldOut) {
+      setError(t('checkout.allLocationsSoldOut'))
+      return
+    }
     setError(null)
     setLoading(true)
 
@@ -162,6 +177,7 @@ export default function CheckoutPage() {
           yookassaMethod: checkoutMethod.yookassaMethod,
           tariffId,
           renewExtraHwid,
+          locationId: needsLocation ? locationId : undefined,
         },
         idempotencyKey,
       )
@@ -176,7 +192,14 @@ export default function CheckoutPage() {
         if (err.status === 429) {
           setError(t('errors.tooManyRequests'))
         } else if (err.status === 400 || err.status === 422) {
-          setError(t('checkout.notAvailable'))
+          const detail = `${err.body} ${err.message}`
+          if (detail.includes('location_required')) {
+            setError(t('checkout.locationRequired'))
+          } else if (detail.includes('location_sold_out') || detail.includes('location_invalid')) {
+            setError(t('checkout.locationInvalid'))
+          } else {
+            setError(t('checkout.notAvailable'))
+          }
         } else {
           setError(t('errors.unknown'))
         }
@@ -191,7 +214,7 @@ export default function CheckoutPage() {
     preview != null &&
     (preview.scenario === 'upgrade' || preview.scenario === 'downgrade') &&
     typeof preview.tariff_switch_total_days === 'number'
-  const canInitiatePay = Boolean(selectedProvider) && Boolean(tariff) && payAmount != null
+  const canInitiatePay = Boolean(selectedProvider) && Boolean(tariff) && payAmount != null && locationReady
   // Пока на экране прошлый ответ, на кнопке его сумма — нажимать нельзя.
   const payButtonDisabled = !canInitiatePay || loading || previewStale
 
@@ -298,6 +321,20 @@ export default function CheckoutPage() {
           )}
         </IncludedList>
 
+        {needsLocation && (
+          <div className="mt-4">
+            <TariffLocationPicker
+              locations={locations}
+              locationId={locationId}
+              onSelect={(id) => {
+                hapticSelection()
+                setLocationId(id)
+                setError(null)
+              }}
+            />
+          </div>
+        )}
+
         {shouldAskExtraRenew && (
           <>
             <div
@@ -372,6 +409,7 @@ export default function CheckoutPage() {
   }
   // Способ не выбран (новый человек без способа по умолчанию): на кнопке вместо суммы подсказка.
   const needMethod = !checkoutMethod.loading && checkoutMethod.methods.length > 0 && !selectedProvider
+  const needLocation = needsLocation && !locationReady && !allLocationsSoldOut
 
   return (
     <AppLayout>
@@ -385,11 +423,15 @@ export default function CheckoutPage() {
         paymentRow={<PaymentMethodRow {...pickerProps} />}
         error={error}
         pay={{
-          label: needMethod
-            ? t('checkout.choosePaymentMethod')
-            : payAmount != null
-              ? `${payVerb} ${formatNumber(payAmount)} ${payUnit}`
-              : payVerb,
+          label: allLocationsSoldOut
+            ? t('checkout.allLocationsSoldOut')
+            : needLocation
+              ? t('checkout.locationRequired')
+              : needMethod
+                ? t('checkout.choosePaymentMethod')
+                : payAmount != null
+                  ? `${payVerb} ${formatNumber(payAmount)} ${payUnit}`
+                  : payVerb,
           disabled: payButtonDisabled,
           loading,
           onPay: handlePay,
