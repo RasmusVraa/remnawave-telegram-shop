@@ -82,6 +82,7 @@ const AdminStatsPage = lazy(() => import('@/features/admin/pages/AdminStatsPage'
 const AdminUsersPage = lazy(() => import('@/features/admin/pages/AdminUsersPage'))
 const AdminUserDetailPage = lazy(() => import('@/features/admin/pages/AdminUserDetailPage'))
 const AdminPaymentsPage = lazy(() => import('@/features/admin/pages/AdminPaymentsPage'))
+const AdminExpensesPage = lazy(() => import('@/features/admin/pages/AdminExpensesPage'))
 const AdminReviewsPage = lazy(() => import('@/features/admin/pages/AdminReviewsPage'))
 const AdminPromosPage = lazy(() => import('@/features/admin/pages/AdminPromosPage'))
 const AdminTariffsPage = lazy(() => import('@/features/admin/pages/AdminTariffsPage'))
@@ -477,6 +478,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AdminRoute>
               <AdminPaymentsPage />
+            </AdminRoute>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/expenses"
+        element={
+          <ProtectedRoute>
+            <AdminRoute>
+              <AdminExpensesPage />
             </AdminRoute>
           </ProtectedRoute>
         }

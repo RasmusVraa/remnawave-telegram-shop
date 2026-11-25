@@ -767,6 +767,47 @@ export interface AdminOkDTO {
   status?: string
 }
 
+export interface AdminExpenseDTO {
+  id: number
+  occurred_on: string
+  amount_rub: number
+  category: string
+  title: string
+  note: string
+  icon: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AdminExpenseCategorySumDTO {
+  category: string
+  amount_rub: number
+  count: number
+}
+
+export interface AdminExpenseSummaryDTO {
+  year: number
+  month: number
+  revenue_rub: number
+  expenses_rub: number
+  profit_rub: number
+  by_category: AdminExpenseCategorySumDTO[]
+}
+
+export interface AdminExpenseListDTO {
+  items: AdminExpenseDTO[]
+  summary: AdminExpenseSummaryDTO
+}
+
+export interface AdminExpenseWriteInput {
+  occurred_on: string
+  amount_rub: number
+  category: string
+  title: string
+  note?: string
+  icon?: string
+}
+
 export interface AdminSquadDTO {
   uuid: string
   name: string

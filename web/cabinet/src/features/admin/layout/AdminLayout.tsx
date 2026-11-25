@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Star,
+  Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -240,6 +241,7 @@ function AdminLayoutInner({ children, meta }: AdminLayoutProps) {
       items: [
         { to: '/admin/users', icon: Users, labelKey: 'admin.nav.users' },
         { to: '/admin/payments', icon: CreditCard, labelKey: 'admin.nav.payments' },
+        { to: '/admin/expenses', icon: Wallet, labelKey: 'admin.nav.expenses' },
         { to: '/admin/reviews', icon: Star, labelKey: 'admin.nav.reviews', badge: reviewsPending.data?.counts.pending },
       ],
     },

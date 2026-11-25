@@ -41,6 +41,9 @@ import type {
   AdminLoyaltyStatsDTO,
   AdminLoyaltyTierDTO,
   AdminOkDTO,
+  AdminExpenseDTO,
+  AdminExpenseListDTO,
+  AdminExpenseWriteInput,
   AdminSyncStatusDTO,
   AdminPaymentsDTO,
   AdminPaymentsListDTO,
@@ -1842,6 +1845,19 @@ export const api = {
     request<{ items: AdminReviewCustomerHit[] }>('GET', `/admin/reviews/customers?q=${encodeURIComponent(q)}`),
   adminReviewByCustomer: (customerId: number) =>
     request<AdminReviewByCustomerResponse>('GET', `/admin/reviews/customer/${customerId}`),
+
+  adminExpenses: (params?: { year?: number; month?: number }) => {
+    const q = new URLSearchParams()
+    if (params?.year != null) q.set('year', String(params.year))
+    if (params?.month != null) q.set('month', String(params.month))
+    const suffix = q.toString() ? `?${q.toString()}` : ''
+    return request<AdminExpenseListDTO>('GET', `/admin/expenses${suffix}`)
+  },
+  adminExpenseCreate: (body: AdminExpenseWriteInput) =>
+    request<AdminExpenseDTO>('POST', '/admin/expenses', body),
+  adminExpenseUpdate: (id: number, body: AdminExpenseWriteInput) =>
+    request<AdminExpenseDTO>('PATCH', `/admin/expenses/${id}`, body),
+  adminExpenseDelete: (id: number) => request<AdminOkDTO>('DELETE', `/admin/expenses/${id}`),
 
   // Payments — тело как в internal/cabinet/http/handlers/payments.go: period, tariff_id, provider, yookassa_method.
   checkout: (

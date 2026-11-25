@@ -171,7 +171,7 @@ func buildAdminSettingsResponse() adminSettingsGetResp {
 	// RuntimeSettingsRegistry, добавьте её и сюда (ниже есть проверка,
 	// которая ругнётся в лог, если про это забыли).
 	order := []string{
-		"cabinet", "status", "cabinet_connect", "tariffs",
+		"cabinet", "landing", "status", "cabinet_connect", "tariffs",
 		"trial", "hwid", "traffic", "referral", "partner", "stars", "loyalty",
 		"payments", "admin_alerts", "moynalog", "access", "channel_gate", "links", "tags",
 		"lifecycle", "notifications", "monitoring", "fortune", "reviews",

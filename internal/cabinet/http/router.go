@@ -468,6 +468,33 @@ func Mount(ctx context.Context, mux *http.ServeMux, pool *pgxpool.Pool, paymentS
 	reviewsHandler := handlers.NewReviews(reviewRepo, linkRepo, customerRepo, purchaseRepo, tariffRepo, meHandler)
 	adminReviewsHandler := handlers.NewAdminReviews(reviewRepo, linkRepo, customerRepo, reviewsHandler)
 	registerReviewRoutes(ctx, api, reviewsHandler, adminReviewsHandler, jwtIssuer, adminChecker, channelGate, subscriptionAcctLim, adminAcctLim)
+	adminExpensesHandler := handlers.NewAdminExpenses(repository.NewExpenseRepo(pool))
+	api.Handle("/cabinet/api/admin/expenses",
+		methodRouter(map[string]http.Handler{
+			http.MethodGet: middleware.Chain(
+				http.HandlerFunc(adminExpensesHandler.List),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_expenses")),
+			),
+			http.MethodPost: middleware.Chain(
+				http.HandlerFunc(adminExpensesHandler.Create),
+				middleware.RequireAuth(jwtIssuer),
+				middleware.RequireAdmin(adminChecker),
+				middleware.CSRF(),
+				middleware.RateLimit(adminAcctLim, accountKey("admin_expenses_write")),
+			),
+		}),
+	)
+	api.Handle("/cabinet/api/admin/expenses/",
+		middleware.Chain(
+			http.HandlerFunc(adminExpensesHandler.HandleByID),
+			middleware.RequireAuth(jwtIssuer),
+			middleware.RequireAdmin(adminChecker),
+			middleware.CSRF(),
+			middleware.RateLimit(adminAcctLim, accountKey("admin_expenses_byid")),
+		),
+	)
 	adminStatusTargets := handlers.NewAdminStatusTargets(statusTargets, statusRunner, rw, publicStatus.Invalidate)
 	adminAlerts := handlers.NewAdminAlerts()
 	adminMonitoring := handlers.NewAdminMonitoring(pool)
